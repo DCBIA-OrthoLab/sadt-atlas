@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VFACE — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="analyse">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+    <div class="lang-switch">
+      <span class="cur">FR</span><a href="../../en/index.html" title="English">EN</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>pour utiliser les outils</small></a>
+      <a href="../index.html"><b>Atlas</b><small>comment ça marche dans le code</small></a>
+    </div>
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../guide/VFACE.html" aria-current="page">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Analyse</div>
+        <h1>VFACE — classer l'asymétrie faciale</h1>
+        <p class="lede">VFACE mesure et classe l'asymétrie squelettique faciale à partir d'un
+        seul CBCT par patient. Pas besoin d'un second scan de comparaison : le module
+        fabrique lui-même un « reflet » du patient et compare le patient à son propre
+        miroir.</p>
+      </header>
+
+      <h2 id="quand">Quand s'en servir</h2>
+      <p>Dès que vous voulez objectiver une asymétrie faciale sur un CBCT — la quantifier
+      plutôt que l'estimer à l'œil — et éventuellement savoir si elle touche plutôt la
+      mandibule, le maxillaire, ou les deux. VFACE part d'un volume brut : pas de
+      segmentation ni de landmarks à préparer avant de le lancer, il s'occupe de tout.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Le module le plus lourd de l'extension</div>
+        <p>VFACE n'est pas un outil isolé : c'est un <strong>chef d'orchestre</strong> qui
+        enchaîne, l'un après l'autre, six autres modules de l'extension (rééchantillonnage,
+        orientation, segmentation des os, recalage, segmentation des surfaces dentaires,
+        classification). Sur un lot de patients, comptez que le traitement complet est
+        <strong>long</strong> — de l'ordre de l'heure par patient selon votre machine — et
+        qu'il occupe les autres outils pendant qu'il tourne. Prévoyez de le lancer quand vous
+        n'avez pas besoin des autres modules en même temps, typiquement la nuit sur une
+        série.</p>
+      </div>
+
+      <h2 id="besoin">Ce qu'il vous faut, ce que vous obtenez</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>À fournir</h4>
+          <ul>
+            <li>Un dossier de CBCT T1 bruts, un par patient (<code>.nii</code>,
+            <code>.nii.gz</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>,
+            <code>.gipl</code>, <code>.gipl.gz</code>)</li>
+            <li>Aucune segmentation ni landmark préalable : le module part du volume seul</li>
+            <li>Les modèles entraînés (ALI, AMASSS, DentalSegmentator, classifieurs VFACE), à
+            télécharger une fois</li>
+            <li>Un dossier de sortie, sur un disque avec de la place</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>Ce qui sort</h4>
+          <ul>
+            <li>Un tableau de mesures par patient (distances et angles squelettiques)</li>
+            <li>Un fichier de classification final indiquant si le patient est symétrique
+            ou asymétrique, et si l'asymétrie touche la mandibule et/ou le maxillaire</li>
+            <li>En option, des surfaces osseuses et des cartes de distance colorées
+            (heatmaps) pour visualiser où se situe l'écart</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Marche à suivre</h2>
+      <ol class="steps">
+        <li><strong>Téléchargez les modèles.</strong> Un bouton dédié récupère tous les
+        poids nécessaires aux modules enchaînés. À ne faire qu'une fois.</li>
+        <li><strong>Désignez le dossier d'entrée</strong> contenant vos CBCT T1, et un
+        dossier de sortie.</li>
+        <li><strong>Choisissez le mode d'analyse.</strong> Pour une asymétrie (le cas
+        courant), VFACE fabrique le miroir du patient et produit la classification. Un mode
+        « études longitudinales » existe pour comparer deux vrais temps du même patient,
+        mais il ne produit alors pas de classification.</li>
+        <li><strong>Choisissez ce que vous voulez en sortie.</strong> Les mesures et la
+        classification (mode quantitatif), les surfaces et cartes de distance (mode
+        visualisation), ou les deux.</li>
+        <li><strong>Lancez.</strong> Le pipeline traite les patients les uns après les
+        autres. Des pauses de revue s'intercalent à des étapes clés : elles chargent les
+        résultats intermédiaires dans la scène et vous laissent les vérifier, voire corriger
+        des landmarks ou ajuster un recalage, avant de continuer.</li>
+      </ol>
+
+      <h2 id="lire">Comment lire le résultat</h2>
+      <p>Le livrable final est un tableau de classification, une ligne par patient, avec
+      trois indications :</p>
+      <ul>
+        <li><strong>Symétrique / Asymétrique</strong> — le verdict global.</li>
+        <li><strong>Mandibule : oui / non</strong> — évalué uniquement si le patient est
+        classé asymétrique.</li>
+        <li><strong>Maxillaire : oui / non</strong> — évalué dans les mêmes conditions,
+        indépendamment de la mandibule.</li>
+      </ul>
+      <p>Les deux dernières indications ne s'excluent pas : un patient peut être marqué
+      asymétrique à la fois côté mandibule et côté maxillaire. Le tableau de mesures
+      détaillées (distances et angles, à côté de la classification) reste consultable si
+      vous voulez comprendre sur quoi repose le verdict d'un patient en particulier.</p>
+
+      <h2 id="coince">Si ça coince</h2>
+      <div class="callout warn">
+        <div class="callout-title">Reprendre un lot interrompu coûte presque aussi cher que
+        recommencer</div>
+        <p>Si vous interrompez un run et rejouez seulement certains patients, marqués ou
+        corrigés, les étapes les plus lentes du pipeline (segmentation des os, recalage,
+        segmentation des surfaces dentaires) sont malgré tout <strong>rejouées pour tous les
+        patients du lot</strong>, pas seulement pour ceux que vous avez marqués. La reprise
+        sélective ne fait donc gagner du temps que sur les étapes rapides ; sur un gros lot,
+        ne comptez pas économiser grand-chose par rapport à un nouveau run complet.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Les résultats amont sont un point de départ</div>
+        <p>Les points de repère et les recalages produits en cours de route peuvent être
+        imparfaits. Les pauses de revue existent pour ça : profitez-en pour vérifier et
+        corriger avant que les étapes suivantes ne s'appuient dessus, car une erreur tôt
+        dans la chaîne se propage à toutes les étapes qui suivent.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Espace disque</div>
+        <p>Sans dossier de sortie valide correctement renseigné, ou selon l'option « garder
+        les fichiers intermédiaires », le nettoyage automatique en fin de run peut se
+        comporter de façon inattendue. Vérifiez toujours que le dossier de sortie indiqué
+        est bien le bon avant de lancer un lot, et gardez un œil sur la place disque
+        disponible sur de longues séries.</p>
+      </div>
+
+      <a class="deep-link" href="../VFACE/VFACE.html">
+        <b>Comment ça marche vraiment →</b>
+        <span>La fiche Atlas : l'arbre d'appels complet, les six modules enchaînés, les
+        formules de mesure, les trois classifieurs LightGBM, et les limites relevées dans le
+        code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Tous les guides</a> ·
+        <a href="../VFACE/VFACE.html">Fiche Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

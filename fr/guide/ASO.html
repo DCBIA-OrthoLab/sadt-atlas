@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASO — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="landmarks">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+    <div class="lang-switch">
+      <span class="cur">FR</span><a href="../../en/index.html" title="English">EN</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>pour utiliser les outils</small></a>
+      <a href="../index.html"><b>Atlas</b><small>comment ça marche dans le code</small></a>
+    </div>
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html" aria-current="page">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Landmarks &amp; orientation</div>
+        <h1>ASO — orienter vos scans automatiquement</h1>
+        <p class="lede">ASO fait pivoter un scan pour l'amener dans le repère d'un patient de
+        référence : il ne compare pas deux dates entre elles et ne segmente rien. Il traite
+        aussi bien un CBCT (un volume) qu'une empreinte optique (une surface), avec deux
+        moteurs différents mais une seule fenêtre.</p>
+      </header>
+
+      <h2 id="quand">Quand s'en servir</h2>
+      <p>Avant la plupart des recalages, en fait. Un recalage part du principe que ses deux
+      entrées commencent dans une orientation raisonnablement cohérente ; sans ça, il n'a pas
+      de point de départ correct. AREG_IOS, par exemple, va chercher directement le fichier de
+      transformation produit par ASO pour construire sa propre matrice — si vos scans n'ont
+      jamais été orientés par ASO, il n'y a rien à trouver. Passez par ASO dès que vous
+      préparez des scans pour un recalage, une superposition de séries, ou simplement pour que
+      toute votre cohorte parte du même repère.</p>
+
+      <h2 id="mode">Choisir son mode</h2>
+      <div class="callout">
+        <div class="callout-title">Deux types de données, deux façons de travailler</div>
+        <p>Vous indiquez d'abord le type de vos fichiers : <strong>CBCT</strong> pour un volume,
+        <strong>IOS</strong> pour une empreinte optique. Pour chacun, deux modes sont proposés.
+        <strong>Fully-Automated</strong> ne demande que vos scans bruts : ASO pose lui-même les
+        repères nécessaires (par un réseau, pour un CBCT) ou segmente les dents (pour une
+        empreinte) avant d'orienter. <strong>Semi-Automated</strong> saute cette étape de
+        prédiction et travaille directement sur des repères ou des dents que vous avez déjà
+        identifiés — plus rapide, mais qui suppose que ce travail préalable existe.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">CBCT semi-automatique : ne le lancez pas seul</div>
+        <p>Sur un CBCT, le mode semi-automatique a besoin d'un fichier de transformation que
+        <strong>seul le mode automatique produit</strong>, lors de son étape de recentrage. Si
+        vous lancez le mode semi directement sur des scans qui n'ont jamais été traités par ASO,
+        il échoue patient après patient. Dans les faits, sur du CBCT, le mode semi-automatique
+        n'a de sens qu'en second passage — par exemple pour reprendre l'orientation d'une série
+        déjà passée une première fois en automatique.</p>
+      </div>
+
+      <h2 id="besoin">Ce qu'il vous faut, ce que vous obtenez</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>À fournir</h4>
+          <ul>
+            <li><strong>CBCT</strong> : le volume en <code>.nii.gz</code> (le DICOM est accepté
+            mais moins fiable, préférez le <code>.nii.gz</code> si vous pouvez). En mode semi,
+            en plus, vos propres repères déjà posés <em>et</em> le fichier de transformation
+            décrit ci-dessus</li>
+            <li><strong>Empreinte optique (IOS)</strong> : le maillage, dans un format courant
+            (converti en <code>.vtk</code> au passage). En mode semi, les 3 ou 4 dents de
+            référence à cocher sur l'arcade ; en mode automatique, rien de plus, la segmentation
+            des dents tourne toute seule si elle n'a pas déjà été faite</li>
+            <li>Le patient de référence (« gold ») : un jeu de données téléchargé une fois, qui
+            sert de cible à toutes vos orientations</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>Ce qui sort</h4>
+          <ul>
+            <li>Le scan réorienté — toujours en <code>.nii.gz</code> pour un CBCT quel qu'ait
+            été le format d'entrée, en <code>.vtk</code> pour une empreinte</li>
+            <li>Un fichier de transformation, que les modules de recalage suivants (AREG_IOS en
+            tête) vont chercher automatiquement</li>
+            <li>Les repères ou les dents de référence, réorientés eux aussi</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Marche à suivre</h2>
+      <ol class="steps">
+        <li><strong>Téléchargez le patient de référence et les modèles.</strong> À faire une
+        fois : c'est la cible vers laquelle tous vos scans vont s'orienter.</li>
+        <li><strong>Choisissez le type de données et le mode.</strong> CBCT ou IOS, puis
+        Fully-Automated ou Semi-Automated selon ce que vous avez déjà sous la main.</li>
+        <li><strong>Désignez le dossier d'entrée.</strong> ASO traite tout le dossier d'un
+        coup.</li>
+        <li><strong>Pour une empreinte en mode semi, cochez les dents de référence</strong>
+        (3 ou 4) sur lesquelles l'orientation va se caler. Pour un CBCT en mode semi, vérifiez
+        que vos repères couvrent au moins 4 points communs avec le gold : l'interface accepte
+        d'en cocher 3, mais l'orientation échoue en dessous de 4.</li>
+        <li><strong>Cochez « occlusion » si vous avez les deux arcades.</strong> Une seule
+        arcade pilote alors l'orientation, et la même rotation est appliquée à l'autre pour
+        garder le rapport d'occlusion intact.</li>
+        <li><strong>Indiquez un dossier de sortie</strong>, puis lancez.</li>
+      </ol>
+
+      <h2 id="coince">Si ça coince</h2>
+      <div class="callout warn">
+        <div class="callout-title">Vos fichiers de repères CBCT ont disparu</div>
+        <p>En mode semi, ASO commence par fusionner tous les fichiers de repères qu'il trouve
+        dans votre dossier d'entrée en un seul fichier — puis <strong>supprime les fichiers
+        d'origine</strong>. Gardez une copie de vos <code>.mrk.json</code> ailleurs avant de
+        lancer un traitement, surtout si le dossier d'entrée est aussi celui où vous conservez
+        votre seule version de ces repères.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Occlusion : nommez vos fichiers Upper / Lower sans ambiguïté</div>
+        <p>Le mode occlusion apparie l'arcade haute et l'arcade basse par le nom du fichier
+        (<code>Upper</code>/<code>_U_</code> ou <code>Lower</code>/<code>_L_</code>). Un fichier
+        dont le nom ne contient aucun de ces marqueurs est traité en silence comme une arcade
+        basse — sans message d'erreur. Vérifiez vos noms de fichiers avant de cocher cette
+        option.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Relancer sur un dossier déjà rempli ne fait rien</div>
+        <p>Si un fichier de sortie porte déjà le nom attendu, ASO ne le réécrit pas et termine
+        quand même en succès. Après avoir corrigé un réglage, pointez vers un dossier de sortie
+        vide plutôt que de relancer sur le même.</p>
+      </div>
+
+      <h2 id="apres">Et après</h2>
+      <p>Un scan orienté par ASO n'est pas garanti anatomiquement parfait : l'orientation est
+      une estimation géométrique, pas une vérité de terrain. Ouvrez le résultat dans Slicer et
+      comparez-le visuellement au patient de référence avant de l'utiliser comme entrée d'un
+      recalage. C'est justement pour cet usage en aval que le fichier de transformation est
+      produit : les modules suivants s'en servent pour reconstruire la matrice complète, du
+      scan brut jusqu'au résultat recalé.</p>
+
+      <a class="deep-link" href="../ASO/ASO.html">
+        <b>Comment ça marche vraiment →</b>
+        <span>La fiche Atlas : le principe géométrique commun aux deux backends, ce qui est
+        prédit par un réseau et ce qui est calculé, et les pièges relevés dans le code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Tous les guides</a> ·
+        <a href="../ASO/ASO.html">Fiche Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

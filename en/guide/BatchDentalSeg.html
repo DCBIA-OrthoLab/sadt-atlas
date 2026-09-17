@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BatchDentalSeg — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="segmentation">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html" aria-current="page">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Segmentation</div>
+        <h1>BatchDentalSeg — segment CT/CBCT scans in bulk</h1>
+        <p class="lede">BatchDentalSeg segments your dento-maxillo-facial CT and CBCT
+        volumes assembly-line style: point it at a folder, and it applies the same set of
+        labels to every scan, one at a time. The choice that matters here isn't a network
+        setting — it's the <strong>model</strong>. Each one segments different
+        structures.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>Whenever you have several CT or CBCT scans that need the same anatomical
+      structures segmented — skull, mandible, teeth, mandibular canal, or a tooth-by-tooth
+      breakdown. BatchDentalSeg is a standalone tool: no other module in the repository
+      calls it, and it doesn't prepare anything for a downstream module. It's an endpoint,
+      not a step in a pipeline.</p>
+
+      <div class="callout">
+        <div class="callout-title">One extension to install first</div>
+        <p>BatchDentalSeg relies on the external Slicer extension <strong>NNUnet</strong> to
+        run the computation. It doesn't install itself: get it through the Extensions
+        Manager, then restart Slicer. Without it, the module shows a message and refuses to
+        start.</p>
+      </div>
+
+      <h2 id="modele">Choosing a model</h2>
+      <p>Four models are offered in the dropdown. They share the same engine and the same
+      window, but they don't segment the same thing:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Model</th><th>What it segments</th><th>Built for</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>DentalSegmentator</td>
+              <td>5 structures: upper skull (maxilla included), mandible, upper teeth,
+              lower teeth, mandibular canal</td>
+              <td>Permanent dentition (adult)</td>
+            </tr>
+            <tr>
+              <td>PediatricDentalsegmentator</td>
+              <td>The same 5 structures, same breakdown</td>
+              <td>Mixed dentition (child) — only the training data differs</td>
+            </tr>
+            <tr>
+              <td>NasoMaxillaDentSeg</td>
+              <td>6 structures: the maxilla is detached from the skull and output as its
+              own structure</td>
+              <td>When you need the maxilla isolated from the rest of the facial mass</td>
+            </tr>
+            <tr>
+              <td>UniversalLabDentalsegmentator</td>
+              <td>55 structures: all 32 permanent teeth numbered individually, 20 primary
+              teeth, mandible, maxilla, mandibular canal</td>
+              <td>Tooth-by-tooth segmentation, mixed or permanent dentition</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Only DentalSegmentator is backed by a peer-reviewed publication (<em>Journal of
+      Dentistry</em>, 2024, 453 CT scans from 7 institutions). The other three models are
+      released by the team without an independent validation paper — treat their published
+      training numbers as internal claims.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">NasoMaxillaDentSeg: don't trust the displayed names or
+        colors</div>
+        <p>On this model, the label and color shown on screen for four of the six segments
+        don't match the real structure — for instance, what's displayed as "Upper Teeth" is
+        actually the maxilla. This isn't just a display glitch: the value written into the
+        exported file follows the wrong name too, and the mandibular canal segment can be
+        <strong>dropped entirely from the export</strong> when no match is found. If you use
+        this model, check each segment individually before trusting its name.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">UniversalLabDentalsegmentator does not segment the
+        skull</div>
+        <p>Its description in the interface — and the upstream model's own documentation —
+        suggests it includes the skull. It doesn't: its 55 structures are teeth, mandible,
+        maxilla, and the mandibular canal, with no "skull" structure at all. Don't reach for
+        this model expecting a cranial segmentation.</p>
+      </div>
+
+      <h2 id="besoin">What you need, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>To provide</h4>
+          <ul>
+            <li>A folder of scans in <code>.nii</code>, <code>.nii.gz</code>,
+            <code>.gipl</code>, or <code>.gipl.gz</code> — no NRRD, and subfolders aren't
+            scanned</li>
+            <li>The model you want, picked from the menu</li>
+            <li>An output folder</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>Always: <code>&lt;name&gt;_Segmentation.nii.gz</code>, the label map on the
+            original scan's geometry</li>
+            <li>Optionally: STL/OBJ meshes, VTK per structure or merged, binary NIfTI per
+            structure, glTF</li>
+            <li>Your original scans are left untouched</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Steps</h2>
+      <ol class="steps">
+        <li><strong>Install the NNUnet extension</strong> if you haven't already, and
+        restart Slicer.</li>
+        <li><strong>Pick a model</strong> from the dropdown, based on which structures you
+        need (table above). The first time you use a given model, its weights are
+        downloaded automatically.</li>
+        <li><strong>Point it at the input folder.</strong> BatchDentalSeg processes the
+        whole folder at once; scans that already have a segmentation can be skipped
+        automatically (checked by default).</li>
+        <li><strong>Check the output formats</strong> you need beyond the label map, which
+        is always written.</li>
+        <li><strong>Set the output folder and the device</strong> (GPU or CPU), then run. A
+        queue works through the scans one at a time with a progress bar; its state is saved
+        continuously, so you can close Slicer and pick up later where you left off.</li>
+      </ol>
+
+      <h2 id="memoire">Memory and time</h2>
+      <p>A full-mouth CBCT can demand a lot of RAM during inference — the module's own notes
+      cite a real case of a scan that filled 114 of a machine's 125 GB and got killed by the
+      system. Three lines of defense are in place:</p>
+      <ul>
+        <li>before starting, a scan whose estimated memory need exceeds your budget (85% of
+        free RAM by default) is marked failed <strong>without ever starting</strong>;</li>
+        <li>during the run, a confirmed overrun on two consecutive checks stops the scan
+        cleanly instead of letting the system lock up;</li>
+        <li>a <em>Free memory</em> button lets you reclaim memory by hand if any processes
+        are left hanging after an abrupt stop.</li>
+      </ul>
+      <p>If a scan fails for this reason, <em>Retry failed</em> offers an automatic crop
+      around the tissue (15 mm margin) before trying again — the output is still placed back
+      on the scan's original grid afterward. On a long batch, a cleanup pause happens every
+      five segmentations.</p>
+      <p>The computation runs without a graphics card, but expect roughly <strong>one hour
+      per scan</strong> instead of a few minutes. If the chosen device isn't available, the
+      question of falling back to CPU is only asked once for the whole queue.</p>
+
+      <h2 id="coince">If something goes wrong</h2>
+      <div class="callout warn">
+        <div class="callout-title">Switching models later can wipe the others' weights</div>
+        <p>Re-downloading or updating DentalSegmentator's weights clears the entire models
+        folder, including anything already downloaded for PediatricDentalsegmentator,
+        NasoMaxillaDentSeg, and UniversalLabDentalsegmentator. If you switch between models,
+        expect to re-download them.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Your files aren't being picked up</div>
+        <p>Only <code>.nii</code>, <code>.nii.gz</code>, <code>.gipl</code>, and
+        <code>.gipl.gz</code> are recognized, and only at the top level of the chosen
+        folder — a scan in NRRD or sitting in a subfolder is silently ignored. Two different
+        folders containing a scan with the same base name will overwrite the same output:
+        give your files unique names.</p>
+      </div>
+
+      <h2 id="resultat">And after</h2>
+      <p>The label map is always written, whatever other formats you checked: open it in
+      Slicer to check the segmentation before using it for a measurement or an export. With
+      UniversalLabDentalsegmentator, the network sometimes mixes up left and right; a
+      dedicated button corrects the laterality using the central incisors, without touching
+      the original result. If a mesh export fails, the scan is still marked done — the label
+      map is what counts.</p>
+
+      <a class="deep-link" href="../BatchDentalSeg/BatchDentalSeg.html">
+        <b>How it actually works →</b>
+        <span>The Atlas page: the four models and their weights, the queue and its memory
+        guard, the geometry restoration, the exports, and the pitfalls found in the
+        code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../BatchDentalSeg/BatchDentalSeg.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

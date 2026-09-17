@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AREG_IOS — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="recalage">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html" aria-current="page">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Registration</div>
+        <h1>AREG_IOS — register two scans of the same patient</h1>
+        <p class="lede">AREG_IOS superimposes two intraoral scans of the same patient taken
+        at two different times — before and after treatment, say — without you having to
+        draw the stable region by hand. It processes a whole batch of patients at once,
+        not one scan at a time.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>Whenever you want to compare T1 and T2 of the same arch — measuring tooth
+      movement, an arch change under treatment — and drawing the stable region by hand,
+      scan after scan, would take too long across your series. If you only have one
+      patient and would rather keep control over the registration region yourself, FlexReg
+      is the interactive tool for that; AREG_IOS is its automatic, batch counterpart.</p>
+
+      <div class="callout">
+        <div class="callout-title">Two modes, one per arch</div>
+        <p><strong>Butterfly</strong> (upper arch): the module predicts the stable palatal
+        patch itself, with a network, and uses it as the registration anchor.
+        <strong>MGL</strong> (lower arch): there's no palate down there, so the module
+        builds a band along the mucogingival line instead, from landmarks it places
+        automatically.</p>
+      </div>
+
+      <h2 id="besoin">What you need, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>To provide</h4>
+          <ul>
+            <li>Two folders of scans, T1 and T2, in <code>.vtk</code>, <code>.vtp</code>,
+            <code>.stl</code> or <code>.obj</code></li>
+            <li>Filenames that literally contain <code>T1</code> or <code>T2</code>, plus
+            an arch marker (Upper/Lower, U/L, Maxilla/Mandible): matching is done on these
+            words</li>
+            <li>The palatal patch model, downloaded once, for Butterfly mode</li>
+            <li>For MGL: a band width in mm, or your own mucogingival landmarks if you
+            already have them</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>Per patient: the T1 scan with the registration region marked on it, and the
+            T2 scan registered onto T1</li>
+            <li>In Butterfly, if the lower arch is provided as a pair, it automatically
+            follows the upper arch's registration</li>
+            <li>A transform matrix (<code>.tfm</code>) per patient, but only in some cases
+            — see below</li>
+            <li>Your original files are never modified</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="mode">Automatic or semi-automatic</h2>
+      <p>This is the second choice to make, independent of which arch you're registering.
+      <strong>Auto</strong> starts from raw scans: the module segments the teeth and
+      orients the scans itself before registering, so there's nothing to prepare.
+      <strong>Semi-auto</strong> assumes your scans are already segmented (tooth IDs
+      already assigned) and already share a common orientation; pick it when that work is
+      already done, since it skips straight to registration. In MGL mode, segmentation is
+      still required either way — without tooth IDs, the mucogingival landmarks can't be
+      placed.</p>
+
+      <h2 id="marche">Step by step</h2>
+      <ol class="steps">
+        <li><strong>Pick the regime.</strong> Auto for raw scans, semi-auto if they're
+        already segmented and oriented.</li>
+        <li><strong>Pick the arch.</strong> Butterfly for the upper arch, MGL for the
+        lower.</li>
+        <li><strong>Point to the two input folders</strong>, T1 and T2. AREG_IOS pairs up
+        patients on its own from the filenames.</li>
+        <li><strong>For MGL</strong>, set the band width (0 to 20 mm), or point to a folder
+        of mucogingival landmarks if you already have them — otherwise they're placed
+        automatically.</li>
+        <li><strong>For Butterfly</strong>, download the palatal patch model if you haven't
+        already.</li>
+        <li><strong>Point to an output folder that already exists</strong>, then run. A
+        progress bar tracks patients as they complete.</li>
+      </ol>
+
+      <h2 id="temps">Time and hardware</h2>
+      <p><strong>Butterfly mode needs a compatible graphics card</strong>: the palatal
+      patch prediction has no CPU fallback, unlike some other tools in the suite. Without a
+      GPU, this mode simply won't run — use MGL on machines that don't have one. MGL mode
+      doesn't call that network at all; it relies on landmark placement and a geometric
+      band construction instead, both lighter. Either way, processing runs folder by
+      folder, so total time mostly scales with how many patients are in the batch.</p>
+
+      <h2 id="coince">If something goes wrong</h2>
+      <div class="callout warn">
+        <div class="callout-title">No compatible graphics card</div>
+        <p>In Butterfly mode, the palatal patch inference requires a CUDA GPU, full stop.
+        On a machine without a compatible GPU, this mode fails outright. Use MGL on those
+        machines, or process the upper arch elsewhere.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">File naming: order matters</div>
+        <p>Put the arch marker <em>before</em> the timepoint marker in the filename
+        (<code>P001_Upper_T1.vtk</code>), not after (<code>P001_T1_Upper.vtk</code>): in the
+        wrong order, one of the output matrices won't be found — with no blocking error, the
+        run finishes but an expected file is simply missing. Also avoid the same words
+        (Upper, Lower, U, L, Mx, Md…) in parent folder names: they're read from the full
+        path and can throw off the upper/lower sorting for the whole batch.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">A failed orientation silently breaks the patch</div>
+        <p>If the canonical orientation step can't be computed — for instance because the
+        reference teeth weren't identified — processing doesn't stop: the network still
+        runs, on a badly oriented scan, and nothing flags it. Always check the resulting
+        patch visually before trusting it.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">MGL never produces a transform</div>
+        <p>Whichever regime you pick, auto or semi-auto, MGL mode writes no
+        <code>.tfm</code> file at all. You get the registered surfaces, but not the
+        transform that produced them.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Output folder and file formats</div>
+        <p>The output folder must already exist: AREG_IOS doesn't create missing
+        subfolders. And your files keep their original extension on write even though the
+        content is always rewritten in VTK format — a <code>.stl</code> or <code>.obj</code>
+        coming out is not a strictly valid STL or OBJ file, so keep it for Slicer rather
+        than handing it to another program.</p>
+      </div>
+
+      <h2 id="apres">What happens next</h2>
+      <p>The registered T2 scan overlays directly onto T1 in the scene: that's your basis
+      for measuring change between the two timepoints. The marked region on T1 (palatal
+      patch or mucogingival band) is only a registration aid, not a segmentation to
+      interpret on its own — and as noted above, check it before trusting the result.</p>
+
+      <a class="deep-link" href="../AREG_IOS/AREG_IOS.html">
+        <b>How it actually works →</b>
+        <span>The Atlas page: the network that predicts the palatal patch, the geodesic
+        mucogingival band, the ICP shared by both modes, and the pitfalls found in the
+        code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../AREG_IOS/AREG_IOS.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

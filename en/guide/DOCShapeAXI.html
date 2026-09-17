@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOCShapeAXI — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="analyse">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html" aria-current="page">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Analysis</div>
+        <h1>DOCShapeAXI — classify a 3D shape and see what drove it</h1>
+        <p class="lede">DOCShapeAXI takes already-segmented meshes and sorts them into a
+        category — a severity stage, a presence or absence of obstruction, or a continuous
+        ratio depending on the case. For every shape it classifies, it also writes a map
+        directly onto the mesh showing where the network looked most closely to reach its
+        decision.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>Reach for it whenever you have 3D shapes already extracted — condyles, airways,
+      cleft bone defects — and want an automatic classification instead of a case-by-case
+      visual read, with a map thrown in that gives you a lead on the model's reasoning.
+      DOCShapeAXI does not segment anything itself: the <code>.vtk</code> meshes you feed
+      it must already exist, produced by another tool (AMASSS for condyles, an airway
+      segmentation, and so on).</p>
+
+      <div class="callout">
+        <div class="callout-title">Three shape families, one window</div>
+        <p>The data type you pick is the only thing that decides which model runs and
+        which categories come out:</p>
+        <ul>
+          <li><strong>Mandibular Condyle</strong> — a severity stage out of
+          <strong>4 classes</strong>.</li>
+          <li><strong>Nasopharynx Airway Obstruction</strong> — three results produced one
+          after another in a single run: presence or absence of obstruction
+          (<strong>2 classes</strong>), a severity stage (<strong>4 classes</strong>), and
+          a <strong>continuous ratio</strong> of obstruction between 0 and 100.</li>
+          <li><strong>Alveolar Bone Defect in Cleft</strong> — a severity stage out of
+          <strong>4 classes</strong>.</li>
+        </ul>
+        <p>For all three severity stages, the 4 classes are really quarters of a
+        continuous 0–100 scale: class 1 covers the low quarter, class 4 the high one.</p>
+      </div>
+
+      <h2 id="besoin">What you need, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>To provide</h4>
+          <ul>
+            <li>A folder of already-segmented <code>.vtk</code> meshes, all of the same
+            shape type</li>
+            <li>The data type picked from the list — condyle, airway, or cleft</li>
+            <li>An output folder, <strong>created ahead of time</strong> before you
+            launch</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>A csv listing every mesh with its prediction, one column per task</li>
+            <li>A copy of each mesh, per task, carrying the explainability map as a
+            per-point scalar</li>
+            <li>Your original meshes are left untouched</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Steps</h2>
+      <ol class="steps">
+        <li><strong>Pick the data type.</strong> Mandibular condyle, airway obstruction,
+        or cleft bone defect. This choice alone decides which model gets downloaded and
+        which categories come back.</li>
+        <li><strong>Point to the input folder.</strong> It should hold only
+        already-segmented <code>.vtk</code> meshes of the type you just picked.</li>
+        <li><strong>Create and point to an output folder.</strong> On the first run
+        against that folder, the matching trained model is downloaded automatically
+        (roughly 70 MB).</li>
+        <li><strong>Launch.</strong> For airway, three passes chain automatically —
+        obstruction, severity, ratio; for the other two types, a single pass is enough.
+        Every mesh then gets its explainability map right after, with no extra action from
+        you.</li>
+      </ol>
+
+      <h2 id="lire">Reading the result</h2>
+      <p>The prediction csv adds one column per task to your list of meshes: a class
+      (an integer) for a severity stage or a binary obstruction call, a number between 0
+      and 100 for the airway's continuous ratio. No confidence score comes with the
+      class — DOCShapeAXI only reports the category it settled on, not how close the call
+      was between two neighboring classes.</p>
+      <p>For the explainability map, open the mesh produced in the explainability
+      subfolder for that task. In Slicer's <em>Models</em> module, under the
+      <em>Scalars</em> tab, set <em>Active Scalar</em> to the array named after the class
+      you're interested in (one array per class for a classification task, a single array
+      for a continuous ratio), then apply the <em>ColdToHotRainbow</em> color table. Warm
+      areas are the ones that weighed most in favor of that class; cold or zero areas did
+      not particularly catch the model's attention for that class.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">The map only shows part of what mattered</div>
+        <p>The model decides by combining two sources: the shape of a sampled point cloud
+        and a rendering of several views of the mesh. The explainability map only
+        describes the second one. If a decision leaned mostly on the point-cloud geometry,
+        the map you see will look faint — with nothing to tell you that's the reason,
+        rather than the decision genuinely having no clear focus.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Two runs, not necessarily the same result</div>
+        <p>The points sampled from the mesh are not drawn the same way twice. Two passes
+        on the same files can therefore produce slightly different saliency maps, and in
+        cases sitting near the boundary between two classes, a different predicted
+        class.</p>
+      </div>
+
+      <h2 id="coince">If something's stuck</h2>
+      <div class="callout warn">
+        <div class="callout-title">The output folder has to exist before you launch</div>
+        <p>If the folder you point to doesn't exist yet, the model download is simply
+        skipped, and the error only surfaces later, when the model tries to load. Create
+        the output folder yourself before starting.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Adding files mid-way has no effect</div>
+        <p>The list of meshes to process is only rebuilt if it doesn't already exist in
+        the output folder. If you drop more meshes into the input folder without changing
+        the output folder, they simply won't be processed.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Disk space</div>
+        <p>The downloaded model isn't cached: every new output folder re-downloads it in
+        full. Across several batches, reuse the same output folder where you can, or clean
+        up the old ones.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Re-running on the same folder</div>
+        <p>Prediction columns are overwritten in place on every re-run, but columns left
+        over from a different task are never cleared out — they sit side by side in the
+        csv.</p>
+      </div>
+
+      <a class="deep-link" href="../DOCShapeAXI/DOCShapeAXI.html">
+        <b>How it actually works →</b>
+        <span>The Atlas page: the network's two branches, what actually gets
+        backpropagated into the explainability map, the <code>shapeaxi</code> version it
+        expects, and the fragile points found in the code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../DOCShapeAXI/DOCShapeAXI.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

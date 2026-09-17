@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MedX — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="texte">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html" aria-current="true"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html" aria-current="page">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Text &amp; language</div>
+        <h1>MedX</h1>
+        <p class="lede">Extraction of TMD clinical indicators from free-text notes by a locally run language model (a fine-tuned BART-large-CNN), then aggregation of the cohort into a single figure panel — text from end to end; no medical image ever enters this module, whatever its name might suggest.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1007/978-3-032-05479-1_5" target="_blank" rel="noopener" title="AI-Driven Multimodal TMJ Patient Modeling.">Gaydamour 2025 · CLIP, LNCS</a>
+          <span class="badge cli">medx_summarize</span>
+          <span class="badge cli">medx_dashboard</span>
+          <span class="badge neutral">conda env: summaries</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliography</a>
+        </div>
+      </header>
+
+      <h2 id="situation">1. Where it sits in the chain</h2>
+
+      <p>MedX is <strong>self-contained in both directions</strong>: nothing in the repository calls it, and it calls no other module in the repository. Grepping for <code>MedX</code> outside <code>MedX/</code> and <code>MedX_CLI/</code> turns up only the table of contents in <code>README.md</code> and the root <code>CMakeLists.txt</code>.</p>
+
+      <p>Two independent paths, two tabs, two CLIs:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Path</th><th>Button</th><th>Executable called</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Summarization</td><td><code>SummarizeButton</code></td><td><code>python -m MedX_Summarize</code></td><td><code>conda run -n summaries</code></td></tr>
+            <tr><td>Dashboard</td><td><code>DashboardButton</code></td><td><code>slicer.modules.medx_dashboard</code></td><td>Slicer's Python, via <code>slicer.cli.run</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The Dashboard path consumes the output of the Summarization path (a folder of <code>.txt</code> files), but nothing chains them together: the operator reruns it by hand.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 750 170" role="img" aria-label="Overview: MedX's two independent paths, with no automatic chaining">
+          <rect class="d-box" x="10" y="30" width="150" height="54" rx="6"/>
+          <text class="d-label" x="85" y="52" text-anchor="middle">Clinical notes</text>
+          <text class="d-label-s" x="85" y="68" text-anchor="middle">.pdf · .docx · .txt</text>
+
+          <path class="d-arrow" d="M160 57 H200"/>
+          <path class="d-arrow-head" d="M200 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="200" y="30" width="150" height="54" rx="6"/>
+          <text class="d-label" x="275" y="52" text-anchor="middle">Summarization path</text>
+          <text class="d-label-s" x="275" y="68" text-anchor="middle">medx_summarize — predicts</text>
+
+          <path class="d-arrow" d="M350 57 H390" stroke-dasharray="4 4"/>
+          <path class="d-arrow-head" d="M390 57 l-7 -4 v8 z"/>
+          <text class="d-label-s" x="370" y="40" text-anchor="middle">manual rerun</text>
+
+          <rect class="d-box" x="390" y="30" width="150" height="54" rx="6"/>
+          <text class="d-label" x="465" y="52" text-anchor="middle">Dashboard path</text>
+          <text class="d-label-s" x="465" y="68" text-anchor="middle">medx_dashboard — deterministic</text>
+
+          <path class="d-arrow" d="M540 57 H580"/>
+          <path class="d-arrow-head" d="M580 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="580" y="30" width="150" height="54" rx="6"/>
+          <text class="d-label" x="655" y="52" text-anchor="middle">Figures + CSV</text>
+          <text class="d-label-s" x="655" y="68" text-anchor="middle">dashboard.png, 2 csv</text>
+
+          <text class="d-mono" x="375" y="140" text-anchor="middle">no network call to an LLM — the only outbound traffic is downloading the weights (GitHub release)</text>
+        </svg>
+        <figcaption>Two CLIs, two tabs, no automatic chaining: the operator reruns the Dashboard path by hand.</figcaption>
+      </figure>
+
+      <div class="callout">
+        <div class="callout-title">Note</div>
+        <p><strong>No network call to an LLM.</strong> No endpoint, no API key, no <code>ollama</code>, no <code>openai</code> — verified by grepping the whole of <code>MedX/</code> and <code>MedX_CLI/</code>. The only outbound traffic is downloading the weights from a GitHub release.</p>
+      </div>
+
+      <h2 id="fichiers">2. Files involved</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
+          <tbody>
+            <tr><td><code>MedX/MedX.py</code></td><td>widget, 1552 lines including ~200 of dark stylesheet; conda management, progress bar, download</td><td>Slicer's Python</td></tr>
+            <tr><td><code>MedX_Method/summarize.py</code>, <code>dashboard.py</code></td><td>path validation, building the parameters dict</td><td>same</td></tr>
+            <tr><td><code>MedX_Method/Method.py</code>, <code>Progress.py</code></td><td>abstract base classes (copied from <a href="../ASO/ASO.html">ASO</a>/AREG)</td><td>same</td></tr>
+            <tr><td><code>MedX_Summarize.py</code></td><td><a class="gterm" href="../glossary.html#g-bart" title="See glossary">BART</a> inference loop</td><td>conda env <code>summaries</code></td></tr>
+            <tr><td><code>MedX_CLI_utils/utils.py</code></td><td>pdf/docx reading, chunking, model loading</td><td>same</td></tr>
+            <tr><td><code>MedX_Dashboard.py</code></td><td>dashboard entry point</td><td>Slicer's Python</td></tr>
+            <tr><td><code>display_figure.py</code></td><td>summary parsing → DataFrame → matplotlib figure (689 lines)</td><td>same</td></tr>
+            <tr><td><code>dashboard_utils.py</code></td><td>the 56 expected fields, and one aggregator per panel</td><td>same</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>An important asymmetry: <strong>summarization does not go through <code>slicer.cli.run</code></strong>. <code>onSummarizeButton</code> (<code>MedX.py:845</code>) builds the <code>list_Processes_Parameters</code> like the other modules do, but ignores the <code>"Process"</code> entry and calls <code>run_conda_tool()</code> (<code>MedX.py:1079</code>), which assembles <code>conda run -n summaries python -m MedX_Summarize &lt;positional args&gt;</code>. The Slicer CLI <code>MedX_Summarize</code> declared in <code>MedX_Summarize.xml</code> therefore only serves to get the file installed in the right place and to give it a <code>slicer.modules.medx_summarize</code> — it is never actually run as a Slicer CLI.</p>
+
+      <p>The dashboard, on the other hand, does go through <code>slicer.cli.run</code> (<code>MedX.py:938</code>): it runs in Slicer's Python and therefore requires <code>pandas</code>, <code>matplotlib</code> and <code>numpy&lt;2.0.0</code> <strong>inside Slicer</strong>, installed by <code>install_function()</code> (<code>MedX.py:89</code>) after confirmation.</p>
+
+      <p>No GPU required: the summarization CLI takes <code>cuda</code> if it's there (<code>MedX_Summarize.py:32</code>), otherwise CPU.</p>
+
+      <h2 id="entrees">3. Inputs and preprocessing</h2>
+
+      <h3 id="regroupement">3.1 Grouping by patient</h3>
+
+      <p><code>process_notes()</code> (<code>MedX_Summarize.py:67</code>) walks the folder non-recursively (<code>os.listdir</code>, no recursion), keeps only <code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, and groups by <strong><code>file_name.split("_")[0]</code></strong>. Everything before the first underscore is the patient identifier; several notes from the same patient are <strong>concatenated</strong> into a single text before inference.</p>
+
+      <p>The progress bar's count, however, uses <code>Method.search()</code>, which is <strong>recursive</strong> (<code>glob.iglob(..., recursive=True)</code>, <code>Method.py:115</code>). On a tree with subfolders, the denominator counts more files than the CLI actually processes.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>The progress count (recursive) and the actual processing (non-recursive) don't operate on the same set of files: with subfolders, the bar never reaches 100%.</p>
+      </div>
+
+      <h3 id="extraction-texte">3.2 Text extraction</h3>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Format</th><th>Function</th><th>Library</th></tr></thead>
+          <tbody>
+            <tr><td><code>.pdf</code></td><td><code>extract_text_from_pdf</code></td><td>PyMuPDF (<code>fitz</code>), concatenation of <code>page.get_text()</code></td></tr>
+            <tr><td><code>.docx</code></td><td><code>extract_text_from_word</code></td><td><code>python-docx</code>, one <code>\n</code> per paragraph</td></tr>
+            <tr><td><code>.txt</code></td><td>direct read</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>clean_text()</code> replaces only two characters: <code>’</code> → <code>'</code> and <code>–</code> → <code>-</code>.</p>
+
+      <h3 id="decoupage-chunks">3.3 Chunking — the most carefully engineered part</h3>
+
+      <p><code>split_text_by_paragraphs()</code> (<code>utils.py:83</code>) then <code>create_chunks_from_paragraphs()</code> (<code>utils.py:128</code>).</p>
+
+      <p>Four section headers are hardcoded:</p>
+
+      <pre><code>section_headers = ["CLINICAL EXAMINATION", "CLINICAL EVALUATION",
+                   "RADIOGRAPHIC EXAMINATION", "RADIOGRAPHIC EVALUATION"]</code></pre>
+
+      <p>Rules, in order:</p>
+
+      <ol>
+        <li>split on a double line break, the start of a numbered list (<code>\n(?=\d+\.\s)</code>), a bullet (<code>-</code>, <code>*</code>), or a section header;</li>
+        <li>a paragraph under 150 characters is <strong>merged back into the previous one</strong> (list items stay with their heading);</li>
+        <li>a whole section (header + the paragraphs that follow up to the next header) is treated as an <strong>indivisible block for as long as it fits</strong> in the chunk: this is the chunking invariant — a clinical section must not be split across two prompts;</li>
+        <li>if it doesn't fit, fall back to paragraph by paragraph, then sentence by sentence (<code>re.split(r'(?&lt;=[.!?])\s+')</code>).</li>
+      </ol>
+
+      <p><strong>Chunk size: 3500 characters</strong>, passed in by <code>generate_combined_summary</code> (<code>MedX_Summarize.py:29</code>) — the default value of <code>create_chunks_from_paragraphs</code> (1800) is never used. 3500 characters ≈ 900 BPE tokens, under the model's 1024 limit, but the tokenization is truncated to <code>max_length=1024</code> regardless.</p>
+
+      <h2 id="modele">4. The model</h2>
+
+      <h3 id="modele-charge">4.1 What actually gets loaded</h3>
+
+      <p><code>load_model_and_tokenizer()</code> (<code>utils.py:22</code>):</p>
+
+      <pre><code>tokenizer = BartTokenizer.from_pretrained(model_path)
+model = BartForConditionalGeneration.from_pretrained(model_path)</code></pre>
+
+      <p>Nothing else. No <code>peft</code>, no <a class="gterm" href="../glossary.html#g-quantification" title="See glossary">quantization</a>, despite <code>peft</code> and <code>bitsandbytes</code> being listed among the packages installed in the environment (<code>MedX.py:849</code>) — those two, plus <code>evaluate</code> and <code>scikit-learn</code>, are leftovers from training.</p>
+
+      <h3 id="poids">4.2 The weights</h3>
+
+      <p>URL: <code>https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/MedX/BART.zip</code> (<code>summarize.py:43</code>), 1.51 GB.</p>
+
+      <p>The archive contains a standard Hugging Face folder: <code>config.json</code>, <code>generation_config.json</code>, <code>model.safetensors</code> (1.63 GB uncompressed, fp32), <code>merges.txt</code>, <code>vocab.json</code>, <code>special_tokens_map.json</code>, <code>tokenizer_config.json</code>.</p>
+
+      <p>The <code>config.json</code> (read from inside the archive) gives the exact architecture:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td><code>_name_or_path</code></td><td><strong><code>facebook/bart-large-cnn</code></strong></td></tr>
+            <tr><td><code>architectures</code></td><td><code>BartForConditionalGeneration</code></td></tr>
+            <tr><td>encoder / decoder</td><td>12 + 12 layers, <code>d_model=1024</code>, 16 heads, FFN 4096</td></tr>
+            <tr><td><code>max_position_embeddings</code></td><td><strong>1024</strong></td></tr>
+            <tr><td><code>vocab_size</code></td><td>50264</td></tr>
+            <tr><td><code>torch_dtype</code></td><td>float32</td></tr>
+            <tr><td><code>transformers_version</code></td><td>4.49.0</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout ok">
+        <div class="callout-title">Verified</div>
+        <p>So this is a <strong>fine-tune of BART-large-CNN</strong> (~406M parameters), not a model trained from scratch — identified directly from the <code>config.json</code> shipped inside the weights archive, not from the documentation.</p>
+      </div>
+
+      <p>The <code>task_specific_params.summarization</code> inherited from the original (<code>max_length=142, min_length=56</code>) is entirely overridden at generation time.</p>
+
+      <p>The configuration file still carries <code>_num_labels: 3</code> and <code>LABEL_0..2</code>: a leftover from the upstream checkpoint, with no effect on <code>BartForConditionalGeneration</code>.</p>
+
+      <h3 id="prompt-generation">4.3 The prompt and generation</h3>
+
+      <p>One generation call <strong>per chunk</strong> (<code>MedX_Summarize.py:50</code>):</p>
+
+      <pre><code>prompt = f"Using the following note, extract structured key-value pairs about the patient's symptoms and diagnoses:\n\n{chunk}"
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
+summary_ids = model.generate(inputs["input_ids"], generation_config=generation_config)</code></pre>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td><code>max_length</code></td><td>1024 (= <code>model_max_tokens</code>)</td></tr>
+            <tr><td><code>min_length</code></td><td>50</td></tr>
+            <tr><td><code>num_beams</code></td><td>4</td></tr>
+            <tr><td><code>no_repeat_ngram_size</code></td><td>3</td></tr>
+            <tr><td><code>repetition_penalty</code></td><td>2.0</td></tr>
+            <tr><td><code>length_penalty</code></td><td>1.0</td></tr>
+            <tr><td><code>do_sample</code></td><td><strong>True</strong></td></tr>
+            <tr><td><code>temperature</code></td><td>0.6</td></tr>
+            <tr><td><code>top_p</code></td><td>0.95</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>Beam search <strong>and</strong> sampling at the same time (<code>num_beams=4</code> + <code>do_sample=True</code>) → <code>transformers</code> falls back to <em>beam sample</em>: the output is not deterministic, two runs on the same note don't produce the same summary. No seed is set.</p>
+      </div>
+
+      <p>BART is not an instruction-tuned model: the instruction sentence is simply prefixed to the source text. It only has an effect if the fine-tune was done with that same prefix — something that can't be verified from the repository.</p>
+
+      <p>What the network literally produces: <strong>free text</strong>, a sequence decoded via <code>tokenizer.decode(..., skip_special_tokens=True)</code>. The <code>key: value</code> format is never enforced or checked at this stage; it's a learned property, not a guarantee. The chunk summaries are concatenated with a line of 100 dashes.</p>
+
+      <p>There is <strong>no validation pass</strong> on the key/value pair on the CLI side: <code>extract_key_value_pairs()</code> and <code>save_dict_to_csv()</code> (<code>utils.py:227</code>) are <strong>dead code</strong>, never imported (the <code>__init__.py</code> doesn't re-export them).</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 900 170" role="img" aria-label="Summarization pipeline: from raw note to key-value text, via a locally run fine-tuned BART-large-CNN">
+          <rect class="d-box" x="10" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="80" y="52" text-anchor="middle">Clinical notes</text>
+          <text class="d-label-s" x="80" y="68" text-anchor="middle">.pdf · .docx · .txt</text>
+
+          <path class="d-arrow" d="M150 57 H195"/>
+          <path class="d-arrow-head" d="M195 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="195" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="265" y="52" text-anchor="middle">Text extraction</text>
+          <text class="d-label-s" x="265" y="68" text-anchor="middle">PyMuPDF / python-docx</text>
+
+          <path class="d-arrow" d="M335 57 H380"/>
+          <path class="d-arrow-head" d="M380 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="380" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="450" y="52" text-anchor="middle">Chunking</text>
+          <text class="d-label-s" x="450" y="68" text-anchor="middle">regex, 3500 chars.</text>
+
+          <path class="d-arrow" d="M520 57 H565"/>
+          <path class="d-arrow-head" d="M565 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="565" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="635" y="52" text-anchor="middle">BART-large-CNN</text>
+          <text class="d-label-s" x="635" y="68" text-anchor="middle">fine-tuned — predicts</text>
+
+          <path class="d-arrow" d="M705 57 H750"/>
+          <path class="d-arrow-head" d="M750 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="750" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="820" y="52" text-anchor="middle">Text summary</text>
+          <text class="d-label-s" x="820" y="68" text-anchor="middle">key: value, per chunk</text>
+
+          <text class="d-mono" x="450" y="130" text-anchor="middle">medx_summarize — conda run -n summaries python -m MedX_Summarize</text>
+        </svg>
+        <figcaption>Only one network in the whole module, run locally with no network call to an LLM: a fine-tuned BART-large-CNN, called once per chunk. No image enters this pipeline.</figcaption>
+      </figure>
+
+      <h2 id="dashboard">5. The algorithmic core — the dashboard</h2>
+
+      <p>No learning here, just parsing and matplotlib.</p>
+
+      <h3 id="resume-vers-dataframe">5.1 Text summary → DataFrame</h3>
+
+      <p><code>read_summaries()</code> (<code>display_figure.py:33</code>) only reads files ending in <code>_summary.txt</code>, key = <code>split("_")[0]</code>.</p>
+
+      <p><code>initialize_key_value_summary()</code> (<code>dashboard_utils.py:343</code>) creates a dict of <strong>56 keys</strong>, all typed <code>str</code>, all initialized to <code>""</code>: <code>patient_age</code>, <code>headache_intensity</code>, <code>disc_displacement</code>, <code>muscle_pain_score</code>, <code>sleep_disorder_type</code>, <code>cpap_used</code>, <code>pain_onset_date</code>… This is <strong>the module's target schema</strong>, and the only place in the repository where it's written down.</p>
+
+      <p><code>update_dictionary()</code> (<code>display_figure.py:69</code>) walks the summary line by line, <code>line.split(":")</code> — a line that doesn't yield exactly two pieces is skipped (so any value containing a <code>:</code> is lost). <code>;</code> characters in the value become <code>,</code>. A key outside the 56 is ignored.</p>
+
+      <p>Merging successive values (the same field recurring across several chunks) is the subtle part:</p>
+
+      <ul>
+        <li>empty existing value → replaced;</li>
+        <li>value already present → nothing happens;</li>
+        <li>an existing value that is a <strong>substring</strong> of the new one is replaced by the new one (the more detailed wording is kept);</li>
+        <li>otherwise the new value is appended, separated by <code>" | "</code>, unless it's already contained in an existing piece.</li>
+      </ul>
+
+      <p>The boolean branch (<code>if current_value in {"True", "False"}</code>) is <strong>dead</strong>: values are initialized to <code>""</code> and the model writes <code>true</code>/<code>false</code> in lowercase, as shown by the sample CSV <code>dashboard_full_dataframe.csv</code>.</p>
+
+      <p><code>process_summaries()</code> then converts 6 fields to numeric via <code>extract_numbers()</code>: <code>patient_age</code>, <code>headache_intensity</code>, <code>average_daily_pain_intensity</code>, <code>diet_score</code>, <code>tmj_pain_rating</code>, <code>disability_rating</code>. The rule: if there's a <code>/</code>, take the number before the first <code>/</code> ("7/10" → 7); otherwise <strong>the average of every number found</strong> ("8-9" → 8.5, hence the <code>9.5</code> and <code>41.0</code> in the sample CSV).</p>
+
+      <h3 id="agregateurs">5.2 The aggregators</h3>
+
+      <p>One per panel, all in <code>dashboard_utils.py</code>, all regex over free text:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Function</th><th>What it computes</th></tr></thead>
+          <tbody>
+            <tr><td><code>set_age_data</code></td><td><code>pd.cut</code> on <code>[0,19,40,100]</code> → <code>12-19 / 20-40 / 40+</code></td></tr>
+            <tr><td><code>set_sleep_data</code></td><td>binary: <code>unknown</code> vs everything else (so <code>""</code> counts as "has a disorder")</td></tr>
+            <tr><td><code>set_tenderness_data</code></td><td><code>true</code> if at least one of the 3 tenderness/stiffness/soreness fields is neither <code>false</code>, <code>unknown</code>, nor empty</td></tr>
+            <tr><td><code>set_left_stick_data</code></td><td>mean ± standard deviation of the 5 numeric clinical scores</td></tr>
+            <tr><td><code>set_middle_stick_data</code></td><td><code>(\d+)\s*mm</code> on <code>maximum_opening</code> and <code>maximum_opening_without_pain</code></td></tr>
+            <tr><td><code>set_right_stick_data</code></td><td>headache location by synonym (<code>frontal/forehead/temple</code>, <code>temporal/side of head</code>, …)</td></tr>
+            <tr><td><code>set_joint_pain_data</code></td><td><a class="gterm" href="../glossary.html#g-tmj" title="See glossary">TMJ</a> / Neck / Shoulder / Back, TMJ tested first with the left/right variants</td></tr>
+            <tr><td><code>set_upper_donuts_data</code></td><td>6 booleans (<code>earache</code>, <code>tinnitus</code>, <code>vertigo</code>, <code>hearing_loss</code>, jaw, mental health)</td></tr>
+            <tr><td><code>set_muscle_pain_data</code></td><td>5 levels, test order matters: "mild to moderate" and "moderate to severe" are tested <strong>before</strong> "mild" and "moderate"</td></tr>
+            <tr><td><code>extract_months_from_pain_onset</code></td><td>"1 year and 9 months ago" → 21 months</td></tr>
+            <tr><td><code>set_disc_displacement_data</code></td><td><code>left.*without reduction</code> / <code>left.*with reduction</code> / <code>left</code> / nothing, same on the right</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Two underlying fragilities in these aggregators:</p>
+
+      <ul>
+        <li><code>set_upper_donuts_data</code> compares <code>df[metric] == "true"</code> (lowercase) but <code>set_disc_displacement_data</code> and <code>set_muscle_pain_data</code> apply <code>.lower()</code> first. A model that wrote <code>True</code> would silently drop the donuts to 0%.</li>
+        <li>Percentages are <strong>always divided by <code>len(df)</code></strong>, never by the number of filled-in values: a missing field counts as a negative.</li>
+      </ul>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><code>set_upper_donuts_data</code> tests the lowercase <code>"true"</code> while other aggregators normalize with <code>.lower()</code> before comparing: a case inconsistency confirmed in the code, which silently drops all six donuts to 0% if the model writes <code>True</code>/<code>False</code> capitalized.</p>
+      </div>
+
+      <p><code>set_migraine_data</code> contains an unreachable <code>return</code> after the first one (<code>dashboard_utils.py:81</code>): an older 5-category version, left in place.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><code>set_migraine_data</code> (<code>dashboard_utils.py:81</code>) contains a second <code>return</code>, placed after an unconditional first <code>return</code>: dead code, never executed, a leftover from a 5-category version.</p>
+      </div>
+
+      <p><code>set_disc_displacement_data</code> is called (<code>display_figure.py:208</code>) but <strong>its two results are never plotted</strong>: a dead computation.</p>
+
+      <h3 id="figure">5.3 The figure</h3>
+
+      <p><code>generate_dashboard_figure()</code>: <code>figsize=(22,14)</code>, a 2×2 gridspec (<code>width_ratios=[3,1.5]</code>, <code>height_ratios=[1,1.5]</code>), split into panels: age / sleep disorder / tenderness pie charts top left, six donuts on the right, bar charts of clinical scores ± SD and maximum opening at the bottom, then muscle pain distribution, joint pain areas, and age crossed with how long the pain has lasted.</p>
+
+      <p>A curiosity worth knowing before touching this (<code>display_figure.py:179</code>): the function receives <code>output_folder</code> as an argument, then reads it back by introspecting its own frame (<code>inspect.getargvalues</code>) to reassign it to itself. It's a no-op; the parameter alone was enough.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 900 170" role="img" aria-label="Dashboard pipeline: from text summaries to the figure panel, with no model involved">
+          <rect class="d-box" x="10" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="80" y="52" text-anchor="middle">Summaries .txt</text>
+          <text class="d-label-s" x="80" y="68" text-anchor="middle">*_summary.txt, per patient</text>
+
+          <path class="d-arrow" d="M150 57 H195"/>
+          <path class="d-arrow-head" d="M195 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="195" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="265" y="52" text-anchor="middle">Key: value parsing</text>
+          <text class="d-label-s" x="265" y="68" text-anchor="middle">merging, 56 fields</text>
+
+          <path class="d-arrow" d="M335 57 H380"/>
+          <path class="d-arrow-head" d="M380 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="380" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="450" y="52" text-anchor="middle">Aggregators</text>
+          <text class="d-label-s" x="450" y="68" text-anchor="middle">regex + pandas, per panel</text>
+
+          <path class="d-arrow" d="M520 57 H565"/>
+          <path class="d-arrow-head" d="M565 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="565" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="635" y="52" text-anchor="middle">Matplotlib figure</text>
+          <text class="d-label-s" x="635" y="68" text-anchor="middle">gridspec 2×2, 22×14 in</text>
+
+          <path class="d-arrow" d="M705 57 H750"/>
+          <path class="d-arrow-head" d="M750 57 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="750" y="30" width="140" height="54" rx="6"/>
+          <text class="d-label" x="820" y="52" text-anchor="middle">Outputs</text>
+          <text class="d-label-s" x="820" y="68" text-anchor="middle">dashboard.png · 2 csv</text>
+
+          <text class="d-mono" x="450" y="130" text-anchor="middle">medx_dashboard — slicer.cli.run, Slicer's Python (no model)</text>
+        </svg>
+        <figcaption>The dashboard neither trains nor runs any network: regex parsing, pandas and matplotlib only.</figcaption>
+      </figure>
+
+      <h2 id="sorties">6. Post-processing and outputs</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Path</th><th>File</th><th>Content</th></tr></thead>
+          <tbody>
+            <tr><td>Summarize</td><td><code>&lt;output&gt;/&lt;patient_id&gt;_summary.txt</code></td><td>free text, chunks separated by 100 dashes</td></tr>
+            <tr><td>Summarize</td><td><code>&lt;log_path&gt;</code></td><td>an integer: the number of patients processed</td></tr>
+            <tr><td>Dashboard</td><td><code>&lt;output&gt;/dashboard.png</code></td><td>the 22×14-inch panel</td></tr>
+            <tr><td>Dashboard</td><td><code>&lt;output&gt;/patient_data.csv</code></td><td>the 56-column DataFrame</td></tr>
+            <tr><td>Dashboard</td><td><code>&lt;output&gt;/dashboard_full_dataframe.csv</code></td><td><strong>the same DataFrame</strong>, written a second time from <code>generate_dashboard_figure</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The <code>log_path</code> is <code>&lt;tempDirectory&gt;/process.log</code> (<code>MedX.py:384</code>); the widget watches its <code>mtime</code> and reads the first line (<code>onCondaProcessUpdate</code>, <code>MedX.py:1125</code>).</p>
+
+      <p>If the <em>Load in 3D Slicer</em> box is checked, <code>showDashboardImageInSliceView()</code> (<code>MedX.py:952</code>) loads the PNG as a volume and switches the layout to <code>SlicerLayoutOneUpRedSliceView</code>.</p>
+
+      <div class="callout">
+        <div class="callout-title">Note</div>
+        <p>The dashboard produces an image (<code>dashboard.png</code>), not a medical volume: the <em>Load in 3D Slicer</em> box loads it anyway as a volume, in the red slice view, for lack of a dedicated image viewer in the interface.</p>
+      </div>
+
+      <h2 id="predit-calcule">7. What's predicted vs what's computed</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>pdf/docx/txt extraction</td><td><span class="badge calcule">computed</span> deterministic (PyMuPDF, python-docx)</td><td>env <code>summaries</code></td></tr>
+            <tr><td>Chunking</td><td><span class="badge calcule">computed</span> deterministic, regex + section heuristics</td><td>env <code>summaries</code></td></tr>
+            <tr><td>Extraction of the 56 indicators</td><td><span class="badge predit">predicted</span> network: fine-tuned BART-large-CNN, free-form generation</td><td>env <code>summaries</code>, GPU if available</td></tr>
+            <tr><td><code>key: value</code> parsing + merging</td><td><span class="badge calcule">computed</span> deterministic</td><td>Slicer's Python</td></tr>
+            <tr><td>Cohort aggregates</td><td><span class="badge calcule">computed</span> deterministic, regex + pandas</td><td>Slicer's Python</td></tr>
+            <tr><td>Figure</td><td><span class="badge calcule">computed</span> matplotlib</td><td>Slicer's Python</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Only one network in the whole module, and it's <strong>generative</strong>: it's the one deciding the output format. The whole downstream chain assumes it produces <code>key: value</code> lines whose keys belong to the 56 expected ones.</p>
+
+      <h2 id="environnement">8. Environment</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>Value</th><th>Source</th></tr></thead>
+          <tbody>
+            <tr><td>Conda env</td><td><strong><code>summaries</code></strong> (specific to MedX, not <code>shapeaxi</code>)</td><td><code>MedX.py:1364</code></td></tr>
+            <tr><td>Python</td><td>3.12</td><td><code>MedX.py:1388</code></td></tr>
+            <tr><td>Packages in the env</td><td><code>transformers</code>, <code>torch</code>, <code>pymupdf</code>, <code>python-docx</code>, <code>evaluate</code>, <code>scikit-learn</code>, <code>peft</code>, <code>bitsandbytes</code>, <code>matplotlib</code></td><td><code>MedX.py:849</code></td></tr>
+            <tr><td>Inside Slicer (dashboard)</td><td><code>numpy&lt;2.0.0</code>, <code>pandas</code>, <code>matplotlib</code></td><td><code>MedX.py:903</code></td></tr>
+            <tr><td>Windows</td><td>conda via WSL (<code>CondaSetUpCallWsl</code>), checks <code>libxrender1</code>, <code>libgl1</code>/<code>libgl1-mesa-glx</code>, <code>libglx-mesa0</code></td><td><code>check_lib_wsl</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>check_cli_script()</code> (<code>MedX.py:1457</code>) tests <code>import MedX_Summarize</code> in the env and, if that fails, pushes Slicer's <code>PYTHONPATH</code> into it (<code>conda env config vars set</code>). Despite its name, <code>give_pythonpath_windows</code> also runs on Linux.</p>
+
+      <p><code>condaRunCommand()</code> (<code>MedX.py:1462</code>) is a copy of SlicerConda, modified to keep the <code>Popen</code> handle around (<code>preexec_fn=os.setsid</code>) so the process group can be killed from <code>cancel_process()</code>.</p>
+
+      <h2 id="pieges">9. Pitfalls and fragile points</h2>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong>The Download button downloads nothing.</strong> <code>setup()</code> creates <code>&lt;Documents&gt;/SlicerDownloads/MedX</code> (<code>MedX.py:394</code>), then <code>downloadModel</code> calls <code>DownloadUnzip(directory=SlicerDownloadPath, folder_name=SlicerDownloadPath)</code>. <code>os.path.join</code> with an absolute path makes that path absolute, so <code>out_path</code> = the folder already created, and the <code>if not os.path.exists(out_path)</code> (<code>MedX.py:770</code>) skips the whole block. Result: a "Folder must have model for" warning and an empty <code>lineEdit</code>. You have to fetch <code>BART.zip</code> by hand.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong>The result of the environment check is ignored.</strong> <code>check_env = self.onCheckRequirements(list_libs)</code> and then <code>check_env</code> is never read again (<code>MedX.py:860</code>): summarization starts even if conda isn't configured.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong>The dashboard's progress bar never moves.</strong> <code>MedX_Dashboard.py</code> receives <code>log_path</code> and never writes to it. <code>DisplayMedX.isProgress</code> waits for that file to change.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><code>OnEndProcess</code> divides by <code>self.nb_scans</code> (<code>MedX.py:1289</code>): <code>ZeroDivisionError</code> on an empty input folder.</p>
+      </div>
+
+      <ul>
+        <li><strong>Non-deterministic generation</strong> (<code>do_sample=True</code> + beams, no seed): two runs give two summaries, hence two dashboards.</li>
+        <li><strong>Everything rests on <code>split("_")[0]</code>.</strong> A file <code>BLANC_Jean_2021.pdf</code> and a file <code>BLANC_2022.docx</code> are the same patient; <code>2021-05-12_B082.pdf</code> has <code>2021-05-12</code> as its identifier.</li>
+        <li><strong>Values containing a <code>:</code> are lost</strong> during parsing (<code>len(key_value) != 2</code>).</li>
+        <li><strong>Hardcoded paths from a development machine</strong> at the top of <code>dashboard_utils.py:18</code> and of <code>display_figure.py</code>: they mention a <code>Qwen1.5B_full_V3/predictions_500</code> folder. The summaries used to develop the dashboard — and the 500-row <code>dashboard_full_dataframe.csv</code> checked into the repository — were therefore produced by a <strong>Qwen 1.5B</strong>, not by the distributed BART. The two output formats are assumed to be interchangeable; nothing guarantees that.</li>
+        <li><strong>Dead code</strong>: <code>extract_key_value_pairs</code>, <code>save_dict_to_csv</code>, <code>MedX_Summarize.xml</code> as a Slicer CLI, <code>set_disc_displacement_data</code> (computed, never plotted), <code>registerSampleData</code> (points at the sample volumes from the Slicer template), <code>MedXLogic.process()</code> (<code>pass</code>), <code>updateParameterNodeFromGUI</code> (references <code>self.ui.inputSelector</code>, absent from the <code>.ui</code>), <code>saveOutput</code>, <code>UpdateTime</code>, <code>UpdateProgressBar</code> (which displays "Matrix applied with success", copied from another module).</li>
+        <li><code>peft</code> and <code>bitsandbytes</code> are installed in the environment and never imported: ~2GB of unused dependencies.</li>
+      </ul>
+
+      <h2 id="litterature">10. Literature</h2>
+
+      <p>The corresponding paper is <strong>AI-Driven Multimodal TMJ Patient Modeling: From Unstructured Notes to Precision Treatment</strong> (2025, Springer LNCS). It describes fine-tuning <strong>BART</strong> and <strong>DeepSeek-R1</strong> on <strong>1,813 annotated segments drawn from 500 TMD records</strong>, to extract <strong>56 clinical indicators</strong> — the exact number of keys in <code>initialize_key_value_summary()</code> — and feed a patient and cohort dashboard. The paper concludes that BART beats DeepSeek on field-extraction accuracy despite a slightly lower ROUGE score; that's consistent with the module shipping a BART.</p>
+
+      <p>Gaps between the paper and the repository's code:</p>
+
+      <ul>
+        <li>the paper places summarization within a multimodal framework (registered MRI and CBCT); <strong>none of that is in MedX</strong>, which only reads text;</li>
+        <li>the development comments point to a <strong>Qwen 1.5B</strong>, a third model not mentioned in the paper's abstract;</li>
+        <li>the paper's metrics can't be reproduced by any script in the repository (<code>evaluate</code> and <code>scikit-learn</code> are installed but unused).</li>
+      </ul>
+
+      <ul>
+        <li><a href="https://link.springer.com/chapter/10.1007/978-3-032-05479-1_5" target="_blank" rel="noopener">AI-Driven Multimodal TMJ Patient Modeling (Springer)</a></li>
+        <li><a href="https://huggingface.co/facebook/bart-large-cnn" target="_blank" rel="noopener">facebook/bart-large-cnn (upstream model)</a></li>
+        <li><a href="https://arxiv.org/abs/1910.13461" target="_blank" rel="noopener">BART: Denoising Sequence-to-Sequence Pre-training (Lewis et al., 2019)</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools" target="_blank" rel="noopener">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>Full bibliography, retrieved files and publisher links: <a href="SOURCES.html">SOURCES.html</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← All tool pages</a> ·
+        <a href="SOURCES.html">Bibliography for this tool</a> ·
+        Source: <code>MedX.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

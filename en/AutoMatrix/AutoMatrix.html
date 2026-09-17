@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoMatrix — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="utilitaires">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html" aria-current="true"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html" aria-current="page">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Utilities</div>
+        <h1>AutoMatrix</h1>
+        <p class="lede">Applies one or more ITK transformations, already computed elsewhere, in batch to a folder of volumes and landmark files — no network, no conda, no GPU.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="Lab utility, unpublished.">unpublished</a>
+          <span class="badge cli">Automatrix_CLI</span>
+          <span class="badge calcule">computed — no network</span>
+          <span class="badge neutral">no conda, no GPU</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliography</a>
+        </div>
+      </header>
+
+      <p>Batch application of one or more ITK transformations to a folder of
+      volumes and landmark files. No network, no conda, no GPU:
+      <code>sitk.ReadTransform</code> + <code>sitk.ResampleImageFilter</code>, and a file ↔ matrix
+      match by name splitting. The whole point of this page lies in the
+      transformation conventions and in the gap between what the UI promises and what
+      the CLI actually does.</p>
+
+      <h2 id="situation">1. Position in the pipeline</h2>
+
+      <p>AutoMatrix is called by no other module in the repository. It is, however, a
+      <strong>consumer</strong> of the <code>.tfm</code> files produced by the registration modules:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Producer</th><th>File produced</th><th>Transformation type</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>AREG_CBCT.py:157</code></td>
+              <td><code>&lt;out&gt;/&lt;Region&gt;/&lt;patient&gt;_OutReg/&lt;patient&gt;_&lt;CB|MAND|MAX&gt;&lt;add_name&gt;_matrix.tfm</code></td>
+              <td>affine / rigid</td>
+            </tr>
+            <tr>
+              <td><code>SEMI_ASO_CBCT.py:176</code></td>
+              <td><code>&lt;patient&gt;_&lt;add_name&gt;_transform.tfm</code></td>
+              <td><strong><code>sitk.CompositeTransform</code></strong> (<code>utils.py:802</code>)</td>
+            </tr>
+            <tr>
+              <td><code>AREG_MRI.py:227</code></td>
+              <td><code>&lt;mri&gt;_reg_transform.tfm</code></td>
+              <td>composite</td>
+            </tr>
+            <tr>
+              <td><code>Review.py:499</code> and <code>VFACE.py:2168</code></td>
+              <td>registration + manual nudge</td>
+              <td><code>CompositeTransform([areg, nudge.GetInverse()])</code></td>
+            </tr>
+            <tr>
+              <td><code>FlexReg_CLI.py:186</code></td>
+              <td><code>&lt;T2&gt;&lt;suffix&gt;.tfm</code></td>
+              <td>affine, already <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a>→<a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a>-conjugated and inverted</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The UI's "From AReg" checkbox hardcodes <a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a>'s naming convention
+      (§6), including the <strong>default</strong> value of a text field belonging to another
+      module.</p>
+
+      <h2 id="fichiers">2. Files involved</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
+          <tbody>
+            <tr><td><code>AutoMatrix.py</code></td><td>widget: selectors, validation, mirror, progress bar</td><td>Slicer Python</td></tr>
+            <tr><td><code>applyMatrix.py</code></td><td><code>Automatrix_Method</code>: builds the CLI's parameter dict</td><td>same</td></tr>
+            <tr><td><code>General_tools.py</code></td><td><code>search</code> and <code>GetPatients</code> — a <strong>copy</strong> of the CLI's versions, used only for counting</td><td>same</td></tr>
+            <tr><td><code>Automatrix_CLI.py</code></td><td>all the real work, 341 lines</td><td>Slicer Python, <code>SlicerMacroBuildScriptedCLI</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>AutoMatrixLogic.process()</code> (<code>AutoMatrix.py:1094</code>)
+      is a <code>pass</code>: the logic lives entirely in <code>Automatrix_Method</code>. No
+      conda, no CUDA — verified by grep, no occurrence of <code>torch</code>, <code>conda</code> or
+      <code>.pth</code> in AutoMatrix/ and Automatrix_CLI/.</p>
+
+      <h2 id="formats">3. Transformation formats read — and those that aren't</h2>
+
+      <p>The UI (<code>AutoMatrix.py:1012</code>) and the README
+      advertise <code>.npy</code>, <code>.h5</code>, <code>.tfm</code>, <code>.mat</code>, <code>.txt</code>. <code>GetPatients</code> collects all of them.
+      The CLI then does, with no distinction
+      (<code>Automatrix_CLI.py:285</code>):</p>
+
+      <pre><code>try:
+    tfm = sitk.ReadTransform(matrix)
+except Exception as e:
+    logger.error(f"ERROR reading transform {matrix}: {e}")
+    continue</code></pre>
+
+      <p><code>sitk.ReadTransform</code> only knows ITK's <em>TransformIO</em> classes. Tested with
+      Slicer 5.12's SimpleITK 2.5.5:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Extension</th><th>Actual result</th></tr></thead>
+          <tbody>
+            <tr><td><code>.tfm</code>, <code>.txt</code></td><td>OK <strong>if and only if</strong> it's an <em>Insight Transform File V1.0</em>. A text file containing a raw 4×4 matrix is rejected: <code>ITK ERROR: Tags must be delimited</code></td></tr>
+            <tr><td><code>.h5</code>, <code>.hdf5</code></td><td>OK (HDF5TransformIO)</td></tr>
+            <tr><td><code>.mat</code></td><td>OK (MatlabTransformIO)</td></tr>
+            <tr><td><code>.npy</code></td><td><strong>Fails</strong>: <code>Could not create Transform IO object for reading file</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><code>.npy</code> support is therefore <strong>broken</strong>: every <code>.npy</code> file produces an
+        error line and is skipped. This is a regression introduced by the move to the CLI
+        (commit <code>7bc362b</code>): the widget version read <code>np.load(matrix)</code> and built a
+        <code>vtkMRMLTransformNode</code> (the <code>extension_mat == ".npy"</code> branch, visible with
+        <code>git show 7bc362b^:AutoMatrix/AutoMatrix.py</code>).</p>
+        <p>Same story for "text matrices": that isn't a matrix format, it's ITK's
+        text format.</p>
+      </div>
+
+      <p>A successful read gives back a <code>sitk.Transform</code> whose concrete type is preserved —
+      <code>isinstance(tfm, sitk.CompositeTransform)</code> works, verified.</p>
+
+      <h2 id="convention">4. The transformation convention — the point that breaks everything</h2>
+
+      <h3 id="sens">4.1 Direction of the transformation</h3>
+
+      <p>ITK is <strong>fixed → moving</strong>: a <code>sitk.Transform</code> passed to a resampler maps the
+      <strong>output</strong> physical point to the <strong>input</strong> physical point to sample
+      from. The visible content therefore moves according to <code>T⁻¹</code>.</p>
+
+      <p>The code exploits this on both sides, and it is consistent:</p>
+
+      <ul>
+        <li><strong>Volumes</strong> (<code>Automatrix_CLI.py:209</code>):
+        <code>resampler.SetTransform(transform)</code> — the transformation is passed
+        as-is, the content moves by <code>T⁻¹</code>.</li>
+        <li><strong>Landmarks</strong> (<code>Automatrix_CLI.py:176</code>):
+        <pre><code>tfm_inverted = transform.GetInverse()
+point['position'] = list(tfm_inverted.TransformPoint(point['position']))</code></pre>
+        <code>T⁻¹</code> is explicitly applied to the point, so it moves like the volume's
+        content.</li>
+      </ul>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 710 245" role="img" aria-label="Batch application of a transformation to a volume and its landmarks">
+          <rect class="d-box" x="10" y="15" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="35" text-anchor="middle">Input scan</text>
+          <text class="d-mono" x="100" y="51" text-anchor="middle">.nii / .nrrd</text>
+
+          <rect class="d-box" x="10" y="85" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="105" text-anchor="middle">Matrix</text>
+          <text class="d-mono" x="100" y="121" text-anchor="middle">.tfm (T)</text>
+
+          <path class="d-arrow" d="M190 40 H225 V62 H243"/>
+          <path class="d-arrow-head" d="M250 62 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M190 110 H225 V88 H243"/>
+          <path class="d-arrow-head" d="M250 88 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="250" y="48" width="200" height="54" rx="6"/>
+          <text class="d-label" x="350" y="70" text-anchor="middle">ResampleImageFilter</text>
+          <text class="d-label-s" x="350" y="85" text-anchor="middle">SetTransform(T), linear/NN</text>
+
+          <path class="d-arrow" d="M450 75 H483"/>
+          <path class="d-arrow-head" d="M490 75 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="490" y="48" width="200" height="54" rx="6"/>
+          <text class="d-label" x="590" y="70" text-anchor="middle">Transformed scan</text>
+          <text class="d-label-s" x="590" y="85" text-anchor="middle">content moved by T⁻¹</text>
+
+          <rect class="d-box" x="10" y="160" width="180" height="54" rx="6"/>
+          <text class="d-label" x="100" y="182" text-anchor="middle">Input .mrk.json</text>
+          <text class="d-label-s" x="100" y="197" text-anchor="middle">landmarks</text>
+
+          <path class="d-arrow" d="M190 187 H223"/>
+          <path class="d-arrow-head" d="M230 187 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="250" y="160" width="200" height="54" rx="6"/>
+          <text class="d-label" x="350" y="182" text-anchor="middle">T⁻¹.TransformPoint</text>
+          <text class="d-label-s" x="350" y="197" text-anchor="middle">point by point (defined)</text>
+
+          <path class="d-arrow" d="M450 187 H483"/>
+          <path class="d-arrow-head" d="M490 187 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="490" y="160" width="200" height="54" rx="6"/>
+          <text class="d-label" x="590" y="182" text-anchor="middle">Transformed .mrk.json</text>
+          <text class="d-label-s" x="590" y="197" text-anchor="middle">same movement as the scan</text>
+
+          <text class="d-label-s" x="355" y="232" text-anchor="middle">No composition: each matrix is applied independently to the original input file.</text>
+        </svg>
+        <figcaption>The same transformation T is passed as-is to the volume's resampler (the content moves by T⁻¹) and explicitly inverted for landmarks (T⁻¹.TransformPoint), so that the scan and its landmarks stay synchronized. No network: everything is computed.</figcaption>
+      </figure>
+
+      <div class="callout ok">
+        <div class="callout-title">Verified</div>
+        <p><strong>Key takeaway</strong>: the same <code>.tfm</code> applied to a scan and to its landmarks
+        moves them with the same motion. This is the property that makes the module
+        usable, and it is also the only place in the code where an inversion appears.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><code>GetInverse()</code> can raise <code>RuntimeError</code> (non-invertible transformation:
+        dense displacement field, B-spline). The case is caught and the landmark file is
+        simply skipped with a warning — the corresponding volume, meanwhile, will have
+        been transformed. The two outputs can therefore silently fall out of sync.</p>
+      </div>
+
+      <h3 id="ras-lps">4.2 RAS / LPS: where the flip happens — nowhere</h3>
+
+      <p><strong>There is no flip in AutoMatrix.</strong> This is correct, and here is why:</p>
+
+      <ul>
+        <li>ITK <code>.tfm</code> files are in <strong>LPS</strong> by construction.</li>
+        <li><code>sitk.ReadImage</code> / <code>WriteImage</code> work in <strong>LPS</strong>. Both sides
+        agree, nothing to do for volumes.</li>
+        <li>The repository's <code>.mrk.json</code> files are hardcoded to <strong>LPS</strong>, everywhere:
+        <code>ALI_CBCT/io.py:36</code>,
+        <code>ASO_CBCT/utils.py:278</code>,
+        <code>AREG_CBCT/utils.py:373</code>,
+        <code>ALI_IOS/io.py:85</code>,
+        <code>mgl_patch.py:193</code>,
+        <code>VFACE/functionaq3dc.py#L1733</code>. This is also
+        Slicer's default on write. So <code>point['position']</code> is already in LPS, and
+        applying it directly to an ITK transformation is correct.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>The fragile part is that <strong>the <code>coordinateSystem</code> field is never
+        read</strong>. <a href="../FlexReg/FlexReg.html">FlexReg</a> does
+        read it (<code>FlexReg.py:2434</code>); AutoMatrix does not. A json
+        declaring <code>"coordinateSystem": "RAS"</code> — which older annotations or other
+        tools write — will be transformed with x and y of the wrong sign, with no
+        message. The output file will even keep its original <code>coordinateSystem: RAS</code>,
+        since the json is read back and rewritten as-is.</p>
+      </div>
+
+      <p>For reference, the modules that <em>produce</em> the matrices do the flip themselves:
+      <code>FlexReg_CLI.py:186</code> computes
+      <code>flip @ M @ flip</code> with <code>flip = np.diag([-1,-1,1,1])</code> and then inverts, before
+      writing the <code>.tfm</code>. AutoMatrix consumes the result of that work and therefore
+      has nothing left to redo.</p>
+
+      <h3 id="composition">4.3 Composition</h3>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong>There isn't any.</strong> When a patient has several matrices, the loop
+        (<code>Automatrix_CLI.py:283</code>) applies each one
+        <strong>to the original input file</strong>, independently, producing one output per
+        matrix. There is no chaining.</p>
+      </div>
+
+      <p>The only composition that exists is the one ITK has already done: a <code>.tfm</code>
+      containing several transformations is read back as a <code>sitk.CompositeTransform</code>
+      and applied as a whole.</p>
+
+      <h3 id="harden">4.4 Harden</h3>
+
+      <p>None. There is no more <code>vtkMRMLTransformNode</code> in the pipeline. The
+      pre-CLI version created one and did <code>model.SetAndObserveTransformNodeID(...)</code>
+      then <code>model.HardenTransform()</code> before <code>slicer.util.exportNode(..., world=True)</code>.
+      That whole block is gone. The widget's <code>saveOutput</code> method
+      (<code>AutoMatrix.py:861</code>), which called <code>exportNode</code>, is still there but is no longer called: <strong>dead code</strong>.</p>
+
+      <h2 id="types-donnees">5. Data types handled</h2>
+
+      <p><code>GetPatients</code> collects <code>.vtk .vtp .stl .off .obj .nii .nii.gz .nrrd .mrk.json</code>
+      (<code>Automatrix_CLI.py:72</code>). The CLI then only
+      distinguishes two cases:</p>
+
+      <pre><code>is_landmark = scan.endswith(".mrk.json")
+...
+image = sitk.ReadImage(scan)     # everything else</code></pre>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong>Meshes are no longer processed.</strong> Tested: <code>sitk.ReadImage</code> on a
+        <code>vtkPolyData</code> written as <code>.vtk</code> fails with
+        <code>sitk::ERROR: Unable to determine ImageIO reader</code>. Same for <code>.stl</code>, <code>.obj</code>,
+        <code>.off</code>, <code>.vtp</code>. The exception is caught
+        (<code>Automatrix_CLI.py:310</code>), logged as
+        <code>ERROR processing ...</code>, and the file is skipped. Yet the UI still offers
+        them, <code>CheckGoodEntre</code> validates them, the progress counter counts them, and
+        <code>README.md:422</code> still advertises IOS support.</p>
+        <p>This is the second regression from the move to the CLI: the widget version
+        loaded meshes with <code>slicer.util.loadModel</code> and did a real
+        <code>HardenTransform</code>. A <code>.vtk</code> <em>structured points</em> file (an image, not a
+        surface), on the other hand, would pass through via VTKImageIO.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Type</th><th>Read by</th><th>Transformed by</th><th>Written by</th></tr></thead>
+          <tbody>
+            <tr><td><code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code></td><td><code>sitk.ReadImage</code></td><td><code>ResampleImageFilter</code></td><td><code>sitk.WriteImage</code></td></tr>
+            <tr><td><code>.mrk.json</code></td><td><code>json.load</code>, <code>markups[0]['controlPoints']</code></td><td><code>T⁻¹.TransformPoint</code> point by point</td><td><code>json.dump(indent=2)</code></td></tr>
+            <tr><td><code>.vtk .vtp .stl .off .obj</code></td><td>—</td><td>—</td><td>— (silent failure)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>For landmarks, only <code>markups[0]</code> is processed, and only points whose
+      <code>positionStatus == 'defined'</code> are moved; the others are left in place,
+      i.e. in the old coordinate frame.</p>
+
+      <h2 id="reechantillonnage">6. Resampling and reference image</h2>
+
+      <pre><code>resampler.SetInterpolator(sitk.sitkNearestNeighbor if is_seg else sitk.sitkLinear)
+resampler.SetDefaultPixelValue(0)
+resampler.SetReferenceImage(reference)</code></pre>
+
+      <p>The interpolator comes from the "Check this box if using segmentations"
+      checkbox (<code>is_seg</code>). Nearest neighbor for a labelmap, linear otherwise —
+      correct, and it's up to the user to declare it, nothing is auto-detected.</p>
+
+      <p>The output grid is chosen as follows
+      (<code>Automatrix_CLI.py:191</code> and
+      <code>:301</code>), in decreasing priority:</p>
+
+      <ol>
+        <li><strong>Composite transformation</strong> → the reference is guessed from the
+        <strong>matrix</strong>'s path: <code>matrix.replace("_transform.tfm", ".nii.gz")</code>, falling
+        back to <code>.nii</code>. This isn't a bug: ASO_CBCT writes <code>&lt;patient&gt;_&lt;add&gt;_transform.tfm</code>
+        and <code>&lt;patient&gt;_&lt;add&gt;.nii.gz</code> <strong>in the same folder</strong>, so the oriented scan
+        next to the matrix is exactly the right grid. If the file is missing, a warning
+        is issued and it falls back to the input image.</li>
+        <li><strong>Matrix name containing <code>mirror</code></strong> (case-insensitive) → the reference
+        is forced to the input image, the UI's reference file is ignored.
+        Dispatch based on the file name.</li>
+        <li><strong>Reference file provided</strong> (<code>reference_file != "None"</code>, the field's
+        default value, <code>AutoMatrix.ui:255</code>) → its geometry is imposed on all outputs.</li>
+        <li>Otherwise the input image itself: <strong>size, spacing, origin and direction
+        unchanged</strong>. A transformation that moves content out of the field of view
+        makes it disappear, filled in with <code>DefaultPixelValue = 0</code>.</li>
+      </ol>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p>The <code>reference is None</code> branch of <code>ResampleImage</code>
+        (<code>Automatrix_CLI.py:215</code>) is
+        <strong>unreachable</strong> — the caller always passes a reference. It is also
+        wrong: it does <code>new_origin = transform.TransformPoint(image.GetOrigin())</code>
+        when the resampler's convention would call for <code>T⁻¹</code>.</p>
+      </div>
+
+      <h2 id="mirror">7. Mirror mode</h2>
+
+      <p><code>Mirror()</code> (<code>AutoMatrix.py:304</code>) downloads
+      <code>Mirror.zip</code> from a personal GitHub release
+      (<code>GaelleLeroux/DCBIA_Apply_matrix</code>), unzips it into
+      <code>&lt;Documents&gt;/SlicerDownloads/Mirror_matrix/</code> and fills the matrix field with
+      <code>Mirror/Matrix_mirror.tfm</code>. The file's actual content:</p>
+
+      <pre><code>#Insight Transform File V1.0
+Transform: AffineTransform_double_3_3
+Parameters: -1 0 0 0 1 0 0 0 1 0 0 0
+FixedParameters: 0 0 0</code></pre>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>That is <code>diag(-1, 1, 1)</code> in LPS, centered at the origin: a
+        <strong>reflection about the plane x_LPS = 0</strong>. Since x_LPS points toward the
+        patient's left, this is indeed a left/right swap — but about the sagittal plane
+        of the <strong>world frame's origin</strong>, not the patient's own sagittal plane. A
+        patient who isn't centered comes out translated in addition to mirrored, which a
+        later registration has to correct for.</p>
+      </div>
+
+      <p>The determinant is −1. For a volume, <code>ResampleImageFilter</code> handles this
+      without any problem. For a mesh, it would flip face orientation and
+      normals — a moot point here since meshes are no longer processed.</p>
+
+      <p>The mode forces <code>ComboBoxMatrix</code> to "File", the suffix to
+      <code>_mir</code>, and unchecks <code>checkBoxMatrixName</code>.</p>
+
+      <h2 id="appariement">8. File ↔ matrix matching</h2>
+
+      <p><code>GetPatients</code> (<code>Automatrix_CLI.py:60</code>)
+      builds <code>{patient_key: {'scan': [...], 'matrix': [...]}}</code>. The key is obtained
+      through a chain of <code>.split()</code> calls that is <strong>not the same on both sides</strong>:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Tokens removed (in order)</th></tr></thead>
+          <tbody>
+            <tr><td>scan</td><td><code>_Seg _seg _Scan _scan _Or _OR _MAND _MD _MAX _MX _CB _lm _T2 _T1 _Cl _MR</code>, then <code>.split('.')[0]</code>, then <code>_T0</code>…<code>_T49</code></td></tr>
+            <tr><td>matrix</td><td><code>_SegOr _Left _left _Right _right _Or _OR _MAND _MD _MAX _MX _CB _lm _T2 _T1 _Cl _MA _Mir _mir _Mirror _mirror _MR</code>, then <code>.split('.')[0]</code>, then <code>_T0</code>…<code>_T49</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 730 270" role="img" aria-label="Matching a scan file and a matrix file by patient-name key">
+          <rect class="d-box" x="10" y="20" width="200" height="50" rx="6"/>
+          <text class="d-label" x="110" y="38" text-anchor="middle">Scan</text>
+          <text class="d-mono" x="110" y="54" text-anchor="middle">patient1_T1_MA.nii.gz</text>
+
+          <path class="d-arrow" d="M210 45 H243"/>
+          <path class="d-arrow-head" d="M250 45 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="250" y="20" width="210" height="50" rx="6"/>
+          <text class="d-label" x="355" y="38" text-anchor="middle">Split: "scan" list</text>
+          <text class="d-label-s" x="355" y="54" text-anchor="middle">removes _T1, _MA, .split('.')…</text>
+
+          <path class="d-arrow" d="M460 45 H493"/>
+          <path class="d-arrow-head" d="M500 45 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="500" y="20" width="140" height="50" rx="6"/>
+          <text class="d-label" x="570" y="38" text-anchor="middle">key</text>
+          <text class="d-mono" x="570" y="54" text-anchor="middle">patient1</text>
+
+          <rect class="d-box" x="10" y="110" width="200" height="50" rx="6"/>
+          <text class="d-label" x="110" y="128" text-anchor="middle">Matrix</text>
+          <text class="d-mono" x="110" y="144" text-anchor="middle">patient1_left_MA.tfm</text>
+
+          <path class="d-arrow" d="M210 135 H243"/>
+          <path class="d-arrow-head" d="M250 135 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="250" y="110" width="210" height="50" rx="6"/>
+          <text class="d-label" x="355" y="128" text-anchor="middle">Split: "matrix" list</text>
+          <text class="d-label-s" x="355" y="144" text-anchor="middle">removes _left, _MA… (different list)</text>
+
+          <path class="d-arrow" d="M460 135 H493"/>
+          <path class="d-arrow-head" d="M500 135 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="500" y="110" width="140" height="50" rx="6"/>
+          <text class="d-label" x="570" y="128" text-anchor="middle">key</text>
+          <text class="d-mono" x="570" y="144" text-anchor="middle">patient1</text>
+
+          <path class="d-arrow" d="M570 160 V183"/>
+          <path class="d-arrow-head" d="M570 190 l-4 -7 h8 z"/>
+          <path class="d-arrow" d="M570 70 H690 V183"/>
+          <path class="d-arrow-head" d="M690 190 l-4 -7 h8 z"/>
+
+          <rect class="d-box" x="490" y="190" width="220" height="60" rx="6"/>
+          <text class="d-label" x="600" y="213" text-anchor="middle">Matching keys</text>
+          <text class="d-label-s" x="600" y="230" text-anchor="middle">→ files matched</text>
+        </svg>
+        <figcaption><code>GetPatients</code> removes different tokens from the scan name and the matrix name to obtain the patient key. Here <code>_T1</code> is trimmed on the scan side and <code>_left</code> on the matrix side: both keys converge on <code>patient1</code>. Without a timestamp (<code>patient1_MA.nii.gz</code> ↔ <code>patient1_MA.tfm</code>), the lists diverge: key <code>patient1_MA</code> on the scan side versus <code>patient1</code> on the matrix side — no match, with no message.</figcaption>
+      </figure>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>The lists diverge: the matrix side removes <code>_MA</code>, <code>_Left</code>/<code>_Right</code>, the
+        <code>_Mir</code> and <code>_SegOr</code> variants; the scan side removes <code>_Seg</code>, <code>_Scan</code>, <code>_lm</code>.
+        Hence the README's requirement: the patient name first, an underscore, then the
+        rest. The example
+        <code>patient1_T1_MA.nii.gz</code> ↔ <code>patient1_left_MA.tfm</code> works because <code>_T1</code> is
+        trimmed on the scan side and <code>_left</code> on the matrix side. But
+        <code>patient1_MA.nii.gz</code> without a timestamp gives the key <code>patient1_MA</code> on the
+        scan side and <code>patient1</code> on the matrix side:
+        <strong>no matrix will be matched</strong>, with no message.</p>
+      </div>
+
+      <p>When the matrix path is a <strong>file</strong> rather than a folder, it is attached to
+      every patient (<code>Automatrix_CLI.py:167</code>).</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong>Duplicated code that has already diverged.</strong> <code>GetPatients</code> exists in
+        two copies that are identical but for one token: the CLI version strips a leading
+        <code>_SegOr</code>, <code>General_tools.py:249</code> does not. And it's the
+        <code>General_tools</code> copy that feeds
+        <code>NbScan</code>, so the progress bar's denominator can differ from the
+        number of files actually processed.</p>
+      </div>
+
+      <h3 id="from-areg">The "From AReg" path</h3>
+
+      <p><code>suffix_map</code> (<code>Automatrix_CLI.py:227</code>)
+      bypasses all the matching logic for landmark files:</p>
+
+      <pre><code>suffix_map = {
+    "_CB": ("Cranial Base", "CBReg_matrix.tfm"),
+    "_L":  ("Maxilla",      "MAXReg_matrix.tfm"),
+    "_U":  ("Mandible",     "MANDReg_matrix.tfm"),
+}
+matrix_path = os.path.join(args.matrix_lineEdit, subdir,
+                           f"{patient_id}_OutReg", f"{patient_id}_{matrix_filename}")</code></pre>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p>Three problems, all verifiable:</p>
+        <ol>
+          <li><strong><code>_L</code> and <code>_U</code> are swapped</strong> relative to the convention used in the rest of the repository.
+          <code>AREG_IOS/dataset.py:231</code> and
+          <code>AREG/IOS.py:122</code> define
+          <code>Lower = ["Lower", "_L", "L_", "Mandibule", "Md"]</code> and
+          <code>Upper = ["Upper", "_U", "U_", "Maxilla", "Mx"]</code>. Here <code>_L</code> points to
+          Maxilla and <code>_U</code> to Mandible.</li>
+          <li><strong><code>matrix_lineEdit</code> does not exist</strong> in the CLI's <code>argparse</code>
+          (<code>Automatrix_CLI.py:329</code>: the
+          arguments are <code>input_patient, input_matrix, reference_file, suffix,
+          matrix_name, fromAreg, output_folder, log_path, is_seg</code>). This branch
+          therefore raises <code>AttributeError</code> as soon as it's taken.</li>
+          <li><strong>It is never taken</strong>: <code>CheckBoxSuffixBased</code> (labeled "From AReg") is
+          hidden at <code>setup</code> by <code>self.ui.CheckBoxSuffixBased.setVisible(False)</code>
+          (<code>AutoMatrix.py:296</code>), so <code>fromAreg</code> is
+          always <code>"False"</code>. Dead code — which explains why 1 and 2 were never
+          noticed.</li>
+        </ol>
+      </div>
+
+      <p>The name <code>MAXReg_matrix.tfm</code> does match <a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a>'s reality, though: it
+      writes <code>patient + "_" + reg_type + add_name + "_matrix.tfm"</code> with <code>add_name</code>
+      defaulting to <code>Reg</code> (<code>AREG.ui:571</code>) —
+      so this path depends on the default value of an editable text field belonging to
+      another module.</p>
+
+      <h2 id="sorties">9. Outputs</h2>
+
+      <pre><code>matrix_suffix = f"_{Path(matrix).stem}" if args.matrix_name == "True" else ""
+out_suffix    = f"{args.suffix}{matrix_suffix}"
+out_file      = outpath.split(extension_scan)[0] + out_suffix + extension_scan</code></pre>
+
+      <p>The input directory tree is reproduced in the output folder
+      (<code>scan.replace(input_patient, output_folder)</code>). Default suffix <code>_apply</code>,
+      <code>checkBoxMatrixName</code> <strong>checked by default</strong>
+      (<code>AutoMatrix.ui:342</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>The README is stale on this point: it advertises
+        <code>patient1_T1_MA_apply_matrix1.nii.gz</code>. The old version extracted the part
+        of the matrix name that came after the patient key (<code>basename.split(ext)[0].split(key)[1]</code>);
+        the CLI uses the <strong>entire</strong> <code>Path(matrix).stem</code>. The actual output for
+        <code>patient1_MAXReg_matrix.tfm</code> is therefore
+        <code>patient1_T1_MA_apply_patient1_MAXReg_matrix.nii.gz</code>.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong>Unchecking "Add matrix name" with several matrices per patient causes
+        outputs to overwrite one another</strong>: the same file name for every
+        matrix.</p>
+      </div>
+
+      <p>No <code>.tfm</code> is ever produced: AutoMatrix consumes transformations, it doesn't
+      write any.</p>
+
+      <h2 id="predit-calcule">10. What is predicted vs what is computed</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Transform reading</td><td><span class="badge calcule">computed</span> ITK TransformIO</td><td>CLI</td></tr>
+            <tr><td>File ↔ matrix matching</td><td><span class="badge calcule">computed</span> string splitting</td><td>CLI (and a diverging copy in the widget)</td></tr>
+            <tr><td>Volumes</td><td><span class="badge calcule">computed</span> <code>sitk.ResampleImageFilter</code>, linear or nearest neighbor</td><td>CLI</td></tr>
+            <tr><td>Landmarks</td><td><span class="badge calcule">computed</span> <code>T⁻¹.TransformPoint</code> per point</td><td>CLI</td></tr>
+            <tr><td>Mirror matrix</td><td><span class="badge calcule">computed</span> fixed <code>.tfm</code> downloaded, <code>diag(-1,1,1)</code></td><td>GitHub release</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>No neural network anywhere.</p>
+
+      <h2 id="environnement">11. Environment</h2>
+
+      <p>Nothing to install: <code>SimpleITK</code>, <code>numpy</code>, <code>vtk</code>, <code>qt</code> are already in
+      Slicer. No conda, no CUDA. The only network access is the mirror matrix
+      download, and only if the Mirror checkbox is checked.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p>The progress bar is not fed by a log file despite the
+        <code>log_path</code> parameter: <code>DisplayAutomatrix.isProgress</code>
+        (<code>Progress.py:39</code>) checks the mtime
+        of <code>log_path</code>, but <strong>the CLI never writes to that file</strong>. Progress
+        actually flows through the <code>&lt;filter-progress&gt;0 / 2 / 0&lt;/filter-progress&gt;</code> sequence emitted
+        by the CLI after each scan (<code>Automatrix_CLI.py:314</code>)
+        and the <code>if kwds["progress"] == 200</code> in <code>isProgress</code> — an indirect,
+        fragile protocol that depends on a <code>time.sleep(0.2)</code> between each print.</p>
+      </div>
+
+      <h2 id="pieges">12. Pitfalls and fragile points</h2>
+
+      <div class="callout warn">
+        <div class="callout-title">Summary</div>
+        <ul>
+          <li><strong><code>.npy</code> does not work</strong> (<a href="#formats">§3</a>), though advertised by the UI and the README.</li>
+          <li><strong>Meshes no longer work</strong> (<a href="#types-donnees">§5</a>), though advertised by the UI and the README. Regression from commit <code>7bc362b</code>.</li>
+          <li><strong><code>.txt</code> does not accept a raw 4×4 matrix</strong> (<a href="#formats">§3</a>), only ITK's text format.</li>
+          <li><strong>The landmarks' <code>coordinateSystem</code> is never read</strong> (<a href="#ras-lps">§4.2</a>).</li>
+          <li><strong>No composition</strong>: N matrices for one patient give N files, not a chain (<a href="#composition">§4.3</a>).</li>
+          <li><strong>Outputs overwritten</strong> if <code>checkBoxMatrixName</code> is unchecked with several matrices (<a href="#sorties">§9</a>).</li>
+          <li><strong><code>OnEndProcess</code> divides by <code>self.nb_scans</code></strong> (<code>AutoMatrix.py:953</code>) with no guard: an empty input folder causes a <code>ZeroDivisionError</code> at the end of processing.</li>
+          <li><strong><code>CheckGoodEntre</code> is logically wrong</strong> (<code>AutoMatrix.py:1013</code>): the extension test is <code>len(dico['.vtk'])==0 and len(dico['.vtp']) and len(dico['.stl']) and …</code>, where only the first term is a comparison. The rest are integers evaluated as booleans, so the "Folder empty or wrong type" warning only fires in an unlikely conjunction. A genuinely empty folder passes validation.</li>
+          <li><strong><code>onPredictButton</code> does not stop on error</strong>: <code>TestProcess</code> returns a tuple <code>(ok, out)</code>, so the <code>isinstance(error, str)</code> check at <code>AutoMatrix.py:766</code> is always false, and processing starts even with empty fields.</li>
+          <li><strong><code>.split(extension_scan)[0]</code></strong> cuts at the <strong>first</strong> occurrence: a path whose folder contains the same substring as the extension would be truncated.</li>
+          <li><strong>Non-<code>defined</code> landmarks</strong> left in the old coordinate frame, mixed with transformed points in the same file (<a href="#types-donnees">§5</a>).</li>
+          <li><strong>The "From AReg" path, dead and broken</strong> (<a href="#appariement">§8</a>).</li>
+          <li><strong>Dead code</strong>: the widget's <code>saveOutput</code> / <code>UpdateProgressBar</code> / <code>UpdateTime</code>, <code>AutoMatrixLogic.process</code>, <code>ResampleImage</code>'s <code>reference is None</code> branch, <code>registerSampleData</code> referencing missing <code>.png</code> files.</li>
+          <li><code>Automatrix_CLI.xml</code>'s metadata is still the Slicer template's (<code>FirstName LastName (Institution)</code>, <code>NIH grant NXNNXXNNNNNN-NNXN</code>).</li>
+        </ul>
+      </div>
+
+      <h2 id="litterature">13. Literature</h2>
+
+      <p>No paper covers AutoMatrix: it's a batch-application utility written for the
+      lab (Gaëlle Leroux, UoM/DCBIA). The scientific content lives
+      entirely in the modules that <em>produce</em> the matrices — AREG, <a href="../ASO/ASO.html">ASO</a>, <a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a>,
+      <a href="../FlexReg/FlexReg.html">FlexReg</a> — and is covered in their respective pages.</p>
+
+      <p>For the transformation convention, the up-to-date reference is ITK / Slicer
+      documentation rather than a paper:</p>
+
+      <ul>
+        <li><a href="https://slicer.readthedocs.io/en/latest/user_guide/modules/transforms.html">Transforms — Slicer user guide</a>
+        (fixed→moving direction, Slicer's RAS vs. ITK's LPS)</li>
+        <li><a href="https://slicer.readthedocs.io/en/latest/user_guide/coordinate_systems.html">Coordinate systems — Slicer developer guide</a></li>
+        <li><a href="https://simpleitk.readthedocs.io/en/master/link_ImageRegistrationMethod1_docs.html">SimpleITK — Transforms and Resampling</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+        <li><a href="https://github.com/GaelleLeroux/DCBIA_Apply_matrix">DCBIA_Apply_matrix</a> —
+        the original repository, which still hosts the mirror matrix and the test sets
+        cited by the README</li>
+      </ul>
+
+      <p><strong>Full bibliography: <a href="SOURCES.html">SOURCES.html</a></strong> — search done, negative
+      result: no work describes AutoMatrix, and none cites it. Nothing was retrieved
+      into this folder, because there is nothing to retrieve.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← All tool pages</a> ·
+        <a href="SOURCES.html">Bibliography for this tool</a> ·
+        Source: <code>AutoMatrix.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

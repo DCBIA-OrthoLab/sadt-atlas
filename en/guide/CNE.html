@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNE — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="texte">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html" aria-current="page">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Text &amp; language</div>
+        <h1>CNE — extract information from clinical notes</h1>
+        <p class="lede">The name doesn't say it: CNE doesn't touch <strong>any image</strong>,
+        volume, or mesh. It's a reading tool — it takes free-text clinical notes and pulls
+        structured information out of them, as key/value pairs, using a language model
+        (LLM) that runs locally inside Slicer.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>Any time you have a batch of free-text notes — TMJ or Ortho visits — and want the
+      key facts (symptoms, diagnoses) pulled out quickly instead of reading each one by
+      hand. CNE processes a whole folder of notes at once, using a different model
+      depending on whether the notes are TMJ or Ortho.</p>
+
+      <div class="callout">
+        <div class="callout-title">Nothing leaves your machine</div>
+        <p>The model runs inside Slicer's own Python, on your computer. Notes aren't sent
+        to any online service during extraction — the only step that touches the network
+        is the one-time model download.</p>
+      </div>
+
+      <h2 id="besoin">What it needs, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>What to provide</h4>
+          <ul>
+            <li>A folder of notes, placed <strong>directly inside it</strong> (no
+            subfolders) — <code>.txt</code>, <code>.pdf</code>, or <code>.docx</code></li>
+            <li>The note type: <strong>TMJ</strong> or <strong>Ortho</strong>, each with
+            its own model</li>
+            <li>The matching model, downloaded once (a few GB)</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>One text file per note, <code>Extraction_&lt;note name&gt;.txt</code>, in
+            the output folder</li>
+            <li><code>key : value</code> lines summarizing the note</li>
+            <li>No summary table, no CSV: one file per note, to be checked one at a
+            time</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Steps</h2>
+      <ol class="steps">
+        <li><strong>Choose the note type.</strong> TMJ or Ortho: this decides which model
+        gets used and how long a note it can take in one go.</li>
+        <li><strong>Download the matching model.</strong> On the first click on "Apply",
+        the module installs whatever is missing (after you confirm), then fetches the
+        model from Hugging Face. Only needed once per note type.</li>
+        <li><strong>Point it to the notes folder.</strong> Files must sit directly at the
+        root of the chosen folder, not sorted into per-patient subfolders.</li>
+        <li><strong>Set an output folder.</strong></li>
+        <li><strong>Launch, then wait.</strong> Notes are processed one after another;
+        expect several tens of seconds per note.</li>
+      </ol>
+
+      <h2 id="temps">How long it takes, how much memory</h2>
+      <p>Even though the module mentions using a graphics card, the install only sets up
+      CPU packages: in practice, extraction <strong>always runs on CPU</strong>. Expect
+      roughly a minute per note depending on its length; on a batch of several dozen
+      notes, it's better to start the run and come back later. The loaded model needs
+      about <strong>5 to 6 GB of RAM</strong> on top of what Slicer already uses, and its
+      download is several gigabytes, done once per note type.</p>
+
+      <h2 id="relire">Check the result</h2>
+      <p>All the clinical content in the output file comes from the model: there's no rule,
+      no term dictionary, no schema check behind it. The module expects a JSON reply but
+      doesn't enforce it technically — it just looks for the first opening brace and the
+      last closing brace in the response. If the model's output isn't well formed, its raw
+      text lands in the file as-is, <strong>with no indication</strong> that formatting
+      failed. Check every file it produces before relying on it.</p>
+
+      <h2 id="coince">If something's off</h2>
+      <div class="callout warn">
+        <div class="callout-title">The Ortho model won't download</div>
+        <p>The file the module asks for the Ortho model doesn't exist at the address
+        listed on Hugging Face: the download fails with "Download failed or was
+        cancelled", with no further explanation. TMJ mode downloads fine. If you pick
+        Ortho today, expect this failure — it isn't something on your end.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Notes sorted into per-patient subfolders</div>
+        <p>CNE only looks at files sitting directly in the folder you chose, not at
+        anything inside subfolders. A folder organized with one subfolder per patient
+        will produce no output at all, with no error message.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Scanned PDF</div>
+        <p>PDF text extraction doesn't do OCR: if your PDF is actually a scanned image,
+        the extracted text is empty and the note can't produce anything.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Tables inside a .docx</div>
+        <p>Only paragraph text is read from a Word document; table content is skipped. If
+        your key information sits in a table, it never reaches the model.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Note too long</div>
+        <p>There's no chunking: a note longer than the model can read in one pass fails
+        entirely instead of being processed in pieces. The margin is especially tight in
+        Ortho mode.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">No anonymization</div>
+        <p>Notes are read as-is, with no personal-data removal. If your files contain
+        identifying information, run them through MedicalDataAnonymizer first if needed.</p>
+      </div>
+
+      <a class="deep-link" href="../CNE/CNE.html">
+        <b>How it actually works →</b>
+        <span>The Atlas page: the model used, how the text is extracted and cleaned, and
+        the weak points found in the code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../CNE/CNE.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

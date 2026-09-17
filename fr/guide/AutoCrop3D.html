@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoCrop3D — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="utilitaires">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+    <div class="lang-switch">
+      <span class="cur">FR</span><a href="../../en/index.html" title="English">EN</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>pour utiliser les outils</small></a>
+      <a href="../index.html"><b>Atlas</b><small>comment ça marche dans le code</small></a>
+    </div>
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html" aria-current="page">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Utilitaires</div>
+        <h1>AutoCrop3D — recadrer une série de volumes</h1>
+        <p class="lede">AutoCrop3D découpe en lot un dossier de volumes sur une région
+        d'intérêt commune, ou une région propre à chaque patient. Pas de réseau, pas de
+        téléchargement de modèle : c'est un recadrage géométrique, quasi instantané, qui ne
+        touche pas aux valeurs de vos voxels.</p>
+      </header>
+
+      <h2 id="quand">Quand s'en servir</h2>
+      <p>Chaque fois qu'une série de scans est trop volumineuse ou trop hétérogène en champ
+      de vue pour être traitée telle quelle : avant un segmenteur (AMASSS,
+      BatchDentalSeg) pour réduire le volume à traiter, ou après lui pour ne garder que la
+      région utile. AutoCrop3D peut aussi générer un maillage VTK à partir d'une
+      segmentation déjà produite, pour une prévisualisation rapide.</p>
+
+      <h2 id="roi">Préparer la région d'intérêt</h2>
+      <p>La région à découper vient uniquement d'un fichier ROI Slicer
+      (<code>.mrk.json</code>) : placez une boîte <b>Markups &gt; ROI</b> dans la scène sur
+      un patient représentatif, ajustez-la, puis sauvegardez-la. Deux façons de l'utiliser :
+      une seule ROI appliquée à tous les volumes du dossier, ou une ROI par patient — dans ce
+      cas, nommez chaque fichier ROI avec le même préfixe que les volumes correspondants,
+      pour que l'appariement se fasse correctement (voir plus bas).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">La ROI doit être une boîte droite, sauvegardée telle quelle</div>
+        <p>La voie de recadrage rapide ignore complètement l'orientation et le repère
+        déclarés dans le fichier ROI : elle ne lit que son centre et sa taille, et suppose
+        une boîte alignée sur les axes du volume. Une ROI tournée est traitée comme si elle
+        ne l'était pas, et une ROI sauvegardée dans le mauvais repère décale le centre sans
+        aucun message d'erreur. Le recadrage rapide n'accepte donc que des boîtes droites,
+        telles que Slicer les enregistre par défaut ; pour une ROI réellement tournée, voir
+        plus bas.</p>
+      </div>
+
+      <h2 id="besoin">Ce qu'il vous faut, ce que vous obtenez</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>À fournir</h4>
+          <ul>
+            <li>Un dossier de volumes — <code>.nii.gz</code>, <code>.nii</code>,
+            <code>.nrrd.gz</code>, <code>.nrrd</code>, <code>.gipl.gz</code> ou
+            <code>.gipl</code></li>
+            <li>Un fichier ROI (<code>.mrk.json</code>), ou un dossier avec une ROI par
+            patient</li>
+            <li>Un suffixe de sortie (« cropped » par défaut)</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>Ce qui sort</h4>
+          <ul>
+            <li>Un volume recadré par entrée, dans l'arborescence du dossier de sortie</li>
+            <li>Optionnel : un maillage VTK par segmentation recadrée</li>
+            <li>Aucun fichier de transformation — la géométrie est portée par le volume
+            lui-même</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Marche à suivre</h2>
+      <ol class="steps">
+        <li><strong>Placez et sauvegardez votre ROI.</strong> Une boîte pour toute la
+        série, ou une par patient nommée pour matcher ses volumes.</li>
+        <li><strong>Désignez le dossier de volumes d'entrée.</strong> AutoCrop3D traite tout
+        le dossier d'un coup.</li>
+        <li><strong>Indiquez le fichier ou le dossier de ROI.</strong> Un seul fichier =
+        appliqué à tous ; plusieurs = appariés par patient.</li>
+        <li><strong>Choisissez un suffixe de sortie</strong>, et si besoin l'option
+        « Keep the same size as input » pour conserver la géométrie complète du volume
+        d'origine, avec tout ce qui est hors ROI mis à zéro.</li>
+        <li><strong>ROI tournée uniquement :</strong> cochez « Use module Crop Volume for
+        tilted images » — voir l'avertissement plus bas avant de l'utiliser.</li>
+        <li><strong>Indiquez un dossier de sortie</strong>, puis lancez.</li>
+      </ol>
+
+      <h2 id="preserve">Ce qui est préservé</h2>
+      <p>C'est l'intérêt principal de l'outil : le recadrage par défaut ne rééchantillonne
+      pas. Il se contente d'extraire un bloc de voxels et de recalculer l'origine du
+      volume ; l'espacement, l'orientation et les valeurs de voxel restent identiques,
+      bit à bit, à celles du volume d'origine. Concrètement, une matrice de recalage
+      calculée sur le volume entier reste valable telle quelle sur le volume recadré,
+      puisque les coordonnées physiques n'ont pas bougé — vous pouvez recadrer après
+      recalage sans rien recalculer.</p>
+
+      <h2 id="coince">Si ça coince</h2>
+      <div class="callout warn">
+        <div class="callout-title">Un seul fichier ROI dans le dossier → erreur</div>
+        <p>Si vous utilisez une ROI par patient mais que le dossier ne contient qu'un seul
+        fichier <code>.mrk.json</code>, le module plante au lieu de l'appliquer à tous les
+        volumes. Dans ce cas, indiquez directement ce fichier comme ROI unique plutôt que le
+        dossier qui le contient.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">ROI par patient : l'appariement casse sur un underscore</div>
+        <p>Le nom de chaque volume et celui de sa ROI ne sont pas découpés de la même façon
+        pour être comparés. Avec des identifiants patient sans underscore
+        (<code>MA0001_Scan.nii.gz</code> / <code>MA0001_ROI.mrk.json</code>), tout va bien ;
+        avec un underscore dans l'identifiant lui-même, l'appariement échoue et le patient
+        est ignoré sans arrêter le traitement des autres (un avertissement est écrit dans le
+        journal).</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">L'interface refuse des formats que le calcul accepte</div>
+        <p>Le contrôle d'entrée de l'interface ne reconnaît que les volumes compressés
+        (<code>.nii.gz</code>, <code>.nrrd.gz</code>, <code>.gipl.gz</code>). Un dossier de
+        <code>.nii</code> ou de <code>.nrrd</code> non compressés est refusé (« Wrong type of
+        patient file detected ») même si le recadrage lui-même les gère très bien :
+        décompressez, ou ne mélangez pas les deux dans un même lot.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">« Use module Crop Volume for tilted images » : lisez avant de cocher</div>
+        <p>Cette option est le seul moyen de gérer une ROI réellement tournée, mais elle
+        change deux choses. D'abord elle rééchantillonne le volume dans le repère de la
+        ROI : les valeurs de voxel sont modifiées, et l'avantage « pas de rééchantillonnage,
+        matrice de recalage toujours valide » ne s'applique plus. Ensuite elle vide
+        entièrement la scène Slicer à chaque patient traité : ne l'utilisez pas si vous avez
+        des données chargées que vous voulez garder.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Génération de maillage VTK depuis une segmentation</div>
+        <p>Se déclenche automatiquement dès que « seg » apparaît dans le chemin de sortie
+        (par exemple un dossier <code>Segmentations/</code>). Fonctionnalité secondaire et
+        fragile : le maillage n'est pas garanti de se superposer exactement au volume
+        recadré, toutes les structures ressortent dans la même couleur, et une segmentation
+        à plus de six étiquettes ne produit aucun maillage — sans message d'erreur.</p>
+      </div>
+
+      <a class="deep-link" href="../AutoCrop3D/AutoCrop3D.html">
+        <b>Comment ça marche vraiment →</b>
+        <span>La fiche Atlas : la lecture de la ROI, la gestion des directions négatives,
+        pourquoi l'origine change et pas les voxels, et le détail des pièges de
+        configuration.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Tous les guides</a> ·
+        <a href="../AutoCrop3D/AutoCrop3D.html">Fiche Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

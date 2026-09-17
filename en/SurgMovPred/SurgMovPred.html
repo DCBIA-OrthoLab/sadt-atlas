@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SurgMovPred — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="analyse">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html" aria-current="true"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html" aria-current="page">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Analysis</div>
+        <h1>SurgMovPred</h1>
+        <p class="lede">A spreadsheet of cephalometric measurements goes in, a spreadsheet of predicted bone displacements comes out: 112 stacked scikit-learn regressors, one per target, no neural network, no image, and no mesh.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="Unpublished — the module isn't even listed in the extension's README.">unpublished</a>
+          <span class="badge cli">SurgMovPred_CLI</span>
+          <span class="badge neutral">no conda — Slicer's own Python</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliography</a>
+        </div>
+      </header>
+
+      <p>Prediction of the surgical movements of an orthognathic surgery from a
+      <strong>spreadsheet of cephalometric measurements</strong>. No neural network, no image, no
+      mesh: 112 stacked scikit-learn regressors, one per value to predict, applied
+      row by row to an Excel/CSV file.</p>
+
+      <h2 id="situation">1. Position in the pipeline</h2>
+
+      <p>Isolated tool. Nothing in the repository calls it, and it calls nothing in the
+      repository: it reads no volume, no mesh, no landmarks. Its input is a folder of
+      spreadsheets, its output another spreadsheet.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1050 140" role="img" aria-label="Complete SurgMovPred pipeline, from the input spreadsheet to the output spreadsheet">
+          <rect class="d-box-a" x="10" y="40" width="140" height="54" rx="6"/>
+          <text class="d-label" x="80" y="62" text-anchor="middle">Input spreadsheet</text>
+          <text class="d-label-s" x="80" y="78" text-anchor="middle">.csv / .xlsx / .ods</text>
+
+          <path class="d-arrow" d="M150 67 H175"/>
+          <path class="d-arrow-head" d="M175 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="175" y="40" width="150" height="54" rx="6"/>
+          <text class="d-label" x="250" y="62" text-anchor="middle">Column cleanup</text>
+          <text class="d-label" x="250" y="76" text-anchor="middle">+ ID detection</text>
+
+          <path class="d-arrow" d="M325 67 H350"/>
+          <path class="d-arrow-head" d="M350 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="350" y="40" width="150" height="54" rx="6"/>
+          <text class="d-label" x="425" y="62" text-anchor="middle">112 packages</text>
+          <text class="d-label" x="425" y="76" text-anchor="middle">loaded (~1.5 GB)</text>
+
+          <path class="d-arrow" d="M500 67 H525"/>
+          <path class="d-arrow-head" d="M525 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="525" y="40" width="150" height="54" rx="6"/>
+          <text class="d-label" x="600" y="62" text-anchor="middle">StandardScaler</text>
+          <text class="d-label-s" x="600" y="78" text-anchor="middle">computed, per package</text>
+
+          <path class="d-arrow" d="M675 67 H700"/>
+          <path class="d-arrow-head" d="M700 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="700" y="40" width="170" height="54" rx="6"/>
+          <text class="d-label" x="785" y="62" text-anchor="middle">StackingRegressor</text>
+          <text class="d-label-s" x="785" y="78" text-anchor="middle">predicts, 112 times</text>
+
+          <path class="d-arrow" d="M870 67 H895"/>
+          <path class="d-arrow-head" d="M895 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="895" y="40" width="145" height="54" rx="6"/>
+          <text class="d-label" x="967" y="62" text-anchor="middle">predictions_outputs</text>
+          <text class="d-label-s" x="967" y="78" text-anchor="middle">.xlsx / .csv</text>
+        </svg>
+        <figcaption>The complete pipeline: deterministic cleanup, then 112 independent regressions, one per target. No return trip into Slicer's 3D scene.</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Called</th><th>How</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge cli">SurgMovPred_CLI</span></td><td><code>slicer.cli.run(slicer.modules.surgmovpred_cli, …)</code> (<code>SurgMovPred.py:842</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The module isn't wired into the MRML scene: no <code>vtkMRMLNode</code> is created, read
+      or transformed. It's a launch interface sitting on top of a pandas script.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>Copy-paste leftovers from the <a href="../CNE/CNE.html">CNE</a> module (clinical-note summarization), not
+        to be mistaken for the actual pipeline: the <code>helpText</code> says <em>"This tool helps to
+        create summaries of clinical notes"</em>, the <code>parameterNodeWrapper</code> is documented with
+        <code>notesFolder_input</code> / <code>modelType</code> / <code>notesType</code>, and <code>process()</code> still names its
+        arguments <code>notesFolder_input</code> / <code>notesFolder_output</code>
+        (<code>SurgMovPred.py:236</code>, <code>SurgMovPred.py:815</code>).</p>
+      </div>
+
+      <h2 id="fichiers">2. Files involved</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>SurgMovPred/SurgMovPred.py</code></td>
+              <td>widget: 3 folder selectors, downloading of models and test files, dependency installation, ~400 lines of QSS</td>
+              <td>Slicer's Python</td>
+            </tr>
+            <tr>
+              <td><code>SurgMovPred_CLI/SurgMovPred_CLI.py</code></td>
+              <td>all of the processing: reading, column-name cleanup, <code>predict</code>, writing</td>
+              <td>Slicer's Python (scripted CLI)</td>
+            </tr>
+            <tr>
+              <td><code>SurgMovPred/Resources/UI/SurgMovPred.ui</code></td>
+              <td>3 fields (<code>inputFolderLineEdit</code>, <code>modelFolderLineEdit</code>, <code>outputFolderLineEdit</code>) + 4 buttons</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Only three positional parameters (<code>inputFolder</code>, <code>modelPath</code>, <code>outputFolder</code>,
+      <code>SurgMovPred_CLI.xml</code>): nothing is configurable — no threshold, no target
+      selection, no skeletal-class option.</p>
+
+      <h2 id="entree">3. Input and preprocessing</h2>
+
+      <p><strong>Accepted format.</strong> <code>load_data_from_directory()</code>
+      (<code>SurgMovPred_CLI.py:141</code>) collects every
+      <code>*.csv</code>, <code>*.xlsx</code>, <code>*.ods</code> file in the folder (extension in
+      lowercase <strong>and</strong> uppercase), reads them (<code>read_csv</code>, <code>read_excel</code>,
+      <code>read_excel(engine='odf')</code>) and <strong>concatenates</strong> them
+      (<code>pd.concat(..., ignore_index=True)</code>). No recursion into subfolders. For an
+      Excel workbook, only the <strong>first sheet</strong> is read — the official test file
+      contains seven (<code>all_data</code>, <code>demographics</code>,
+      <code>Invivo_ceph</code>, <code>surgical_mov</code>, <code>dolp_ceph_T0</code>, <code>dolp_ceph_T1</code>,
+      <code>dolp_ceph_total</code>), and it's <code>all_data</code> that sits in first position.</p>
+
+      <p><strong>Column-name normalization</strong>, <code>clean_name()</code>
+      (<code>SurgMovPred_CLI.py:39</code>), applied on input
+      to fall back onto the spelling used at training time:</p>
+
+      <ol>
+        <li>removal of <code>"</code>, <code>\</code>, <code>[</code>, <code>]</code>;</li>
+        <li>any character outside <code>[0-9a-zA-Z_']</code> becomes <code>_</code> — the apostrophe
+        is <strong>deliberately kept</strong> (code comment: for <code>Jarabak's</code> and <code>SM_A'_CP</code>);</li>
+        <li>collapsing of repeated <code>_</code>, trimmed at both ends;</li>
+        <li><code>"total"</code> → <code>"Total"</code>;</li>
+        <li><code>f_</code> prefix if the name starts with a digit.</li>
+      </ol>
+
+      <p>This cleanup explains the actual feature names: <code>SM-A-FH&nbsp;&nbsp;</code> (with two
+      trailing spaces, in the test file) becomes <code>SM_A_FH</code>, <code>Jarabak's ratio&nbsp;&nbsp;</code>
+      becomes <code>Jarabak's_ratio</code>, <code>FMA(MP-FH) Ang_2D</code> becomes <code>FMA_MP_FH_Ang_2D</code>.</p>
+
+      <p><strong>Patient identifier.</strong> <code>find_id_column()</code>
+      (<code>SurgMovPred_CLI.py:81</code>) tests 8 case-insensitive
+      patterns (<code>#</code>, <code>id</code>, <code>patient id</code>, <code>patient number</code>,
+      <code>subject</code>, …) then, as a last resort, any column containing both "patient" and
+      "id". In the test file, the column is <code>#</code>. On failure, the output column
+      <code>IDPatient</code> is filled with <code>pd.NA</code> with a plain warning.</p>
+
+      <p><strong>Value normalization.</strong> Each model package carries <strong>its own</strong>
+      <code>StandardScaler</code> <span class="badge calcule">computed</span> (centering + scaling,
+      <code>with_mean=True</code>, <code>with_std=True</code>), applied right before prediction
+      (<code>SurgMovPred_CLI.py:237</code>). No imputation: a missing value propagates as
+      <code>NaN</code> all the way to the output.</p>
+
+      <p><strong>Tolerance on the <code>_T0</code> suffix</strong> (<code>SurgMovPred_CLI.py:223</code>):
+      if the model expects <code>X_T0</code> and the column is named <code>X</code>, it is accepted.</p>
+
+      <div class="callout">
+        <div class="callout-title">Note</div>
+        <p>This is the only leniency; any other missing feature makes the <strong>entire
+        model</strong> get skipped with a warning, and the corresponding column is absent from the
+        result.</p>
+      </div>
+
+      <h2 id="modeles">4. The models</h2>
+
+      <p>The weights are <strong>not in the repository</strong>. <code>onDownloadDefaultModel()</code>
+      (<code>SurgMovPred.py:782</code>) downloads and unzips:</p>
+
+      <pre><code>https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/SurgMovPred/all_models.zip
+  -&gt; Documents/SlicerDownloads/SurgMovPred/Models/all_models/</code></pre>
+
+      <p><strong>706 MB</strong>, 112 folders, one <code>stacking_package.pkl</code> of ~13 MB each.
+      <code>load_all_model_packages()</code> does a recursive <code>Path.glob("**/stacking_package.pkl")</code>
+      and indexes by <code>package['target_name']</code>: pointing the selector at <code>all_models/</code>
+      loads all 112 models, pointing at a subfolder loads only one. The CLI's help text
+      mentions <code>saved_models/class_1</code>, <code>saved_models/class_None</code> folders —
+      <strong>this hierarchy by skeletal class does not exist in the published archive</strong>,
+      which is flat.</p>
+
+      <h3 id="modeles-paquet">4.1 Contents of a package</h3>
+
+      <p>Each <code>.pkl</code> is a four-key <code>joblib</code> dict, used as-is by
+      <code>SurgMovPred_CLI.py:212</code>:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Key</th><th>Content</th></tr></thead>
+          <tbody>
+            <tr><td><code>target_name</code></td><td>target name, e.g. <code>Mx_ALL_APoint_P-/A+_Pred</code> (raw form, with <code>-</code>, <code>/</code>, <code>+</code>)</td></tr>
+            <tr><td><code>features_names</code></td><td>ordered list of <strong>145</strong> feature names</td></tr>
+            <tr><td><code>scaler</code></td><td>fitted <code>sklearn.preprocessing.StandardScaler</code></td></tr>
+            <tr><td><code>model</code></td><td>fitted <code>sklearn.ensemble.StackingRegressor</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout ok">
+        <div class="callout-title">Verified</div>
+        <p>This information was read directly from
+        <code>all_models/Mn_MB_Genioplasty_Total_Pred/stacking_package.pkl</code> and
+        <code>all_models/Mx_ALL_APoint_P-_A_Pred/stacking_package.pkl</code> (pickle-stream
+        inspection, without execution). The 145 features are identical in both packages;
+        nothing formally guarantees the same holds for the other 110, but their near-identical
+        sizes (13.17–13.19 MB) strongly suggest it.</p>
+      </div>
+
+      <h3 id="modeles-architecture">4.2 The architecture</h3>
+
+      <p>No network. A <strong>stacking ensemble of three base regressors and one linear
+      meta-regressor</strong>, serialized with <code>_sklearn_version = 1.6.1</code>:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Role</th><th>Estimator</th><th>Parameters readable in the pickle</th></tr></thead>
+          <tbody>
+            <tr><td>base <code>multitask_elasticnet</code></td><td><code>ElasticNetCV</code></td><td>grid of <code>l1_ratio</code>, <code>n_alphas</code>, <code>eps</code>, <code>selection='cyclic'</code></td></tr>
+            <tr><td>base <code>lgbm</code></td><td><code>lightgbm.sklearn.LGBMRegressor</code></td><td><code>boosting_type='gbdt'</code>, <code>objective='regression'</code>, <code>num_leaves=31</code></td></tr>
+            <tr><td>base <code>gaussian_process</code></td><td><code>GaussianProcessRegressor</code></td><td>kernel <code>Product(ConstantKernel, RBF)</code>, <code>optimizer='fmin_l_bfgs_b'</code>, <code>normalize_y</code></td></tr>
+            <tr><td>meta</td><td><code>LinearRegression</code></td><td><code>stack_method='predict'</code>, <code>passthrough=False</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 850 260" role="img" aria-label="Stacking architecture: three base regressors combined by a linear meta-regression">
+          <rect class="d-box-a" x="10" y="103" width="150" height="54" rx="6"/>
+          <text class="d-label" x="85" y="125" text-anchor="middle">145 features</text>
+          <text class="d-label" x="85" y="139" text-anchor="middle">standardized</text>
+
+          <path class="d-arrow" d="M160 130 L230 37"/>
+          <path class="d-arrow-head" d="M230 37 l-9 -1 l4 -8 z"/>
+          <path class="d-arrow" d="M160 130 H230"/>
+          <path class="d-arrow-head" d="M230 130 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M160 130 L230 223"/>
+          <path class="d-arrow-head" d="M230 223 l-9 1 l4 -9 z"/>
+
+          <rect class="d-box-n" x="230" y="10" width="170" height="54" rx="6"/>
+          <text class="d-label" x="315" y="30" text-anchor="middle">ElasticNetCV</text>
+          <text class="d-label-s" x="315" y="44" text-anchor="middle">base — predicts</text>
+          <text class="d-label-s" x="315" y="57" text-anchor="middle">multitask_elasticnet</text>
+
+          <rect class="d-box-n" x="230" y="103" width="170" height="54" rx="6"/>
+          <text class="d-label" x="315" y="123" text-anchor="middle">LGBMRegressor</text>
+          <text class="d-label-s" x="315" y="137" text-anchor="middle">base — predicts</text>
+          <text class="d-label-s" x="315" y="150" text-anchor="middle">lightgbm gbdt</text>
+
+          <rect class="d-box-n" x="230" y="196" width="170" height="54" rx="6"/>
+          <text class="d-label" x="315" y="216" text-anchor="middle">GaussianProcessRegressor</text>
+          <text class="d-label-s" x="315" y="230" text-anchor="middle">base — predicts</text>
+          <text class="d-label-s" x="315" y="243" text-anchor="middle">Constant × RBF kernel</text>
+
+          <path class="d-arrow" d="M400 37 L470 123"/>
+          <path class="d-arrow-head" d="M470 123 l-9 -2 l2 -9 z"/>
+          <path class="d-arrow" d="M400 130 H470"/>
+          <path class="d-arrow-head" d="M470 130 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M400 223 L470 137"/>
+          <path class="d-arrow-head" d="M470 137 l-2 9 l-9 -3 z"/>
+
+          <rect class="d-box-n" x="470" y="103" width="170" height="54" rx="6"/>
+          <text class="d-label" x="555" y="123" text-anchor="middle">LinearRegression</text>
+          <text class="d-label-s" x="555" y="137" text-anchor="middle">meta — predicts</text>
+          <text class="d-label-s" x="555" y="150" text-anchor="middle">passthrough=False</text>
+
+          <path class="d-arrow" d="M640 130 H690"/>
+          <path class="d-arrow-head" d="M690 130 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="690" y="103" width="150" height="54" rx="6"/>
+          <text class="d-label" x="765" y="123" text-anchor="middle">1 predicted value</text>
+          <text class="d-label-s" x="765" y="139" text-anchor="middle">one of 112 targets</text>
+        </svg>
+        <figcaption>The meta-model sees only the three base models' predictions (<code>passthrough=False</code>), never the 145 original features.</figcaption>
+      </figure>
+
+      <p><code>passthrough=False</code> means the meta-model sees <strong>only</strong> the three
+      base models' predictions, not the 145 original features. <code>stack_method='predict'</code>:
+      one scalar value per base model, hence a three-input linear regression.</p>
+
+      <p>The file's dominant weight (13 MB for 145 features) comes from the
+      <code>GaussianProcessRegressor</code>, which keeps its training matrix, and from the
+      <a class="gterm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> booster.</p>
+
+      <p>Training is not in the repository: no script, no dataset, no metrics, no seed.
+      <strong>Not determinable from the repository</strong>: cohort size, validation protocol,
+      per-target performance.</p>
+
+      <h3 id="modeles-features">4.3 The 145 features</h3>
+
+      <p>Four families, reconstructed from <code>features_names</code> and cross-checked
+      against the <code>all_data</code> sheet of the test file:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Family</th><th>Count</th><th>Examples</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Point positions relative to the three reference planes — <strong>FH</strong> (Frankfort horizontal), <strong>MSP</strong> (midsagittal plane), <strong>CP</strong> (coronal plane)</td>
+              <td>~76</td>
+              <td><code>SM_A_FH</code>, <code>SM_GoL_MSP</code>, <code>SM_PNS_CP</code>, <code>SM_CoR_FH</code></td>
+            </tr>
+            <tr>
+              <td>Soft-tissue points, marked by the apostrophe</td>
+              <td>~20</td>
+              <td><code>SM_N'_FH</code>, <code>SM_Sn'_MSP</code>, <code>SM_ULip'_FH</code>, <code>SM_Pg'_MSP</code></td>
+            </tr>
+            <tr>
+              <td>Classic 2D cephalometric measurements</td>
+              <td>~12</td>
+              <td><code>SNA</code>, <code>SM_ANB_signed</code>, <code>SM_Witts</code>, <code>LAFH</code>, <code>Jarabak's_ratio</code>, <code>UAFH_LAFH</code>, <code>FMA_MP_FH_Ang_2D</code>, <code>IMPA_L1_MP_Ang_2D</code>, <code>U1_to_SN_Ang_2D</code>, <code>SM_Mx_Width</code>, <code>SM_Mn_Width</code>, <code>OP_to_FH_Ang_2D</code></td>
+            </tr>
+            <tr>
+              <td>Occlusal/dental measurements, in two sets suffixed <code>_T0</code> and <code>_Total</code></td>
+              <td>2 × ~18</td>
+              <td><code>MxMn_Overjet_R_T0</code> / <code>MxMn_Overjet_R_Total</code>, <code>MxMn_Molar_Relationship_L_T0</code>, <code>Mn_Gonions_to_Midline_Distances_R_Total</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>What exactly the two <code>_T0</code> / <code>_Total</code> sets mean is documented nowhere
+      in the repository. The naming (<code>T0</code> = before, <code>Total</code> = total variation) and
+      the fact that both are on the <strong>input</strong> side suggest the model receives the
+      pre-surgical state <em>and</em> the targeted <a class="gterm" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> outcome, in order to infer the bone
+      displacements to be carried out — this is an <strong>inference</strong>, not a claim made by
+      the code.</p>
+
+      <p>The columns <code>Gender</code>, <code>Surg</code>, <code>Genio</code>, <code>3piece</code>, <code>assymetry</code>,
+      <code>Skl_Cl_2</code> from the test file do not appear among the 145 features of the two
+      inspected packages: they are read and then ignored.</p>
+
+      <h3 id="modeles-cibles">4.4 What is predicted</h3>
+
+      <p>112 targets = <strong>28 structures × 4 components</strong>.</p>
+
+      <p>Components, based on target names: <code>P-/A+</code> (posterior negative / anterior
+      positive), <code>R-/L+</code> (right negative / left positive), <code>Down+</code> (vertical, down
+      positive), and <code>Total</code>. The first three are therefore the signed components of a
+      displacement vector in the cephalometric frame (CP, MSP, FH), the fourth very
+      likely its magnitude — <strong>inferred from the naming, the unit (mm) is written
+      nowhere</strong>.</p>
+
+      <p>The 28 structures:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Segment</th><th>Points</th></tr></thead>
+          <tbody>
+            <tr><td>Maxilla, <code>Mx_ALL_*</code> (10)</td><td>APoint, ANS, PNS, U3CanineTip L/R, U6MesialCuspTip L/R, UpperIncisorTip L/R, UpperIncisorTipMidpoint</td></tr>
+            <tr><td>Mandible, <code>Mn_ALL_*</code> (17)</td><td>BPoint, Gnathion, Menton, Pogonion, Gonion L/R, ChinSideCut L/R, MandibleBackCut L/R, L3CanineTip L/R, L6MesialCuspTip L/R, LowerIncisorTip L/R, LowerIncisorTipMidpoint</td></tr>
+            <tr><td>Genioplasty, <code>Mn_MB_Genioplasty</code> (1)</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>ALL</code> designates the entire bone segment (maxilla or mandible mobilized as a
+      block), <code>MB</code> the genioplasty segment. What is predicted, then, is the displacement
+      <strong>of landmark points rigidly attached to each segment</strong>, <span class="badge predit">predicted</span>,
+      not a rigid transform: nothing forces the maxilla's 10 points to be consistent
+      with one another (see §7).</p>
+
+      <h2 id="traitement">5. The core processing</h2>
+
+      <p><code>predict_all_targets()</code> (<code>SurgMovPred_CLI.py:194</code>), in full:</p>
+
+      <pre><code>for target_name, pack in packages.items():
+    X_target = df_cleaned[[feature_source[f] for f in pack['features_names']]]
+    X_target.columns = pack['features_names']
+    X_scaled = pack['scaler'].transform(X_target)
+    predictions_by_target[target_name] = pack['model'].predict(
+        pd.DataFrame(X_scaled, columns=..., index=df_cleaned.index))</code></pre>
+
+      <p>No post-correction, no bounding, no inter-target consistency, no confidence
+      interval — the <code>GaussianProcessRegressor</code> can produce a standard deviation, it
+      isn't asked to. Each target is handled independently, with a <code>try/except</code> per
+      target: a target that crashes doesn't interrupt the others, its column simply
+      disappears.</p>
+
+      <p>All 112 models are loaded into memory at once (<code>load_all_model_packages</code>), i.e.
+      <strong>~1.5 GB of RAM</strong> before the data is even read.</p>
+
+      <h2 id="sorties">6. Outputs</h2>
+
+      <p><code>save_results()</code> writes two files, same content, into the output folder:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Content</th></tr></thead>
+          <tbody>
+            <tr><td><code>predictions_outputs.xlsx</code></td><td>one row per input patient, <code>IDPatient</code> column then one column per predicted target</td></tr>
+            <tr><td><code>predictions_outputs.csv</code></td><td>same</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>index=True</code> in both cases: the pandas index (0, 1, 2…) becomes an unnamed
+      column. Column names are the packages' raw <code>target_name</code>, so with <code>/</code> and
+      <code>+</code> (<code>Mx_ALL_APoint_P-/A+_Pred</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong>There is no reapplication of the result whatsoever.</strong> Nothing builds a
+        matrix, moves a mesh, creates a Slicer node, or opens a view: the prediction stops
+        at the spreadsheet. The question "how is the prediction reapplied to produce a
+        visualizable result" has no answer in this repository — it's up to the operator to
+        carry the values into their planning software.</p>
+      </div>
+
+      <h2 id="predit-vs-calcule">7. What is predicted vs. what is computed</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Column-name cleanup, ID detection</td><td><span class="badge calcule">computed</span> deterministic (regex)</td><td>CLI</td></tr>
+            <tr><td>Standardization</td><td><span class="badge calcule">computed</span> learned <code>StandardScaler</code></td><td>CLI</td></tr>
+            <tr><td>Prediction of the 112 displacements</td><td><span class="badge predit">predicted</span> stacking ElasticNetCV + LightGBM + GP, meta <code>LinearRegression</code></td><td>CLI, CPU</td></tr>
+            <tr><td>Consolidation into a single segment transform</td><td><strong>nonexistent</strong></td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 760 200" role="img" aria-label="The points of a single segment are predicted independently, with no rigid consolidation step">
+          <rect class="d-box-n" x="10" y="73" width="190" height="54" rx="6"/>
+          <text class="d-label" x="105" y="93" text-anchor="middle">10 maxillary points</text>
+          <text class="d-label-s" x="105" y="109" text-anchor="middle">40 independent regressions</text>
+
+          <path class="d-arrow" d="M200 100 H255" stroke-dasharray="4 4"/>
+          <path class="d-arrow-head" d="M255 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="255" y="73" width="230" height="54" rx="6" stroke-dasharray="4 4"/>
+          <text class="d-label" x="370" y="93" text-anchor="middle">rigid transform</text>
+          <text class="d-label-s" x="370" y="109" text-anchor="middle">does not exist in the repository</text>
+
+          <path class="d-arrow" d="M485 100 H540" stroke-dasharray="4 4"/>
+          <path class="d-arrow-head" d="M540 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="540" y="73" width="210" height="54" rx="6" stroke-dasharray="4 4"/>
+          <text class="d-label" x="645" y="93" text-anchor="middle">consistent displacement</text>
+          <text class="d-label-s" x="645" y="109" text-anchor="middle">applicable to the mesh — hypothetical</text>
+        </svg>
+        <figcaption>The dashed boxes do not exist in the code: nothing guarantees a consistent rigid-body movement for an entire bone segment.</figcaption>
+      </figure>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>The maxilla's 10 points are predicted by 40 independent models. Nothing
+        guarantees that the predicted displacements are compatible with a rigid-body
+        movement of the maxillary block; a post-processing step (a least-squares rigid
+        fit on the predicted points) would be the natural complement, and it does not
+        exist.</p>
+      </div>
+
+      <h2 id="environnement">8. Environment</h2>
+
+      <p>Everything runs inside Slicer's Python. <code>check_dependencies()</code>
+      (<code>SurgMovPred.py:156</code>) is called on <strong>every</strong> click of Apply:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Packages</td><td><code>pandas</code>, <code>joblib</code>, <code>openpyxl</code>, <code>scikit-learn</code>, <code>lightgbm</code></td></tr>
+            <tr><td>Missing from the list</td><td><code>odfpy</code> — yet needed by <code>read_excel(engine='odf')</code> for the advertised <code>.ods</code> files</td></tr>
+            <tr><td>numpy</td><td><code>slicer.util.pip_install("numpy==2.4.0")</code> <strong>unconditional</strong>, on every Apply</td></tr>
+            <tr><td>macOS</td><td><code>ensure_mac_openmp()</code> downloads <code>libomp.dylib</code> from <code>mac.r-project.org</code> and drops it into Slicer's <code>cli-modules</code> folder, then loads it with <code>RTLD_GLOBAL</code> — LightGBM needs it</td></tr>
+            <tr><td>Compilation</td><td><code>CC=gcc</code> / <code>CXX=g++</code> forced during <code>pip_install</code>, restored afterward</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><code>pip_install("numpy==2.4.0")</code> runs <strong>unconditionally, on every click of
+        Apply</strong>. Replacing numpy under a live Slicer session is exactly what breaks
+        scipy's import elsewhere in the extension (Slicer's scipy is compiled against its
+        numpy). By far the most dangerous point in the module, triggered by the main
+        button.</p>
+      </div>
+
+      <p>Installation happens without conda, without GPU, without torch.</p>
+
+      <p>The CLI silences scikit-learn's <code>InconsistentVersionWarning</code>
+      (<code>SurgMovPred_CLI.py:19</code>): the packages were serialized with scikit-learn 1.6.1
+      and are unpickled with whatever version happens to be installed. The comment
+      accepts the risk ("models are tested for compatibility before being shipped").</p>
+
+      <h2 id="pieges">9. Pitfalls and fragile points</h2>
+
+      <ul>
+        <li><strong><code>pip_install("numpy==2.4.0")</code> on every run.</strong> Replacing numpy
+        under a live Slicer session is exactly what breaks scipy's import elsewhere in
+        the extension (Slicer's scipy is compiled against its numpy). By far the most
+        dangerous point in the module, and it's triggered by the main button.</li>
+        <li><strong>Inoperative "test files" button</strong>: <code>DownloadTestFiles()</code>
+        (<code>SurgMovPred.py:763</code>) does download <code>TestFiles.zip</code>, but only fills in the
+        input/output fields <code>if os.path.exists(.../V_FACE/DefaultList)</code> — a copy-paste
+        leftover from the VFACE module. Without <a href="../VFACE/VFACE.html">VFACE</a>'s test data, the archive is
+        downloaded and then ignored.</li>
+        <li><strong><code>.ods</code> advertised, <code>odfpy</code> not installed</strong> by <code>check_dependencies</code>
+        (it is, however, installed by the Anonymizer module, which can mask the problem
+        on a machine where both have been used).</li>
+        <li><strong>A missing feature = a model silently skipped.</strong> The log says
+        "Model 'X' skipped: missing N input feature(s)", but the output file itself simply
+        ends up with one fewer column. A poorly named spreadsheet can produce a
+        <code>predictions_outputs.xlsx</code> with zero prediction columns and no failure.</li>
+        <li><strong>Blind concatenation of the input files</strong>: two spreadsheets with
+        different columns give <code>NaN</code>, and <code>model.predict</code> on <code>NaN</code> raises —
+        the error is caught per target, so the result comes out partial without much of
+        it being visible.</li>
+        <li><strong>Only one Excel sheet is read.</strong> A workbook whose first sheet isn't
+        the data sheet produces an empty result.</li>
+        <li><strong>1.5 GB of models loaded systematically</strong>, even for a single row to
+        predict, even if the operator only cares about one target.</li>
+        <li><strong>No uncertainty on output</strong> even though one of the three base models is
+        a Gaussian process.</li>
+        <li><strong>No rigid consistency between the points of a given segment</strong> (§7).</li>
+        <li>The <code>helpText</code>, the parameter node's docstring, and <code>process()</code>'s
+        argument names describe an entirely different tool (clinical-note summarization).</li>
+      </ul>
+
+      <h2 id="litterature">10. Literature</h2>
+
+      <p><strong>No paper covers SurgMovPred.</strong> Neither the repository, nor the release,
+      nor the README cites any reference, and a search on the module's name returns
+      nothing. The module isn't even listed in the extension's README.</p>
+
+      <p>The published context, not to be confused with a description of this code:</p>
+
+      <ul>
+        <li><a href="https://pubmed.ncbi.nlm.nih.gov/35132764/">Machine-learning-based approach for predicting postoperative skeletal changes for orthognathic surgical planning (PubMed 35132764)</a> —
+        the problem posed is the same (predicting post-operative skeletal displacements
+        from pre-operative measurements), but nothing indicates this is the work behind
+        these weights.</li>
+        <li><a href="https://onlinelibrary.wiley.com/doi/10.1111/ocr.12805">Oliveira, Cevidanes, Bianchi et al., <em>Artificial intelligence as a prediction tool for orthognathic surgery assessment</em>, Orthodontics &amp; Craniofacial Research, 2024</a> —
+        same team (UNC/Pacific), but a different target: predicting the <em>need</em> for
+        surgery from lateral cephalograms, not the movements themselves.</li>
+        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10024836/">Prediction of orthognathic surgery plan from 3D cephalometric analysis via deep learning (PMC10024836)</a> —
+        same goal, deep-learning approach; SurgMovPred, meanwhile, is a classic tabular
+        model.</li>
+      </ul>
+
+      <p>The underlying tools, for their part, are documented:
+      <a href="https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.StackingRegressor.html"><code>StackingRegressor</code></a>
+      and <a href="https://lightgbm.readthedocs.io/">LightGBM</a>.</p>
+
+      <p>Detailed bibliography, retrieved files, and links to visit:
+      <a href="SOURCES.html">SOURCES.html</a> — including the NA-MIC Project Week 45 (Boston, 2026)
+      page devoted to this module, the only primary source found
+      (<a href="2026_Buisson_NAMIC_PW45_surgery_movement.html">2026_Buisson_NAMIC_PW45_surgery_movement.html</a>).</p>
+
+      <footer class="footer">
+        <a href="../index.html">← All tool pages</a> ·
+        <a href="SOURCES.html">Bibliography for this tool</a> ·
+        Source: <code>SurgMovPred.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

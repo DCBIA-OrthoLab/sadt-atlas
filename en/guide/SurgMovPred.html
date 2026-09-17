@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SurgMovPred — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="analyse">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html" aria-current="page">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Analysis</div>
+        <h1>SurgMovPred — estimate the expected bone movement after surgery</h1>
+        <p class="lede">SurgMovPred doesn't look at your volumes or your meshes: it takes a
+        spreadsheet of cephalometric measurements and turns it into a numeric estimate of the
+        bone displacements expected after orthognathic surgery — how far a point such as
+        Pogonion or the posterior nasal spine should move, along the three axes of space. No
+        imaging, no neural network: 112 small, independent statistical models, one per
+        predicted value, applied row by row to your table.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>Use it once you already have, per patient, a set of cephalometric measurements — the
+      pre-surgical state and the intended occlusal outcome — and you want a quick numeric
+      estimate of the corresponding bone displacements, across a whole batch of patients at
+      once rather than one at a time. It's a numeric complement to your own surgical planning,
+      not a 3D visualization tool.</p>
+
+      <div class="callout">
+        <div class="callout-title">A spreadsheet-only tool</div>
+        <p>SurgMovPred doesn't read any volume, surface, or Slicer landmark, and it doesn't
+        touch your 3D scene: nothing is created or displayed there. Everything happens on
+        disk — a folder of spreadsheets in, a folder of spreadsheets out.</p>
+      </div>
+
+      <h2 id="format">The input spreadsheet format</h2>
+      <p>This is where most people get stuck with this module: what it expects on input is
+      quite specific, and nothing warns you clearly when it isn't met.</p>
+      <ul>
+        <li><strong>A folder, not a single file.</strong> Every <code>.csv</code>,
+        <code>.xlsx</code>, and <code>.ods</code> file inside is read and stacked into one
+        big table, with no check that their columns actually match. Subfolders aren't
+        scanned.</li>
+        <li><strong>Only one sheet per workbook.</strong> For an Excel or <code>.ods</code>
+        file, only the <strong>first sheet</strong> is read. If your workbook has several
+        sheets (demographics, raw measurements…), make sure the one with per-patient
+        measurements comes first.</li>
+        <li><strong>Column headers get lightly cleaned up automatically:</strong> quotes and
+        brackets stripped, stray characters and spaces turned into underscores, doubled
+        underscores collapsed, "total" capitalized, and a header starting with a digit gets a
+        prefix. So you can generally keep your own headers as-is — <code>SM-A-FH  </code>
+        becomes <code>SM_A_FH</code> automatically, and apostrophes are kept on purpose for
+        names like <code>Jarabak's ratio</code>.</li>
+        <li><strong>But that cleanup doesn't excuse missing the right columns.</strong> Each of
+        the 112 models expects a precise list of roughly 145 measurements: point positions
+        relative to cephalometric reference planes, soft-tissue points, standard 2D
+        cephalometric measurements (SNA, ANB, Wits…), and occlusal measurements duplicated
+        into two sets — one for the starting state, the other most likely for the intended
+        target (that isn't spelled out anywhere; it's inferred from both being present on
+        input). A small tolerance exists for one of those two sets, but nothing beyond that:
+        the safest approach is to start from the example spreadsheet shipped with the module
+        and only replace its values.</li>
+        <li><strong>Patient ID column.</strong> It's auto-detected among common headers
+        (<code>#</code>, <code>ID</code>, <code>Patient ID</code>, <code>Patient Number</code>,
+        <code>Subject</code>…). If none matches, the output simply keeps an empty ID column —
+        the run still completes, but you lose the link back to your patients.</li>
+        <li><strong>No missing value is ever filled in.</strong> An empty cell stays empty all
+        the way through; it isn't estimated, and it doesn't get the rest of its row skipped
+        either.</li>
+      </ul>
+
+      <h2 id="besoin">What it needs, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>What to provide</h4>
+          <ul>
+            <li>A folder of spreadsheets (<code>.csv</code>, <code>.xlsx</code>, or
+            <code>.ods</code>) in the format described above</li>
+            <li>The trained models, downloaded once (dedicated button, about 700 MB)</li>
+            <li>An output folder</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>Two identical spreadsheets (<code>.xlsx</code> and <code>.csv</code>) in the
+            output folder</li>
+            <li>One row per input patient, one column per predicted displacement value</li>
+            <li>Your input spreadsheets and your Slicer scene are left untouched</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Steps</h2>
+      <ol class="steps">
+        <li><strong>Download the models.</strong> Dedicated button, about 700 MB, only needed
+        once but required before the first run.</li>
+        <li><strong>Prepare your input folder</strong> following the format above — one
+        consolidated spreadsheet or several files, either way, as long as the expected columns
+        are there.</li>
+        <li><strong>Set the three folders</strong>: input, downloaded models, output.</li>
+        <li><strong>Run it.</strong> There's nothing to tune: no threshold, no target
+        selection, no skeletal-class option. All 112 values are predicted at once, for every
+        row of the assembled table.</li>
+        <li><strong>Collect the two output spreadsheets</strong> from the folder you chose.</li>
+      </ol>
+
+      <h2 id="lire">How to read the result — and not read too much into it</h2>
+      <p>Each output column is a predicted displacement value for a given point on the
+      maxilla, the mandible, or the genioplasty segment, expressed along three components of
+      the cephalometric frame (front/back, left/right, up/down), plus a fourth "Total" column
+      that's most likely an overall magnitude. The unit is written nowhere in the tool; it's
+      probably millimeters, but that's an inference, not a stated certainty.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Each point is predicted on its own, not the whole
+        segment</div>
+        <p>The 112 output values come from 112 independent models, one per value. Nothing
+        guarantees that the ten points predicted for the maxilla, say, stay consistent with
+        each other: the result isn't a rigid transform of the bone block, only a collection of
+        pointwise displacements computed separately from one another. Don't reconstruct an
+        overall movement from these numbers without checking them against each other first.</p>
+      </div>
+
+      <p>The table carries no confidence interval and no reliability score: every cell is a
+      single value, with no margin of error attached. And the prediction stops at the
+      spreadsheet — SurgMovPred moves nothing in Slicer, builds no transform, opens no view.
+      It's up to you to carry the values into your planning software if you want to visualize
+      or apply them.</p>
+
+      <h2 id="coince">If something's off</h2>
+      <div class="callout warn">
+        <div class="callout-title">Clicking Apply reinstalls a dependency every time</div>
+        <p>Clicking Apply always forces a reinstall of numpy, even when everything was already
+        working. That makes the run slower, and swapping out a core numerical library inside
+        an already-running Slicer session can unsettle other tools that depend on it. If
+        another module starts misbehaving after you've used SurgMovPred, restart Slicer before
+        looking any further.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">A missing column in the output isn't a crash</div>
+        <p>If one of the expected values is missing from the result, nothing errors out
+        visibly: the model behind it was simply skipped because one of the columns it needed
+        couldn't be found after the header cleanup. The warning stays in Slicer's log, not in
+        the spreadsheet — if your output has almost no predicted columns, compare your headers
+        against the example spreadsheet before looking elsewhere.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Check which sheet is active in your workbook</div>
+        <p>Only the first sheet of an <code>.xlsx</code> or <code>.ods</code> file is read. If
+        your per-patient measurements aren't on the first sheet, SurgMovPred will read a
+        different one — or an empty one — without saying so.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">The test-files button doesn't fill anything in by itself</div>
+        <p>It does download an archive, but it only fills in the input and output folders if
+        another module's test data (VFACE's) is already present on the machine. On a machine
+        without it, clicking the button has no visible effect.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">All models are loaded on every run</div>
+        <p>SurgMovPred loads all 112 models into memory as soon as it runs, even for a single
+        patient or a single value you actually care about — roughly 1.5 GB of RAM before it
+        even reads your spreadsheet. Plan for that on a memory-constrained machine.</p>
+      </div>
+
+      <a class="deep-link" href="../SurgMovPred/SurgMovPred.html">
+        <b>How it actually works →</b>
+        <span>The Atlas page: the three-model stack and meta-model behind every predicted
+        value, the 145 expected measurements in detail, the copy-paste leftovers from another
+        module in the interface, and the limitations found in the code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../SurgMovPred/SurgMovPred.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

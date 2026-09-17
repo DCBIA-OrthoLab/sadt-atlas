@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoMatrix — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="utilitaires">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+    <div class="lang-switch">
+      <span class="cur">FR</span><a href="../../en/index.html" title="English">EN</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>pour utiliser les outils</small></a>
+      <a href="../index.html"><b>Atlas</b><small>comment ça marche dans le code</small></a>
+    </div>
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html" aria-current="page">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Utilitaires</div>
+        <h1>AutoMatrix — appliquer une matrice à toute une série de fichiers</h1>
+        <p class="lede">AutoMatrix applique une ou plusieurs matrices de transformation ITK à
+        tout un dossier de volumes et de fichiers de landmarks, en une seule fois. Pas de
+        réseau de neurones, pas de GPU : c'est un outil de mise en lot, pas de calcul — la
+        matrice, vous l'obtenez d'un recalage fait ailleurs.</p>
+      </header>
+
+      <h2 id="quand">Quand s'en servir</h2>
+      <p>Vous avez lancé un module de recalage (AREG, ASO, FlexReg…) et vous en avez tiré une
+      matrice de transformation (<code>.tfm</code>). Vous voulez maintenant appliquer cette
+      même matrice à d'autres fichiers du même patient — une segmentation, un second volume,
+      des landmarks — sans rouvrir chacun dans Slicer. Ou vous avez fait ce recalage pour toute
+      une série de patients et vous voulez traiter le dossier entier d'un coup. C'est le rôle
+      d'AutoMatrix : il ne recale rien lui-même, il rejoue une transformation déjà calculée.</p>
+
+      <div class="callout">
+        <div class="callout-title">Une matrice, un mouvement</div>
+        <p>Appliquée à un volume, la matrice déplace son contenu. Appliquée à un fichier de
+        landmarks, elle déplace les points exactement du même mouvement. C'est ce qui garantit
+        qu'un scan et ses repères restent alignés après être passés par AutoMatrix — à
+        condition d'utiliser la même matrice pour les deux.</p>
+      </div>
+
+      <h2 id="appariement">Comment les fichiers et les matrices se retrouvent</h2>
+      <p>AutoMatrix ne vous demande jamais de désigner à la main quelle matrice va avec quel
+      patient. Il devine la paire en comparant les noms de fichiers : il retire une liste de
+      mots-clés connus (<code>_Seg</code>, <code>_Or</code>, <code>_MAND</code>,
+      <code>_CB</code>, un horodatage <code>_T1</code>, <code>_T2</code>…) du nom du scan, et
+      une liste légèrement différente du nom de la matrice, jusqu'à obtenir dans les deux cas
+      un identifiant de patient. Si les deux identifiants obtenus sont identiques, le fichier
+      et la matrice sont appariés.</p>
+      <p>Le problème : ces deux listes de mots-clés ne sont pas les mêmes. La règle qui
+      fonctionne de façon fiable : faites commencer chaque nom de fichier par l'identifiant du
+      patient, suivi d'un underscore, puis de ce que vous voulez. Exemple qui marche :
+      <code>patient1_T1_MA.nii.gz</code> et <code>patient1_left_MA.tfm</code> s'apparient tous
+      les deux sur <code>patient1</code>, parce que <code>_T1</code> est reconnu côté scan et
+      <code>_left</code> côté matrice. Exemple qui échoue : <code>patient1_MA.nii.gz</code>
+      sans horodatage donne la clé <code>patient1_MA</code> côté scan, mais
+      <code>patient1</code> côté matrice — les deux ne correspondent plus, et ce fichier ne
+      recevra aucune matrice.</p>
+      <p>Un raccourci existe : si vous indiquez un seul fichier de matrice, et non un dossier,
+      il est appliqué tel quel à tous les patients du dossier d'entrée, sans qu'aucun nom
+      n'ait besoin de correspondre.</p>
+
+      <h2 id="besoin">Ce qu'il vous faut, ce que vous obtenez</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>À fournir</h4>
+          <ul>
+            <li>Un dossier de volumes en <code>.nii</code>, <code>.nii.gz</code> ou
+            <code>.nrrd</code>, et/ou de fichiers de landmarks Slicer
+            (<code>.mrk.json</code>)</li>
+            <li>Une matrice ITK (<code>.tfm</code>, <code>.h5</code> ou <code>.mat</code>), ou
+            un dossier de matrices nommées selon la même règle que les scans</li>
+            <li>À cocher si vos volumes sont des segmentations : la case dédiée, pour que les
+            étiquettes ne soient pas lissées à l'interpolation</li>
+            <li>Optionnel : un fichier de référence pour imposer la grille (taille,
+            orientation) des sorties</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>Ce qui sort</h4>
+          <ul>
+            <li>Une version transformée de chaque fichier apparié, rangée dans la même
+            arborescence que l'entrée</li>
+            <li>Les fichiers d'origine ne sont jamais modifiés</li>
+            <li>Dans un fichier de landmarks, seuls les points marqués comme définis se
+            déplacent</li>
+            <li>Aucune nouvelle matrice n'est produite : AutoMatrix consomme des
+            transformations, il n'en écrit pas</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Marche à suivre</h2>
+      <ol class="steps">
+        <li><strong>Désignez le dossier d'entrée.</strong> Scans et/ou fichiers de landmarks à
+        transformer ; tout le dossier est traité d'un coup.</li>
+        <li><strong>Désignez la matrice ou le dossier de matrices.</strong> Vérifiez que les
+        noms suivent la règle patient + suffixe (ci-dessus), ou pointez directement un seul
+        fichier pour l'appliquer à tout le monde.</li>
+        <li><strong>Cochez la case segmentation</strong> si vos volumes sont des labelmaps.</li>
+        <li><strong>Donnez un fichier de référence</strong> si vous voulez imposer la grille de
+        sortie ; sinon chaque fichier garde la grille de son volume d'entrée, et tout ce qui
+        sort du champ de vue après transformation est perdu.</li>
+        <li><strong>Choisissez un suffixe de sortie</strong>, et décidez si le nom de la
+        matrice doit y être ajouté — utile dès qu'un patient a plusieurs matrices (voir plus
+        bas).</li>
+        <li><strong>Indiquez le dossier de sortie</strong>, puis lancez. Une barre de
+        progression suit les fichiers traités.</li>
+      </ol>
+
+      <h2 id="miroir">Inverser gauche/droite sans chercher de matrice</h2>
+      <p>Si vous avez seulement besoin d'un miroir gauche/droite, inutile de fabriquer votre
+      propre matrice : le mode Mirror télécharge une matrice de réflexion toute prête et la
+      place dans le champ matrice à votre place, avec un suffixe de sortie dédié
+      (<code>_mir</code>).</p>
+      <div class="callout warn">
+        <div class="callout-title">Le miroir n'est pas centré sur votre patient</div>
+        <p>La réflexion se fait par rapport au plan sagittal de l'origine de la scène, pas par
+        rapport à celui du patient. Si votre patient n'est pas déjà centré dans la scène, le
+        résultat sera à la fois miroité et décalé — prévoyez un recalage après coup pour
+        rattraper le décalage.</p>
+      </div>
+
+      <h2 id="coince">Si ça coince</h2>
+      <div class="callout warn">
+        <div class="callout-title">Certains formats annoncés ne fonctionnent plus</div>
+        <p>L'interface propose encore les maillages (<code>.vtk</code>, <code>.vtp</code>,
+        <code>.stl</code>, <code>.off</code>, <code>.obj</code>) comme scans d'entrée pour les
+        empreintes optiques, et les matrices en <code>.npy</code> — les deux sont comptés dans
+        la barre de progression, mais aucun des deux ne produit de sortie : chaque fichier de
+        ce type est simplement ignoré, avec une ligne dans le journal d'erreurs. Une matrice en
+        <code>.txt</code> ne fonctionne que si c'est un fichier de transformation ITK, pas un
+        simple tableau 4×4.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Un appariement raté ne prévient pas</div>
+        <p>Si le nom d'un scan et celui d'une matrice ne se réduisent pas au même identifiant
+        de patient (voir plus haut), ce fichier ne sera tout simplement pas transformé — sans
+        message d'erreur ni avertissement visible. Si un patient manque à l'arrivée, la
+        première chose à vérifier est le nom de ses fichiers.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Une sortie peut en écraser une autre</div>
+        <p>Si vous décochez l'option qui ajoute le nom de la matrice au fichier de sortie, et
+        qu'un même patient a plusieurs matrices, tous les résultats portent le même nom :
+        chacun écrase le précédent, et il ne reste que la dernière matrice traitée. Laissez
+        cette option cochée dès que vous appliquez plus d'une matrice par patient.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Un fichier de landmarks peut disparaître silencieusement</div>
+        <p>Certaines transformations (déformation dense, B-spline) ne peuvent pas être
+        inversées mathématiquement. Quand c'est le cas, le fichier de landmarks correspondant
+        est sauté avec un simple avertissement dans le journal, alors que le volume, lui, est
+        bien transformé — le scan et ses repères peuvent donc se retrouver désynchronisés sans
+        que rien ne le signale à l'écran.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Pas d'enchaînement de matrices</div>
+        <p>Quand un patient a plusieurs matrices, chacune est appliquée séparément au fichier
+        d'entrée d'origine : vous obtenez un fichier de sortie par matrice, jamais une
+        composition de l'une avec l'autre.</p>
+      </div>
+
+      <a class="deep-link" href="../AutoMatrix/AutoMatrix.html">
+        <b>Comment ça marche vraiment →</b>
+        <span>La fiche Atlas : la convention de transformation ITK, le détail de
+        l'appariement fichier ↔ matrice, les formats réellement lus, et tous les pièges
+        relevés dans le code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Tous les guides</a> ·
+        <a href="../AutoMatrix/AutoMatrix.html">Fiche Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

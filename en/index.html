@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SADT Atlas — SlicerAutomatedDentalTools</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/site.js"></script>
+</head>
+<body data-cat="recalage">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="guide/index.html"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="index.html" aria-current="true"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="ALI/ALI.html">ALI</a></li>
+      <li><a href="ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="CNE/CNE.html">CNE</a></li>
+      <li><a href="MedX/MedX.html">MedX</a></li>
+      <li><a href="MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="findings.html">Findings</a></li>
+      <li><a href="glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <h1>SlicerAutomatedDentalTools — how each tool works</h1>
+        <p class="lede">One page per tool, organised around the <strong>pipeline</strong>: what is computed, what
+        is predicted by a network, when the model gets called, what it actually does, what the preprocessing is,
+        and what comes out.</p>
+        <p>This is not a user manual. Code links point to the
+        <code>~/Projects/UNC/SlicerAutomatedDentalTools</code> repository.</p>
+      </header>
+
+      <h2 id="lecture">Where to start</h2>
+      <p>From the bottom of the chain to the top. The first two steps are the ones everything else depends on.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Page</th><th>Why this one first</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><a href="FlexReg/FlexReg.html">FlexReg</a></td><td>The simplest, everything is explicit. Introduces the <a class="gterm" href="glossary.html#g-lps" title="See glossary">LPS</a>/<a class="gterm" href="glossary.html#g-ras" title="See glossary">RAS</a> conventions, crown segmentation, and patch-based <a class="gterm" href="glossary.html#g-icp" title="See glossary">ICP</a>.</td></tr>
+          <tr><td>2</td><td><a href="ALI/ALI.html">ALI</a> and <a href="AMASSS/AMASSS.html">AMASSS</a></td><td>The two landmark providers everything else depends on.</td></tr>
+          <tr><td>3</td><td><a href="ASO/ASO.html">ASO</a></td><td>Orientation, a prerequisite for most registrations.</td></tr>
+          <tr><td>4</td><td><a href="AREG_IOS/AREG_IOS.html">AREG_IOS</a> then <a href="AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></td><td>The registrations themselves.</td></tr>
+          <tr><td>5</td><td><a href="VFACE/VFACE.html">VFACE</a></td><td>Highest in the chain: it stacks all the others.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="briques">The three shared building blocks</h2>
+      <p>Almost every module rests on the same three components. Understanding them once means not re-reading
+      the same mechanics across five pages.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 690 292" role="img" aria-label="Call matrix: the six operator-driven modules against the three shared building blocks; ALI is called by all six, dentalmodelseg by four, AMASSS by two">
+          <text class="d-label-s" x="18" y="24">calls ↓</text>
+          <line class="d-rule" x1="18" y1="76" x2="664" y2="76"/>
+                    <text class="d-label" x="250" y="52" text-anchor="middle">ALI_CBCT / ALI_IOS</text>
+          <text class="d-label-s" x="250" y="66" text-anchor="middle">landmarks — predicted</text>
+          <text class="d-mono" x="250" y="274" text-anchor="middle">6 / 6</text>
+          <text class="d-label" x="400" y="52" text-anchor="middle">AMASSS_CLI</text>
+          <text class="d-label-s" x="400" y="66" text-anchor="middle">CBCT segmentation — predicted</text>
+          <text class="d-mono" x="400" y="274" text-anchor="middle">2 / 6</text>
+          <text class="d-label" x="550" y="52" text-anchor="middle">dentalmodelseg</text>
+          <text class="d-label-s" x="550" y="66" text-anchor="middle">IOS crowns — predicted</text>
+          <text class="d-mono" x="550" y="274" text-anchor="middle">4 / 6</text>
+                    <rect class="d-band" x="18" y="85" width="646" height="22" rx="3"/>
+          <text class="d-label" x="168" y="100" text-anchor="end">VFACE</text>
+          <circle class="d-dot" cx="250" cy="96" r="5.5"/>
+          <circle class="d-dot" cx="400" cy="96" r="5.5"/>
+          <circle class="d-dot-off" cx="550" cy="96" r="5.5"/>
+          <text class="d-label" x="168" y="126" text-anchor="end">AREG</text>
+          <circle class="d-dot" cx="250" cy="122" r="5.5"/>
+          <circle class="d-dot" cx="400" cy="122" r="5.5"/>
+          <circle class="d-dot" cx="550" cy="122" r="5.5"/>
+          <rect class="d-band" x="18" y="137" width="646" height="22" rx="3"/>
+          <text class="d-label" x="168" y="152" text-anchor="end">ASO</text>
+          <circle class="d-dot" cx="250" cy="148" r="5.5"/>
+          <circle class="d-dot-off" cx="400" cy="148" r="5.5"/>
+          <circle class="d-dot" cx="550" cy="148" r="5.5"/>
+          <text class="d-label" x="168" y="178" text-anchor="end">ALI</text>
+          <circle class="d-dot" cx="250" cy="174" r="5.5"/>
+          <circle class="d-dot-off" cx="400" cy="174" r="5.5"/>
+          <circle class="d-dot" cx="550" cy="174" r="5.5"/>
+          <rect class="d-band" x="18" y="189" width="646" height="22" rx="3"/>
+          <text class="d-label" x="168" y="204" text-anchor="end">FlexReg</text>
+          <circle class="d-dot" cx="250" cy="200" r="5.5"/>
+          <circle class="d-dot-off" cx="400" cy="200" r="5.5"/>
+          <circle class="d-dot" cx="550" cy="200" r="5.5"/>
+          <text class="d-label" x="168" y="230" text-anchor="end">GreedyReg</text>
+          <circle class="d-dot" cx="250" cy="226" r="5.5"/>
+          <circle class="d-dot-off" cx="400" cy="226" r="5.5"/>
+          <circle class="d-dot-off" cx="550" cy="226" r="5.5"/>
+          <line class="d-rule" x1="18" y1="256" x2="664" y2="256"/>
+          <text class="d-label-s" x="168" y="274" text-anchor="end">called by</text>
+        </svg>
+        <figcaption>Who calls what, found by grepping <code>slicer.modules.*</code>. A filled dot
+        means "actually launches". <strong>ALI sits in the path of all six modules</strong> — it's the
+        building block to understand first. Details in <a href="ALI/ALI.html">ALI</a> and
+        <a href="AMASSS/AMASSS.html">AMASSS</a>.</figcaption>
+      </figure>
+
+      <h2 id="fiches">All the pages</h2>
+
+      <h3>Registration</h3>
+      <div class="card-grid">
+        <a class="card" href="FlexReg/FlexReg.html"><span class="card-name">FlexReg</span><span class="card-desc">IOS registration with a hand-drawn patch</span></a>
+        <a class="card" href="AREG_IOS/AREG_IOS.html"><span class="card-name">AREG_IOS</span><span class="card-desc">IOS registration with a predicted patch — the automatic FlexReg</span></a>
+        <a class="card" href="AREG_CBCT/AREG_CBCT.html"><span class="card-name">AREG_CBCT</span><span class="card-desc">T1/T2 CBCT registration</span></a>
+        <a class="card" href="AREG_IOSCBCT/AREG_IOSCBCT.html"><span class="card-name">AREG_IOSCBCT</span><span class="card-desc">multimodal IOS ↔ CBCT registration</span></a>
+        <a class="card" href="GreedyReg/GreedyReg.html"><span class="card-name">GreedyReg</span><span class="card-desc">ITK-SNAP-style CBCT registration, Greedy engine</span></a>
+        <a class="card" href="MRI2CBCT/MRI2CBCT.html"><span class="card-name">MRI2CBCT</span><span class="card-desc">multimodal MRI ↔ CBCT registration</span></a>
+      </div>
+
+      <h3>Segmentation</h3>
+      <div class="card-grid">
+        <a class="card" href="AMASSS/AMASSS.html"><span class="card-name">AMASSS</span><span class="card-desc">craniofacial structure segmentation on CBCT</span></a>
+        <a class="card" href="BatchDentalSeg/BatchDentalSeg.html"><span class="card-name">BatchDentalSeg</span><span class="card-desc">DentalSegmentator and variants, in batch</span></a>
+      </div>
+
+      <h3>Landmarks and orientation</h3>
+      <div class="card-grid">
+        <a class="card" href="ALI/ALI.html"><span class="card-name">ALI</span><span class="card-desc">automatic landmark placement, CBCT and IOS</span></a>
+        <a class="card" href="ASO/ASO.html"><span class="card-name">ASO</span><span class="card-desc">automatic scan orientation, CBCT and IOS</span></a>
+      </div>
+
+      <h3>Analysis and classification</h3>
+      <div class="card-grid">
+        <a class="card" href="VFACE/VFACE.html"><span class="card-name">VFACE</span><span class="card-desc">facial asymmetry classification</span></a>
+        <a class="card" href="DOCShapeAXI/DOCShapeAXI.html"><span class="card-name">DOCShapeAXI</span><span class="card-desc">3D shape classification with explainability</span></a>
+        <a class="card" href="CLIC/CLIC.html"><span class="card-name">CLIC</span><span class="card-desc">impacted canine classification and localisation</span></a>
+        <a class="card" href="SurgMovPred/SurgMovPred.html"><span class="card-name">SurgMovPred</span><span class="card-desc">surgical movement prediction</span></a>
+      </div>
+
+      <h3>Utilities</h3>
+      <div class="card-grid">
+        <a class="card" href="AutoCrop3D/AutoCrop3D.html"><span class="card-name">AutoCrop3D</span><span class="card-desc">batch volume cropping, without resampling</span></a>
+        <a class="card" href="AutoMatrix/AutoMatrix.html"><span class="card-name">AutoMatrix</span><span class="card-desc">batch transform application</span></a>
+      </div>
+
+      <h3>Text and natural language</h3>
+      <p>These don't process images at all: they run a language model, on clinical text for the first three, on
+      the operator's request for the last one. Kept in their own group because the name doesn't give it away.</p>
+      <div class="card-grid">
+        <a class="card" href="CNE/CNE.html"><span class="card-name">CNE</span><span class="card-desc"><em>Clinical Notes Extraction</em> — extraction from clinical notes, local llama.cpp and GGUF models</span></a>
+        <a class="card" href="MedX/MedX.html"><span class="card-name">MedX</span><span class="card-desc">report summarisation (fine-tuned, local BART-large-cnn) and dashboard</span></a>
+        <a class="card" href="MedicalDataAnonymizer/MedicalDataAnonymizer.html"><span class="card-name">MedicalDataAnonymizer</span><span class="card-desc">text document de-identification (Presidio + spaCy) — not a DICOM anonymiser</span></a>
+        <a class="card" href="Agent/Agent.html"><span class="card-name">Agent</span><span class="card-desc">launching the other modules from natural language</span></a>
+      </div>
+
+      <h2 id="carte">Call map</h2>
+      <p>Found by grepping <code>slicer.modules.*</code> and <code>conda run -m &lt;module&gt;</code> invocations.
+      An arrow means "actually launches".</p>
+      <pre class="ascii"><code>Agent ──────────────► Agent_CLI ──► (routes to any module)
+
+VFACE ──────────────► AMASSS_CLI
+       ├────────────► ALI_CBCT
+       ├────────────► AREG_CBCT
+       ├────────────► Automatrix_CLI
+       └────────────► VFACE_CLI
+
+AREG ───────────────► AREG_CBCT / AREG_IOS / AREG_IOSCBCT
+       ├────────────► AMASSS_CLI
+       ├────────────► ALI_CBCT / ALI_IOS
+       └────────────► dentalmodelseg (CrownSegmentationcli)
+
+ASO ────────────────► PRE_ASO_CBCT / SEMI_ASO_CBCT
+       ├────────────► PRE_ASO_IOS / SEMI_ASO_IOS
+       ├────────────► ALI_CBCT
+       └────────────► dentalmodelseg
+
+ALI ────────────────► ALI_CBCT / ALI_IOS
+       └────────────► dentalmodelseg
+
+FlexReg ────────────► FlexReg_CLI
+       ├────────────► dentalmodelseg
+       └────────────► ALI_IOS
+
+GreedyReg ──────────► GreedyReg_CLI
+       └────────────► ALI_CBCT
+
+AMASSS ─────────────► AMASSS_CLI
+AutoMatrix ─────────► Automatrix_CLI
+DOCShapeAXI ────────► DOCShapeAXI_CLI
+SurgMovPred ────────► SurgMovPred_CLI
+CNE ────────────────► CNE_CLI
+MRI2CBCT ───────────► mri2cbct_{approx, lr_crop, tmj_crop, orient_center_mri,
+                               resample_cbct_mri, reg}
+MedX ───────────────► medx_summarize, medx_dashboard
+
+CLIC, AutoCrop3D, BatchDentalSeg, Medical_Data_Anonymizer : standalone</code></pre>
+
+      <h2 id="divergences">When the paper doesn't describe the code</h2>
+      <p>A frequent case here, flagged at the top of the relevant <code>SOURCES</code> pages.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Tool</th><th>The paper describes</th><th>The code does</th></tr></thead>
+        <tbody>
+          <tr><td><a href="AMASSS/AMASSS.html">AMASSS</a></td><td><a class="gterm" href="glossary.html#g-unetr" title="See glossary">UNETR</a> <a class="gterm" href="glossary.html#g-monai" title="See glossary">MONAI</a>, 128³ crop</td><td><a class="gterm" href="glossary.html#g-nnunet" title="See glossary">nnU-Net</a> v2 <code>PlainConvUNet</code></td></tr>
+          <tr><td><a href="VFACE/VFACE.html">VFACE</a></td><td>unsupervised UMAP + spectral clustering</td><td>3 supervised binary <a class="gterm" href="glossary.html#g-lightgbm" title="See glossary">LightGBM</a> models</td></tr>
+          <tr><td><a href="DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td>ResNet-18, condyles as <strong>binary</strong></td><td>dual-branch 4096 points + 42 views, <strong>4-class</strong> checkpoint</td></tr>
+          <tr><td><a href="AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></td><td>two passes, SimpleElastix</td><td>one pass, itk-elastix</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="constats">What the reading turned up</h2>
+      <p>Found while documenting, not while hunting for bugs. The "verified" column distinguishes what was
+      reproduced or confirmed directly from the code from what a page reports and still needs checking.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Where</th><th>Symptom</th><th>Verified</th></tr></thead>
+        <tbody>
+          <tr><td><a href="MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></td><td><code>anonymize_text_presidio</code> does <code>return text</code> on any exception: the <code>_anonymized</code> file holds the <strong>untouched</strong> text, and the UI shows "Complete!"</td><td>yes, read line by line</td></tr>
+          <tr><td><a href="CLIC/CLIC.html">CLIC</a></td><td>the <code>[SEG]</code>/<code>[PROGRESS]</code> markers are emitted through <code>logger.info</code> with a prefix, the reader tests <code>startswith</code>: the segmentation is <strong>never loaded</strong> into Slicer</td><td>yes</td></tr>
+          <tr><td><a href="BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></td><td>NasoMaxillaDentSeg: the rename list is out of order, the last 4 segments get the wrong name and the wrong colour</td><td>yes</td></tr>
+          <tr><td><a href="AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a> · <a href="MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></td><td><code>MatrixRetrieval</code> ignores <code>CenterOfRotationPoint</code> (absent from the whole repository); the output volume is resampled again with this matrix, so the <code>.tfm</code> <strong>and</strong> the image drift apart from <a class="gterm" href="glossary.html#g-elastix" title="See glossary">elastix</a></td><td>yes, to be measured on a case</td></tr>
+          <tr><td><a href="MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></td><td><code>install_function()</code> requests <code>nnunet_version==2.8.0</code>, a package that doesn't exist (PyPI 404); the 7 callers ignore the return value</td><td>yes</td></tr>
+          <tr><td><a href="ASO/ASO.html">ASO</a></td><td>the semi-CBCT mode requires a <code>.tfm</code> that only PRE_ASO writes: fails patient by patient unless a <code>.tfm</code> is already lying in the folder</td><td>yes</td></tr>
+          <tr><td><a href="AMASSS/AMASSS.html">AMASSS</a></td><td>"small <a class="gterm" href="glossary.html#g-fov" title="See glossary">FOV</a>" is broken (<code>highDefinition</code> missing from the <code>.xml</code>); DICOM input is ignored; <code>temp_fold</code> shared with AREG and <a href="VFACE/VFACE.html">VFACE</a>, unconditional <code>rmtree</code></td><td>reported</td></tr>
+          <tr><td><a href="AutoMatrix/AutoMatrix.html">AutoMatrix</a></td><td><code>.npy</code> and mesh support advertised but unreadable since <code>7bc362b</code></td><td>tested by the agent</td></tr>
+          <tr><td><a href="CNE/CNE.html">CNE</a></td><td>the Ortho model requests <code>model-q4_0.gguf</code>, the HF repo only has <code>model-q4_k_m.gguf</code> (404)</td><td>tested by the agent</td></tr>
+          <tr><td><a href="DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td>the CLI is written against the shapeaxi 1.0.x API while <code>install_pytorch</code> installs <code>&gt;=2.0.2</code></td><td>reported</td></tr>
+          <tr><td><a href="Agent/Agent.html">Agent</a></td><td><code>resolve_tool_path</code> looks for a <code>CLI files</code> folder absent from the repository; 17 of 23 signatures are out of step with the real <code>argparse</code></td><td>reported</td></tr>
+          <tr><td><a href="SurgMovPred/SurgMovPred.html">SurgMovPred</a></td><td><code>pip_install("numpy==2.4.0")</code> <strong>unconditional on every Apply</strong></td><td>reported</td></tr>
+          <tr><td><a href="VFACE/VFACE.html">VFACE</a></td><td><code>INPUT_KEYS</code> doesn't cover <code>inputVolume</code> / <code>t1_folder</code> / <code>input_path</code>: the selective rollback replays the slow steps on the whole batch</td><td>reported</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="conda">Shared conda environment</h2>
+      <div class="callout warn">
+        <div class="callout-title">Coupling worth knowing</div>
+        <p><a href="ALI/ALI.html">ALI</a>, <a href="AREG_CBCT/AREG_CBCT.html">AREG</a>,
+        <a href="ASO/ASO.html">ASO</a>, <a href="DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a> and
+        <a href="FlexReg/FlexReg.html">FlexReg</a> share the same conda environment
+        <code>shapeaxi</code>, on <strong>Python 3.12</strong>. A change to the Python version breaks all of
+        them at once. Details in <a href="FlexReg/FlexReg.html">FlexReg</a>, Environment section.</p>
+      </div>
+
+      <h2 id="organisation">Folder layout</h2>
+      <p>One folder per tool. Each one holds:</p>
+      <ul>
+        <li><code>&lt;Tool&gt;.html</code> — the pipeline, read from the code;</li>
+        <li><code>SOURCES.html</code> — the bibliography: what's deposited here, what's meant to be read
+        online, and the "neighbourhood" (related work that <strong>does not describe</strong> the code);</li>
+        <li>the retrieved documents, as PDF where the publisher allows it, otherwise as <code>.xml</code>
+        (JATS, the full text) with a readable <code>.txt</code> alongside it.</li>
+      </ul>
+      <p>The original <code>.md</code> files are kept next to the HTML pages.</p>
+      <p>29 PDFs and 54 full texts, all verified: the PDFs are paginated, the XML files carry a text body.
+      Nothing was obtained by working around a paywall — arXiv, PLOS, PMC/NCBI, HAL, institutional repositories,
+      author pages, and author-deposited versions. Anything paywalled is given as a link with its DOI.</p>
+
+      <h3>Retrieving a text the publisher doesn't serve</h3>
+      <p>Author manuscripts deposited with the NIH are free to read but often invisible to the usual routes.
+      What works, tested:</p>
+      <pre><code>curl -sL "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&amp;id=&lt;number without PMC&gt;"</code></pre>
+      <p>What fails on the same articles: <code>pmc.ncbi.nlm.nih.gov/.../pdf/</code> (anti-bot HTML),
+      Europe PMC's <code>fullTextXML</code> (empty), the BioC API (<em>open access subset</em> only). And for
+      MDPI, <code>mdpi-res.com/d_attachment/...</code> serves the real PDF where <code>mdpi.com/.../pdf</code>
+      returns a page.</p>
+
+      <h3>What isn't published anywhere</h3>
+      <p>Checked against Crossref, OpenAlex, Europe PMC, arXiv, HAL and the full NA-MIC tree:
+      <a href="FlexReg/FlexReg.html">FlexReg</a> and its MGL track, <strong><a href="ALI/ALI.html">ALI_IOS</a></strong>,
+      <a href="AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a>, <a href="CLIC/CLIC.html">CLIC</a>,
+      <a href="CNE/CNE.html">CNE</a>, <a href="AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a>,
+      <a href="AutoMatrix/AutoMatrix.html">AutoMatrix</a>,
+      <a href="MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a>, the three variants
+      of <a href="BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a>, and the nnU-Net version of
+      <a href="AMASSS/AMASSS.html">AMASSS</a>. For several of these, a NA-MIC Project Week page is the only
+      written description that exists — they are deposited in the relevant folders.</p>
+
+      <footer class="footer">
+        Static site, no external dependency. Serve with
+        <code>python3 -m http.server</code> from this folder, or open <code>index.html</code> directly.
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

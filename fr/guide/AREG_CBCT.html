@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AREG_CBCT — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="recalage">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+    <div class="lang-switch">
+      <span class="cur">FR</span><a href="../../en/index.html" title="English">EN</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>pour utiliser les outils</small></a>
+      <a href="../index.html"><b>Atlas</b><small>comment ça marche dans le code</small></a>
+    </div>
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html" aria-current="page">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Recalage</div>
+        <h1>AREG_CBCT — recaler un CBCT de suivi sur l'initial</h1>
+        <p class="lede">AREG_CBCT superpose deux CBCT du même patient pris à deux moments
+        différents (T1 et T2), en s'appuyant sur une région osseuse censée ne pas avoir
+        bougé — base du crâne, mandibule ou maxillaire. Le recalage lui-même est un calcul
+        géométrique classique, sans réseau de neurones : reproductible, mais qui dépend
+        entièrement du choix d'un bon point d'ancrage.</p>
+      </header>
+
+      <h2 id="quand">Quand s'en servir</h2>
+      <p>Dès que vous voulez comparer deux CBCT du même patient — avant/après traitement,
+      suivi de croissance, contrôle post-chirurgical — et que vous avez besoin qu'ils
+      partagent le même repère spatial pour être superposés ou mesurés. AREG_CBCT ne fait
+      que ce recalage voxel à voxel sur une structure osseuse stable : vos deux scans
+      doivent déjà appartenir au même patient et représenter deux temps distincts.</p>
+
+      <h2 id="modes">Trois modes, un seul recalage</h2>
+      <p>Les trois modes aboutissent au même calcul ; ils ne diffèrent que par ce qui se
+      passe avant.</p>
+      <ul>
+        <li><strong>Semi-Automated</strong> — vous fournissez vous-même les masques de la
+        région de référence sur T1. Le plus direct si ce travail est déjà fait.</li>
+        <li><strong>Fully-Automated</strong> — AREG_CBCT calcule ces masques à votre place.
+        À réserver aux cas où vos CBCT T1 sont déjà orientés de façon homogène entre eux.</li>
+        <li><strong>Orientation &amp; Registration</strong> — AREG_CBCT commence par centrer
+        T1, y poser des repères et l'orienter sur une référence commune, avant de calculer
+        les masques et de recaler. Le mode le plus complet, pour des T1 sans orientation
+        homogène au départ.</li>
+      </ul>
+      <div class="callout">
+        <div class="callout-title">Lequel choisir</div>
+        <p>Vous avez déjà des masques ? Semi-Automated. Pas de masques, mais des T1 déjà
+        orientés de la même façon ? Fully-Automated. Ni l'un ni l'autre ? Orientation &amp;
+        Registration. Dans les trois cas, vous cochez une ou plusieurs régions de référence
+        (<strong>Cranial Base</strong>, <strong>Mandible</strong>, <strong>Maxilla</strong>) :
+        chacune lance un recalage indépendant, avec sa propre sortie.</p>
+      </div>
+
+      <h2 id="besoin">Ce qu'il vous faut, ce que vous obtenez</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>À fournir</h4>
+          <ul>
+            <li>Un CBCT initial (T1) et un CBCT de suivi (T2) par patient, nommés avec les
+            suffixes <code>_T1</code> et <code>_T2</code> — c'est ce nommage qui permet de
+            les apparier automatiquement, rien d'autre</li>
+            <li>Formats acceptés : <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>,
+            <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code></li>
+            <li>En Semi-Automated : un dossier de masques de la région de référence sur T1,
+            déjà préparés</li>
+            <li>En Fully-Automated et Orientation &amp; Registration : les modèles de
+            segmentation et d'orientation, à télécharger une fois</li>
+            <li>Une ou plusieurs régions de référence cochées</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>Ce qui sort</h4>
+          <ul>
+            <li>Un dossier par région recalée, contenant pour chaque patient le CBCT T2
+            recalé et la matrice de transformation (<code>.tfm</code>) correspondante</li>
+            <li>Le CBCT T1 et vos fichiers d'origine restent inchangés</li>
+            <li>Si « Merge Segmentations » est coché, les segmentations finales de T1 et du
+            T2 recalé</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Marche à suivre</h2>
+      <ol class="steps">
+        <li><strong>Choisissez le mode.</strong> Semi-Automated, Fully-Automated ou
+        Orientation &amp; Registration — voir plus haut.</li>
+        <li><strong>Désignez les dossiers T1 et T2.</strong> Vérifiez que chaque paire de
+        fichiers partage bien le même identifiant patient, suivi de <code>_T1</code> ou
+        <code>_T2</code>.</li>
+        <li><strong>En Semi-Automated, indiquez le dossier de masques T1.</strong> Sans lui,
+        il n'y a rien à recaler.</li>
+        <li><strong>Cochez la ou les régions de référence.</strong> Cranial Base, Mandible,
+        Maxilla — chacune lance son propre recalage.</li>
+        <li><strong>Téléchargez les modèles si c'est votre premier lancement</strong>, puis,
+        si vous le souhaitez, cochez dans « Review and manual adjustment » les étapes que
+        vous voulez pouvoir vérifier avant de continuer.</li>
+        <li><strong>Indiquez un dossier de sortie et lancez.</strong> Si des pauses de revue
+        sont activées, le run s'arrête après chaque étape cochée : vous inspectez le
+        résultat, vous l'ajustez à la souris si besoin — pour le recalage, en déplaçant le
+        scan superposé — puis vous passez au patient suivant ou reprenez le run entier.</li>
+      </ol>
+
+      <h2 id="temps">Combien de temps</h2>
+      <p>Le recalage lui-même tourne sur processeur, sans carte graphique, et sur un seul
+      fil d'exécution pour rester reproductible d'un run à l'autre — un choix qui
+      privilégie la stabilité du résultat sur la vitesse. Les étapes qui l'entourent
+      (segmentation automatique des masques, orientation) sont, elles, bien plus rapides
+      avec un GPU. D'après la publication qui décrit la méthode, comptez <strong>moins de
+      cinq minutes par patient</strong> pour l'ensemble de la chaîne ; sans GPU pour les
+      étapes amont, prévoyez davantage sur une grosse série.</p>
+
+      <h2 id="coince">Si ça coince</h2>
+      <div class="callout warn">
+        <div class="callout-title">Un patient ne ressort pas, sans message d'erreur</div>
+        <p>L'appariement T1/T2 ne fonctionne qu'avec les suffixes <code>_T1</code> et
+        <code>_T2</code> dans le nom de fichier. Toute autre convention (<code>_T3</code>,
+        <code>_baseline</code>, une date…) empêche AREG_CBCT de reconnaître la paire, et ce
+        patient est silencieusement ignoré — rien ne s'affiche pour le signaler. Si un
+        patient manque à l'arrivée, la première chose à vérifier est le nom de ses
+        fichiers.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Évitez les mots-clés de masque dans le nom d'un scan</div>
+        <p>AREG_CBCT reconnaît un fichier de masque à des mots-clés dans son nom
+        (<code>seg</code>, <code>mask</code>, <code>pred</code>, ou l'abréviation de la
+        région — <code>cb</code>, <code>mand</code>, <code>max</code>). Le premier fichier
+        qui correspond est pris tel quel, sans vérification que c'en est bien un. Un scan
+        nommé par exemple <code>P1_T1_MAX.nii.gz</code> peut donc être confondu avec un
+        masque de maxillaire.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Import DICOM</div>
+        <p>Convertissez vos CBCT en <code>.nii.gz</code> avant de lancer AREG_CBCT. L'entrée
+        DICOM n'est proposée que dans le mode Orientation &amp; Registration, et reste
+        fragile même là : partir de fichiers déjà convertis évite la surprise.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">La matrice enregistrée peut légèrement s'écarter du
+        meilleur alignement trouvé</div>
+        <p>Le fichier <code>.tfm</code> et le CBCT recalé restent cohérents entre eux, mais
+        tous les deux peuvent s'écarter un peu de l'alignement réellement optimal calculé
+        pendant le recalage. L'écart dépend de la position du crâne dans le volume, et reste
+        faible si vos images sont déjà bien centrées — ce qui est le cas après un passage
+        par Orientation &amp; Registration. Si vous réutilisez cette matrice ailleurs, dans
+        AutoMatrix par exemple, vérifiez toujours la superposition à l'œil avant de vous y
+        fier.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">« Include Approximation Step » n'a plus d'effet</div>
+        <p>La case reste cochée par défaut dans l'interface, mais ne change rien au
+        résultat : ne comptez pas dessus pour accélérer ou affiner un recalage qui pose
+        problème.</p>
+      </div>
+
+      <h2 id="apres">Et après</h2>
+      <p>Le CBCT recalé et sa matrice sont réutilisables directement — dans AutoMatrix,
+      dans les outils d'analyse de la chaîne, ou pour une simple superposition visuelle dans
+      Slicer. Comme pour tout recalage automatique, un contrôle visuel rapide avant de vous
+      en servir pour une mesure reste de bon sens. Notez aussi que la matrice ne tient pas
+      compte d'un éventuel centrage effectué en amont sur le T2 : pour ramener le scan de
+      suivi jusqu'à son repère d'origine, il faut recomposer cette étape avec la matrice
+      d'AREG_CBCT, pas l'une sans l'autre.</p>
+
+      <a class="deep-link" href="../AREG_CBCT/AREG_CBCT.html">
+        <b>Comment ça marche vraiment →</b>
+        <span>La fiche Atlas : le recalage elastix rigide, l'appariement des patients, les
+        modes qui s'enchaînent en coulisse, et les limites relevées dans le code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Tous les guides</a> ·
+        <a href="../AREG_CBCT/AREG_CBCT.html">Fiche Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

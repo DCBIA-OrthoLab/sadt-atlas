@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AREG_IOS — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="recalage">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html" aria-current="true"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html" aria-current="page">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Registration</div>
+        <h1>AREG_IOS</h1>
+        <p class="lede">Longitudinal T1/T2 registration of Intra Oral Scans by <a class="gterm" href="../glossary.html#g-icp" title="See glossary">ICP</a> restricted to a stable region — a palatal patch predicted by a network (Butterfly) or a mucogingival band computed from predicted landmarks (MGL), processed in batches of folders.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1007/978-3-031-46914-5_18" target="_blank" rel="noopener" title="AReg IOS: Automatic Registration on IntraOral Scans.">Hutin 2023 · LNCS 14350</a>
+          <span class="badge cli">AREG_IOS</span>
+          <span class="badge neutral">conda env: shapeaxi</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliography</a>
+        </div>
+      </header>
+
+      <p>Longitudinal T1/T2 registration of Intra Oral Scans. Same principle as
+      FlexReg.md — a rigid ICP restricted to a stable region — but the
+      region is <strong>predicted by a network</strong> instead of being drawn by the operator, and
+      processing runs <strong>in batches of folders</strong> instead of patient by patient.</p>
+
+      <p>Two modes coexist in the same CLI:</p>
+      <ul>
+        <li><strong>Butterfly</strong> — upper arch, palatal patch predicted by a multi-view <code>MonaiUNetHRes</code>;</li>
+        <li><strong>MGL</strong> — lower arch, geodesic band around the mucogingival line, built from the 13 MG landmarks predicted by ALI_IOS. It's the same code as <a href="../FlexReg/FlexReg.html">FlexReg</a>'s MGL path, copied into the CLI.</li>
+      </ul>
+
+      <h2 id="situation">1. Position in the chain</h2>
+
+      <p>AREG_IOS is a CLI. Its only caller in the repository is the AREG module, via
+      <code>AREG/AREG_Method/IOS.py</code>. It doesn't call any other module itself:
+      everything it needs (segmentation, orientation, landmarks) is produced
+      <strong>upstream</strong> by the steps the orchestrator stacks ahead of it.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 990 260" role="img" aria-label="AREG_IOS chain: inputs, upstream preprocessing depending on mode, predicted or computed patch, ICP, outputs">
+          <rect class="d-box" x="10" y="90" width="140" height="60" rx="6"/>
+          <text class="d-label" x="80" y="115" text-anchor="middle">T1 + T2</text>
+          <text class="d-label-s" x="80" y="132" text-anchor="middle">IOS per patient</text>
+
+          <path class="d-arrow" d="M150 120 H190"/>
+          <path class="d-arrow-head" d="M190 120 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="190" y="90" width="170" height="60" rx="6"/>
+          <text class="d-label" x="275" y="115" text-anchor="middle">Upstream preprocessing</text>
+          <text class="d-label-s" x="275" y="132" text-anchor="middle">CrownSeg + PRE_ASO_IOS / ALI_IOS</text>
+
+          <path class="d-arrow" d="M360 120 H385 V50 H400"/>
+          <path class="d-arrow-head" d="M400 50 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M360 120 H385 V200 H400"/>
+          <path class="d-arrow-head" d="M400 200 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="400" y="20" width="200" height="60" rx="6"/>
+          <text class="d-label" x="500" y="45" text-anchor="middle">Butterfly patch</text>
+          <text class="d-label-s" x="500" y="62" text-anchor="middle">predicted — 2D UNet, 7 views</text>
+
+          <rect class="d-box" x="400" y="170" width="200" height="60" rx="6"/>
+          <text class="d-label" x="500" y="195" text-anchor="middle">MGL band</text>
+          <text class="d-label-s" x="500" y="212" text-anchor="middle">computed — spline + Dijkstra</text>
+
+          <path class="d-arrow" d="M600 50 H625 V120 H650"/>
+          <path class="d-arrow" d="M600 200 H625 V120 H650"/>
+          <path class="d-arrow-head" d="M650 120 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="650" y="90" width="150" height="60" rx="6"/>
+          <text class="d-label" x="725" y="115" text-anchor="middle">Rigid ICP</text>
+          <text class="d-label-s" x="725" y="132" text-anchor="middle">moving T2 → fixed T1</text>
+
+          <path class="d-arrow" d="M800 120 H840"/>
+          <path class="d-arrow-head" d="M840 120 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="840" y="90" width="140" height="60" rx="6"/>
+          <text class="d-label" x="910" y="115" text-anchor="middle">Outputs</text>
+          <text class="d-mono" x="910" y="132" text-anchor="middle">.vtk + .tfm</text>
+        </svg>
+        <figcaption>Upstream preprocessing depends on the mode (Butterfly vs MGL); the CLI then produces either a palatal patch <span class="badge predit">predicted</span> by a network, or an MGL band <span class="badge calcule">computed</span>, before the rigid ICP.</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>AREG mode</th><th>Steps stacked before AREG_IOS</th><th>Source</th></tr></thead>
+          <tbody>
+            <tr><td><code>Auto_IOS</code> / Butterfly</td><td><code>CrownSegmentationcli</code> T1 and T2 → <code>PRE_ASO_IOS</code> T1 and T2</td><td><code>AREG/AREG_Method/IOS.py:594</code></td></tr>
+            <tr><td><code>Semi_IOS</code> / Butterfly</td><td>nothing: the scans must already carry <code>Universal_ID</code> and be oriented</td><td><code>AREG/AREG_Method/IOS.py:743</code></td></tr>
+            <tr><td><code>Auto_IOS</code> / MGL</td><td><code>CrownSegmentationcli</code> T1 and T2 → <code>ALI_IOS</code> T1 and T2</td><td><code>AREG/AREG_Method/IOS.py:40</code></td></tr>
+            <tr><td><code>Semi_IOS</code> / MGL</td><td>same: MGL also segments, since <a href="../ALI/ALI.html">ALI</a> doesn't place anything without tooth labels</td><td><code>AREG/AREG_Method/IOS.py:743</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The Butterfly/MGL choice is a combo box on the widget
+      (<code>AREG/AREG.py:660</code>), read by <code>isMGLRegistration()</code>
+      (<code>AREG/AREG.py:753</code>) and passed as <code>reg_type</code>.</p>
+
+      <p>Conceptually upstream, <strong><a href="../FlexReg/FlexReg.html">FlexReg</a> produces exactly the same input</strong>: an array
+      of 0/1 points named <code>Butterfly</code> or <code>Bottom_MGL</code>. A scan patched by hand in
+      FlexReg passes unchanged into AREG_IOS's ICP.</p>
+
+      <h2 id="fichiers">2. Files involved</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
+          <tbody>
+            <tr><td><code>AREG_IOS/AREG_IOS.py</code></td><td>the CLI, 451 lines: Butterfly loop, <code>RunMGL</code>, writing <code>.tfm</code> files</td><td>conda env <code>shapeaxi</code></td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS_utils/PredPatch.py</code></td><td>palatal patch inference + morphological post-processing</td><td>same, <strong>CUDA mandatory</strong></td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS_utils/net.py</code></td><td><code>MonaiUNetHRes</code>: PyTorch3D rendering + <a class="gterm" href="../glossary.html#g-monai" title="See glossary">MONAI</a> UNet</td><td>same</td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS_utils/dataset.py</code></td><td>T1/T2 pairing, canonical orientation, normalization, tensors</td><td>same</td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS_utils/mgl_patch.py</code></td><td>MGL band: spline, snap, Dijkstra via binary heap</td><td>same, CPU</td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS_utils/ICP.py</code></td><td>wrapped <code>vtkIterativeClosestPointTransform</code></td><td>same, CPU</td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS_utils/post_process.py</code></td><td><code>RemoveIslands</code>, <code>DilateLabel</code>, <code>ErodeLabel</code> on the mesh graph</td><td>same, pure-Python CPU</td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS_utils/vtkSegTeeth.py</code></td><td>extraction of the patch's point cloud</td><td>same</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Unlike <a href="../FlexReg/FlexReg.html">FlexReg</a></strong>, AREG_IOS doesn't go through <code>slicer.cli.run</code> despite
+      its Slicer CLI <code>.xml</code>. <code>run_conda_tool("areg")</code>
+      (<code>AREG/AREG.py:2667</code>) builds:</p>
+
+      <pre><code>conda run -n shapeaxi python -m AREG_IOS "&lt;T1&gt;" "&lt;T2&gt;" "&lt;output&gt;" "&lt;model&gt;" \
+  "&lt;suffix&gt;" "&lt;log_path&gt;" "&lt;areg_mode&gt;" ["&lt;reg_type&gt;" "&lt;patch_radius&gt;" "&lt;lm_T1&gt;" "&lt;lm_T2&gt;"]</code></pre>
+
+      <p>Values are appended <strong>in the parameter dictionary's iteration order</strong> —
+      hence the "Key order matters" comments in
+      <code>AREG/AREG_Method/IOS.py</code>. The module is found because
+      <code>give_pythonpath_windows()</code> (<code>AREG/AREG.py:3190</code>) pushes Slicer's
+      <code>searchPaths</code> into the conda environment's <code>PYTHONPATH</code>.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>Consequence: <code>AREG_IOS/AREG_IOS.xml</code> is <strong>dead</strong>. It only declares
+        7 parameters, skips index 4, and ignores <code>reg_type</code>, <code>patch_radius</code>,
+        <code>lm_T1</code>, <code>lm_T2</code>. Its only purpose is to register <code>slicer.modules.areg_ios</code> so
+        the orchestrator can reference the module object.</p>
+      </div>
+
+      <h2 id="entrees">3. Inputs and preprocessing</h2>
+
+      <h3>3.1 T1/T2 pairing</h3>
+
+      <p><code>Sort()</code> (<code>AREG_IOS/AREG_IOS_utils/dataset.py:98</code>) and
+      <code>sort()</code> (<code>AREG_IOS/AREG_IOS_utils/dataset.py:267</code>):</p>
+
+      <ol>
+        <li><code>glob</code> over both folders, filtered to <code>.vtk .vtp .stl .obj</code> (the <code>.tfm</code>
+        files are explicitly excluded);</li>
+        <li>files are classified Upper/Lower by substring search:
+        <code>["Lower","_L","L_","Mandibule","Md"]</code> and <code>["Upper","_U","U_","Maxilla","Mx"]</code>;</li>
+        <li>pairing works by <strong>literally stripping the <code>T1</code> / <code>T2</code> substring</strong>
+        from the basename and comparing what's left;</li>
+        <li>matching Upper↔Lower for the same patient works by additionally stripping the
+        words Upper/Lower and comparing.</li>
+      </ol>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>Non-negotiable assumptions: the name literally contains <code>T1</code> or <code>T2</code>, and an
+        arch marker. A <code>_T4</code> pairs with nothing (the
+        <code>TIMEPOINT-SUFFIX</code> comment in <code>AREG_IOS/AREG_IOS.py:318</code> points to the
+        central note in <code>AREG_CBCT/AREG_CBCT_utils/utils.py:83</code>).</p>
+      </div>
+
+      <p><code>SortLower()</code> (<code>AREG_IOS/AREG_IOS_utils/dataset.py:173</code>) is the
+      MGL variant: a <strong>recursive</strong> glob (<code>**/*</code>), because <code>CrownSegmentationcli</code>
+      writes into a subfolder named after the csv (<code>liste_csv_file_T1_Seg</code>), and
+      it pairs lower arches alone, without requiring the matching upper
+      pair.</p>
+
+      <h3>3.2 Canonical orientation (Butterfly only)</h3>
+
+      <p><code>DatasetPatch.__getitem__</code> (<code>AREG_IOS/AREG_IOS_utils/dataset.py:39</code>)
+      calls <code>orientation()</code> (<code>AREG_IOS/AREG_IOS_utils/orientation.py:42</code>)
+      with the target <code>[[-0.5,-0.5,0], [0,0,0], [0.5,-0.5,0]]</code> and the teeth
+      <code>["3","8","9","14"]</code> = UR6, UR1, UL1, UL6.</p>
+
+      <p>It's the same algorithm as FlexReg.md §3 (two successive
+      Rodrigues rotations + translation), but on <strong>different landmarks</strong>:
+      <a href="../FlexReg/FlexReg.html">FlexReg</a> uses 3, 5, 12, 14 (UR6, UR4, UL4, UL6), AREG_IOS uses the molars
+      and the <strong>central incisors</strong>, averaging their two centroids to get
+      the midpoint. Same kind of result: <a class="gterm" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane ≈ <code>z=0</code>,
+      <code>+y</code> anterior, <code>+x</code> patient's left side.</p>
+
+      <p>The frame is <strong>right-handed with x = patient's left and y = anterior</strong>, so
+      <code>z = x × y</code> points inferiorly for a maxilla — the 7 cameras placed
+      at <code>z ≈ +0.9</code> therefore look at the arch <strong>from the occlusal side</strong>, the palate side.
+      (A geometric deduction from the target, not a claim made by the code.)</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>A failed orientation <strong>doesn't stop the prediction</strong>: <code>NoSegmentationSurf</code> and
+        <code>ToothNoExist</code> are caught, a warning is written, and the network runs on the
+        scan as-is. The error message says "UR6, UR1, UL1 or UR6" — a typo, it
+        should read UL6.</p>
+      </div>
+
+      <h3>3.3 Normalization</h3>
+
+      <p><code>ScaleSurf()</code> (<code>AREG_IOS/AREG_IOS_utils/transformation.py:181</code>)
+      recenters on the bounding box center and applies
+      <code>scale = 1 / ||bounds_max − center||</code>. Then <code>ComputeNormals</code> (point
+      normals, <code>SplittingOff</code> — <strong>mandatory</strong>, otherwise the order and count of
+      vertices change).</p>
+
+      <p>The three tensors:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tensor</th><th>Content</th><th>Shape</th><th>dtype</th></tr></thead>
+          <tbody>
+            <tr><td><code>V</code></td><td>vertices after orientation + normalization</td><td><code>(N_v, 3)</code></td><td>float32</td></tr>
+            <tr><td><code>F</code></td><td>triangles, column 0 of <code>GetPolys()</code> removed</td><td><code>(N_f, 3)</code></td><td>int64</td></tr>
+            <tr><td><code>CN</code></td><td>color-encoded normals: <code>(n·0.5+0.5)·255</code> then <code>/255</code></td><td><code>(N_v, 3)</code></td><td>float32</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Despite its name, <code>CN</code> ("color normal") really is a color <strong>per vertex</strong> —
+      <code>GetColorArray</code> (<code>AREG_IOS/AREG_IOS_utils/utils.py:83</code>) loops over
+      the points, not the cells. The round trip through 0–255 integers quantizes
+      the normals to 8 bits; that's deliberate, training saw the same thing.</p>
+
+      <div class="callout">
+        <div class="callout-title">Important point</div>
+        <p>The network is fed the oriented/normalized surface,
+        but the label array is written onto the <strong>raw</strong> surface
+        (<code>dataset.getUpperSurf(idx, time)</code>, read independently). Both share the same
+        vertex order, so the indexing is valid, and the ICP runs in the input file's
+        coordinates — not in the canonical frame.</p>
+      </div>
+
+      <h2 id="modele">4. The model — MonaiUNetHRes</h2>
+
+      <p>Weights file: a single <code>.ckpt</code> in the model folder, selected by
+      <code>getModel(..., extension="ckpt")</code> (<code>AREG/AREG_Method/IOS.py:266</code>).
+      Source: <code>AREG_model.zip</code>, release
+      <a href="https://github.com/HUTIN1/AREG/releases/download/v1.0.0/AREG_model.zip">HUTIN1/AREG v1.0.0</a>
+      (<code>AREG/AREG_Method/IOS.py:272</code>). Loaded via
+      <code>torch.load(path)["state_dict"]</code> — a PyTorch Lightning checkpoint.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1080 160" role="img" aria-label="Palatal patch prediction pipeline: multi-view rendering, 2D UNet, reprojection, morphological closing">
+          <rect class="d-box" x="10" y="50" width="160" height="60" rx="6"/>
+          <text class="d-label" x="90" y="75" text-anchor="middle">Oriented surface</text>
+          <text class="d-label-s" x="90" y="91" text-anchor="middle">+ normalized</text>
+          <text class="d-mono" x="90" y="104" text-anchor="middle">V, F, CN</text>
+
+          <path class="d-arrow" d="M170 80 H190"/>
+          <path class="d-arrow-head" d="M190 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="190" y="50" width="160" height="60" rx="6"/>
+          <text class="d-label" x="270" y="75" text-anchor="middle">7-view rendering</text>
+          <text class="d-label-s" x="270" y="91" text-anchor="middle">PyTorch3D, 320×320</text>
+          <text class="d-label-s" x="270" y="104" text-anchor="middle">z ≈ 0.9</text>
+
+          <path class="d-arrow" d="M350 80 H370"/>
+          <path class="d-arrow-head" d="M370 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="370" y="50" width="160" height="60" rx="6"/>
+          <text class="d-label" x="450" y="75" text-anchor="middle">2D MONAI UNet</text>
+          <text class="d-label-s" x="450" y="91" text-anchor="middle">predicted — patch vs background</text>
+          <text class="d-label-s" x="450" y="104" text-anchor="middle">in=4, out=2</text>
+
+          <path class="d-arrow" d="M530 80 H550"/>
+          <path class="d-arrow-head" d="M550 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="550" y="50" width="160" height="60" rx="6"/>
+          <text class="d-label" x="630" y="75" text-anchor="middle">Reprojection + vote</text>
+          <text class="d-label-s" x="630" y="91" text-anchor="middle">pix_to_face</text>
+          <text class="d-label-s" x="630" y="104" text-anchor="middle">argmax over 7 views</text>
+
+          <path class="d-arrow" d="M710 80 H730"/>
+          <path class="d-arrow-head" d="M730 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="730" y="50" width="170" height="60" rx="6"/>
+          <text class="d-label" x="815" y="75" text-anchor="middle">Morph. closing</text>
+          <text class="d-label-s" x="815" y="91" text-anchor="middle">dilate ×2 + erode ×2</text>
+          <text class="d-label-s" x="815" y="104" text-anchor="middle">edge graph</text>
+
+          <path class="d-arrow" d="M900 80 H920"/>
+          <path class="d-arrow-head" d="M920 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="920" y="50" width="150" height="60" rx="6"/>
+          <text class="d-label" x="995" y="75" text-anchor="middle">Array</text>
+          <text class="d-mono" x="995" y="91" text-anchor="middle">Butterfly</text>
+          <text class="d-label-s" x="995" y="104" text-anchor="middle">PointData</text>
+        </svg>
+        <figcaption>Multi-view rendering, a per-view 2D UNet <span class="badge predit">predicted</span>, reprojection onto the mesh by voting, then a morphological closing <span class="badge calcule">computed</span> to fill in the holes left by a degenerate vote (writes only to the first vertex of each triangle).</figcaption>
+      </figure>
+
+      <h3>4.1 Architecture</h3>
+
+      <p><code>AREG_IOS/AREG_IOS_utils/net.py:61</code>. A <code>LightningModule</code> that
+      contains <strong>both the renderer and the network</strong>:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Backbone</td><td><code>monai.networks.nets.UNet</code>, <code>spatial_dims=2</code></td></tr>
+            <tr><td>Channels</td><td><code>channels=(16, 32, 64, 128, 256)</code>, <code>strides=(2,2,2,2)</code>, <code>num_res_units=2</code></td></tr>
+            <tr><td>Input</td><td><code>in_channels=4</code> — normals RGB + 1 depth channel</td></tr>
+            <tr><td>Output</td><td><code>out_channels=2</code> — background / patch</td></tr>
+            <tr><td>Wrapper</td><td><code>TimeDistributed</code>: folds the view axis into the batch, applies the UNet, unfolds it</td></tr>
+            <tr><td>Loss (training)</td><td><code>monai.losses.DiceCELoss(include_background=False, to_onehot_y=True, softmax=True)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>So it's an <strong>ordinary 2D UNet</strong>; everything "3D" about it lives in the rendering.
+      The <code>HRes</code> in the name doesn't correspond to anything specific in the code.</p>
+
+      <p>The <code>inspect.signature(DiceCELoss.__init__)</code> block picks between <code>weight</code> and
+      <code>ce_weight</code> depending on the installed MONAI version. <code>class_weights</code> is always
+      <code>None</code> at inference, so this block's only purpose is to re-import the checkpoint without
+      crashing.</p>
+
+      <h3>4.2 The multi-view rendering</h3>
+
+      <p><code>setup_ico_verts()</code> (<code>AREG_IOS/AREG_IOS_utils/net.py:114</code>) —
+      <strong>7 camera positions</strong>; despite the name <code>ico_verts</code>, it isn't an
+      icosphere:</p>
+
+      <pre><code>[0, 0, 0.9]  [0.2, 0, 0.9]  [-0.2, 0, 0.9]  [0, 0.2, 0.9]
+[0, -0.2, 0.9]  [-0.2, -0.2, 0.9]  [0.2, -0.2, 0.9]</code></pre>
+
+      <p>Seven points clustered at <code>z = 0.9</code>, all looking at the origin
+      (<code>look_at_rotation</code>, <code>T = -Rᵀ·C</code>). This is <strong>not</strong> a <a class="gterm" href="../glossary.html#g-fly-by" title="See glossary">fly-by</a> over the sphere
+      like <a href="../ALI/ALI.html">DentalModelSeg</a> or <a href="../ALI/ALI.html">ALI</a>: it's a single occlusal view, slightly
+      shifted seven times, which only makes sense because the scan was just placed
+      into the canonical frame beforehand.</p>
+
+      <p><code>setup_render()</code> (<code>AREG_IOS/AREG_IOS_utils/net.py:132</code>):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td><code>image_size</code></td><td><strong>320</strong></td></tr>
+            <tr><td><code>blur_radius</code></td><td>0</td></tr>
+            <tr><td><code>faces_per_pixel</code></td><td>1</td></tr>
+            <tr><td><code>max_faces_per_bin</code></td><td>200000</td></tr>
+            <tr><td><code>perspective_correct</code></td><td>True</td></tr>
+            <tr><td>Camera</td><td><code>FoVPerspectiveCameras</code>, default (60° fov)</td></tr>
+            <tr><td>Lighting</td><td><code>AmbientLights</code> + <code>HardPhongShader</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>For each camera, <code>render()</code> (<code>AREG_IOS/AREG_IOS_utils/net.py:184</code>)
+      produces:</p>
+
+      <ul>
+        <li><code>images[..., 0:3]</code> — the Phong rendering of the <code>TexturesVertex(CN)</code> texture,
+        i.e. the normals;</li>
+        <li><code>zbuf</code> — the rasterizer's depth map, concatenated as the 4<sup>th</sup>
+        channel;</li>
+        <li><code>pix_to_face</code> — for each pixel, <strong>the index of the face it hits</strong>, or <code>-1</code>
+        if the ray hits nothing.</li>
+      </ul>
+
+      <p>Final shapes: <code>X (1, 7, 4, 320, 320)</code>, <code>PF (1, 7, 1, 320, 320)</code>,
+      <code>x (1, 7, 2, 320, 320)</code>.</p>
+
+      <p><code>PF</code> is the pivot of the whole mechanism: it's the <strong>pixel → face link</strong> that
+      lets a 2D segmentation be reprojected onto the mesh without ever doing
+      inverse ray casting. The rasterizer is called twice (<code>self.renderer(...)</code>
+      then <code>self.renderer.rasterizer(...)</code>) — the second call, without <code>R</code>/<code>T</code>, redoes
+      the rasterization with the rasterizer's default camera. This works
+      because <code>MeshRenderer.__call__</code> has already pushed <code>R</code>/<code>T</code> into the
+      camera's <code>kwargs</code>, but it's duplicated work on every view.</p>
+
+      <h3>4.3 From the 2D prediction to the per-vertex label</h3>
+
+      <p><code>AREG_IOS/AREG_IOS_utils/PredPatch.py:36</code>:</p>
+
+      <pre><code>x, X, PF = self.model((V, F, CN))
+x = self.softmax(x * (PF &gt;= 0))          # softmax dim=2, over the 2 channels
+P_faces = torch.zeros(2, F.shape[1])
+for pf, pred in zip(PF.squeeze(), x.squeeze(0)):   # loop over the 7 views
+    P_faces[:, pf] += pred
+P_faces = torch.argmax(P_faces, dim=0)
+V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
+
+      <p>Three things to understand:</p>
+
+      <ol>
+        <li><strong>The background mask.</strong> <code>x * (PF &gt;= 0)</code> zeroes out the logits of empty pixels.
+        After softmax they become <code>(0.5, 0.5)</code> — not 0. So they contribute a
+        half-vote to both classes, which cancels out at the <code>argmax</code> but dilutes the
+        real votes. Faces of index <code>-1</code> (the background) write into
+        <code>P_faces[:, -1]</code>, i.e. <strong>the mesh's last face</strong>, which ends up
+        absorbing that noise.</li>
+        <li><strong>The accumulation doesn't really accumulate.</strong> <code>P_faces[:, pf] += pred</code> is an
+        <code>index_put_</code> without <code>accumulate=True</code>: when several pixels from the same view
+        land on the same face (the general case, since a face covers several pixels),
+        <strong>only one contribution survives</strong>, non-deterministically. The sum across the 7 views,
+        though, does work (7 separate Python loop iterations).</li>
+        <li><strong>The face → vertex vote is degenerate.</strong> <code>V_labels_prediction[F[0,:,0]] = P_faces</code>
+        only writes to the <strong>first vertex of each triangle</strong>. A vertex that is
+        never in position 0 of its face list stays at 0. The patch therefore comes out
+        full of holes by construction — and it's the morphological post-processing that
+        repairs it, not a cosmetic refinement.</li>
+      </ol>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p>The three points above are <strong>facts about the code</strong>, not conjectures: the background mask dilutes the real votes without changing the argmax outcome, the <code>index_put_</code> accumulation loses contributions without <code>accumulate=True</code>, and the vote only writes to <code>F[:,0]</code>, leaving the patch full of holes by construction.</p>
+      </div>
+
+      <p>Then <code>torch.where(&gt;= 1, 1, 0)</code>, <code>numpy_to_vtk</code>, an array named <strong><code>Butterfly</code></strong>,
+      added to the raw surface's <code>PointData</code>.</p>
+
+      <h3>4.4 Post-processing</h3>
+
+      <p><code>AREG_IOS/AREG_IOS_utils/post_process.py</code>, called in exactly this
+      order (<code>AREG_IOS/AREG_IOS_utils/PredPatch.py:77</code>):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Call</th><th>Actual parameters</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td><code>RemoveIslands(surf, arr, 33, 500, ignore_neg1=True)</code></td><td>label <strong>33</strong></td><td><strong>none</strong>: the array only contains 0 and 1. Dead code.</td></tr>
+            <tr><td><code>RemoveIslands(..., label, 200, ignore_neg1=True)</code> for <code>label</code> ∈ {0, 1}</td><td><code>min_count=200</code></td><td>any connected component with fewer than 200 vertices is relabeled with its neighborhood's majority label</td></tr>
+            <tr><td><code>DilateLabel(..., 1, iterations=2, dilateOverTarget=False, target=None)</code></td><td>2 iterations</td><td>sets to 1 any neighbor of a vertex at 1</td></tr>
+            <tr><td><code>ErodeLabel(..., 1, iterations=2, target=None)</code></td><td>2 iterations</td><td>gives back to their neighbor the vertices at 1 that touch a vertex at 0</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><code>RemoveIslands(surf, arr, 33, 500, ignore_neg1=True)</code> can't do anything: the targeted label, 33, never exists in the array (which only contains 0 and 1). It's dead code.</p>
+      </div>
+
+      <p>Dilation then erosion of the same radius = a <strong>morphological closing on the
+      edge graph</strong>: the holes left by the first-vertex vote get filled in,
+      and the boundary comes back to roughly where it was.</p>
+
+      <p>Connectivity is that of the incident cells (<code>GetPointCells</code> then
+      <code>GetCellPoints</code>), so a 1-ring neighborhood. It's all pure Python, VTK call by
+      VTK call, over ~100,000 vertices: it's the dominant compute cost after
+      inference. <code>NeighborLabel</code> uses
+      <code>max(neighbor_labels, key=neighbor_labels.count)</code>, which is quadratic.</p>
+
+      <h2 id="mgl">5. MGL mode — lower arch</h2>
+
+      <p>The palate gives a stable plateau up top; the mandible has none. The
+      substitute is the mucogingival line. This mode is <strong>the CLI port of path C
+      of <a href="../FlexReg/FlexReg.html">FlexReg</a></strong> (see FlexReg.md §5.3), and it involves
+      <strong>no AREG network</strong> at all: the palatal <code>.ckpt</code> isn't even loaded
+      (<code>parameter_reg["model"] = "None"</code>, <code>AREG/AREG_Method/IOS.py:92</code>, and
+      <code>RunMGL</code> returns before <code>PredPatch</code>).</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1080 160" role="img" aria-label="MGL band construction pipeline: predicted landmarks, filtering, spline, geodesic growth, crown removal">
+          <rect class="d-box-n" x="10" y="50" width="170" height="60" rx="6"/>
+          <text class="d-label" x="95" y="75" text-anchor="middle">ALI_IOS ×2 (T1, T2)</text>
+          <text class="d-label-s" x="95" y="91" text-anchor="middle">predicted — 13 MG landmarks</text>
+
+          <path class="d-arrow" d="M180 80 H200"/>
+          <path class="d-arrow-head" d="M200 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="200" y="50" width="180" height="60" rx="6"/>
+          <text class="d-label" x="290" y="75" text-anchor="middle">DropDoubtfulLandmarks</text>
+          <text class="d-label-s" x="290" y="91" text-anchor="middle">filter on description</text>
+
+          <path class="d-arrow" d="M380 80 H400"/>
+          <path class="d-arrow-head" d="M400 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="400" y="50" width="170" height="60" rx="6"/>
+          <text class="d-label" x="485" y="75" text-anchor="middle">Spline + Snap</text>
+          <text class="d-label-s" x="485" y="91" text-anchor="middle">300 samples</text>
+
+          <path class="d-arrow" d="M570 80 H590"/>
+          <path class="d-arrow-head" d="M590 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="590" y="50" width="180" height="60" rx="6"/>
+          <text class="d-label" x="680" y="75" text-anchor="middle">GrowBand (Dijkstra)</text>
+          <text class="d-label-s" x="680" y="91" text-anchor="middle">geodesic, radius in mm</text>
+
+          <path class="d-arrow" d="M770 80 H790"/>
+          <path class="d-arrow-head" d="M790 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="790" y="50" width="150" height="60" rx="6"/>
+          <text class="d-label" x="865" y="75" text-anchor="middle">Crown removal</text>
+          <text class="d-label-s" x="865" y="91" text-anchor="middle">labels 18–32</text>
+
+          <path class="d-arrow" d="M940 80 H960"/>
+          <path class="d-arrow-head" d="M960 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="960" y="50" width="110" height="60" rx="6"/>
+          <text class="d-label" x="1015" y="75" text-anchor="middle">Array</text>
+          <text class="d-mono" x="1015" y="91" text-anchor="middle">Bottom_MGL</text>
+        </svg>
+        <figcaption>Mucogingival landmarks <span class="badge predit">predicted</span> by ALI_IOS, filtering out doubtful points, then <span class="badge calcule">computed</span> construction of the band via spline and geodesic growth.</figcaption>
+      </figure>
+
+      <h3>5.1 The landmarks</h3>
+
+      <p><code>MGLProcess()</code> (<code>AREG/AREG_Method/IOS.py:40</code>) stacks two
+      <a href="../ALI/ALI.html">ALI_IOS</a> calls (T1 then T2), unless the user has supplied a landmarks folder:</p>
+
+      <pre><code>conda run -n shapeaxi python -m ALI_IOS \
+  &lt;input&gt; &lt;dir_models&gt; None None \
+  "LL6MG LL5MG LL4MG LL3MG LL2MG LL1MG L0MG LR1MG LR2MG LR3MG LR4MG LR5MG LR6MG" \
+  &lt;output_dir&gt; 224 0 1 &lt;log_path&gt;</code></pre>
+
+      <p>13 points, <code>image_size=224</code>, <code>blur_radius=0</code>, <code>faces_per_pixel=1</code>. Both
+      timepoints write into <strong>the same temporary folder</strong>, and
+      <code>FindLandmarkFile()</code> (<code>AREG_IOS/AREG_IOS.py:88</code>) finds the
+      json by the scan's stem: first <code>&lt;stem&gt;_Lower_MG_Pred.json</code> (<a href="../ALI/ALI.html">ALI</a>'s
+      convention, <code>ALI_IOS/ALI_IOS.py:610</code>), otherwise any json in the
+      folder that contains the stem.</p>
+
+      <h3>5.2 DropDoubtfulLandmarks</h3>
+
+      <p><code>AREG_IOS/AREG_IOS_utils/mgl_patch.py:61</code>. ALI writes into the
+      markup's <code>description</code> field how it obtained a degraded point:
+      "cameras aimed from an arch fit, tooth not segmented", "forced (confidence
+      x.xxx)", "fallback (nothing predicted on the mesh)"
+      (<code>ALI_IOS/ALI_IOS.py:547</code>). Any point carrying a non-empty
+      <code>description</code> is dropped.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verified</div>
+        <p>Code's justification (measured on 364 predictions, not published elsewhere):
+        <strong>4.2 mm median deviation from the neighbors' curve, versus 1.2 mm</strong> for the
+        rest. Safeguard: if fewer than 3 points would survive, everything is kept.</p>
+      </div>
+
+      <p><code>OrderedMGLandmarks</code> also accepts the legacy naming without the <code>MG</code> suffix
+      (<code>MGL_ORDER_LEGACY</code>), and tolerates missing ones as long as 3 remain.</p>
+
+      <h3>5.3 MGLPatch</h3>
+
+      <p><code>AREG_IOS/AREG_IOS_utils/mgl_patch.py:227</code>:</p>
+
+      <ol>
+        <li><code>SplineThroughLandmarks</code> — an open <code>vtkParametricSpline</code>,
+        <code>SetUResolution(300)</code> (<code>DEFAULT_SAMPLES</code>);</li>
+        <li><code>SnapToSurface</code> — each sample is snapped to the nearest vertex
+        (<code>vtkPointLocator</code>), duplicates removed. An interpolated spline strays off the
+        surface in interdental concavities;</li>
+        <li><code>GrowBand</code> — <strong>multi-source Dijkstra</strong> over the edge graph, weighted by the
+        real Euclidean edge length, implemented with a binary heap (<code>heapq</code>), stopping at
+        <code>radius</code> mm. <strong>Geodesic</strong> distance, not Euclidean: a buccal band
+        can't leak through to the lingual side where the ridge is thinner than the radius;</li>
+        <li>crowns are removed: <code>LOWER_TOOTH_LABELS = range(18, 32)</code> on
+        <code>Universal_ID</code>, <code>PredictedID</code>, or <code>UniversalID</code> (whichever is found first). Without
+        segmentation, a warning is issued and everything is kept;</li>
+        <li>output array: <strong><code>Bottom_MGL</code></strong> (<code>MGL_ARRAY_NAME</code>), the same name as in
+        FlexReg.</li>
+      </ol>
+
+      <p>Special case <code>radius == 0</code>: no band, no spline, the patch reduces to the 13
+      snapped landmark vertices. This is a deliberate <strong>control case</strong>, meant to measure
+      what the band adds over the points alone.</p>
+
+      <p>Differences from the FlexReg version (FlexReg.md §5.3):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>FlexReg (<code>FlexReg/FlexReg_utils/mgl_patch.py</code>)</th><th>AREG_IOS (<code>AREG_IOS/AREG_IOS_utils/mgl_patch.py</code>)</th></tr></thead>
+          <tbody>
+            <tr><td>Solver</td><td><code>scipy.sparse.csgraph.dijkstra</code>, <code>min_only=True</code></td><td>home-grown <code>heapq</code></td></tr>
+            <tr><td>Local frame</td><td><code>LocalFrames</code> via <a class="gterm" href="../glossary.html#g-svd" title="See glossary">SVD</a>, buccal/apical/tangential offsets</td><td><strong>absent</strong></td></tr>
+            <tr><td>Height</td><td>asymmetric, interpolated between landmarks (<code>np.interp</code>)</td><td><strong>a single value</strong>, <code>radius</code></td></tr>
+            <tr><td>Samples</td><td><code>SAMPLES_PER_SEGMENT = 25</code></td><td><code>DEFAULT_SAMPLES = 300</code> total</td></tr>
+            <tr><td>Bounds</td><td>0 – 5 mm</td><td>0 – 20 mm (<code>MGL_MAX_RADIUS</code>, <code>AREG/AREG.py:39</code>)</td></tr>
+            <tr><td>Preview</td><td>yes (<code>Bottom_MGLPreview</code>)</td><td>no</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>In other words AREG_IOS has the <strong>simplified</strong> version: a symmetric band of
+      constant height, with no fine-tuning. These are two separate files that diverged, not
+      a shared module.</p>
+
+      <h3>5.4 The MGL loop</h3>
+
+      <p><code>RunMGL()</code> (<code>AREG_IOS/AREG_IOS.py:111</code>): for each lower
+      pair, patch on T1 <strong>and</strong> on T2, ICP, write both out. If no pair goes through,
+      a <code>RuntimeError</code> is raised with the first error — a run that "succeeded"
+      while leaving the output folder empty used to send users looking in the wrong
+      place.</p>
+
+      <h2 id="icp">6. The ICP</h2>
+
+      <p>Identical in both modes, only the array changes
+      (<code>AREG_IOS/AREG_IOS.py:191</code> and
+      <code>AREG_IOS/AREG_IOS.py:204</code>):</p>
+
+      <pre><code>option = vtkMeshTeeth(list_teeth=[1], property="Butterfly")   # or MGL_ARRAY_NAME
+icp = ICP([vtkICP()], option=option)
+output_icp = icp.run(surf_T2, surf_T1)     # source = moving T2, target = fixed T1</code></pre>
+
+      <p><code>vtkMeshTeeth.__call__</code> (<code>AREG_IOS/AREG_IOS_utils/vtkSegTeeth.py:87</code>)
+      doesn't build a mesh despite its name: it returns a <code>vtkPolyData</code>
+      made up solely of <strong>isolated vertices</strong>, the ones whose array value is 1. <code>list_teeth=[1]</code>
+      therefore doesn't mean <strong>tooth #1</strong> but <strong>mask value 1</strong>.</p>
+
+      <p>The ICP on this point cloud
+      (<code>AREG_IOS/AREG_IOS_utils/ICP.py:94</code>):</p>
+
+      <pre><code>icp.GetLandmarkTransform().SetModeToRigidBody()   # 6 dof, no scale
+icp.SetMaximumNumberOfIterations(1000)
+icp.StartByMatchingCentroidsOn()</code></pre>
+
+      <p>Strictly the same block as FlexReg. No tooth enters the matching:
+      those are precisely the structures that move between T1 and T2.</p>
+
+      <p><code>ICP.run</code> returns a dictionary of which only <code>matrix</code> and <code>source_Or</code>
+      (= <code>ApplyTransform(source, matrix)</code>, i.e. the <strong>full</strong> transformed T2 surface)
+      are consumed. As in <a href="../FlexReg/FlexReg.html">FlexReg</a>, <code>vtkICP.__call__</code> returns <code>source</code>
+      <strong>untransformed</strong> instead of the result: harmless here since <code>list_icp</code>
+      only holds one method, but a multi-step chain would be wrong.</p>
+
+      <h2 id="sorties">7. Post-processing and outputs</h2>
+
+      <p><code>WriteSurf(surf, output_folder, name, inname)</code>
+      (<code>AREG_IOS/AREG_IOS_utils/utils.py:159</code>) writes
+      <code>&lt;name without extension&gt;&lt;suffix&gt;&lt;extension&gt;</code>.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Content</th><th>Mode</th></tr></thead>
+          <tbody>
+            <tr><td><code>&lt;T1&gt;&lt;suffix&gt;.vtk</code></td><td>T1 geometrically unchanged, <strong>with</strong> the <code>Butterfly</code> or <code>Bottom_MGL</code> array</td><td>both</td></tr>
+            <tr><td><code>&lt;T2&gt;&lt;suffix&gt;.vtk</code></td><td>T2 registered</td><td>both</td></tr>
+            <tr><td><code>&lt;Lower_T1&gt;&lt;suffix&gt;.vtk</code></td><td>lower arch T1, copied unchanged</td><td>Butterfly, if a lower pair exists</td></tr>
+            <tr><td><code>&lt;Lower_T2&gt;&lt;suffix&gt;.vtk</code></td><td>lower arch T2, with the <strong>upper arch's matrix</strong> applied to it</td><td>Butterfly, if a lower pair exists</td></tr>
+            <tr><td><code>&lt;pid&gt;_T1_SegOr.tfm</code></td><td>copy of <code>&lt;pid&gt;_SegOr.tfm</code> written by PRE_ASO_IOS</td><td><code>areg_mode == "Auto_IOS"</code> only</td></tr>
+            <tr><td><code>&lt;pid&gt;_T2_SegOr&lt;suffix&gt;.tfm</code></td><td>composed matrix</td><td>same</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The composition (<code>AREG_IOS/AREG_IOS_utils/transformation.py:80</code>):</p>
+
+      <pre><code>final_matrix = np.linalg.inv(areg_matrix @ np.linalg.inv(matrix_aso))</code></pre>
+
+      <p><code>matrix_aso</code> is the orientation matrix written by PRE_ASO_IOS
+      (<code>ASO_IOS/PRE_ASO_IOS/PRE_ASO_IOS.py:422</code>). The final inversion
+      follows the ITK convention (<em>fixed → moving</em>). Unlike <a href="../FlexReg/FlexReg.html">FlexReg</a>, there's
+      <strong>no conjugation by <code>diag(-1,-1,1,1)</code></strong>: surfaces are read and
+      written as-is, no <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a>/<a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a> flip happens anywhere in AREG_IOS.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>In <code>Semi_IOS</code> mode, the <code>.tfm</code> block isn't executed at all: the branch
+        <code>if args.areg_mode == "Auto_IOS"</code> (<code>AREG_IOS/AREG_IOS.py:315</code>)
+        is the only one. <strong>MGL mode produces no <code>.tfm</code> at all</strong>, regardless of
+        <code>areg_mode</code>, since <code>RunMGL</code> returns before that point.</p>
+      </div>
+
+      <p>The <code>log_path</code> file receives a simple integer counter, read back by
+      <code>DisplayAREGIOS</code> (<code>AREG/AREG_Method/Progress.py:92</code>), which divides
+      by <code>nb_patients × 3</code> for the progress bar.</p>
+
+      <h2 id="predit-calcule">8. What's predicted vs what's computed</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Crown segmentation</td><td><span class="badge predit">network</span> multi-view (<a href="../ALI/ALI.html">DentalModelSeg</a>, <code>latest</code>)</td><td><code>conda run -n shapeaxi -m CrownSegmentationcli</code></td></tr>
+            <tr><td><a href="../ASO/ASO.html">ASO</a> orientation (Butterfly, Auto)</td><td><span class="badge calcule">geometric</span> + ICP against a gold file</td><td><code>slicer.cli.run(pre_aso_ios)</code></td></tr>
+            <tr><td>Internal canonical orientation</td><td><span class="badge calcule">geometric</span>, 4 centroids, 2 rotations</td><td>CLI, inside <code>DatasetPatch</code></td></tr>
+            <tr><td>7-view rendering</td><td><span class="badge calcule">geometric</span> (PyTorch3D)</td><td>CLI, <strong>GPU</strong></td></tr>
+            <tr><td>Palatal patch</td><td><span class="badge predit">network</span> 2D MONAI UNet over the 7 views</td><td>CLI, <strong>GPU</strong></td></tr>
+            <tr><td>Reprojection + vote</td><td><span class="badge calcule">geometric</span> (<code>pix_to_face</code>, argmax)</td><td>CLI, GPU</td></tr>
+            <tr><td>Morphological closing</td><td><span class="badge calcule">geometric</span>, edge graph</td><td>CLI, CPU</td></tr>
+            <tr><td>MG landmarks</td><td><span class="badge predit">network</span> multi-view (<a href="../ALI/ALI.html">ALI_IOS</a>, <code>Lower_MG_*.pth</code>)</td><td><code>conda run -n shapeaxi -m ALI_IOS</code></td></tr>
+            <tr><td>MGL band</td><td><span class="badge calcule">geometric</span>, spline + Dijkstra</td><td>CLI, CPU</td></tr>
+            <tr><td>Registration</td><td><span class="badge calcule">geometric</span> rigid VTK ICP</td><td>CLI, CPU</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="comparaison">9. <a href="../FlexReg/FlexReg.html">FlexReg</a> vs AREG_IOS — the table</h2>
+
+      <p>Same output, same arrays, same ICP. The dividing line is: <strong>who decides
+      the patch's shape</strong>.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Step</th><th>FlexReg</th><th>AREG_IOS</th></tr></thead>
+          <tbody>
+            <tr><td>Granularity</td><td>one patient, interactive</td><td>T1/T2 folders, batch</td></tr>
+            <tr><td>Where the heavy computation runs</td><td>Slicer's Python (<code>slicer.cli.run</code>)</td><td>conda env (<code>python -m AREG_IOS</code>)</td></tr>
+            <tr><td>Crown segmentation</td><td>network, on demand if the array is missing</td><td>network, a step stacked by AREG</td></tr>
+            <tr><td>Orientation</td><td>geometric, teeth 3/5/12/14, in the CLI</td><td><a href="../ASO/ASO.html">ASO</a> (upstream) <strong>then</strong> geometric, teeth 3/8/9/14, in the dataset</td></tr>
+            <tr><td><strong>Upper patch</strong></td><td><strong>built by hand</strong>: 4 centroids, Bézier curves mirrored across the chord, GPU geodesic flood fill</td><td><strong>predicted</strong>: 7 views at 320², 2D MONAI UNet, <code>pix_to_face</code> reprojection, voting, closing</td></tr>
+            <tr><td>Upper patch settings</td><td><code>shift_lr</code>, <code>shift_ap</code>, <code>adjust</code>, <code>ratio</code>, stackable index</td><td>none</td></tr>
+            <tr><td>Real-time preview</td><td>yes, CPU numpy, point-in-polygon</td><td>no</td></tr>
+            <tr><td><strong>Lower patch</strong></td><td>MGL: SVD for the frame, interpolated asymmetric heights, offsets, scipy Dijkstra</td><td>MGL: symmetric band of constant height, heapq Dijkstra</td></tr>
+            <tr><td>MG landmarks</td><td><a href="../ALI/ALI.html">ALI</a>, edited and cleaned up in the widget</td><td>ALI, cleaned up by <code>DropDoubtfulLandmarks</code> in the CLI</td></tr>
+            <tr><td>Alternative patch</td><td>curve drawn with the mouse (<code>type="curve"</code>)</td><td>—</td></tr>
+            <tr><td>Array produced</td><td><code>Butterfly</code> (merging <code>Butterfly1..N</code>), <code>Bottom_MGL</code></td><td><code>Butterfly</code>, <code>Bottom_MGL</code></td></tr>
+            <tr><td>ICP</td><td><code>vtkICP</code>, rigid, 1000 it., centroids</td><td><strong>identical</strong></td></tr>
+            <tr><td>LPS↔RAS flip</td><td>yes, explicit in the CLI</td><td><strong>no</strong></td></tr>
+            <tr><td>Output <code>.tfm</code></td><td>always, via conjugation + inversion</td><td>only in <code>Auto_IOS</code>, composed with the ASO matrix</td></tr>
+            <tr><td>Input file</td><td><strong>overwritten</strong> in patch mode</td><td>never modified</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Bottom line: AREG_IOS replaces <strong>a single</strong> FlexReg step with a network — the
+      delineation of the palatal patch. Everything else is the same code, or its
+      direct cousin.</p>
+
+      <h2 id="environnement">10. Environment</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element</th><th>Value</th><th>Source</th></tr></thead>
+          <tbody>
+            <tr><td>Conda env</td><td><code>shapeaxi</code>, shared with <a href="../ALI/ALI.html">ALI</a>, <a href="../ASO/ASO.html">ASO</a>, <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td><code>AREG/AREG.py:3104</code></td></tr>
+            <tr><td>Python</td><td>3.12</td><td><code>AREG/AREG.py:3106</code></td></tr>
+            <tr><td>Env creation</td><td><code>torch>=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td><code>AREG/AREG.py:3132</code></td></tr>
+            <tr><td>pytorch3d + shapeaxi</td><td>installed after torch by <code>install_pytorch.py</code></td><td><code>AREG/AREG.py:3139</code></td></tr>
+            <tr><td>Slicer side (IOS)</td><td><code>tqdm</code>, <code>vtk</code>, <code>pandas</code>, <code>monai==1.3.2</code></td><td><code>AREG/AREG.py:1448</code></td></tr>
+            <tr><td>Windows</td><td>conda inside WSL, plus <code>libxrender1</code>, <code>libgl1</code>/<code>libgl1-mesa-glx</code>, <code>libglx-mesa0</code></td><td><code>check_lib_wsl</code>, <code>AREG/AREG.py:3161</code></td></tr>
+            <tr><td>GPU</td><td><code>torch.device("cuda")</code> hardcoded in <code>PredPatch.__init__</code></td><td><code>AREG_IOS/AREG_IOS_utils/PredPatch.py:31</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>check_deps.ensure_compatible()</code>
+      (<code>AREG_IOS/AREG_IOS_utils/check_deps.py:171</code>) runs right at the
+      start of the CLI: it removes a broken torchvision <code>image.so</code>, and reinstalls
+      torchvision via <code>pip</code> if the torch/torchvision pair isn't in its hardcoded
+      compatibility table (2.1→0.16.0 … 2.7→0.23.0).</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong>A table that stops at torch 2.7, while the env installs <code>torch>=2.8</code></strong>: for torch 2.8+,
+        <code>get_compatible_torchvision</code> returns <code>None</code>, <code>is_compatible</code> defaults to
+        <code>True</code>, and nothing gets touched. That's the desirable behavior, but by
+        accident.</p>
+      </div>
+
+      <h2 id="pieges">11. Pitfalls and fragile points</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong><code>isLowerUpper()</code> tests the full path</strong>, not the basename
+        (<code>AREG_IOS/AREG_IOS_utils/dataset.py:241</code>; called with
+        <code>file</code> as a full path from <code>Sort</code> and <code>SortLower</code>). A folder containing <code>_U</code>,
+        <code>L_</code>, <code>Md</code>… misclassifies every arch. And the words are tested
+        <strong>case-sensitively</strong> here, whereas <code>Method.IsLower</code> on the widget side
+        (<code>AREG/AREG_Method/IOS.py:141</code>) lowercases the basename first:
+        the two don't classify the same way.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong>The face→vertex vote only writes to <code>F[:,0]</code></strong>, and
+        <code>P_faces[:, pf] += pred</code> doesn't accumulate pixels from the same face. These are
+        facts about the code, not conjectures; the patch gets repaired afterward by the
+        morphological closing.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong><code>RemoveIslands(..., 33, 500, ...)</code></strong> can't do anything: dead code.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong><code>check_platform()</code> looks for <code>'Microsoft'</code> with a capital letter</strong>
+        (<code>AREG_IOS/AREG_IOS.py:45</code>). WSL2 reports itself as
+        <code>microsoft-standard-WSL2</code>, lowercase, so the WSL branch is
+        probably never taken, and it's the <code>else</code> branch (package imports) that
+        runs instead. Just as well: the WSL branch mixes
+        <code>from AREG_IOS_utils.transformation import ...</code> with
+        <code>from AREG_IOS.AREG_IOS_utils.transformation import ...</code>, which requires
+        both the repository root <strong>and</strong> <code>AREG_IOS/</code> to be on the <code>PYTHONPATH</code>.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong>T1's <code>.tfm</code> often can't be found.</strong> AREG_IOS looks for
+        <code>&lt;patient_id_short&gt;_SegOr.tfm</code> where <code>patient_id_short = name_t2.split("_T2")[0].split("_")[0]</code>,
+        while PRE_ASO_IOS named it after <code>PatientNumber()</code> =
+        <code>basename.split('_U')[0].split('_L')[0]</code>
+        (<code>ASO_IOS/ASO_IOS_utils/utils.py:295</code>). The two only agree if the
+        arch marker comes before the timepoint (<code>P001_Upper_T1.vtk</code> ✔,
+        <code>P001_T1_Upper.vtk</code> ✘). The failure is a warning, not an error.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong><code>WriteSurf</code> always uses <code>vtkPolyDataWriter</code></strong> but keeps the input
+        extension: an input <code>.stl</code> comes out as a <code>.stl</code> file containing legacy VTK.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong><code>os.mkdir</code></strong> (not <code>makedirs</code>) in <code>WriteSurf</code>: a nested output
+        folder that doesn't exist yet makes the write fail.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong><code>DatasetPatch.isLower()</code> tests <code>is not None</code>, not the length.</strong> If
+        <code>Sort</code> returns an empty lower list, <code>lower</code> evaluates to <code>True</code> and every
+        access raises an <code>IndexError</code>, caught as a warning.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug</div>
+        <p><strong><code>sort()</code> and <code>insideLower()</code> use <code>continue</code> where <code>break</code> was
+        expected</strong>: <code>sort()</code> can pair the same T1 with several T2 files if the names
+        collapse together.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong>A failed orientation stops nothing.</strong> An unsegmented scan still goes to
+        the network, in some arbitrary frame, with 7 cameras looking from the
+        wrong side. The patch will be silently wrong.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong><code>AREG_IOS.xml</code> is out of sync with the CLI</strong> (index 4
+        missing, 4 MGL parameters absent). Harmless as long as launching
+        goes through conda, but any attempt to go back through <code>slicer.cli.run</code>
+        will break.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong><code>patch_radius</code> is clamped to [0, 20] mm on the widget side</strong>
+        (<code>AREG/AREG.py:734</code>), whereas <a href="../FlexReg/FlexReg.html">FlexReg</a> stops at 5 mm. Beyond
+        the height of attached gingiva, the band spills over onto mobile tissue.</p>
+      </div>
+
+      <h2 id="litterature">12. Literature</h2>
+
+      <p>The published foundation is <strong>AReg IOS: Automatic Registration on IntraOral Scans</strong>
+      (Hutin, Anchling, Cevidanes et al., <em>Lecture Notes in Computer Science</em>, 2023,
+      MICCAI): crown segmentation by <a href="../ALI/ALI.html">DentalModelSeg</a>, initial alignment via
+      shared centroids, palatal ROI segmented by multi-view 3D shape analysis,
+      then ICP.</p>
+
+      <p>Two discrepancies between the paper and this repository's code:</p>
+
+      <ul>
+        <li>the paper describes an <strong>initial alignment by shared crown
+        centroids</strong>; in the code, that role is played by upstream <code>PRE_ASO_IOS</code> plus
+        VTK's <code>StartByMatchingCentroidsOn()</code> — there is no centroid-alignment step
+        inside AREG_IOS itself;</li>
+        <li>the <strong>MGL path doesn't exist in the paper</strong>. It's a later internal
+        development, unpublished to date, and the figures cited in its code
+        (4.2 mm vs 1.2 mm over 364 predictions) aren't sourced anywhere else
+        than in the comments.</li>
+      </ul>
+
+      <ul>
+        <li><a href="https://github.com/lucanchling/AREG">AREG (original repository)</a></li>
+        <li><a href="https://github.com/HUTIN1/AREG/releases/tag/v1.0.0">HUTIN1/AREG — weights release</a></li>
+        <li><a href="https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5">Automated Orientation and Registration of CBCT Scans, LNCS</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+        <li><a href="https://www.researchgate.net/publication/390709249_Bridging_the_gap_enabling_PyTorch3D_and_advanced_dental_imaging_tools_on_Windows_through_WSL2">Bridging the gap: enabling PyTorch3D and advanced dental imaging tools on Windows through WSL2</a></li>
+      </ul>
+
+      <p>Detailed bibliography, retrieved files, and links worth visiting:
+      <a href="SOURCES.html">SOURCES.md</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← All pages</a> ·
+        <a href="SOURCES.html">Bibliography for this tool</a> ·
+        Source: <code>AREG_IOS.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

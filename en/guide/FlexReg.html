@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlexReg — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="recalage">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html" aria-current="page">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Registration</div>
+        <h1>FlexReg — register two scans by drawing the stable area yourself</h1>
+        <p class="lede">FlexReg registers two intraoral scans of the same patient taken at
+        different times. Instead of letting a network guess which area hasn't moved, you
+        mark it yourself, with the mouse, on the upper or lower arch.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>Reach for FlexReg when AREG_IOS — the automatic version — can't find a good
+      registration area on its own: a partially edentulous arch, an unusual palate shape, or
+      simply a case where you'd rather keep control over what counts as the fixed reference.
+      FlexReg is the "draw it yourself" version of the same registration: both tools produce
+      and read the same kind of landmark, so you can start in one and continue in the
+      other.</p>
+
+      <div class="callout">
+        <div class="callout-title">Two ways to build the stable area</div>
+        <p>On an <strong>upper</strong> arch, the area is anchored on the palate: pick four
+        reference teeth and FlexReg builds a butterfly-shaped patch around them, or draw its
+        outline directly with the mouse. On a <strong>lower</strong> arch, with no palate to
+        act as a stable plate, FlexReg instead relies on the mucogingival line — placed
+        automatically — then thickens it into a band running along the gum.</p>
+      </div>
+
+      <h2 id="besoin">What you need, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>To provide</h4>
+          <ul>
+            <li>Two scans of the same patient, as <code>.vtk</code> or <code>.stl</code>
+            (<code>.stl</code> is converted automatically)</li>
+            <li>A "moving" scan (the more recent one) and a "fixed" scan (the reference)</li>
+            <li>Teeth identified crown by crown — if not, FlexReg runs the segmentation
+            itself, at the cost of a wait on that first pass</li>
+            <li>A graphics card (GPU) — required to build the patch</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>A registered scan in <code>.vtk</code>, saved next to the original</li>
+            <li>A transformation matrix (<code>.tfm</code>) reusable by the other tools in
+            the repository</li>
+            <li>A preview shown in the scene before anything is saved</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Steps</h2>
+      <ol class="steps">
+        <li><strong>Load both scans.</strong> Mark which one is moving (the one being
+        aligned) and which one is the fixed reference.</li>
+        <li><strong>Check the tooth identification.</strong> If the arch has no
+        segmentation array yet, FlexReg computes one on its own the first time — expect
+        extra time on that run only.</li>
+        <li><strong>Build the stable area.</strong> On an upper arch, pick four reference
+        teeth and shape the butterfly patch with the sliders (position, length, width), or
+        draw its outline freehand. On a lower arch, let FlexReg place the mucogingival
+        landmarks, then adjust the band's height around them.</li>
+        <li><strong>Preview.</strong> The preview button runs the registration into a
+        temporary folder and shows the result in the scene without saving anything — use it
+        to judge whether the area you chose gives a good alignment.</li>
+        <li><strong>Run the final registration</strong> once you're satisfied, and pick
+        where to write the result.</li>
+      </ol>
+
+      <h2 id="temps">How long it takes</h2>
+      <p>Building the patch and running the registration take a few seconds per pair of
+      scans on a GPU, once the area is drawn. The slow step is crown segmentation on the
+      first pass over an unidentified arch — that wait happens once per scan and isn't
+      repeated afterward.</p>
+
+      <h2 id="coince">If it gets stuck</h2>
+      <div class="callout warn">
+        <div class="callout-title">A graphics card is mandatory</div>
+        <p>Building the patch and running the registration only work with a compatible
+        GPU. Without one, these steps fail outright — this isn't a performance nicety, it's
+        a hard requirement of the module.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">"The registration only looks at the teeth I checked"</div>
+        <p>FlexReg aligns only the area you marked out — never the whole arch. If the result
+        looks off away from that area, that's expected: the rest of the mesh simply follows
+        the motion computed on the patch, it isn't registered independently.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Mucogingival landmarks can be unreliable</div>
+        <p>On the lower arch, some automatically placed points can be markedly less trusted
+        than the others (the measured error jumps from roughly 1 mm to over 4 mm in those
+        cases). FlexReg drops them by default and bridges the gap by interpolation — so a
+        point can look "missing" even though it was detected.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">DICOM import</div>
+        <p>Start from already-exported <code>.vtk</code> or <code>.stl</code> files. The
+        registration itself doesn't read DICOM.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Input file gets overwritten</div>
+        <p>Drawing the stable area and running crown segmentation both rewrite the input
+        file, not a copy. Always keep a backup of your original scans before you start.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Steeply tilted arch: the patch can overshoot</div>
+        <p>The butterfly patch's outline is decided by flattening the arch into a
+        projection. On a strongly tilted arch, that projection can pick up points that are
+        actually far away in height, producing a patch that spills past the intended area —
+        check the preview before committing.</p>
+      </div>
+
+      <h2 id="apres">What happens next</h2>
+      <p>The registered scan and its transformation matrix are ready to use directly in
+      AREG_IOS and in the other tools in the repository that overlay scans across time. As
+      with any automatic registration, a quick visual check before using it for a
+      measurement is still good practice.</p>
+
+      <a class="deep-link" href="../FlexReg/FlexReg.html">
+        <b>How it actually works →</b>
+        <span>The Atlas entry: the geometric construction of the patch, the role of the two
+        supporting networks, the ICP that performs the registration, and the pitfalls found
+        in the code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../FlexReg/FlexReg.html">Atlas entry</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

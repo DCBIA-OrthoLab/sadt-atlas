@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GreedyReg — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="recalage">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html" aria-current="page">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Registration</div>
+        <h1>GreedyReg — register two CBCT scans with the ITK-SNAP engine</h1>
+        <p class="lede">GreedyReg aligns two CBCT scans of the same patient (a T1 and a T2)
+        by driving the ITK-SNAP <strong>greedy</strong> engine. No neural network in the
+        main computation, nothing to install: the result comes from a classic
+        intensity-based optimization, not a prediction.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>To register two CBCT scans of the same modality — a before/after follow-up, for
+      instance — when you want fine control over the computation: which metric, how many
+      degrees of freedom, optionally a mask to focus the optimization on one region. It is
+      an end-of-chain tool: nothing else in SADT consumes its result. If you need the
+      resulting transform to be reused elsewhere in Slicer, this is not the right module —
+      its matrix stays specific to greedy and is not a Slicer transform file.</p>
+
+      <div class="callout">
+        <div class="callout-title">Three modes, one real registration</div>
+        <p>Only <strong>Automatic Registration</strong> actually performs an
+        intensity-based registration. <strong>Manual Alignment</strong> and
+        <strong>Distant Registration</strong> only prepare a starting point, to be refined
+        afterward.</p>
+      </div>
+
+      <h2 id="besoin">What you need, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>To provide</h4>
+          <ul>
+            <li>Two folders of CBCT scans in <code>.nii.gz</code>: one for the fixed volume
+            (T1), one for the moving volume (T2)</li>
+            <li>File names starting with letters then digits, for example
+            <code>A01_T1.nii.gz</code> — that is what lets GreedyReg pair a T1 with its T2
+            for the same patient; any other naming is never paired, with no warning</li>
+            <li>Optional: a mask (segmentation or labelmap), in the space of the fixed
+            volume</li>
+            <li>Optional: an initialization matrix, or a manual pre-alignment done inside
+            the module</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>The T2 resampled into the T1 grid, as <code>.nii.gz</code>, plus the affine
+            matrix found</li>
+            <li>In Distant mode: only a starting matrix, never a registered volume</li>
+            <li>The matrix produced is in greedy's own format, not Slicer's transform
+            format: it does not load as a transform node as-is, and nothing else in SADT
+            reuses it</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="modes">The three modes, and which one to pick</h2>
+      <ul>
+        <li><strong>Manual Alignment.</strong> You move the moving volume by hand (sliders,
+        or the "Center T2 on T1" button for a quick centering). Useful when the two CBCT
+        scans are already close and only a rough adjustment is missing before running the
+        actual computation.</li>
+        <li><strong>Automatic Registration.</strong> The only mode that actually registers:
+        the greedy engine optimizes a rigid or affine transform from image intensities.
+        This is where you pick the metric (NMI by default, for heterogeneous intensities;
+        NCC for a local correlation; SSD if both volumes share the same modality) and the
+        degrees of freedom (rigid or full affine).</li>
+        <li><strong>Distant Registration (Large Misalignment).</strong> For two scans that
+        start out geometrically far apart. "Distant" describes that gap, not a remote
+        computation: nothing leaves your machine besides the one-time download of the
+        engine and of the prediction weights, never patient data. This mode predicts a
+        handful of anatomical landmarks (cranial base, mandible, or maxilla — one region at
+        a time) and derives a starting matrix from them. It never produces a registered
+        volume: always follow it with Automatic Registration to refine.</li>
+      </ul>
+      <p>In practice: if your two CBCT scans are already roughly superimposed, go straight
+      to Manual then Automatic. If they are far apart, start with Distant Registration,
+      then refine with Automatic.</p>
+
+      <h2 id="marche">Steps</h2>
+      <ol class="steps">
+        <li><strong>Split your volumes.</strong> One folder for the fixed CBCT scans (T1),
+        one for the moving ones (T2), with the same patient identifier in each file
+        name.</li>
+        <li><strong>Add a mask if needed.</strong> It must be in the space of the fixed
+        volume: that is where the optimization will look for its gradient.</li>
+        <li><strong>Pre-align if the misalignment is large.</strong> By hand in Manual mode
+        for a small gap, via Distant Registration for a large one.</li>
+        <li><strong>Switch to Automatic Registration.</strong> Pick the metric and the
+        degrees of freedom (rigid or affine), then run.</li>
+        <li><strong>For a series</strong>, point directly at the full T1/T2 folders: batch
+        processing chains the pairs matched by identifier.</li>
+        <li><strong>Save the result</strong> before closing Slicer — see below why that
+        matters.</li>
+      </ol>
+
+      <h2 id="coince">If something goes wrong</h2>
+      <div class="callout warn">
+        <div class="callout-title">"Save Registered Volume" does nothing in Distant mode</div>
+        <p>This mode does not produce a registered volume, only a starting matrix: the
+        button always answers "No result to save!". Use "Save Transform Matrix" instead, or
+        go straight to Automatic Registration to get a volume worth saving.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Misleading checkboxes in Distant mode</div>
+        <p>Checking several structures (cranial base, mandible, maxilla) does not combine
+        them. Only one region is actually used, chosen by a fixed priority order (cranial
+        base first, then mandible, then maxilla), regardless of which boxes you checked.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">In batch, one failure stops everything, not always clearly</div>
+        <p>On a full folder, the first case that fails halts the entire run: no resume, no
+        list of the remaining cases. In Distant mode, a failed landmark prediction does not
+        always surface as an obvious error: the only visible sign can be a quiet "only 0
+        matched landmarks" in the log.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Temporary folders are never cleaned up</div>
+        <p>Whether after an automatic registration or a manual session, the module does not
+        clear its working folders. On a long series, disk usage builds up; clean them
+        yourself from time to time — but only after saving your results, since that is also
+        where "Save Registered Volume" pulls its file from in Automatic mode.</p>
+      </div>
+
+      <h2 id="apres">And after</h2>
+      <p>Always check the result by eye, overlaying the registered volume on the fixed CBCT
+      in Slicer, before using it for a measurement. And keep in mind that the exported
+      matrix is a plain greedy-format file, not a Slicer or ITK transform: reusing it
+      outside this module needs a conversion that GreedyReg does not perform itself.</p>
+
+      <a class="deep-link" href="../GreedyReg/GreedyReg.html">
+        <b>How it actually works →</b>
+        <span>The Atlas page: the exact role of the greedy binary and the CLI, what is
+        predicted versus what is computed in each mode, the matrix format, and the limits
+        found in the code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../GreedyReg/GreedyReg.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

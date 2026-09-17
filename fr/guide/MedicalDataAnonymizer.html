@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MedicalDataAnonymizer — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="texte">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+    <div class="lang-switch">
+      <span class="cur">FR</span><a href="../../en/index.html" title="English">EN</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>pour utiliser les outils</small></a>
+      <a href="../index.html"><b>Atlas</b><small>comment ça marche dans le code</small></a>
+    </div>
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html" aria-current="page">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Texte &amp; langage</div>
+        <h1>MedicalDataAnonymizer — dé-identifier un document texte</h1>
+        <p class="lede">MedicalDataAnonymizer repère puis remplace des données personnelles —
+        noms, dates, adresses, numéros — dans des documents texte (<code>.docx</code>,
+        <code>.txt</code>, <code>.pdf</code>, <code>.csv</code>, <code>.xml</code>,
+        <code>.odt</code>). Ce n'est <strong>pas un anonymiseur DICOM</strong> : il ne lit,
+        ne modifie ni n'efface la moindre image médicale.</p>
+      </header>
+
+      <div class="callout warn">
+        <div class="callout-title">Ce n'est pas un anonymiseur d'images</div>
+        <p>Malgré le nom, aucun tag DICOM n'est touché — ni le nom du patient, ni sa date de
+        naissance, ni l'identifiant de l'étude, ni l'établissement — et aucun visage n'est
+        effacé sur un CBCT ou un scanner. Si ce que vous voulez dé-identifier, ce sont des
+        images, cet outil ne fait rien pour vous : il vous faut un anonymiseur DICOM dédié,
+        et un defacing séparé si les volumes couvrent le visage.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Un échec peut ressembler à une réussite</div>
+        <p>Si le traitement d'un document échoue, quelle qu'en soit la raison, le fichier
+        produit contient <strong>le texte d'origine intact</strong> — et l'interface affiche
+        quand même « Complete! ». Aucun compteur, aucun rapport, aucun avertissement visible
+        ne signale la différence : un document non anonymisé est indiscernable d'un document
+        propre tant qu'on ne l'a pas rouvert. <strong>Ouvrez et relisez chaque fichier produit
+        avant de le transmettre ou de le publier.</strong></p>
+      </div>
+
+      <h2 id="quand">Quand s'en servir</h2>
+      <p>Pour une première passe sur un lot de comptes rendus, courriers ou notes en anglais
+      dont vous devez retirer les mentions les plus visibles avant de les partager ou de les
+      exporter — pas pour déclarer un jeu de données dé-identifié en une seule étape. Le
+      résultat reste à relire, et il ne remplace ni un renommage de fichiers ni un traitement
+      des images.</p>
+
+      <h2 id="besoin">Ce qu'il vous faut, ce que vous obtenez</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>À fournir</h4>
+          <ul>
+            <li>Un dossier de documents texte : <code>.docx</code>, <code>.txt</code>,
+            <code>.pdf</code>, <code>.csv</code>, <code>.xml</code> ou <code>.odt</code></li>
+            <li>Les dépendances installées une fois (bouton dédié), et Slicer redémarré
+            ensuite</li>
+            <li>Les catégories de données à repérer, cochées dans la liste — sept sont
+            cochées par défaut (noms, téléphones, emails, dates, adresses, numéros de
+            sécurité sociale américains, licences médicales)</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>Ce qui sort</h4>
+          <ul>
+            <li>Une copie de chaque document, suffixée <code>_anonymized</code>, dans le
+            dossier de sortie</li>
+            <li>Un fichier <code>file_mappings.csv</code> listant les noms de fichiers
+            d'origine et de sortie — à ne pas diffuser avec les documents</li>
+            <li>Vos fichiers d'origine ne sont pas modifiés, mais leur nom est recopié tel
+            quel dans les fichiers produits et dans <code>file_mappings.csv</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Marche à suivre</h2>
+      <ol class="steps">
+        <li><strong>Installez les dépendances</strong> (une seule fois), via le bouton prévu
+        à cet effet. Le module télécharge Presidio et un modèle d'analyse de texte en
+        anglais ; un redémarrage de Slicer est ensuite demandé.</li>
+        <li><strong>Désignez le dossier source.</strong> Il est parcouru en entier, sous-
+        dossiers compris ; inutile de traiter les documents un par un.</li>
+        <li><strong>Cochez les catégories à repérer.</strong> N'ajoutez que ce dont vous avez
+        besoin parmi les catégories proposées en plus des sept par défaut (carte bancaire,
+        IP, URL, permis de conduire américain…).</li>
+        <li><strong>Choisissez une méthode de remplacement</strong> dans « Advanced Options » :
+        remplacement par une étiquette (<code>&lt;PERSON&gt;</code>, défaut), suppression,
+        astérisques, ou empreinte. L'empreinte reste la même pour un même nom d'un document à
+        l'autre, mais elle n'est ni salée ni protégée par une clé — à traiter comme un
+        pseudonyme public, pas comme un chiffrement.</li>
+        <li><strong>Indiquez un dossier de sortie</strong>, puis lancez « Anonymize Files ».
+        L'interface se fige pendant le traitement — c'est normal, laissez la barre de
+        progression avancer jusqu'au bout.</li>
+      </ol>
+
+      <h2 id="verifier">Vérifier le résultat</h2>
+      <p>Avant toute diffusion, rouvrez chaque fichier <code>_anonymized</code> et comparez-le
+      à l'original : c'est le seul moyen de repérer un échec silencieux (voir plus haut).
+      Renommez ensuite les fichiers vous-même — le nom du patient survit dans le nom du
+      fichier produit — et ne joignez pas <code>file_mappings.csv</code> à un envoi externe :
+      il liste les noms de fichiers d'origine, pas une correspondance de ré-identification
+      exploitable.</p>
+
+      <h2 id="limites">Ce que la détection ne voit pas</h2>
+      <ul>
+        <li><strong>La langue est figée en anglais.</strong> Un dossier en français ou dans
+        une autre langue passe par le même modèle, sans avertissement, avec un rappel très
+        dégradé.</li>
+        <li><strong>Le seuil de confiance par défaut</strong> écarte les détections les moins
+        sûres — typiquement les noms rares ou non anglo-saxons.</li>
+        <li><strong>Les identifiants hospitaliers</strong> (numéro de dossier, d'accession,
+        d'étude, de lit) ne sont recherchés par aucune catégorie proposée.</li>
+        <li><strong>Les numéros non américains</strong> — sécurité sociale française, NHS,
+        passeport — ne sont pas couverts ; seuls les formats américains sont reconnus.</li>
+        <li><strong>Ce qui n'a pas pu être extrait</strong> d'un fichier (tableaux d'un
+        <code>.docx</code>, attributs d'un <code>.xml</code>, PDF scanné) n'est pas analysé —
+        ni recopié, ni dé-identifié.</li>
+        <li><strong>Un <code>.csv</code></strong> ressort avec ses colonnes reconstruites à
+        partir du texte détecté : l'alignement d'origine n'est pas garanti.</li>
+      </ul>
+
+      <h2 id="coince">Si ça coince</h2>
+      <div class="callout warn">
+        <div class="callout-title">L'installation des dépendances échoue</div>
+        <p>Elle nécessite un accès internet pour télécharger Presidio et le modèle de langue.
+        Si l'installation retombe en erreur, vérifiez la connexion puis relancez-la ; un
+        redémarrage de Slicer est de toute façon nécessaire une fois qu'elle a réussi.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Deux fichiers de même nom, un seul en sortie</div>
+        <p>Le dossier de sortie est écrit à plat : la hiérarchie de sous-dossiers de l'entrée
+        n'est pas reproduite, et si deux sous-dossiers contiennent un fichier de même nom, le
+        second écrase le premier sans message. Renommez au besoin avant de lancer le
+        traitement.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Un <code>.csv</code> illisible en sortie</div>
+        <p>C'est le format le plus fragile : les colonnes ne sont pas préservées telles
+        quelles. Pour des données tabulaires que vous devez garder exploitables, préférez
+        anonymiser une copie texte séparément et reconstruire le tableau à la main.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">L'interface semble bloquée</div>
+        <p>C'est attendu : le traitement tourne dans le fil principal de Slicer. Sur un
+        dossier volumineux, laissez tourner sans fermer Slicer, même si rien d'autre ne
+        répond pendant ce temps.</p>
+      </div>
+
+      <a class="deep-link" href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">
+        <b>Comment ça marche vraiment →</b>
+        <span>La fiche Atlas : le moteur Presidio et le modèle spaCy employés, le détail des
+        entités et méthodes de remplacement, la ligne de code du repli silencieux, et la
+        grille de lecture HIPAA appliquée aux limites du module.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Tous les guides</a> ·
+        <a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">Fiche Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

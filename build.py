@@ -7,6 +7,8 @@ Ne modifie aucune page existante ; écrit assets/search-index.js et constats.htm
 import os, re, json, html
 from html.parser import HTMLParser
 
+import nav
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SKIP_DIRS = {"assets"}
 
@@ -139,20 +141,20 @@ def clean(s, limit=None):
     return s[:limit].rstrip() + "…" if limit and len(s) > limit else s
 
 
-def walk():
+def walk(lang):
     out = []
-    for dp, dirs, fs in os.walk(ROOT):
+    for dp, dirs, fs in os.walk(os.path.join(ROOT, lang)):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
         for f in sorted(fs):
-            if f.endswith(".html") and f != "constats.html":
+            if f.endswith(".html") and f not in ("constats.html", "findings.html"):
                 out.append(os.path.join(dp, f))
     return sorted(out)
 
 
-def main():
+def build_lang(lang):
     index, constats = [], []
-    for path in walk():
-        rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
+    for path in walk(lang):
+        rel = os.path.relpath(path, os.path.join(ROOT, lang)).replace(os.sep, "/")
         folder = rel.split("/")[0] if "/" in rel else ""
         tool = folder if folder in CATS else ("Accueil" if rel == "index.html" else folder)
         cat = CATS.get(folder, "")
@@ -182,17 +184,17 @@ def main():
             })
 
     os.makedirs(os.path.join(ROOT, "assets"), exist_ok=True)
-    with open(os.path.join(ROOT, "assets", "search-index.js"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(ROOT, "assets", f"search-index-{lang}.js"), "w", encoding="utf-8") as fh:
         fh.write("window.LT_INDEX=")
         json.dump(index, fh, ensure_ascii=False, separators=(",", ":"))
         fh.write(";")
-    with open(os.path.join(ROOT, "assets", "constats.json"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(ROOT, "assets", f"constats-{lang}.json"), "w", encoding="utf-8") as fh:
         json.dump(constats, fh, ensure_ascii=False, indent=0)
 
-    n = len(open(os.path.join(ROOT, "assets", "search-index.js"), encoding="utf-8").read())
-    print(f"index de recherche : {len(index)} sections, {n/1024:.0f} Ko")
+    n = len(open(os.path.join(ROOT, "assets", f"search-index-{lang}.js"), encoding="utf-8").read())
+    print(f"{lang} : index {len(index)} sections, {n/1024:.0f} Ko", end="")
     from collections import Counter
-    print("constats :", dict(Counter(c["kind"] for c in constats)), f"total {len(constats)}")
+    print(" — constats", dict(Counter(c["kind"] for c in constats)))
     return index, constats
 
 
@@ -224,12 +226,18 @@ KIND_LABEL = {"bug": "Défaut confirmé", "warn": "Piège", "ok": "Vérifié", "
 KIND_ORDER = ["bug", "warn", "ok", "note"]
 
 
-def write_constats(constats):
+CONSTAT_INTRO = {
+ "fr": ("Constats", "Tout ce que la lecture du code a fait ressortir, rassemblé depuis les "
+                    "{n} encarts des fiches. Relevé en documentant, pas en cherchant des bugs."),
+ "en": ("Findings", "Everything reading the code turned up, gathered from the {n} callouts "
+                    "across the pages. Noted while documenting, not while hunting for bugs."),
+}
+
+
+def write_constats(lang, constats):
     """Page statique agrégeant tous les callouts. Aucun fetch : tout est inline,
     donc la page marche aussi en file://."""
-    idx = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
-    sidebar = idx[idx.index('<nav class="sidebar">'):idx.index("</nav>") + 6]
-    sidebar = sidebar.replace('<a href="constats.html">', '<a href="constats.html" aria-current="page">')
+    sidebar = nav.sidebar(lang, "atlas", "findings", 1)
 
     tools = sorted({c["tool"] for c in constats})
     counts = {k: sum(1 for c in constats if c["kind"] == k) for k in KIND_ORDER}
@@ -256,14 +264,17 @@ def write_constats(constats):
     )
     opts = "".join(f'<option value="{html.escape(t)}">{html.escape(t)}</option>' for t in tools)
 
+    title, lede_t = CONSTAT_INTRO[lang]
+    lede = lede_t.format(n=len(constats))
+    back = nav.UI[lang]["toindex"]
     page = f"""<!doctype html>
-<html lang="fr">
+<html lang="{lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Constats — sadt-atlas</title>
-<link rel="stylesheet" href="assets/style.css">
-<script src="assets/site.js"></script>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/site.js"></script>
 </head>
 <body data-cat="recalage">
 <div class="layout">
@@ -273,8 +284,7 @@ def write_constats(constats):
       <header class="page-head">
         <div class="breadcrumb"><a href="index.html">sadt-atlas</a></div>
         <h1>Constats</h1>
-        <p class="lede">Tout ce que la lecture du code a fait ressortir, rassemblé depuis les
-        {len(constats)} encarts des fiches. Relevé en documentant, pas en cherchant des bugs.</p>
+        <p class="lede">{lede}</p>
       </header>
 
       <div class="filters">
@@ -291,8 +301,8 @@ def write_constats(constats):
       </div>
 
       <footer class="footer">
-        <a href="index.html">← Toutes les fiches</a> ·
-        Page générée par <code>build.py</code> — relancer après modification des fiches.
+        <a href="index.html">{back}</a> ·
+        <code>build.py</code>
       </footer>
     </article>
   </div>
@@ -300,11 +310,155 @@ def write_constats(constats):
 </body>
 </html>
 """
-    with open(os.path.join(ROOT, "constats.html"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(ROOT, lang, nav.FILES[lang]["findings"]), "w", encoding="utf-8") as fh:
         fh.write(page)
-    print(f"constats.html : {len(constats)} entrées, {len(tools)} outils")
+    print(f"{lang}/{nav.FILES[lang]['findings']} : {len(constats)} entrées, {len(tools)} outils")
+
+
+NAV_RX = re.compile(r'<nav class="sidebar">.*?</nav>', re.S)
+
+
+def page_params(rel):
+    """chemin relatif à la racine -> (lang, section, current, depth) ou None."""
+    parts = rel.split("/")
+    if len(parts) < 2 or parts[0] not in nav.LANGS:
+        return None
+    lang, rest = parts[0], parts[1:]
+    fl = nav.FILES[lang]
+    if len(rest) == 1:
+        f = rest[0]
+        cur = {"index.html": "home", fl["findings"]: "findings",
+               fl["glossary"]: "glossary"}.get(f, "home")
+        return lang, "atlas", cur, 1
+    folder, f = rest[0], rest[1]
+    if folder == "guide":
+        return lang, "guide", ("home" if f == "index.html" else os.path.splitext(f)[0]), 2
+    return lang, "atlas", folder, 2
+
+
+def sync_nav():
+    """Réécrit la sidebar de chaque page à partir de nav.py."""
+    n = miss = 0
+    for dp, dirs, fs in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in (".git", "assets") and not d.startswith(".")]
+        for f in sorted(fs):
+            if not f.endswith(".html"):
+                continue
+            path = os.path.join(dp, f)
+            rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
+            prm = page_params(rel)
+            if not prm:
+                continue
+            s = open(path, encoding="utf-8").read()
+            if "<nav class=\"sidebar\">" not in s:
+                miss += 1
+                continue
+            new = NAV_RX.sub(lambda _m: nav.sidebar(*prm), s, count=1)
+            if new != s:
+                open(path, "w", encoding="utf-8").write(new)
+                n += 1
+    print(f"sidebar : {n} pages synchronisées" + (f", {miss} sans sidebar" if miss else ""))
+
+
+
+
+LANDING = """<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SADT Atlas</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/site.js"></script>
+</head>
+<body>
+<div class="landing">
+  <h1>SADT Atlas</h1>
+  <p>Comment fonctionne chaque outil de SlicerAutomatedDentalTools.<br>
+     How each SlicerAutomatedDentalTools module works.</p>
+  <div class="choices">
+    <a href="fr/index.html"><b>Français</b><small>Guide et Atlas</small></a>
+    <a href="en/index.html"><b>English</b><small>Guide and Atlas</small></a>
+  </div>
+</div>
+</body>
+</html>
+"""
+
+
+def write_landing():
+    open(os.path.join(ROOT, "index.html"), "w", encoding="utf-8").write(LANDING)
+    print("index.html : page de choix de langue")
+
+
+GUIDE_INTRO = {
+ "fr": ("Guide d'utilisation",
+        "Ce que fait chaque outil, ce qu'il faut lui donner, ce qu'il rend — sans entrer "
+        "dans le code. Pour comprendre les mécanismes internes, passez à l'Atlas."),
+ "en": ("User guide",
+        "What each tool does, what to feed it, what it returns — without going into the "
+        "code. For the internal mechanisms, switch to the Atlas."),
+}
+
+
+def write_guide_index(lang):
+    d = os.path.join(ROOT, lang, "guide")
+    os.makedirs(d, exist_ok=True)
+    title, lede = GUIDE_INTRO[lang]
+    ui = nav.UI[lang]
+    cards = []
+    for cat, labels in nav.CATS.items():
+        tools = [t for t, c in nav.TOOLS if c == cat]
+        if not tools:
+            continue
+        cards.append(f"      <h2 id=\"{cat}\">{nav.esc(labels[lang])}</h2>")
+        cards.append('      <div class="card-grid">')
+        for t in tools:
+            b = nav.BLURBS[t][f"guide_{lang}"]
+            cards.append(f'        <a class="card" href="{t}.html">'
+                         f'<span class="card-name">{t}</span>'
+                         f'<span class="card-desc">{nav.esc(b)}</span></a>')
+        cards.append("      </div>")
+    page = f"""<!doctype html>
+<html lang="{lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{nav.esc(title)} — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide">
+<div class="layout">
+{nav.sidebar(lang, "guide", "home", 2)}
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <h1>{nav.esc(title)}</h1>
+        <p class="lede">{nav.esc(lede)}</p>
+      </header>
+{chr(10).join(cards)}
+      <footer class="footer">
+        <a href="../index.html">{nav.esc(ui["toindex"])}</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>
+"""
+    open(os.path.join(d, "index.html"), "w", encoding="utf-8").write(page)
+    print(f"{lang}/guide/index.html : {len(nav.BLURBS)} outils")
 
 
 if __name__ == "__main__":
-    _idx, _c = main()
-    write_constats(_c)
+    write_landing()
+    for _l in nav.LANGS:
+        if os.path.isdir(os.path.join(ROOT, _l)):
+            write_guide_index(_l)
+    sync_nav()
+    for _l in nav.LANGS:
+        if os.path.isdir(os.path.join(ROOT, _l)):
+            _idx, _c = build_lang(_l)
+            write_constats(_l, _c)

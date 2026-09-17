@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AREG_CBCT — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="recalage">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html" aria-current="page">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Registration</div>
+        <h1>AREG_CBCT — register a follow-up CBCT onto the baseline</h1>
+        <p class="lede">AREG_CBCT superimposes two CBCT scans of the same patient taken at
+        two different times (T1 and T2), anchored on a bony region that's assumed not to
+        have changed — the cranial base, the mandible, or the maxilla. The registration
+        itself is a classic geometric computation, no neural network involved: reproducible,
+        but entirely dependent on picking a good anchor.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>Whenever you need to compare two CBCT scans of the same patient — before/after
+      treatment, growth follow-up, post-surgical check — and they need to share the same
+      spatial frame to be overlaid or measured. AREG_CBCT only does this voxel-to-voxel
+      registration on a stable bony structure: your two scans must already belong to the
+      same patient and represent two distinct time points.</p>
+
+      <h2 id="modes">Three modes, one registration</h2>
+      <p>All three modes end up computing the same registration; they only differ in what
+      happens beforehand.</p>
+      <ul>
+        <li><strong>Semi-Automated</strong> — you supply the reference-region masks on T1
+        yourself. The most direct route if that work is already done.</li>
+        <li><strong>Fully-Automated</strong> — AREG_CBCT computes those masks for you. Only
+        reliable when your T1 scans are already oriented consistently with each other.</li>
+        <li><strong>Orientation &amp; Registration</strong> — AREG_CBCT starts by centering
+        T1, placing landmarks on it and orienting it to a common reference, before computing
+        masks and registering. The most complete mode, for T1 scans with no consistent
+        orientation to begin with.</li>
+      </ul>
+      <div class="callout">
+        <div class="callout-title">Which one to pick</div>
+        <p>Already have masks? Semi-Automated. No masks, but T1 scans already oriented the
+        same way? Fully-Automated. Neither? Orientation &amp; Registration. In all three
+        modes, you check one or more reference regions (<strong>Cranial Base</strong>,
+        <strong>Mandible</strong>, <strong>Maxilla</strong>): each one runs its own
+        independent registration, with its own output.</p>
+      </div>
+
+      <h2 id="besoin">What it needs, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>What to provide</h4>
+          <ul>
+            <li>A baseline CBCT (T1) and a follow-up CBCT (T2) per patient, named with the
+            <code>_T1</code> and <code>_T2</code> suffixes — that naming is what lets them
+            be paired automatically, nothing else</li>
+            <li>Accepted formats: <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>,
+            <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code></li>
+            <li>In Semi-Automated: a folder of reference-region masks on T1, already
+            prepared</li>
+            <li>In Fully-Automated and Orientation &amp; Registration: the segmentation and
+            orientation models, downloaded once</li>
+            <li>One or more reference regions checked</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>One folder per registered region, holding for each patient the registered T2
+            CBCT and its matching transformation matrix (<code>.tfm</code>)</li>
+            <li>The T1 CBCT and your original files are left untouched</li>
+            <li>If "Merge Segmentations" is checked, the final segmentations of T1 and of
+            the registered T2</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Steps</h2>
+      <ol class="steps">
+        <li><strong>Pick a mode.</strong> Semi-Automated, Fully-Automated, or Orientation
+        &amp; Registration — see above.</li>
+        <li><strong>Point it to the T1 and T2 folders.</strong> Check that each pair of
+        files shares the same patient id, followed by <code>_T1</code> or <code>_T2</code>.</li>
+        <li><strong>In Semi-Automated, set the T1 masks folder.</strong> Without it, there's
+        nothing to register against.</li>
+        <li><strong>Check the reference region(s).</strong> Cranial Base, Mandible, Maxilla
+        — each one triggers its own registration.</li>
+        <li><strong>Download the models the first time you run it</strong>, then, if you
+        want, check under "Review and manual adjustment" the steps you'd like to inspect
+        before the run continues.</li>
+        <li><strong>Set an output folder and launch.</strong> If review pauses are enabled,
+        the run stops after each checked step: you inspect the result, nudge it with the
+        mouse if needed — for the registration, by dragging the overlaid scan — then move on
+        to the next patient or resume the full run.</li>
+      </ol>
+
+      <h2 id="temps">How long it takes</h2>
+      <p>The registration itself runs on CPU, no graphics card needed, and on a single
+      thread to stay reproducible from one run to the next — a choice that favors stability
+      of the result over speed. The steps around it (automatic mask segmentation,
+      orientation) are much faster with a GPU. The paper describing the method reports
+      <strong>under five minutes per patient</strong> for the whole chain; without a GPU for
+      the upstream steps, budget more time on a large series.</p>
+
+      <h2 id="coince">If something's off</h2>
+      <div class="callout warn">
+        <div class="callout-title">A patient goes missing, with no error message</div>
+        <p>T1/T2 pairing only works with the <code>_T1</code> and <code>_T2</code> suffixes
+        in the file name. Any other convention (<code>_T3</code>, <code>_baseline</code>, a
+        date…) keeps AREG_CBCT from recognizing the pair, and that patient is silently
+        dropped — nothing is shown to flag it. If a patient is missing from the output, the
+        first thing to check is that patient's file names.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Avoid mask keywords in a scan's file name</div>
+        <p>AREG_CBCT recognizes a mask file by keywords in its name (<code>seg</code>,
+        <code>mask</code>, <code>pred</code>, or the region's abbreviation —
+        <code>cb</code>, <code>mand</code>, <code>max</code>). The first file that matches
+        is used as-is, with no check that it's actually a mask. A scan named, say,
+        <code>P1_T1_MAX.nii.gz</code> could therefore be mistaken for a maxilla mask.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">DICOM import</div>
+        <p>Convert your CBCT scans to <code>.nii.gz</code> before running AREG_CBCT. DICOM
+        input is only offered in Orientation &amp; Registration mode, and stays fragile even
+        there: starting from already-converted files avoids the surprise.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">The saved matrix can drift slightly from the best
+        alignment found</div>
+        <p>The <code>.tfm</code> file and the registered CBCT stay consistent with each
+        other, but both can drift a bit from the alignment the registration actually found
+        as optimal. The gap depends on where the skull sits in the volume, and stays small
+        when your images are already well centered — which is the case after a run through
+        Orientation &amp; Registration. If you reuse this matrix elsewhere, in AutoMatrix for
+        instance, always check the overlay by eye before trusting it.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">"Include Approximation Step" no longer does anything</div>
+        <p>The checkbox stays checked by default in the interface, but it has no effect on
+        the result: don't count on it to speed up or refine a registration that's giving you
+        trouble.</p>
+      </div>
+
+      <h2 id="apres">What's next</h2>
+      <p>The registered CBCT and its matrix are directly reusable — in AutoMatrix, in the
+      chain's analysis tools, or for a simple visual overlay in Slicer. As with any automatic
+      registration, a quick visual check before using it for a measurement remains good
+      practice. Also note that the matrix doesn't account for any centering applied upstream
+      to T2: to bring the follow-up scan all the way back to its original frame, you need to
+      chain that step together with the AREG_CBCT matrix, not use one without the other.</p>
+
+      <a class="deep-link" href="../AREG_CBCT/AREG_CBCT.html">
+        <b>How it actually works →</b>
+        <span>The Atlas page: the rigid elastix registration, patient pairing, the modes
+        chained behind the scenes, and the limitations found in the code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../AREG_CBCT/AREG_CBCT.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

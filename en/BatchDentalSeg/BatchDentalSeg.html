@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BatchDentalSeg — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="segmentation">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html" aria-current="true"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html" aria-current="page">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Segmentation</div>
+        <h1>BatchDentalSeg</h1>
+        <p class="lede">Queue that drives <code>nnUNetv2_predict</code> over a batch of CT/CBCT scans, with four interchangeable weight bundles — DentalSegmentator and its three variants — plus all the guard-rail, geometry-restoration, and export work around them.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1016/j.jdent.2024.105130" target="_blank" rel="noopener" title="DentalSegmentator. The module's variants are not published.">Dot 2024 · J Dent</a>
+          <span class="badge cli">BATCHDENTALSEG</span>
+          <span class="badge cli">nnUNetv2_predict</span>
+          <span class="badge neutral">no conda — Slicer's Python + nnunetv2</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliography</a>
+        </div>
+      </header>
+
+      <p>Batch dento-maxillofacial segmentation of CT/CBCT scans. The module is not a
+      network: it is a <strong>queue and an orchestrator</strong> around
+      <code>nnUNetv2_predict</code>, with four interchangeable weight bundles. All the
+      learning happens outside this repository; what is written here is the model
+      choice, the memory guard-rails, the geometry restoration, and the exports.</p>
+
+      <h2 id="situation">1. Where it sits in the pipeline</h2>
+
+      <p><strong>No other module in the repository calls BatchDentalSeg</strong>, and BatchDentalSeg
+      does not call any other module in the repository. It is a terminal tool. It does,
+      however, depend on an <strong>external Slicer extension</strong>, <code>NNUNet</code>
+      (<a href="https://github.com/KitwareMedical/SlicerNNUnet" target="_blank" rel="noopener">SlicerNNUNetLib</a>), from which it
+      uses three classes.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Called</th><th>Origin</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td><code>SlicerNNUNetLib.InstallLogic</code></td><td>NNUNet extension</td><td><code>setupPythonRequirements()</code>: installs nnunetv2 in Slicer's Python</td></tr>
+            <tr><td><code>SlicerNNUNetLib.Parameter</code></td><td>NNUNet extension</td><td>validates the model directory tree and builds the command line</td></tr>
+            <tr><td><code>SlicerNNUNetLib.SegmentationLogic</code></td><td>NNUNet extension</td><td>writes the volume as NIfTI into a temporary folder, launches <code>nnUNetv2_predict</code> as a <code>QProcess</code>, reloads the segmentation</td></tr>
+            <tr><td><code>OpenAnatomyExport</code></td><td>SlicerOpenAnatomy extension</td><td>glTF export only; installed on the fly if absent</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The module is a <strong>batch variant of DentalSegmentator</strong> (extension
+      <a href="https://github.com/gaudot/SlicerDentalSegmentator" target="_blank" rel="noopener">gaudot/SlicerDentalSegmentator</a>),
+      from which it reuses the widget, the icons, and the weight-download
+      mechanism. The contributors declared in
+      <code>BATCHDENTALSEG.py:30</code> mix the original
+      team (Dot, Gajny, Fenioux, Pelletier) with the UoM addition (Tulissi).</p>
+
+      <h2 id="fichiers">2. Files involved</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Role</th><th>Size</th></tr></thead>
+          <tbody>
+            <tr><td><code>BATCHDENTALSEG.py</code></td><td>wraps <code>ScriptedLoadableModule</code>, only instantiates the widget</td><td>83 lines</td></tr>
+            <tr><td><code>SegmentationWidget.py</code></td><td><strong>everything</strong>: UI, queue, model choice, memory guard, crop, labels, exports</td><td>2940 lines</td></tr>
+            <tr><td><code>Queue.py</code></td><td>persistent queue, <code>QueueItem</code> / <code>SegmentationQueue</code></td><td>204 lines</td></tr>
+            <tr><td><code>PythonDependencyChecker.py</code></td><td>download and freshness check for the DentalSegmentator weights</td><td>184 lines</td></tr>
+            <tr><td><code>Utils.py</code>, <code>Signal.py</code>, <code>IconPath.py</code></td><td>Qt helpers</td><td></td></tr>
+            <tr><td><code>Resources/ML/</code></td><td>weight root; the repository ships <code>Dataset111_453CT/.../dataset.json</code> and <code>plans.json</code></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Everything runs inside <strong>Slicer's Python</strong>. <code>nnUNetv2_predict</code> is launched as a
+      <strong>child process</strong> (<code>QProcess</code>), one scan at a time — unlike <a href="../AMASSS/AMASSS.html">AMASSS</a>, which
+      calls the <a class="gterm" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> Python API in-process.</p>
+
+      <p><code>Resources/ML</code> is <strong>not</strong> listed in <code>MODULE_PYTHON_RESOURCES</code> of
+      <code>CMakeLists.txt</code>: in an installed extension,
+      the folder is created entirely at runtime. The <code>.pth</code> files are <code>.gitignore</code>d.</p>
+
+      <h2 id="entrees">3. Inputs, folder traversal, naming</h2>
+
+      <h3 id="entrees-acceptees">3.1 What is accepted</h3>
+
+      <p><code>listVolumes()</code> (<code>Queue.py:28</code>)
+      does a <strong>non-recursive</strong> <code>glob</code> over four patterns: <code>*.nii</code>, <code>*.nii.gz</code>,
+      <code>*.gipl</code>, <code>*.gipl.gz</code>. Subfolders are not visited, and <strong>NRRD is not
+      recognized</strong> — Slicer's default format, and a format the repository's other modules
+      commonly produce.</p>
+
+      <p><code>volumeStem()</code> strips the compound suffix: <code>case01.nii.gz</code> → <code>case01</code> (a
+      <code>Path.stem</code> would leave <code>case01.nii</code>).</p>
+
+      <h3 id="entrees-file">3.2 The queue</h3>
+
+      <p>One entry = <strong>one scan</strong>, not one folder
+      (<code>QueueItem</code>, <code>Queue.py:52</code>):
+      <code>inputPath</code>, <code>outputDir</code>, <code>model</code>, <code>device</code>, <code>status</code>, <code>error</code>, <code>durationSec</code>,
+      <code>autoCrop</code>. Several folders with different models can therefore be
+      stacked in the same session.</p>
+
+      <p><code>addFolder()</code> skips a scan if <code>&lt;outputDir&gt;/&lt;stem&gt;_Segmentation.nii.gz</code> already
+      exists (the <em>Skip scans already segmented</em> checkbox, checked by default) or if it is
+      already in the queue.</p>
+
+      <p><strong>Persistence</strong>: the state is rewritten after each scan into
+      <code>&lt;outputDir&gt;/.batchdentalseg_queue.json</code>. On reload, a scan left in
+      <code>running</code> (Slicer killed mid-inference) is <strong>rewound</strong> to <code>pending</code> and
+      the index goes back to it.</p>
+
+      <p><code>isChunkBoundary()</code>: every <code>chunkSize</code> scans (default 5), <code>_coolDown()</code> does
+      a deep cleanup — removes orphan nodes, <code>torch.cuda.empty_cache()</code>
+      + <code>ipc_collect()</code>, <code>gc.collect()</code>.</p>
+
+      <h3 id="entrees-reseau">3.3 What the network actually sees</h3>
+
+      <p>The widget does not preprocess anything. <code>SegmentationLogic._prepareInferenceDir()</code> does a
+      <code>slicer.util.exportNode(volumeNode, &lt;tmp&gt;/input/volume_0000.nii.gz)</code>, and <strong>all
+      of the preprocessing is nnU-Net's</strong>: transposition per
+      <code>transpose_forward</code>, resampling to the plan's <code>spacing</code>, <code>CTNormalization</code>
+      (clip to the 0.5% / 99.5% percentiles of the training set, then standardization
+      by its mean and standard deviation).</p>
+
+      <p>The only preprocessing written in this repository is the <strong>automatic crop</strong> (§5.2), and
+      it is optional, reserved for replay after a memory failure.</p>
+
+      <h2 id="modeles">4. The four models</h2>
+
+      <h3 id="modeles-combo">4.1 What the combo box selects</h3>
+
+      <p><code>onApplyClickedForVolume()</code>
+      (<code>SegmentationWidget.py:1729</code>)
+      is an <code>if/elif</code> with four near-identical branches. Each builds the same
+      object:</p>
+
+      <pre><code>Parameter(folds="0", modelPath=basePath, device=self.deviceComboBox.currentText)</code></pre>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 920 260" role="img" aria-label="A single entry point in the code, four weight bundles out">
+          <rect class="d-box-a" x="330" y="14" width="260" height="46" rx="6"/>
+          <text class="d-label" x="460" y="33" text-anchor="middle">onApplyClickedForVolume()</text>
+          <text class="d-label-s" x="460" y="48" text-anchor="middle">if / elif — same Parameter(...)</text>
+
+          <path class="d-arrow" d="M460 60 V80"/>
+          <path class="d-arrow" d="M460 80 H115"/>
+          <path class="d-arrow" d="M460 80 H345"/>
+          <path class="d-arrow" d="M460 80 H575"/>
+          <path class="d-arrow" d="M460 80 H805"/>
+          <path class="d-arrow" d="M115 80 V100"/>
+          <path class="d-arrow" d="M345 80 V100"/>
+          <path class="d-arrow" d="M575 80 V100"/>
+          <path class="d-arrow" d="M805 80 V100"/>
+          <path class="d-arrow-head" d="M115 100 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M345 100 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M575 100 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M805 100 l-4 -7 h8 z"/>
+
+          <rect class="d-box-n" x="10" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="115" y="122" text-anchor="middle">DentalSegmentator</text>
+          <text class="d-mono" x="115" y="140" text-anchor="middle">Dataset111_453CT</text>
+          <text class="d-label-s" x="115" y="157" text-anchor="middle">5 labels — permanent dentition</text>
+          <text class="d-label-s" x="115" y="172" text-anchor="middle">Upper Skull, Mandible,</text>
+          <text class="d-label-s" x="115" y="185" text-anchor="middle">Upper/Lower Teeth, canal</text>
+
+          <rect class="d-box-n" x="240" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="345" y="122" text-anchor="middle">PediatricDentalsegmentator</text>
+          <text class="d-mono" x="345" y="140" text-anchor="middle">Dataset001_380CT</text>
+          <text class="d-label-s" x="345" y="157" text-anchor="middle">5 labels — same table</text>
+          <text class="d-label-s" x="345" y="172" text-anchor="middle">as DentalSegmentator,</text>
+          <text class="d-label-s" x="345" y="185" text-anchor="middle">mixed dentition</text>
+
+          <rect class="d-box-n" x="470" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="575" y="122" text-anchor="middle">NasoMaxillaDentSeg</text>
+          <text class="d-mono" x="575" y="140" text-anchor="middle">Dataset001_max4</text>
+          <text class="d-label-s" x="575" y="157" text-anchor="middle">6 labels — maxilla</text>
+          <text class="d-label-s" x="575" y="172" text-anchor="middle">detached from the skull</text>
+          <text class="d-label-s" x="575" y="185" text-anchor="middle">(renaming defect, §9)</text>
+
+          <rect class="d-box-n" x="700" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="805" y="122" text-anchor="middle">UniversalLabDentalsegmentator</text>
+          <text class="d-mono" x="805" y="140" text-anchor="middle">Dataset002_380CT</text>
+          <text class="d-label-s" x="805" y="157" text-anchor="middle">55 labels — teeth, one</text>
+          <text class="d-label-s" x="805" y="172" text-anchor="middle">at a time, no “Upper</text>
+          <text class="d-label-s" x="805" y="185" text-anchor="middle">Skull” despite the UI</text>
+
+          <path class="d-arrow" d="M115 192 V212"/>
+          <path class="d-arrow" d="M345 192 V212"/>
+          <path class="d-arrow" d="M575 192 V212"/>
+          <path class="d-arrow" d="M805 192 V212"/>
+          <path class="d-arrow-head" d="M115 212 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M345 212 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M575 212 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M805 212 l-4 -7 h8 z"/>
+          <text class="d-mono" x="115" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="345" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="575" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="805" y="228" text-anchor="middle">nnUNetv2_predict</text>
+        </svg>
+        <figcaption>The combo box's four entries all go through the same code; only the dataset folder and the label table change.</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name in the combo box</th><th>Folder under <code>Resources/ML</code></th><th>Weight origin</th></tr></thead>
+          <tbody>
+            <tr><td><code>DentalSegmentator</code></td><td><code>Dataset111_453CT/nnUNetTrainer__nnUNetPlans__3d_fullres</code></td><td>zip of the <strong>latest release</strong> of <code>gaudot/SlicerDentalSegmentator</code>, resolved via the GitHub API</td></tr>
+            <tr><td><code>PediatricDentalsegmentator</code></td><td><code>Dataset001_380CT/...</code></td><td>3 files from <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/PEDIATRICDENTALSEG_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/PEDIATRICDENTALSEG_MODEL</a></td></tr>
+            <tr><td><code>NasoMaxillaDentSeg</code></td><td><code>Dataset001_max4/...</code></td><td><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/NASOMAXILLADENTSEG_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/NASOMAXILLADENTSEG_MODEL</a></td></tr>
+            <tr><td><code>UniversalLabDentalsegmentator</code></td><td><code>Dataset002_380CT/...</code></td><td><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/UNIVERSALLAB_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/UNIVERSALLAB_MODEL</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The last three follow the same pattern: if
+      <code>&lt;basePath&gt;/fold_0/checkpoint_final.pth</code> is missing, three files are downloaded
+      (<code>checkpoint_final.pth</code>, <code>dataset.json</code>, <code>plans.json</code>) via
+      <code>slicer.util.downloadFile</code>. No checksum, no versioning, no
+      resume: an interrupted download leaves a truncated checkpoint that the code
+      will consider present on the next run.</p>
+
+      <p>DentalSegmentator goes through a separate path,
+      <code>PythonDependencyChecker</code>:
+      <code>Github().get_repo("gaudot/SlicerDentalSegmentator")</code>, then <strong>the first asset of
+      the first release</strong> listed, streamed down and unzipped. The URL used
+      is stored in <code>Resources/ML/download_info.json</code>, and a more recent
+      release triggers an update prompt. The file committed in the
+      repository points to
+      <a href="https://github.com/gaudot/SlicerDentalSegmentator/releases/download/v1.0.0-alpha/Dataset111_453CT_v100.zip" target="_blank" rel="noopener">Dataset111_453CT_v100.zip</a>.</p>
+
+      <h3 id="modeles-nnunet">4.2 nnU-Net, verified in the code</h3>
+
+      <p>Yes, this is nnU-Net v2, not just in name. The proof is in the call
+      chain: <code>Parameter.asArgList()</code> literally builds</p>
+
+      <pre><code>nnUNetv2_predict -i &lt;tmp&gt;/input -o &lt;tmp&gt;/output
+  -d Dataset111_453CT -tr nnUNetTrainer -p nnUNetPlans -c 3d_fullres
+  -f 0 -npp 1 -nps 1 -step_size 0.5 -device cuda -chk checkpoint_final.pth --disable_tta</code></pre>
+
+      <p><code>-d</code>, <code>-tr</code>, <code>-p</code>, <code>-c</code> are <strong>inferred from folder names</strong>: the parent folder
+      gives the <code>Dataset…</code>, and the configuration folder's name is split on <code>__</code>
+      into (trainer, plan, configuration). Hence the requirement
+      <code>Dataset&lt;id&gt;/&lt;trainer&gt;__&lt;plan&gt;__&lt;conf&gt;/fold_&lt;i&gt;/checkpoint_final.pth</code>.</p>
+
+      <p>Parameters not exposed to the user, default values from
+      <code>SlicerNNUNetLib.Parameter</code>: <code>stepSize = 0.5</code>, <code>disableTta = True</code> (no
+      mirror augmentation at test time), <code>folds = "0"</code> (<strong>a single fold</strong>, never
+      an ensemble), <code>nProcessPreprocessing = nProcessSegmentationExport = 1</code>, forced to
+      <code>0</code> on macOS (nnU-Net hangs on write there because of multiprocessing).</p>
+
+      <p>The only setting the UI offers is the device: <code>cuda</code> / <code>cpu</code> / <code>mps</code>. If
+      unavailable, only <strong>one</strong> question is asked for the whole queue
+      (<code>_deviceFallbackAccepted</code>), and in <em>Unattended</em> mode the CPU fallback is
+      accepted automatically.</p>
+
+      <p><code>nnUNet_raw</code>, <code>nnUNet_preprocessed</code>, and <code>nnUNet_results</code> are all pointed at the
+      model folder — three process-level environment variables, written by
+      <code>SegmentationLogic._startInferenceProcess</code>. Since <code>os.environ</code> is global, two
+      concurrent inferences in the same Slicer session would step on each other;
+      here the queue is strictly sequential, so the issue does not arise.</p>
+
+      <h3 id="modeles-architecture">4.3 Architecture and plan — what is verifiable</h3>
+
+      <p>Only <code>Dataset111_453CT</code> (DentalSegmentator) has its JSON files in the repository. Summary from
+      <code>plans.json</code>:</p>
+
+      <pre><code>UNet_class_name = PlainConvUNet     base/max features = 32 / 320
+n_conv_per_stage encoder [2,2,2,2,2,2]  decoder [2,2,2,2,2]
+pool_op_kernel_sizes = [1,1,1], 4 x [2,2,2], [2,2,1]   conv_kernel 6 x [3,3,3]
+patch_size = [128, 160, 112]    spacing = [0.4492, 0.3120, 0.4492] mm
+transpose_forward = transpose_backward = [1, 0, 2]     batch_size = 2, batch_dice
+normalization_schemes = CTNormalization
+foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</code></pre>
+
+      <p>This <code>plans.json</code> is in the <strong>nnU-Net format predating 2.4</strong> (flat
+      <code>UNet_class_name</code> / <code>pool_op_kernel_sizes</code> fields, no <code>architecture</code> block),
+      whereas the <a href="../AMASSS/AMASSS.html">AMASSS</a> bundles use the newer format. Both remain readable
+      by current nnunetv2.</p>
+
+      <p>The plans of the other three models <strong>cannot be determined from the
+      repository</strong>: they arrive with the download. Everything known about them comes
+      from the dictionaries hard-coded in the widget (§4.4) and from the README.</p>
+
+      <h3 id="modeles-labels">4.4 The labels produced, per model</h3>
+
+      <p><code>_get_active_label_map()</code>
+      (<code>SegmentationWidget.py:1847</code>)
+      is <strong>the</strong> reference table: it decides the values written into the
+      output NIfTI.</p>
+
+      <p><strong>DentalSegmentator and PediatricDentalsegmentator</strong> — <span class="badge predit">5 labels</span> identical,
+      confirmed by the <code>dataset.json</code> of bundle 111: 1 Upper Skull (maxilla
+      included), 2 Mandible, 3 Upper Teeth, 4 Lower Teeth, 5 Mandibular canal. What
+      distinguishes them is therefore <strong>not the output but the training data</strong>: permanent
+      dentition (<code>453CT</code>, 7 institutions) versus mixed dentition (<code>380CT</code>). The code
+      treats them in a rigorously identical way — same label table, same colors,
+      same post-processing; only <code>_modelBasePath</code> differs.</p>
+
+      <p><strong>NasoMaxillaDentSeg</strong> — <span class="badge predit">6 labels</span>, the maxilla <strong>detached</strong> from the skull:
+      1 Upper Skull, 2 Mandible, <strong>3 Maxilla</strong>, 4 Upper Teeth, 5 Lower Teeth,
+      6 Mandibular canal.</p>
+
+      <p><strong>UniversalLabDentalsegmentator</strong> — <span class="badge predit">55 labels</span>: the 32 permanent teeth
+      numbered one by one (1 = upper right 3<sup>rd</sup> molar → 32 = lower right 3<sup>rd</sup>
+      molar, going around the upper arch then the lower arch), then
+      20 primary teeth (33 → 52), then <code>Mandible</code> = 53, <code>Maxilla</code> = 54,
+      <code>Mandibular canal</code> = 55. No "Upper Skull": this model does not segment the
+      cranial vault, contrary to what its UI description shows and to what
+      the README says.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p>The description shown in the UI for <code>UniversalLabDentalsegmentator</code> and the repository's README announce a segmentation of the cranial vault. The actual model has no "Upper Skull" label: it only numbers the teeth, plus mandible/maxilla/canal.</p>
+      </div>
+
+      <p>Values are set on each segment via a <code>LabelValue</code> tag
+      (<code>_segmentLabelValue</code>), which <strong>takes priority over the name</strong> when present.</p>
+
+      <h2 id="coeur">5. The non-learned core</h2>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 980 230" role="img" aria-label="Full pipeline, from the input volume to the output files">
+          <rect class="d-box" x="10" y="70" width="150" height="60" rx="6"/>
+          <text class="d-label" x="85" y="96" text-anchor="middle">Input volume</text>
+          <text class="d-label-s" x="85" y="112" text-anchor="middle">.nii / .nii.gz / .gipl</text>
+
+          <path class="d-arrow" d="M160 100 H205"/>
+          <path class="d-arrow-head" d="M205 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="210" y="60" width="185" height="80" rx="6"/>
+          <text class="d-label" x="302" y="82" text-anchor="middle">nnU-Net preprocessing</text>
+          <text class="d-label-s" x="302" y="98" text-anchor="middle">transpose, resample,</text>
+          <text class="d-label-s" x="302" y="112" text-anchor="middle">CTNormalization</text>
+          <text class="d-label-s" x="302" y="127" text-anchor="middle">(driven by plans.json)</text>
+
+          <path class="d-arrow" d="M395 100 H440"/>
+          <path class="d-arrow-head" d="M440 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="445" y="60" width="180" height="80" rx="6"/>
+          <text class="d-label" x="535" y="85" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-label-s" x="535" y="101" text-anchor="middle">PlainConvUNet 3D</text>
+          <text class="d-label-s" x="535" y="115" text-anchor="middle">1 fold, no TTA</text>
+          <text class="d-label-s" x="535" y="129" text-anchor="middle">network predicts</text>
+
+          <path class="d-arrow" d="M625 100 H670"/>
+          <path class="d-arrow-head" d="M670 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="675" y="60" width="150" height="80" rx="6"/>
+          <text class="d-label" x="750" y="85" text-anchor="middle">Label map</text>
+          <text class="d-label-s" x="750" y="101" text-anchor="middle">single export</text>
+          <text class="d-label-s" x="750" y="115" text-anchor="middle">+ numpy LUT</text>
+          <text class="d-label-s" x="750" y="129" text-anchor="middle">(restored onto grid</text>
+
+          <path class="d-arrow" d="M825 100 H870"/>
+          <path class="d-arrow-head" d="M870 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="875" y="55" width="95" height="90" rx="6"/>
+          <text class="d-label" x="922" y="80" text-anchor="middle">Outputs</text>
+          <text class="d-label-s" x="922" y="96" text-anchor="middle">NIfTI</text>
+          <text class="d-label-s" x="922" y="110" text-anchor="middle">STL/OBJ</text>
+          <text class="d-label-s" x="922" y="124" text-anchor="middle">VTK, glTF</text>
+
+          <path class="d-arrow" d="M535 140 V170 H302 V140"/>
+          <path class="d-arrow-head" d="M302 140 l-7 4 v-8 z"/>
+          <text class="d-label-s" x="418" y="185" text-anchor="middle">memory failure ⇒ auto crop (§5.2) ⇒ new attempt</text>
+        </svg>
+        <figcaption>The only learning happens in a single step; everything else — preprocessing, reconstruction, the replay loop — is computed.</figcaption>
+      </figure>
+
+      <h3 id="coeur-labelmap">5.1 Label map reconstruction and geometry restoration</h3>
+
+      <p><code>_buildLabelArray()</code>
+      (<code>SegmentationWidget.py:1912</code>):</p>
+
+      <p>a single <code>ExportSegmentsToLabelmapNode</code>, with the explicit list of <code>segmentId</code>
+      (which pins down the correspondence "exported value <em>i</em>+1 ↔ <code>segIds[i]</code>"), then
+      a numpy LUT that remaps to the official values in one pass
+      (<code>lut[exported]</code>). The earlier version rasterized the full extent of the volume
+      once per segment: 55 rasterizations of a full-mouth CBCT for
+      UniversalLab.</p>
+
+      <h3 id="coeur-crop">5.2 Automatic crop (replay after memory failure)</h3>
+
+      <p>Optional, triggered by <em>Retry failed</em> after explicit confirmation.
+      <code>_applyAutoCrop()</code>
+      (<code>SegmentationWidget.py:1017</code>):</p>
+
+      <ul>
+        <li><strong>air/tissue threshold</strong> scale-tolerant: if <code>array.min() &lt; −800</code>, we are in
+          Hounsfield units and the threshold is <code>−500</code>; otherwise <code>min + 0.15 × (p99.5 − min)</code>;</li>
+        <li>bounding box of the voxels above the threshold, expanded by
+          <code>_CROP_MARGIN_MM = 15.0</code> mm converted to voxels per axis;</li>
+        <li>if more than <code>_CROP_MIN_GAIN = 0.85</code> of the voxels are kept, <strong>the crop is
+          abandoned</strong>: gaining less than 15% is not worth the risk;</li>
+        <li>the sub-volume keeps its spacing and axes, <strong>only the origin moves</strong>
+          (<code>ijkToRas.MultiplyPoint([i0,j0,k0,1])</code>). Nothing is interpolated.</li>
+      </ul>
+
+      <p><code>_restoreCropToOriginalGrid()</code> pastes the label map back into an array of the
+      original size by a simple index offset: the output is therefore always on the
+      grid of the scan as acquired.</p>
+
+      <h3 id="coeur-memoire">5.3 Memory guard — three lines of defense</h3>
+
+      <p>The code comment gives the real case: a scan filled 114 GB on a
+      125 GB machine, got killed by the OOM killer, and left its multiprocessing
+      workers alive holding the memory.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 900 170" role="img" aria-label="Three lines of memory defense: before, during, after">
+          <rect class="d-box" x="10" y="20" width="260" height="100" rx="6"/>
+          <text class="d-label" x="140" y="42" text-anchor="middle">a) Before: a priori estimate</text>
+          <text class="d-label-s" x="140" y="60" text-anchor="middle">_estimatePeakRamGb()</text>
+          <text class="d-label-s" x="140" y="76" text-anchor="middle">FOV, spacing, label count</text>
+          <text class="d-label-s" x="140" y="92" text-anchor="middle">budget = free RAM × 85%</text>
+          <text class="d-label-s" x="140" y="108" text-anchor="middle">exceeded ⇒ failed without launching</text>
+
+          <path class="d-arrow" d="M270 70 H315"/>
+          <path class="d-arrow-head" d="M315 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="320" y="20" width="260" height="100" rx="6"/>
+          <text class="d-label" x="450" y="42" text-anchor="middle">b) During: monitoring</text>
+          <text class="d-label-s" x="450" y="60" text-anchor="middle">_onMemCheck, every 3000 ms</text>
+          <text class="d-label-s" x="450" y="76" text-anchor="middle">2 consecutive overruns</text>
+          <text class="d-label-s" x="450" y="92" text-anchor="middle">(not a transient spike)</text>
+          <text class="d-label-s" x="450" y="108" text-anchor="middle">⇒ kill order</text>
+
+          <path class="d-arrow" d="M580 70 H625"/>
+          <path class="d-arrow-head" d="M625 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="630" y="20" width="260" height="100" rx="6"/>
+          <text class="d-label" x="760" y="42" text-anchor="middle">c) After: recovery</text>
+          <text class="d-label-s" x="760" y="60" text-anchor="middle">_killInferenceTree(): entire tree</text>
+          <text class="d-label-s" x="760" y="76" text-anchor="middle">_reclaimStrayProcesses(): orphans</text>
+          <text class="d-label-s" x="760" y="92" text-anchor="middle">nnunetv2_predict / nnunetv2.inference</text>
+          <text class="d-label-s" x="760" y="108" text-anchor="middle">"Free memory" button</text>
+        </svg>
+        <figcaption>The memory guard's three lines of defense — each covers a different moment in the nnU-Net process lifecycle.</figcaption>
+      </figure>
+
+      <p><strong>a) A priori estimate</strong>, <code>_estimatePeakRamGb()</code>
+      (<code>SegmentationWidget.py:1161</code>).
+      Since the physical volume of the field of view is independent of spacing, the number of
+      resampled voxels equals <code>fovMm3 / targetVoxelMm3</code>. The peak is reached in
+      <code>convert_predicted_logits_to_segmentation_with_correct_shape</code>, where, per class,
+      the following coexist: the sliding-window accumulator (<code>torch.half</code> on the
+      resampled grid, 2 bytes), its float64 copy (<code>data = data.astype(float)</code> on
+      the whole 4D array at once, 8 bytes), and <code>reshaped_final</code> (<code>torch.half</code> on the
+      original grid, 2 bytes). Hence
+      <code>logitsGb = (10 × C × Vresampled + 2 × C × Voriginal) / 2³⁰</code>, plus
+      <code>8 × (Voriginal + Vresampled)</code> for the float64 transients of <code>skimage.resize</code>,
+      plus <code>_RAM_FIXED_OVERHEAD_GB = 4.0</code> (torch, weights, workers). The <code>spacing</code> and the
+      label count are read from the <strong>same</strong> configuration folder, so as not to
+      cross one model's spacing with another model's label count.</p>
+
+      <p>Budget = <code>free RAM × ramLimitSpinBox</code> (default <strong>85%</strong>). Above it, the scan is
+      marked <code>failed</code> with the reason, without ever starting nnU-Net.</p>
+
+      <p><strong>b) Monitoring during execution</strong>: <code>_onMemCheck</code> samples every
+      <code>_RAM_SAMPLE_MS = 3000</code> ms; it takes <code>_RAM_CONSECUTIVE_HITS = 2</code> consecutive
+      overruns to kill (a transient spike must not condemn a good scan).</p>
+
+      <p><strong>c) Memory recovery</strong>: <code>_killInferenceTree()</code> kills the <strong>entire tree</strong> —
+      <code>QProcess.kill()</code> only reaches the direct child, yet nnU-Net does
+      multiprocessing. <code>_reclaimStrayProcesses()</code> sweeps processes whose command
+      line contains <code>nnunetv2_predict</code>, <code>nnunetv2/inference</code>, or <code>nnunet</code> and that
+      no longer belong to anyone. The <em>Free memory</em> button does this by hand.</p>
+
+      <h3 id="coeur-fin">5.4 Fallback completion detection</h3>
+
+      <p><code>_checkInferenceCompletionFallback()</code>
+      (<code>SegmentationWidget.py:2514</code>):
+      when the "done with volume" line appears in nnU-Net's output, a timer
+      checks the output file's size every 1.5 s; <strong>two consecutive equal
+      readings</strong> ⇒ forced finalization, even if the <code>QProcess</code>'s <code>finished</code> signal
+      never arrived. Gives up after 40 attempts (60 s).</p>
+
+      <p>Additional guard-rail: a per-scan watchdog
+      (<code>itemTimeoutSpinBox</code>, default <strong>60 min</strong>) marks the scan as failed and moves to
+      the next one. <code>_finishCurrentItem</code> is the <strong>single exit point</strong>, guarded by
+      <code>_itemFinalized</code> against double advancement.</p>
+
+      <h3 id="coeur-miroir">5.5 Mirror correction (UniversalLab only)</h3>
+
+      <p><code>onResolveMirroring()</code>
+      (<code>SegmentationWidget.py:1308</code>),
+      a button visible only for UniversalLab. The network regularly confuses
+      left and right; the correction is purely geometric:</p>
+
+      <ol>
+        <li>reconstruction of the official label map (§5.1), then the <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> <em>R</em> coordinate of
+          each foreground voxel <strong>in numpy</strong> (<code>m00·x + m01·y + m02·z + m03</code>) — the
+          previous version called <code>vtkMatrix4x4.MultiplyPoint</code> once per voxel and
+          per label;</li>
+        <li><strong>sagittal plane</strong> = average of the <em>R</em> centroids of the four central incisors
+          (labels 8, 9, 24, 25); if one is missing, the correction is refused;</li>
+        <li>for each lateralized label, the voxels on the wrong side of the plane receive the
+          value of the symmetric label (a table built by substituting
+          <code>left</code> ↔ <code>right</code> in the name); <code>{53, 54, 55}</code> are <strong>protected</strong>.</li>
+      </ol>
+
+      <p>The result goes into a new node <code>&lt;name&gt;_Mirrored</code>, the original is kept.</p>
+
+      <h3 id="coeur-postproc">5.6 Missing post-processing</h3>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><code>_postProcessSegments()</code> only logs two lines;
+        <code>_keepLargestIsland()</code> and <code>_removeSmallIsland()</code> (which would use
+        <code>_minimumIslandSize_mm3 = 60</code>) <strong>are never called anywhere</strong> — dead code inherited
+        from upstream DentalSegmentator. No morphological cleanup is therefore applied:
+        what comes out is nnU-Net's raw output, with its own internal
+        post-processing if present in the bundle.</p>
+      </div>
+
+      <h2 id="sorties">6. Outputs</h2>
+
+      <p><code>onInferenceFinished</code> <strong>always</strong> writes, regardless of which formats
+      are checked, <code>&lt;outputFolder&gt;/&lt;stem&gt;_Segmentation.nii.gz</code>: a label map with the values
+      from <code>_get_active_label_map</code>, on the geometry (spacing, origin, <code>IJKToRAS</code>) of the
+      original volume — uncropped if a crop took place. This is the file
+      <code>expectedOutputPath()</code> looks for to decide a scan has already been processed.</p>
+
+      <p>Additional formats, checkboxes, all written into the same folder:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Format</th><th>Function</th><th>Naming</th><th>Details</th></tr></thead>
+          <tbody>
+            <tr><td>STL, OBJ</td><td><code>ExportSegmentsClosedSurfaceRepresentationToFiles</code></td><td>one file per segment</td><td>smoothing 1.0, no merging</td></tr>
+            <tr><td>VTK (per label)</td><td><code>_exportVTKPerLabel</code></td><td><code>&lt;segNodeName&gt;_&lt;labelName&gt;.vtk</code></td><td>clean → <code>vtkWindowedSincPolyDataFilter</code> (60 it., <code>passBand</code> 0.05, smoothing of boundaries/sharp edges/non-manifold) → cell normals → <code>vtkQuadricDecimation</code> 40% → <strong>flip RAS→<a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a></strong> (<code>Scale(-1,-1,1)</code>), binary</td></tr>
+            <tr><td>VTK (merged)</td><td><code>_exportMergedVTK</code></td><td><code>&lt;segNodeName&gt;_merged.vtk</code></td><td><code>vtkDiscreteMarchingCubes</code> <strong>one contour per present label</strong>, same smoothing chain, then per-label thresholding, 40% decimation, constant <code>Label</code> cell array, concatenation, LPS flip</td></tr>
+            <tr><td>NIfTI (checkbox)</td><td><code>ExportSegmentsBinaryLabelmapRepresentationToFiles</code></td><td>one <strong>binary</strong> <code>.nii.gz</code> per segment</td><td>not to be confused with the label map above</td></tr>
+            <tr><td>glTF</td><td><code>OpenAnatomyExport</code></td><td></td><td>adjustable decimation factor (default 0.9); installs SlicerOpenAnatomy if needed</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The mesh file names derive from the segmentation <strong>node</strong>'s name,
+      <code>&lt;stem&gt;_Segmentation</code>, not from the scan's name: segment names are sanitized
+      by <code>re.sub(r"[^0-9A-Za-z_-]+", "_", ...)</code>.</p>
+
+      <p>A mesh export failure <strong>does not fail the scan</strong>: the NIfTI is already
+      written, the scan is marked <code>done</code> with an <code>export warning</code>.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verified — fixed in the code</div>
+        <p>A bug that was fixed, documented in the code of <code>_exportMergedVTK</code>:
+        <code>vtkDiscreteMarchingCubes.SetValue</code> takes a contour <strong>index</strong>, not a label
+        value. Passing the label as the index left index 0 at contour value
+        0.0, so the background was contoured, smoothed, and normal-computed before being discarded.</p>
+      </div>
+
+      <h2 id="predit">7. What is predicted vs what is computed</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Preprocessing (transposition, resampling, <code>CTNormalization</code>)</td><td><span class="badge calcule">computed</span> deterministic, driven by <code>plans.json</code></td><td><code>nnUNetv2_predict</code>, child process</td></tr>
+            <tr><td>Segmentation</td><td><span class="badge predit">predicted</span> <code>PlainConvUNet</code> 3D network, 1 fold, no TTA</td><td>same</td></tr>
+            <tr><td>Automatic crop</td><td><span class="badge calcule">computed</span> geometric (air threshold + bounding box)</td><td>widget, numpy</td></tr>
+            <tr><td>Restoration onto the original grid</td><td><span class="badge calcule">computed</span> index offset, no interpolation</td><td>widget, numpy</td></tr>
+            <tr><td>Label map reconstruction</td><td><span class="badge calcule">computed</span> single export + LUT</td><td>widget, VTK/numpy</td></tr>
+            <tr><td>Mirror correction</td><td><span class="badge calcule">computed</span> geometric (sagittal plane on the incisors)</td><td>widget, numpy</td></tr>
+            <tr><td>Meshes</td><td><span class="badge calcule">computed</span> <a class="gterm" href="../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a> + windowed-sinc + quadric decimation</td><td>widget, VTK</td></tr>
+            <tr><td>Memory estimation and guard</td><td><span class="badge calcule">computed</span> arithmetic on the <a class="gterm" href="../glossary.html#g-fov" title="See glossary">FOV</a> and the plans</td><td>widget, psutil</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The only learning is that of the four checkpoints, outside this repository.</p>
+
+      <h2 id="environnement">8. Environment</h2>
+
+      <p>Installed <strong>once per session</strong>, on the first <em>Apply</em>, by
+      <code>_runSetupThenStartQueue()</code>
+      (<code>SegmentationWidget.py:1651</code>):</p>
+
+      <ol>
+        <li><code>pip install light-the-torch</code>, then <code>python -m light_the_torch install torch
+          torchvision</code> — <code>ltt</code> picks the CUDA wheel matching the detected driver,
+          <strong>no version is pinned</strong>;</li>
+        <li><code>pip install numexpr&gt;=2.10.2</code>;</li>
+        <li><code>pip install numpy&lt;2.0 numexpr&gt;=2.10.2 psutil</code>, via <code>PipRunner</code>, a <code>QProcess</code>
+          that returns control to the UI;</li>
+        <li><code>SlicerNNUNetLib.InstallLogic().setupPythonRequirements()</code>: <code>nnunetv2</code>,
+          outside this repository;</li>
+        <li><code>PythonDependencyChecker.downloadWeightsIfNeeded()</code>: DentalSegmentator weights
+          only.</li>
+      </ol>
+
+      <p><code>numpy&lt;2.0</code> for the same reason as in <a href="../AMASSS/AMASSS.html">AMASSS</a>: current torch wheels are
+      compiled against numpy 1.x.</p>
+
+      <p>The <strong>NNUNet extension must be installed manually</strong>: its absence is
+      detected (<code>import SlicerNNUNetLib</code>) and produces a message asking to
+      install it and restart. <code>SlicerOpenAnatomy</code>, on the other hand, installs itself
+      on the first glTF export.</p>
+
+      <p>No conda environment, no WSL. GPU is optional (<code>cpu</code>, <code>mps</code> available),
+      at the cost of "about an hour per scan" according to the fallback message.</p>
+
+      <h2 id="pieges">9. Pitfalls and fragile points</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">Confirmed bug — NasoMaxillaDentSeg</div>
+        <p><strong>The segment names and the label table diverge for
+        NasoMaxillaDentSeg.</strong> <code>_get_active_label_map</code> gives <code>Maxilla = 3</code>,
+        <code>Upper Teeth = 4</code>, <code>Lower Teeth = 5</code>, <code>Mandibular canal = 6</code>, while
+        <code>_updateSegmentationDisplay</code>
+        (<code>SegmentationWidget.py:2385</code>)
+        renames <code>Segment_1..6</code> using the list
+        <code>["Upper Skull", "Mandible", "Upper Teeth", "Lower Teeth", "Mandibular canal", "Maxilla "]</code>.</p>
+        <p>The first effect is <strong>visible on screen</strong>, before any question of export: the
+        list is not in the order of the table, so the last four segments
+        get the wrong name, the wrong color, and the wrong opacity.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Segment</th><th>Actual structure</th><th>Displayed name</th></tr></thead>
+            <tbody>
+              <tr><td><code>Segment_3</code></td><td>Maxilla</td><td>"Upper Teeth"</td></tr>
+              <tr><td><code>Segment_4</code></td><td>Upper Teeth</td><td>"Lower Teeth"</td></tr>
+              <tr><td><code>Segment_5</code></td><td>Lower Teeth</td><td>"Mandibular canal"</td></tr>
+              <tr><td><code>Segment_6</code></td><td>Mandibular canal</td><td>"Maxilla" (with a trailing space)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The fix is to reorder the list — and the accompanying <code>colors</code> and
+        <code>opacities</code> lists — to match <code>_get_active_label_map</code>, rather than just
+        removing the space.</p>
+        <p>But the renaming happens <strong>before</strong> the <code>LabelValue</code> tags are set, and
+        <code>_segmentLabelValue</code> then falls back on the name: <code>Segment_3</code>, which actually
+        carries label 3 (maxilla), is renamed "Upper Teeth" and <strong>exported
+        with value 4</strong>. Worse, <code>"Maxilla "</code> has a <strong>trailing space</strong>: the lookup
+        in the table fails, <code>Segment_6</code> (the mandibular canal) is logged as
+        "unexpected segment" and <strong>lost</strong> from the NIfTI. The two lists,
+        however, correspond perfectly for the other three models.</p>
+      </div>
+
+      <ul>
+        <li><strong>The four branches of <code>onApplyClickedForVolume</code> are copy-pasted</strong>:
+          the UniversalLab branch still names its variable <code>pediatricCheckpoint</code> and
+          logs "Downloading pediatricdentalseg model…". Cosmetic, but misleading
+          when reading logs.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong>Downloading the DentalSegmentator weights wipes out the other three models</strong>:
+        <code>downloadWeights()</code> does <code>shutil.rmtree(self.destWeightFolder)</code> on
+        <code>Resources/ML</code>, which also holds <code>Dataset001_380CT</code>, <code>Dataset001_max4</code>, and
+        <code>Dataset002_380CT</code>. And <code>areWeightsMissing()</code> tests <code>rglob("dataset.json")</code>
+        <strong>anywhere</strong> under <code>Resources/ML</code>: if only the pediatric model is
+        present, the checker believes DentalSegmentator is installed.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong>Fragile release resolution</strong>: <code>assets[0]</code> among all the assets of all
+        the releases, via an <strong>unauthenticated</strong> GitHub client (60 requests/h per IP).
+        An asset added at the head of the latest release changes the downloaded model. And
+        <strong>no integrity check</strong> on the three checkpoints downloaded one by one:
+        a truncated file is indistinguishable from a complete one.</p>
+      </div>
+
+      <ul>
+        <li><strong>NRRD is not recognized</strong> and subfolders are not traversed
+          (<code>listVolumes</code>), whereas the repository's other modules readily produce
+          NRRD and folder trees. <strong>Name collision</strong> is possible: two scans from
+          different folders sharing the same base name overwrite the same
+          <code>&lt;stem&gt;_Segmentation.nii.gz</code>.</li>
+        <li><strong>A single fold, never an ensemble</strong> (<code>folds="0"</code>): a bundle that shipped
+          <code>fold_1..4</code> would see them ignored.</li>
+        <li><strong><code>os.environ['nnUNet_results']</code></strong> is rewritten at every scan by
+          <code>SegmentationLogic</code>: harmless here (sequential queue), dangerous if
+          another nnU-Net inference runs in the same Slicer session.</li>
+        <li><strong>Dead code</strong>: <code>_saveSegmentationAsNifti</code>, <code>_postProcessSegments</code>,
+          <code>_keepLargestIsland</code>, <code>_removeSmallIsland</code>, <code>onExportClicked</code> (the
+          corresponding button is not wired into the batch layout).</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong><code>Resources/ML</code> is not installed by CMake</strong>: in a packaged extension, the
+        repository's <code>dataset.json</code> / <code>plans.json</code> are not there, and the a priori
+        memory estimate (§5.3) returns <code>None</code> as long as the weights are not downloaded —
+        it then lets the scan through.</p>
+      </div>
+
+      <h2 id="litterature">10. Literature</h2>
+
+      <p><strong>DentalSegmentator</strong> is published:</p>
+
+      <blockquote>
+        <p>Dot G., Chaurasia A., Dubois G., Savoldelli C., Haghighat S., Azimian S.,
+        Rahbar Taramsari A., Sivaramakrishnan G., Issa J., Dubey A., Schouman T.,
+        Gajny L. <em>DentalSegmentator: robust open source deep learning-based CT and CBCT
+        image segmentation.</em> Journal of Dentistry 147:105130, 2024.
+        <a href="https://doi.org/10.1016/j.jdent.2024.105130" target="_blank" rel="noopener">doi:10.1016/j.jdent.2024.105130</a>
+        — PMID 38878813</p>
+      </blockquote>
+
+      <p>nnU-Net v2 (v2.2 per the Zenodo notice for the weights), <strong>470 CT and CBCT scans</strong> from
+      7 institutions for training, 5 structures, tested hold-out on 256 scans
+      (133 internal, 123 external): DSC 92.2 ± 6.3% internal, 94.2 ± 7.4%
+      external. The <code>dataset.json</code> shipped here announces <code>numTraining = 453</code>, consistent with
+      the corpus described.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verified</div>
+        <p>On this model, code and paper agree. The weights are also
+        published under CC-BY-4.0 on <a href="https://zenodo.org/records/10829675" target="_blank" rel="noopener">Zenodo</a>
+        (concept DOI <a href="https://doi.org/10.5281/zenodo.10829674" target="_blank" rel="noopener">10.5281/zenodo.10829674</a>)
+        — but this module fetches them from GitHub releases, not from Zenodo.</p>
+      </div>
+
+      <p>The methodological foundation:</p>
+
+      <blockquote>
+        <p>Isensee F., Jaeger P.F., Kohl S.A.A., Petersen J., Maier-Hein K.H. <em>nnU-Net: a
+        self-configuring method for deep learning-based biomedical image segmentation.</em>
+        Nature Methods 18(2):203-211, 2021.
+        <a href="https://doi.org/10.1038/s41592-020-01008-z" target="_blank" rel="noopener">doi:10.1038/s41592-020-01008-z</a></p>
+      </blockquote>
+
+      <p><strong>The three variants are not attached to any publication in the repository.</strong>
+      The repository's README announces 513 CBCT scans in mixed dentition for
+      PediatricDentalSegmentator and UniversalLabDentalSegmentator, and 135 scans for
+      NasoMaxillaDentalSegmentator, with no reference and no test set. These figures
+      cannot be verified anywhere in the code: the corresponding <code>dataset.json</code>
+      files only arrive with the weight download. To be treated as internal
+      claims until a publication covers them.</p>
+
+      <ul>
+        <li><a href="https://github.com/gaudot/SlicerDentalSegmentator" target="_blank" rel="noopener">gaudot/SlicerDentalSegmentator</a> — upstream extension, and source of the DentalSegmentator weights</li>
+        <li><a href="https://github.com/KitwareMedical/SlicerNNUnet" target="_blank" rel="noopener">KitwareMedical/SlicerNNUnet</a> — the required <code>NNUNet</code> extension</li>
+        <li><a href="https://github.com/MIC-DKFZ/nnUNet" target="_blank" rel="noopener">MIC-DKFZ/nnUNet</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools" target="_blank" rel="noopener">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>Full references, retrieved PDFs, and links to consult: <a href="SOURCES.html">SOURCES.md</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← All pages</a> ·
+        <a href="SOURCES.html">Bibliography for this tool</a> ·
+        Source: <code>BatchDentalSeg.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

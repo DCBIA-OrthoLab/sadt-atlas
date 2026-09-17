@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AREG_IOSCBCT — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="recalage">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html" aria-current="page">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Registration</div>
+        <h1>AREG_IOSCBCT — place an intraoral scan into a CBCT's frame</h1>
+        <p class="lede">AREG_IOSCBCT registers an intraoral scan (IOS) onto the CBCT of the
+        same patient, taken at the same visit. It has nothing to do with AREG_IOS, which
+        compares two scans from two different visits: here the two inputs come from
+        different sensors — optical and volumetric — that have to be brought into
+        agreement.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>Whenever you want the surface detail of an intraoral scan — crowns, contact points
+      — and the bone anatomy of a CBCT in the same frame: for a visual check, a combined
+      measurement, or simply to overlay both images from one visit. The module does the
+      alignment; there is nothing to draw or register by hand.</p>
+
+      <div class="callout">
+        <div class="callout-title">Three ways to get there</div>
+        <p>Depending on what you already have — nothing, raw scans, or landmarks already
+        placed — the module offers three modes that don't ask for the same input files. See
+        "Three modes" below before you start.</p>
+      </div>
+
+      <h2 id="besoin">What you need, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>To provide</h4>
+          <ul>
+            <li>Intraoral scans in <code>.vtk</code> only — no other format is read</li>
+            <li>CBCT in <code>.nii.gz</code> only — same rule</li>
+            <li>File names carrying the patient id, a timepoint (<code>T0</code>,
+            <code>T1</code> or <code>T2</code>), and the arch (<code>U</code> for upper,
+            <code>L</code> for lower) as standalone tokens, not buried inside another
+            word</li>
+            <li>Depending on the mode: landmarks already computed, or nothing beyond the
+            raw scans</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>One registered scan per arch and per patient, in <code>.vtk</code></li>
+            <li>One landmark file per arch, in Slicer's format (<code>.mrk.json</code>),
+            carrying the registered scan's coordinates</li>
+            <li>Normalized output names — they may no longer look exactly like your input
+            names</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="modes">Three modes, which one to pick</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>Manual</h4>
+          <ul>
+            <li>You already provide the occlusal landmarks on both sides: an IOS folder, a
+            CBCT folder, an IOS landmark folder, a CBCT landmark folder</li>
+            <li>The module predicts nothing, it registers directly</li>
+            <li>Pick this if another module (ALI) already placed your points</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>Semi-automated</h4>
+          <ul>
+            <li>You provide the raw IOS and CBCT, no landmarks</li>
+            <li>The module segments the scan's crowns, then predicts landmarks on both
+            sides before registering</li>
+            <li>Pick this if your CBCT is already oriented but you have no landmarks
+            yet</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>Fully automated</h4>
+          <ul>
+            <li>You provide only the raw scans, CBCT and IOS</li>
+            <li>The module chains resampling, orientation, segmentation and landmarks
+            before registration — seven steps ahead of the registration itself</li>
+            <li>Pick this if you're starting from nothing; it is also the slowest mode</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Steps</h2>
+      <ol class="steps">
+        <li><strong>Pick the mode</strong> that matches what you already have — see the
+        section above.</li>
+        <li><strong>Check your file names</strong> before launching anything. A file named
+        <code>P001_T1_U_IOS.vtk</code> is recognized; a timepoint outside T0–T2, or an arch
+        letter glued to the rest of the name, is not.</li>
+        <li><strong>Point the module to the folders</strong> the chosen mode asks for — IOS,
+        CBCT, and where relevant the landmark folders.</li>
+        <li><strong>Set an output folder</strong>, then launch.</li>
+        <li><strong>Open the log when it's done</strong> if the number of registered
+        patients is lower than expected — that is where skipped patients are reported.</li>
+      </ol>
+
+      <h2 id="coince">If something's wrong</h2>
+      <div class="callout warn">
+        <div class="callout-title">No matrix is written</div>
+        <p>Registration produces surfaces that are already transformed, not a matrix file.
+        Unlike AREG_IOS or AREG_CBCT, you cannot reopen the result and nudge it with the
+        mouse: if the alignment is off, the fix is to rerun — with different landmarks or a
+        different setting — not to correct it by hand.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">One scanned arch means the patient is dropped</div>
+        <p>Every patient must provide both arches, scan and landmarks included. If even one
+        is missing — say, only one arch was ever scanned — the patient disappears from the
+        result with no visible error, only a line in the log.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Only T0, T1 and T2 are recognized</div>
+        <p>The clinical timepoint is read from the file name, and only those three values
+        count. A file marked <code>T3</code> or beyond matches nothing: the patient is
+        simply left out.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">The CBCT surface threshold is fixed</div>
+        <p>The surface extracted from the CBCT for registration always uses the same
+        threshold value, whatever your scanner or reconstruction. On a CBCT whose units
+        aren't calibrated, the resulting surface may not correspond to bone or teeth at
+        all, and the registration then runs against noise.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">The progress bar can announce more patients than it will
+        deliver</div>
+        <p>The interface's counter also recognizes <code>.nrrd</code>, <code>.nii</code> and
+        <code>.gipl</code> for the CBCT. The engine itself only accepts
+        <code>.nii.gz</code>: a patient counted at the start may never actually be
+        processed.</p>
+      </div>
+
+      <h2 id="apres">What happens next</h2>
+      <p>The registered scans open directly in Slicer, next to the original CBCT. Since no
+      matrix is kept, the only check available is visual — inspect the overlay before using
+      it for a measurement. Also check the log for any line saying the pre-alignment was
+      skipped: that would mean a batch came out without the first registration step, and
+      nothing else would have told you.</p>
+
+      <a class="deep-link" href="../AREG_IOSCBCT/AREG_IOSCBCT.html">
+        <b>How it actually works →</b>
+        <span>The Atlas page: the two successive matching steps (landmarks, then ICP), the
+        hard-coded extraction threshold, and the other fragile points found in the code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

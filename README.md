@@ -23,16 +23,36 @@ python3 -m http.server 8080
 
 ## Ce qu'il y a dedans
 
+Le site a **deux moitiés** et **deux langues**.
+
+- Le **Guide** s'adresse à qui utilise les outils : à quoi ça sert, quoi fournir,
+  quoi vérifier. Aucun détail d'implémentation.
+- L'**Atlas** s'adresse à qui lit ou modifie le code : le pipeline complet, ce qui
+  est prédit, ce qui est calculé, et ce que la lecture a fait ressortir.
+
+```
+index.html              choix de la langue
+assets/                 style, script, index de recherche (partagés)
+<Outil>/                sources : le .md d'origine, les articles récupérés
+fr/  et  en/
+├── index.html          accueil de l'Atlas
+├── constats.html       findings.html en anglais
+├── glossaire.html      glossary.html en anglais
+├── guide/
+│   ├── index.html      accueil du Guide
+│   └── <Outil>.html    un guide par outil
+└── <Outil>/
+    ├── <Outil>.html    la fiche pipeline
+    └── SOURCES.html    la bibliographie, avec les DOI
+```
+
+Les sources markdown et les articles restent **à la racine** : ils ne sont d'aucune
+langue. Seules les pages rendues se dédoublent.
+
 | | |
 |---|---|
-| [`index.html`](index.html) | l'accueil : ordre de lecture, les 20 outils, la matrice des appels |
-| `<Outil>/<Outil>.html` | la fiche pipeline, longue et détaillée |
-| `<Outil>/SOURCES.html` | la bibliographie de l'outil, avec les DOI |
-| [`constats.html`](constats.html) | les 250 encarts des fiches agrégés et filtrables |
-| [`glossaire.html`](glossaire.html) | 47 termes définis tels qu'employés ici |
-| `assets/` | une feuille de style, un script, l'index de recherche |
-| `build.py` | régénère index de recherche, constats et glossaire |
-| `*.md` | les sources markdown d'origine, conservées à côté des pages |
+| [`nav.py`](nav.py) | **définition unique de la navigation.** La sidebar est identique sur une centaine de pages : ne l'édite jamais dans un `.html`, elle sera écrasée |
+| [`build.py`](build.py) | réécrit les sidebars, génère l'index de recherche, les constats et les index de guides, par langue |
 
 Après avoir modifié une fiche :
 
@@ -40,8 +60,11 @@ Après avoir modifié une fiche :
 python3 build.py
 ```
 
-`search-index.js`, `constats.html` et `glossaire.html` sont versionnés à dessein — un
-clone doit fonctionner sans rien exécuter.
+Les fichiers générés sont versionnés à dessein — un clone doit fonctionner sans rien
+exécuter.
+
+**La sidebar ne se modifie que dans `nav.py`.** `build.py` la réécrit ensuite dans
+chaque page. C'est ce qui évite qu'une centaine de copies divergent.
 
 ## Conventions des fiches
 
@@ -66,32 +89,21 @@ institutionnels et versions déposées par les auteurs.
 
 ## Feuille de route
 
-Deux chantiers identifiés, pas encore commencés.
+Les deux chantiers annoncés sont **en cours**. L'arbitrage est tranché :
 
-### 1. Version anglaise
+- **langues** — deux arborescences `fr/` et `en/`, plutôt qu'une bascule côté client.
+  Les 55 schémas SVG portent du texte : deux arbres permettent de le traduire vraiment,
+  et chaque page garde une URL propre.
+- **couche utilisateur** — des pages séparées, regroupées sous `guide/`, plutôt qu'un
+  encart en tête de fiche. Les deux publics n'ont ni le même besoin ni le même ton, et
+  le renvoi de l'un vers l'autre suffit à les relier.
 
-Tout est en français aujourd'hui. Une version anglaise est prévue — c'est la langue du
-dépôt documenté et de son public.
+Restent ouverts :
 
-À trancher avant de commencer : deux arborescences (`fr/`, `en/`) avec un sélecteur de
-langue, ou un seul jeu de pages et une bascule côté client. La première est plus simple
-et référençable ; la seconde évite de dupliquer les schémas SVG, qui portent du texte.
-
-### 2. Couche utilisateur
-
-Les fiches actuelles s'adressent à quelqu'un qui va lire ou modifier le code. Les
-**utilisateurs** des outils ont besoin d'autre chose : à quoi sert ce module, quelles
-données lui donner, comment lire ce qui sort, quels pièges éviter — sans internes.
-
-Deux formes possibles, à trancher :
-
-- **un résumé en tête de chaque fiche**, avant le pipeline. Une seule page par outil,
-  pas de contenu à synchroniser, mais la fiche s'alourdit et l'utilisateur doit
-  s'arrêter au bon endroit ;
-- **des pages séparées**, par exemple `<Outil>/guide.html`, liées depuis la fiche.
-  Chaque public a sa page et son ton, au prix de deux documents à tenir à jour par
-  outil — et d'un risque de dérive entre les deux.
-
-Un troisième point, plus petit, reste ouvert : les flèches ne sont étiquetées que sur
-6 des 55 schémas. Le reste demande de comprendre chaque pipeline, donc se fait fiche
-par fiche.
+- **Les flèches des schémas** ne sont étiquetées que sur 6 des 55. Le reste demande de
+  comprendre chaque pipeline, donc se fait fiche par fiche.
+- **Le nom `AREG` employé seul** n'est lié nulle part : il désigne la famille de
+  modules, et il n'existe pas de fiche `AREG`, seulement `AREG_CBCT`, `AREG_IOS` et
+  `AREG_IOSCBCT`.
+- **Les `.xml` et `.txt`** des articles sont encore versionnés alors que les PDF ne le
+  sont plus. Même nature de contenu, 6,5 Mo : décision à prendre.

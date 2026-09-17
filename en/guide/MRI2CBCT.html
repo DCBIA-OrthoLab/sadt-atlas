@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MRI2CBCT — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="recalage">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html" aria-current="page">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Registration</div>
+        <h1>MRI2CBCT — align an MRI and a CBCT of the TMJ</h1>
+        <p class="lede">MRI2CBCT registers an MRI onto a CBCT of the
+        temporomandibular joint (TMJ), so you can look at both exams in the same
+        frame. It's a long pipeline — six independent steps, one per tab — but
+        each one is short and sets up the next.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>Whenever you have, for the same patient, an MRI and a CBCT of the TMJ and
+      you want them superimposed: bone shows up better on the CBCT, soft tissue
+      (disc, capsule) better on the MRI, and registering the two lets you look at
+      both at once instead of comparing them from memory. This isn't a
+      one-click tool: plan on going through all six tabs, in order, for each
+      patient.</p>
+
+      <div class="callout">
+        <div class="callout-title">Six tabs, not one button</div>
+        <p>Each tab has its own button and writes its files to its own folder;
+        nothing in the module stops you from running them out of order or
+        skipping one. Two tabs are genuinely optional (the left/right crop and the
+        joint crop); the others only look optional — without them, the final
+        registration starts with no starting point and won't converge.</p>
+      </div>
+
+      <h2 id="besoin">What it needs, what it gives back</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>To provide</h4>
+          <ul>
+            <li>A CBCT and an MRI (T1 and/or T2) of the same patient</li>
+            <li>A segmentation of the condyle on the CBCT — you can supply it, or
+            let the module produce it itself during the joint-crop step</li>
+            <li>Files named <code>&lt;ID&gt;_CBCT…</code>, <code>&lt;ID&gt;_MR…</code>
+            or <code>&lt;ID&gt;_MRI…</code>, as <code>.nii.gz</code> — this shared
+            identifier is what ties a patient's files together from one step to
+            the next</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>The MRI registered onto the CBCT, and the matrix of the applied
+            transformation</li>
+            <li>Two volumes you can now overlay in the same scene — not a merged
+            file</li>
+            <li>One folder per intermediate step, kept or deleted through a
+            checkbox</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Tab by tab</h2>
+      <ol class="steps">
+        <li><strong>MRI orientation / centering.</strong> Rewrites the header of
+        the MRI volume (the voxels themselves don't move) to a fixed convention,
+        and recenters the origin to match. If you check "Bilateral MRI", it also
+        fixes the inter-slice spacing that this kind of acquisition often loses
+        when converted to NIfTI. Mandatory in practice: the final registration has
+        no starting transform and no search margin, so the MRI and CBCT need to
+        already sit in comparable orientations before you get there.</li>
+        <li><strong>Left/right crop</strong> (optional). Useful if your
+        acquisition covers both TMJs in a single volume: splits the CBCT, MRI and
+        segmentation into a left half and a right half, to be processed side by
+        side afterward.</li>
+        <li><strong>Resampling.</strong> Brings the CBCT, MRI and segmentation to
+        a comparable spacing and recenters them — the defaults are
+        443 × 443 × 119 voxels at 0.3 mm, but each row of the table can be turned
+        off to keep the input's own size and spacing. Mandatory in practice:
+        without a comparable spacing, the final registration can't compare the
+        two images properly.</li>
+        <li><strong>Approximation.</strong> Provides the rough starting alignment,
+        without which the final registration won't converge. Two ways to get
+        there: <em>automatic</em>, where the module locates the condyle on the
+        CBCT to get an anchor point, then positions the MRI by comparing that
+        point to the MRI's own center of mass; or <em>manual</em>, with rotation
+        and translation sliders or handles you drag in the scene, plus a button
+        to center the MRI on the CBCT before fine-tuning by hand. Either way,
+        this step writes a new, already-moved MRI volume: that volume — not a
+        separate transform file — is what you point to as the input MRI for the
+        final registration.</li>
+        <li><strong>Joint crop</strong> (optional). Locates the condyle again,
+        then reduces the CBCT, MRI and segmentation to a box centered on the
+        joint. Tightens the field of view and speeds up registration; it can also
+        produce the condyle segmentation the next step needs, if you haven't
+        supplied one.</li>
+        <li><strong>Registration.</strong> The final step, the one that does the
+        actual work. It needs a CBCT, an already-approximated MRI (step 4), and a
+        segmentation of the condyle on the CBCT. The module then inverts the
+        MRI's contrast (so bone turns bright there too, as it is on the CBCT),
+        normalizes both modalities, masks both with the same segmentation, and
+        registers the MRI onto the CBCT using a method based on mutual
+        information — a comparison that doesn't assume the two images look alike,
+        which matters since MRI and CBCT don't share the same kind of
+        contrast.</li>
+      </ol>
+
+      <h2 id="coince">If it gets stuck</h2>
+      <div class="callout warn">
+        <div class="callout-title">An install prompt keeps coming back</div>
+        <p>Automatic dependency installation fails every time (a misspelled
+        package name that doesn't exist). You'll see an installation error before
+        almost every button, but the action carries on anyway regardless. If the
+        rest of your setup is already in place, that changes nothing; but if
+        condyle segmentation later fails without a clear message, this is the
+        likely cause — the real dependency was never installed on its own, and
+        you'll need to install it yourself.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Two paths that crash the module</div>
+        <p>In manual approximation, "Confirm &amp; Save Alignment" crashes if the
+        MRI volume was picked from the scene's drop-down list: only loading it
+        through "Load from Folders Above" works reliably. And in resampling,
+        processing T2 MRIs without also filling in the T1 fields crashes the
+        step — always fill in both, even if one of the two folders stays
+        empty.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">The written matrix doesn't quite match the
+        produced image</div>
+        <p>The transform file (<code>.tfm</code>) saved at the end of
+        registration doesn't fully capture the internal computation: a reference
+        point for the final rotation is lost on writing. The already-registered
+        MRI the module gives you is reliable; but if you reload the matrix in
+        another program to apply it yourself, expect a slight mismatch with the
+        result produced here.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Files skipped without a word</div>
+        <p>Normalization and registration only accept <code>.nii.gz</code> — a
+        <code>.nii</code> file is silently ignored, with no error. And during
+        resampling, two files with the same name coming from different
+        subfolders overwrite each other without warning. Use unique names per
+        patient and check that every file you expect actually comes out.</p>
+      </div>
+
+      <h2 id="apres">Afterward</h2>
+      <p>The original CBCT is never modified: only the MRI is moved and then
+      registered. Open both volumes together in Slicer to visually check the
+      overlay before using it for any measurement. If the final registration
+      can't find a good alignment, the problem is almost always a too-rough
+      starting approximation (step 4) rather than the registration itself —
+      redo that step before trying again.</p>
+
+      <a class="deep-link" href="../MRI2CBCT/MRI2CBCT.html">
+        <b>How it really works →</b>
+        <span>The Atlas page: the six CLIs and what they actually do, how the
+        condyle segmentation network is used, and the fragile points found in the
+        code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../MRI2CBCT/MRI2CBCT.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

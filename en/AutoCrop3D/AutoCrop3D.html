@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoCrop3D — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="utilitaires">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html" aria-current="true"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html" aria-current="page">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Utilities</div>
+        <h1>AutoCrop3D</h1>
+        <p class="lede">Batch-crops a folder of volumes to a ROI box (<code>.mrk.json</code>) by extracting indices in the original grid — no interpolation, no network, no conda.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="Lab utility, unpublished.">unpublished</a>
+          <span class="badge cli">autocrop3d_cli</span>
+          <span class="badge neutral">no conda</span>
+          <span class="badge neutral">no GPU</span>
+          <span class="badge calcule">purely computational</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliography</a>
+        </div>
+      </header>
+
+      <h2 id="situation">1. Position in the pipeline</h2>
+
+      <p>Nothing in the repository calls AutoCrop3D, and AutoCrop3D calls nothing but
+      Slicer. It is declared in <code>CMakeLists.txt:39</code> and that's it.</p>
+
+      <p>In practice it sits <strong>upstream</strong> of the segmenters (<a href="../AMASSS/AMASSS.html">AMASSS</a>, BATCHDENTALSEG) or
+      <strong>downstream</strong> of them: the "generate VTK" mode only triggers if the output
+      file name contains <code>seg</code>, which presupposes it's being handed labelmaps already
+      produced elsewhere.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 700 200" role="img" aria-label="AutoCrop3D receives volumes and a ROI, then chooses between two paths: the default CLI or Slicer's Crop Volume module.">
+          <rect class="d-box" x="10" y="70" width="220" height="60" rx="6"/>
+          <text class="d-label" x="120" y="93" text-anchor="middle">Volumes</text>
+          <text class="d-label-s" x="120" y="108" text-anchor="middle">+ ROI (.mrk.json)</text>
+
+          <path class="d-arrow" d="M230 100 H278"/>
+          <path class="d-arrow-head" d="M278 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="283" y="70" width="140" height="60" rx="6"/>
+          <text class="d-label" x="353" y="105" text-anchor="middle">AutoCrop3D</text>
+
+          <path class="d-arrow" d="M423 90 C450 90 445 50 470 50"/>
+          <path class="d-arrow-head" d="M470 50 l-8 -2 l2 8 z"/>
+          <path class="d-arrow" d="M423 110 C450 110 445 150 470 150"/>
+          <path class="d-arrow-head" d="M470 150 l-8 2 l2 -8 z"/>
+
+          <rect class="d-box" x="475" y="20" width="215" height="60" rx="6"/>
+          <text class="d-label" x="582" y="42" text-anchor="middle">autocrop3d_cli</text>
+          <text class="d-label-s" x="582" y="57" text-anchor="middle">index extraction</text>
+          <text class="d-label-s" x="582" y="71" text-anchor="middle">(default path, no resampling)</text>
+
+          <rect class="d-box" x="475" y="120" width="215" height="60" rx="6"/>
+          <text class="d-label" x="582" y="142" text-anchor="middle">cropvolume.logic()</text>
+          <text class="d-label-s" x="582" y="157" text-anchor="middle">tilted ROI</text>
+          <text class="d-label-s" x="582" y="171" text-anchor="middle">resamples</text>
+        </svg>
+        <figcaption>AutoCrop3D is called by no other module in the repository and calls nothing but Slicer; its place upstream or downstream of the segmenters is a matter of usage, not code. No step is predicted by a network — both paths do nothing but geometric computation.</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Called</th><th>When</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge cli">slicer.modules.autocrop3d_cli</span></td><td>default path</td><td>index extraction, no resampling</td></tr>
+            <tr><td><span class="badge cli">slicer.modules.cropvolume.logic()</span></td><td>"Use module 'Crop Volume' for tilted images" checkbox</td><td>hand the rotated-ROI case off to Slicer</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>No model, no <code>.pth</code>, no download: verified by grepping
+      <code>torch|conda|\.pth|monai|nnunet</code> across all of AutoCrop3D/ — zero hits outside
+      a <code>vtkPolyData</code> named <code>model</code>.</p>
+
+      <h2 id="fichiers">2. Files involved</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
+          <tbody>
+            <tr><td><code>AutoCrop3D.py</code></td><td>widget, input validation, Crop Volume path</td><td>Slicer's Python</td></tr>
+            <tr><td><code>AutoCrop3D_CLI.py</code></td><td>the main path, 175 lines, all the cropping</td><td>Slicer's Python (<code>SlicerMacroBuildScriptedCLI</code>)</td></tr>
+            <tr><td><code>FilesType.py</code></td><td><code>Search</code> (extension glob) and <code>ChangeKeyDict</code> (patient→ROI pairing)</td><td>same</td></tr>
+            <tr><td><code>GenerateVTKfromSeg.py</code></td><td><a class="gterm" href="../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a> on the cropped labelmap</td><td>same</td></tr>
+            <tr><td><code>CropCBCT.py</code></td><td><strong>dead code</strong>, says so itself: <code>!!! UNUSED !!!</code></td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The CLI is a <em>scripted CLI</em> (<code>AutoCrop3D/Crop_Volumes_CLI/CMakeLists.txt</code>),
+      so it's launched by <code>slicer.cli.run</code> inside Slicer's Python. No conda
+      environment, unlike <a href="../AMASSS/AMASSS.html">AMASSS</a> or ALI.</p>
+
+      <h2 id="boite-crop">3. What defines the crop box</h2>
+
+      <p>A <strong>markups ROI json</strong> file (<code>.mrk.json</code>), read as follows
+      (<code>AutoCrop3D_CLI.py:70</code>):</p>
+
+      <pre><code>ROI = json.load(open(ROI_Path))['markups'][0]
+ROI_Center = np.array(ROI['center'])
+ROI_Size   = np.array(ROI['size'])
+Lower = ROI_Center - ROI_Size / 2
+Upper = ROI_Center + ROI_Size / 2</code></pre>
+
+      <p>Three fields of the json are <strong>ignored</strong>, and that's the main source of
+      surprises:</p>
+
+      <ul>
+        <li><code>coordinateSystem</code>. The test file
+        <code>ROI.mrk.zip</code> (in <code>AutoCrop3D/Crop_Volumes_UI/Testing/Test_data/</code>) declares
+        <code>"coordinateSystem": "LPS"</code>, which is the repository's convention (every
+        markups writer hardcodes <code>"LPS"</code>: <a href="../ALI/ALI.html">ALI_CBCT</a>, ASO_CBCT, <a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a>,
+        <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../VFACE/VFACE.html">VFACE</a>). <code>center</code> is therefore in <a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a>, exactly what SimpleITK's
+        <code>TransformPhysicalPointToContinuousIndex</code> expects. But <strong>the field is
+        never read</strong>: a ROI saved in <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> would give a center whose x and y have
+        the opposite sign, with no message at all.</li>
+        <li><code>orientation</code> (the box's 3×3 matrix). Ignored: the box is assumed to be
+        aligned with the LPS axes. In the test file it's
+        <code>diag(-1,-1,1)</code>, a 180° rotation around z — no effect on a centered box.
+        A genuinely rotated ROI would be silently treated as its own axis-aligned
+        bounding box. That's exactly the reason the
+        "tilted images" checkbox exists (§5).</li>
+        <li>Neither segmentation nor a computed bounding box: the box comes <strong>solely</strong> from
+        this json. There is no code anywhere that derives a ROI from a labelmap.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><code>coordinateSystem</code>: a ROI saved in RAS would give a center whose x and y have the opposite sign, with no message at all.</p>
+        <p><code>orientation</code>: a genuinely rotated ROI would be silently treated as its own axis-aligned bounding box.</p>
+      </div>
+
+      <p>On the volume side, <code>Search</code> accepts <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd.gz</code>, <code>.nrrd</code>,
+      <code>.gipl.gz</code>, <code>.gipl</code> (<code>AutoCrop3D_CLI.py:48</code>),
+      via a <code>glob.iglob(**, recursive=True)</code> followed by an <code>endswith</code>.</p>
+
+      <h2 id="application">4. How the box is applied — index extraction, no resampling</h2>
+
+      <p>This is the key point: <strong>no interpolation</strong>. The physical → index conversion
+      followed by the crop (<code>AutoCrop3D_CLI.py:77</code>):</p>
+
+      <pre><code>Lower = np.array(img.TransformPhysicalPointToContinuousIndex(Lower)).astype(int)
+Upper = np.array(img.TransformPhysicalPointToContinuousIndex(Upper)).astype(int)
+for i in range(3):
+    if Lower[i] &gt; Upper[i]:
+        Lower[i], Upper[i] = Upper[i], Lower[i]
+Lower = [max(0, l) for l in Lower]
+Upper = [min(img_size[i], u) for i, u in enumerate(Upper)]
+img_roi = img[Lower[0]:Upper[0], Lower[1]:Upper[1], Lower[2]:Upper[2]]</code></pre>
+
+      <p><strong>The <code>swap</code> is not cosmetic.</strong> <code>TransformPhysicalPointToContinuousIndex</code>
+      applies the inverse of the direction matrix. On a volume whose direction cosines
+      are negative on some axis (common in CBCT), the physical "lower" corner
+      becomes the largest index: without the swap, the slice would be empty.
+      This is the correct handling of <code>direction</code>.</p>
+
+      <p><strong>What SimpleITK indexing preserves.</strong> Verified: slicing a <code>sitk.Image</code>
+      keeps <code>spacing</code> and <code>direction</code> identical and <strong>recomputes the origin</strong> of
+      the extracted corner. On a 50×60×70 volume, spacing 0.3, origin (10,20,30),
+      direction <code>diag(-1,-1,1)</code>, <code>img[5:20,5:20,5:20]</code> gives an origin of
+      <code>(8.5, 18.5, 31.5)</code> — a shift of <code>-5·0.3</code> on x and y (negative direction),
+      <code>+5·0.3</code> on z. The voxel values are bit-for-bit identical to the input.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verified</div>
+        <p>Slicing a <code>sitk.Image</code> keeps <code>spacing</code> and <code>direction</code> identical and only recomputes the origin of the extracted corner. The voxel values are bit-for-bit identical to the input.</p>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 640 260" role="img" aria-label="The original volume's grid is preserved in the cropped volume: same spacing, same direction, only the origin is recomputed.">
+          <rect class="d-box" x="20" y="30" width="260" height="180" rx="4"/>
+          <path class="d-arrow" d="M60 30 V210 M100 30 V210 M140 30 V210 M180 30 V210 M220 30 V210 M260 30 V210"/>
+          <path class="d-arrow" d="M20 75 H280 M20 120 H280 M20 165 H280"/>
+
+          <rect class="d-box-a" x="100" y="75" width="120" height="90" stroke-dasharray="4 3"/>
+          <text class="d-label-s" x="102" y="172" text-anchor="start">Lower</text>
+          <text class="d-label-s" x="218" y="70" text-anchor="end">Upper</text>
+
+          <circle class="d-box-a" cx="20" cy="30" r="4"/>
+          <text class="d-label-s" x="27" y="24" text-anchor="start">origin</text>
+          <text class="d-label" x="150" y="18" text-anchor="middle">Original volume</text>
+
+          <path class="d-arrow" d="M285 120 H355"/>
+          <path class="d-arrow-head" d="M355 120 l-7 -4 v8 z"/>
+          <text class="d-label-s" x="320" y="105" text-anchor="middle">slicing</text>
+          <text class="d-label-s" x="320" y="145" text-anchor="middle">SimpleITK</text>
+
+          <rect class="d-box" x="380" y="75" width="120" height="90" rx="4"/>
+          <path class="d-arrow" d="M420 75 V165 M460 75 V165"/>
+          <path class="d-arrow" d="M380 120 H500"/>
+          <circle class="d-box-a" cx="380" cy="75" r="4"/>
+          <text class="d-label-s" x="387" y="69" text-anchor="start">origin′</text>
+          <text class="d-label" x="440" y="55" text-anchor="middle">Cropped volume</text>
+
+          <text class="d-mono" x="320" y="230" text-anchor="middle">spacing′ = spacing · direction′ = direction</text>
+          <text class="d-mono" x="320" y="245" text-anchor="middle">origin′ = origin + Lower · spacing · direction</text>
+        </svg>
+        <figcaption>Cropping interpolates nothing: the sub-block of voxels is extracted as-is. Spacing and direction stay identical to the input; only the origin is recomputed to point at the extracted corner.</figcaption>
+      </figure>
+
+      <p><strong>"Keep the same size as input" mode</strong> (<code>box_Size == 'True'</code>,
+      <code>AutoCrop3D_CLI.py:107</code>): an empty image is
+      created with the original geometry (<code>sitk.Image(...)</code> +
+      <code>CopyInformation</code>), the extracted block is pasted back at the same index
+      location, and <code>CopyInformation</code> is reapplied. The geometry is strictly identical
+      to the input, with everything outside the ROI set to 0. Note the axis
+      inversion of <code>GetArrayFromImage</code> (<code>z,y,x</code>), correctly handled by the code.</p>
+
+      <p><strong>What happens to any associated transforms: nothing.</strong> No
+      <code>vtkMRMLTransformNode</code>, no <code>.tfm</code> read or written, no <code>HardenTransform</code>. The
+      geometry is carried entirely by the header (origin/spacing/direction), and
+      the crop offset is absorbed by the origin.</p>
+
+      <div class="callout">
+        <div class="callout-title">Note</div>
+        <p>Practical consequence: a registration matrix computed on the full volume remains <strong>valid as-is</strong> on the cropped volume, since the physical coordinates haven't moved.</p>
+      </div>
+
+      <h2 id="crop-volume">5. The alternative path — Slicer's Crop Volume module</h2>
+
+      <p><code>processCropVolume()</code> (<code>AutoCrop3D.py:915</code>),
+      activated by the "Use module 'Crop Volume' for tilted images" checkbox (commit
+      <code>9d2bbe8</code>). It runs <strong>inside the widget</strong>, not in the CLI:</p>
+
+      <pre><code>cropVolumeLogic = slicer.modules.cropvolume.logic()
+parameters = slicer.vtkMRMLCropVolumeParametersNode()
+parameters.SetInputVolumeNodeID(inputVolume.GetID())
+parameters.SetROINodeID(roiNode.GetID())
+parameters.SetOutputVolumeNodeID(outputVolume.GetID())
+cropVolumeLogic.Apply(parameters)</code></pre>
+
+      <p>Only the three IDs are set: interpolation, isotropy, and spacing scale
+      stay at the <code>vtkMRMLCropVolumeParametersNode</code>'s default values. With
+      interpolation on, Crop Volume <strong>resamples</strong> in the ROI's own coordinate frame,
+      which is precisely what lets it handle a rotated ROI — at the cost of
+      modifying the voxel values, unlike the CLI path. The two
+      paths therefore do not produce the same file, and that's intentional.</p>
+
+      <p><code>optionCheckBox()</code> hides "Keep the same size" in this mode, since Crop Volume has
+      no equivalent.</p>
+
+      <p>This path loads the ROI and the volume as MRML nodes (<code>loadMarkups</code>,
+      <code>loadVolume</code>), so <strong>it, and it alone, reads <code>coordinateSystem</code> and
+      <code>orientation</code></strong> — Slicer takes care of that when parsing the json.</p>
+
+      <h2 id="batch">6. Batch mode and patient ↔ ROI pairing</h2>
+
+      <p>Two regimes, discriminated by <code>len(ROIList['.mrk.json']) &gt; 1</code>
+      (<code>AutoCrop3D_CLI.py:53</code>):</p>
+
+      <ul>
+        <li><strong>a single ROI</strong> → applied to every volume found;</li>
+        <li><strong>several ROIs</strong> → <code>ChangeKeyDict</code> builds <code>{basename.split('_')[0]: path}</code>
+        and each volume looks up its key; on failure → <code>logger.warning('No ROI for patient:')</code>
+        and <code>continue</code>.</li>
+      </ul>
+
+      <p>Both sides compute the key <strong>differently</strong>:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Side</th><th>Rule</th><th>Example <code>MA_0001_T1_Scan.nii.gz</code> / <code>MA_0001_ROI.mrk.json</code></th></tr></thead>
+          <tbody>
+            <tr><td>volume</td><td>chain of <code>.split()</code> on <code>_Scan _scan _Seg _seg _Or _OR _MAND _MD _MAX _MX _CB _lm _T2 _T1 _Cl</code> then <code>.split('.')[0]</code></td><td><code>MA_0001</code></td></tr>
+            <tr><td>ROI</td><td><code>basename.split('_')[0]</code></td><td><code>MA</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>A patient name containing an underscore therefore breaks the pairing. With
+      names that have no underscore (<code>MA0001_…</code>), everything works fine.</p>
+
+      <p>Progress is a simple <code>open(logPath,'r+').write(str(index))</code> on every
+      file; the widget doesn't read the content, only the <code>st_mtime</code>
+      (<code>AutoCrop3D.py:574</code>).</p>
+
+      <h2 id="vtk">7. Generating a VTK mesh from a segmentation</h2>
+
+      <p>Triggered by <code>if "seg" in ScanOutPath.lower()</code>
+      (<code>AutoCrop3D_CLI.py:151</code>) — the
+      test is against the <strong>full output path</strong>, so a parent folder named
+      <code>Segmentations/</code> is enough to trigger it on every file. The failure is swallowed
+      by a bare <code>except: pass</code>.</p>
+
+      <p><code>convertNiftiToVTK</code> (<code>GenerateVTKfromSeg.py:16</code>):</p>
+
+      <ol>
+        <li><code>padding()</code>: <code>sitk.ConstantPad(img, [50,50,10], [0,0,0])</code>. The actual
+        signature verified: <code>ConstantPad(image, padLowerBound, padUpperBound, constant)</code> — the
+        third argument being zero means that <strong>only the lower bound gets
+        padded</strong>.
+        <div class="callout bug">
+          <div class="callout-title">Confirmed bug</div>
+          <p>The comment "add 50 pixels around each dimension" is wrong: a structure that touches the crop's upper face will stay open.</p>
+        </div>
+        The temporary file is named <code>image_padded.nii.gz</code> and is written <strong>into the
+        process's current directory</strong>, not into a tempdir.</li>
+        <li><code>vtkNIFTIImageReader</code> → <code>vtkDiscreteMarchingCubes(GenerateValues(100, 1, 100))</code>
+        → <code>vtkSmoothPolyDataFilter</code> (5 iterations, feature angle 120°, relaxation 0.6).</li>
+        <li>Coloring: <code>color_tup = LABEL_COLORS[label]</code> with <code>label = np.max(img_arr)</code>,
+        <strong>the same color for every cell</strong>.
+        <div class="callout bug">
+          <div class="callout-title">Confirmed bug</div>
+          <p>The comment "coloring according to labels" does not describe the code.</p>
+        </div>
+        And <code>LABEL_COLORS</code> only holds keys 1–6: a labelmap with more than 6 classes raises a <code>KeyError</code> swallowed by the
+        caller's <code>except: pass</code>, so no VTK and no message.</li>
+        <li><code>present_labels</code> is computed and then never used — dead code.</li>
+      </ol>
+
+      <p>VTK's NIfTI reader applies neither qform nor sform (the code doesn't even
+      retrieve them), and the 50/50/10-voxel padding is never compensated for. <strong>A deduction</strong>,
+      not tested here: the resulting mesh does not line up with the cropped volume in
+      Slicer.</p>
+
+      <h2 id="sorties">8. Outputs</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Path</th><th>Name produced</th><th>Construction</th></tr></thead>
+          <tbody>
+            <tr><td>CLI</td><td><code>&lt;stem&gt;_&lt;suffix&gt;&lt;ext&gt;</code></td><td><code>basename.split('.')[0] + "_" + suffix + key</code>, where <code>key</code> is the matched search extension (<code>.nii.gz</code>, …)</td></tr>
+            <tr><td>CLI, segmentation</td><td><code>&lt;stem&gt;_&lt;suffix&gt;_vtk.vtk</code></td><td>same</td></tr>
+            <tr><td>Crop Volume</td><td><code>&lt;basename with .nii.gz → _&lt;suffix&gt;.nii.gz&gt;</code></td><td><code>basename.replace('.nii.gz', f'_{suffix}.nii.gz')</code> — <strong>hardcoded to <code>.nii.gz</code></strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Default suffix: <code>cropped</code> (<code>AutoCrop3D.ui:308</code>).
+      The input folder tree is reproduced in the output folder via
+      <code>os.path.relpath</code>.</p>
+
+      <p>No transform file is produced.</p>
+
+      <h2 id="predit-calcule">9. Predicted vs. computed</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Reading the ROI</td><td><span class="badge calcule">computed</span> json, no computation</td><td>CLI</td></tr>
+            <tr><td>Physical → index</td><td><span class="badge calcule">computed</span> <code>TransformPhysicalPointToContinuousIndex</code> (ITK)</td><td>CLI</td></tr>
+            <tr><td>Cropping</td><td><span class="badge calcule">computed</span> SimpleITK slicing, no interpolation</td><td>CLI</td></tr>
+            <tr><td>"Tilted" cropping</td><td><span class="badge calcule">computed</span> resampling via <code>cropVolumeLogic.Apply</code></td><td>widget</td></tr>
+            <tr><td>VTK surface</td><td><span class="badge calcule">computed</span> marching cubes + laplacian smoothing</td><td>CLI</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>No network. No part of this module learns or predicts anything.</p>
+
+      <h2 id="environnement">10. Environment</h2>
+
+      <p>Nothing to install. The module uses only what Slicer already ships with:
+      <code>SimpleITK</code>, <code>numpy</code>, <code>vtk</code>, <code>qt</code>. <code>pip_install</code> is imported in
+      <code>AutoCrop3D.py:11</code> but never
+      called. No CUDA, no WSL, no conda.</p>
+
+      <h2 id="pieges">11. Pitfalls and fragile points</h2>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — ROI folder with a single file</div>
+        <p><strong>A ROI folder containing exactly one file → crash.</strong> <code>ROI_dict</code> is
+        only built if <code>len(ROIList) &gt; 1</code>; otherwise <code>ROI_Path</code> stays the <strong>folder</strong>, and
+        <code>json.load(open(ROI_Path))</code> raises <code>IsADirectoryError</code>. The Crop Volume path,
+        by contrast, tests <code>os.path.isdir</code> and handles it fine.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — inconsistent extensions between widget and CLI</div>
+        <p><strong>The widget and the CLI don't look for the same extensions.</strong> <code>CheckInput</code>
+        (<code>AutoCrop3D.py:808</code>) only looks
+        for <code>.nii.gz</code>, <code>.nrrd.gz</code>, <code>.gipl.gz</code>. A folder of uncompressed <code>.nii</code> or
+        <code>.nrrd</code> files is rejected by the UI ("Wrong type of patient file detected") even
+        though the CLI handles them perfectly well. And since <code>nbFiles</code> comes from that same
+        list, the progress bar's denominator is wrong as soon as a mix
+        of extensions is present.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — ignored ROI fields</div>
+        <p><strong>The ROI's <code>coordinateSystem</code> and <code>orientation</code> are ignored</strong> by the CLI path
+        (§3). A rotated box or a ROI saved in RAS: wrong result, silently.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — index truncation</div>
+        <p><strong><code>.astype(int)</code> truncates toward zero</strong>, so <code>Upper</code> loses up to one voxel per
+        axis. No clinical consequence, but the crop is not symmetric around the
+        requested center.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — no intersection check</div>
+        <p><strong>No check that the ROI intersects the volume.</strong> The clamping constrains
+        <code>Lower ≥ 0</code> and <code>Upper ≤ size</code> but nothing prevents <code>Lower &gt; Upper</code> after
+        the clamp: this yields a zero-size image and the write fails inside the
+        <code>try/except</code> that logs <code>Lower</code>/<code>Upper</code>.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — overly broad path replacement</div>
+        <p><strong><code>.replace(basename, filename)</code> replaces every occurrence</strong> in the
+        joined path (<code>AutoCrop3D_CLI.py:129</code>):
+        a folder sharing the file's name would get renamed too.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — Crop Volume clears the scene</div>
+        <p><strong>Crop Volume path: <code>slicer.mrmlScene.Clear(0)</code> on every patient</strong>
+        (<code>AutoCrop3D.py:998</code>) — clears
+        the entire scene, including any data the user had loaded into it.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — MRML access off the main thread</div>
+        <p><strong>Crop Volume path: <code>slicer.util.saveNode</code> called from a <code>threading.Thread</code></strong>
+        (<code>AutoCrop3D.py:979</code>), meaning
+        MRML access off the main thread. The following <code>while thread.is_alive(): processEvents()</code>
+        effectively serializes execution, which masks the problem without fixing it.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — partial suffix</div>
+        <p><strong>Crop Volume path: the suffix is only applied to <code>.nii.gz</code> files.</strong> A <code>.nrrd</code>
+        comes out with no suffix, at the same relative name.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall — inoperative unit test</div>
+        <p><strong>The unit test tests nothing.</strong> <code>test_AutoCrop3D1</code> is defined twice:
+        a class method that contains only a docstring (called by <code>runTest</code>),
+        then a <strong>module-level</strong> function (<code>AutoCrop3D.py:1097</code>)
+        which holds the actual test and is never executed.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Dead code</div>
+        <p><strong>Dead code</strong>: <code>CropCBCT.py</code>
+        (flagged in its own docstring), <code>Autofill()</code> which still contains absolute
+        paths from a development machine, <code>registerSampleData()</code> which references
+        <code>AutoCrop3D2.png</code> — a file absent from the repository.</p>
+      </div>
+
+      <h2 id="litterature">12. Literature</h2>
+
+      <p>No paper covers AutoCrop3D. It's a batch-processing utility
+      written for the lab (Jeanne Claret, UoM/DCBIA), documented only by the
+      <code>README.md:336</code> section and by the help of Slicer's
+      Crop Volume module, whose semantics it reuses:</p>
+
+      <ul>
+        <li><a href="https://slicer.readthedocs.io/en/latest/user_guide/modules/cropvolume.html">Crop Volume — Slicer documentation</a></li>
+        <li><a href="https://slicer.readthedocs.io/en/latest/user_guide/modules/cropvolumesequence.html">Crop Volume Sequence — Slicer documentation</a>
+        (cited by the README as the limitation AutoCrop3D works around: files too
+        heavy to load as a sequence)</li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>The CLI's <code>documentation-url</code> points to
+      <a href="https://github.com/Jeanneclre/DCBIA-code">https://github.com/Jeanneclre/DCBIA-code</a>, a personal repository that is not
+      the project's own.</p>
+
+      <p><strong>Full bibliography: <a href="SOURCES.html">SOURCES.html</a></strong> — search performed, negative
+      result: no work describes AutoCrop3D. Two articles retrieved in this
+      folder cite it in a single sentence as a tool used.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← All tool pages</a> ·
+        <a href="SOURCES.html">Bibliography for this tool</a> ·
+        Source: <code>AutoCrop3D.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

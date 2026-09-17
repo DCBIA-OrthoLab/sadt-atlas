@@ -5,6 +5,25 @@
 
   var KEY = "sadt_atlas_theme";
   var root = document.documentElement;
+  var LANG = (root.getAttribute("lang") || "fr").slice(0, 2).toLowerCase();
+  if (LANG !== "en") LANG = "fr";
+
+  var T = {
+    fr: { dark: "☾ sombre", light: "☀ clair", onpage: "Sur cette page",
+          copy: "copier", copied: "copié", failed: "échec",
+          search: "Rechercher…  /", searchAria: "Rechercher dans le site",
+          noResult: "Aucun résultat.", noIndex: "Index introuvable — lancer <code>python3 build.py</code>.",
+          prev: "← précédent", next: "suivant →", top: "↑ haut",
+          toTop: "Revenir en haut", skip: "Aller au contenu",
+          anchor: "Lien vers cette section", reading: "Ordre de lecture conseillé" },
+    en: { dark: "☾ dark", light: "☀ light", onpage: "On this page",
+          copy: "copy", copied: "copied", failed: "failed",
+          search: "Search…  /", searchAria: "Search the site",
+          noResult: "No results.", noIndex: "Index not found — run <code>python3 build.py</code>.",
+          prev: "← previous", next: "next →", top: "↑ top",
+          toTop: "Back to top", skip: "Skip to content",
+          anchor: "Link to this section", reading: "Suggested reading order" }
+  }[LANG];
   try { var saved = localStorage.getItem(KEY); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
 
   /* Ordre de lecture conseillé, pour le précédent/suivant. */
@@ -31,11 +50,21 @@
     ["Agent", "Agent/Agent.html"]
   ];
 
+  /* Profondeur réelle, lue sur le href de la feuille de style :
+     fr/index.html -> 1, fr/ALI/ALI.html -> 2. */
   function depth() {
-    /* 0 à la racine, 1 dans un dossier d'outil. */
-    return document.querySelector('link[rel="stylesheet"]').getAttribute("href").indexOf("../") === 0 ? 1 : 0;
+    var h = document.querySelector('link[rel="stylesheet"]').getAttribute("href");
+    return (h.match(/\.\.\//g) || []).length;
   }
-  function rel(p) { return (depth() ? "../" : "") + p; }
+  function up(n) { var s = ""; for (var i = 0; i < n; i++) s += "../"; return s; }
+  /* vers la racine du site (assets/) */
+  function rel(p) { return up(depth()) + p; }
+  /* vers la racine de la langue (fr/ ou en/) */
+  function relLang(p) { return up(Math.max(0, depth() - 1)) + p; }
+  /* section courante, d'après le chemin */
+  function section() {
+    return /\/guide\//.test(location.pathname) ? "guide" : "atlas";
+  }
 
   var pageBarSec = null;   /* <span> de la section courante dans la barre collante */
 
@@ -53,7 +82,7 @@
       return root.getAttribute("data-theme") === "dark" ||
         (!root.hasAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
     }
-    function sync() { btn.textContent = isDark() ? "☀ clair" : "☾ sombre"; }
+    function sync() { btn.textContent = isDark() ? T.light : T.dark; }
     btn.addEventListener("click", function () {
       var next = isDark() ? "light" : "dark";
       root.setAttribute("data-theme", next);
@@ -81,7 +110,7 @@
       li.appendChild(a); ul.appendChild(li);
       links.push(a);
     });
-    var t = document.createElement("h4"); t.textContent = "Sur cette page";
+    var t = document.createElement("h4"); t.textContent = T.onpage;
     box.appendChild(t); box.appendChild(ul);
 
     if (!("IntersectionObserver" in window)) return;
@@ -105,7 +134,7 @@
     document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) {
       var a = document.createElement("a");
       a.className = "anchor"; a.href = "#" + h.id; a.textContent = "¶";
-      a.setAttribute("aria-label", "Lien vers cette section");
+      a.setAttribute("aria-label", T.anchor);
       h.insertBefore(a, h.firstChild);
     });
   }
@@ -119,17 +148,17 @@
       pre.parentNode.insertBefore(wrap, pre);
       wrap.appendChild(pre);
       var b = document.createElement("button");
-      b.className = "copy-btn"; b.type = "button"; b.textContent = "copier";
+      b.className = "copy-btn"; b.type = "button"; b.textContent = T.copy;
       b.addEventListener("click", function () {
         var txt = pre.innerText;
-        var done = function () { b.textContent = "copié"; b.classList.add("done");
-          setTimeout(function () { b.textContent = "copier"; b.classList.remove("done"); }, 1400); };
+        var done = function () { b.textContent = T.copied; b.classList.add("done");
+          setTimeout(function () { b.textContent = T.copy; b.classList.remove("done"); }, 1400); };
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(txt).then(done, function () { b.textContent = "échec"; });
+          navigator.clipboard.writeText(txt).then(done, function () { b.textContent = T.failed; });
         } else {
           var ta = document.createElement("textarea");
           ta.value = txt; document.body.appendChild(ta); ta.select();
-          try { document.execCommand("copy"); done(); } catch (e) { b.textContent = "échec"; }
+          try { document.execCommand("copy"); done(); } catch (e) { b.textContent = T.failed; }
           document.body.removeChild(ta);
         }
       });
@@ -148,16 +177,17 @@
     var foot = art.querySelector(".footer");
     var nav = document.createElement("nav");
     nav.className = "pager";
-    nav.setAttribute("aria-label", "Ordre de lecture conseillé");
+    nav.setAttribute("aria-label", T.reading);
     function card(entry, dir, cls) {
       var a = document.createElement("a");
-      a.className = cls; a.href = rel(entry[1]);
+      var target = section() === "guide" ? "guide/" + entry[0] + ".html" : entry[1];
+      a.className = cls; a.href = relLang(target);
       a.innerHTML = '<span class="p-dir">' + dir + '</span><span class="p-name">' + entry[0] + "</span>";
       return a;
     }
-    if (i > 0) nav.appendChild(card(READING[i - 1], "← précédent", "prev"));
+    if (i > 0) nav.appendChild(card(READING[i - 1], T.prev, "prev"));
     else nav.appendChild(document.createElement("span"));
-    if (i < READING.length - 1) nav.appendChild(card(READING[i + 1], "suivant →", "next"));
+    if (i < READING.length - 1) nav.appendChild(card(READING[i + 1], T.next, "next"));
     if (foot) art.insertBefore(nav, foot); else art.appendChild(nav);
   }
 
@@ -167,7 +197,7 @@
     if (!side) return;
     var box = document.createElement("div");
     box.className = "search";
-    box.innerHTML = '<input type="search" placeholder="Rechercher…  /" aria-label="Rechercher dans le site" autocomplete="off">' +
+    box.innerHTML = '<input type="search" placeholder="' + T.search + '" aria-label="' + T.searchAria + '" autocomplete="off">' +
                     '<div class="search-results" role="listbox"></div>';
     var brand = side.querySelector(".brand");
     brand.parentNode.insertBefore(box, brand.nextSibling);
@@ -180,9 +210,9 @@
       if (loading) return;
       loading = true;
       var s = document.createElement("script");
-      s.src = rel("assets/search-index.js");
+      s.src = rel("assets/search-index-" + LANG + ".js");
       s.onload = function () { loaded = true; loading = false; cb(); };
-      s.onerror = function () { loading = false; out.innerHTML = '<div class="search-empty">Index introuvable — lancer <code>python3 build.py</code>.</div>'; };
+      s.onerror = function () { loading = false; out.innerHTML = '<div class="search-empty">' + T.noIndex + "</div>"; };
       document.head.appendChild(s);
     }
 
@@ -219,7 +249,7 @@
           if (ok) hits.push([score, r]);
         });
         hits.sort(function (a, b) { return b[0] - a[0]; });
-        if (!hits.length) { out.innerHTML = '<div class="search-empty">Aucun résultat.</div>'; return; }
+        if (!hits.length) { out.innerHTML = '<div class="search-empty">' + T.noResult + "</div>"; return; }
         out.innerHTML = hits.slice(0, 20).map(function (h) {
           var r = h[1];
           var ctx = r.x;
@@ -323,7 +353,7 @@
       '<a class="pb-name" href="#contenu"></a>' +
       '<span class="pb-sep" hidden>›</span>' +
       '<span class="pb-sec"></span>' +
-      '<button class="pb-top" type="button" title="Revenir en haut">↑ haut</button>' +
+      '<button class="pb-top" type="button" title="' + T.toTop + '">' + T.top + "</button>" +
       "</div>";
     bar.querySelector(".pb-name").textContent = name;
     document.body.appendChild(bar);
@@ -357,12 +387,27 @@
     if (!art) return;
     if (!art.id) art.id = "contenu";
     var a = document.createElement("a");
-    a.className = "skip-link"; a.href = "#contenu"; a.textContent = "Aller au contenu";
+    a.className = "skip-link"; a.href = "#contenu"; a.textContent = T.skip;
     document.body.insertBefore(a, document.body.firstChild);
   }
 
   ready(function () {
-    skipLink(); themeToggle(); anchors(); pageBar(); toc();
-    copyButtons(); pager(); search(); constats();
+    /* Chaque bloc est isolé : une exception dans l'un ne doit pas empêcher
+       les suivants de s'exécuter. Le sommaire et la navigation passent avant
+       les agréments (barre collante, copie, recherche). */
+    var steps = [
+      ["skipLink", skipLink], ["anchors", anchors], ["toc", toc],
+      ["theme", themeToggle], ["pager", pager], ["pageBar", pageBar],
+      ["copy", copyButtons], ["search", search], ["constats", constats]
+    ];
+    for (var i = 0; i < steps.length; i++) {
+      try {
+        steps[i][1]();
+      } catch (e) {
+        if (window.console && console.warn) {
+          console.warn("[sadt-atlas] « " + steps[i][0] + " » a échoué :", e);
+        }
+      }
+    }
   });
 })();

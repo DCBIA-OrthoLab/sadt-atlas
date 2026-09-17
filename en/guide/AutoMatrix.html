@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoMatrix — Guide — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="utilitaires">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><a href="../../fr/index.html" title="Français">FR</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html" aria-current="true"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html" aria-current="page">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <div class="breadcrumb"><a href="index.html">Guide</a> › Utilities</div>
+        <h1>AutoMatrix — apply a matrix across a whole batch of files</h1>
+        <p class="lede">AutoMatrix applies one or more ITK transformation matrices to an
+        entire folder of volumes and landmark files in a single pass. No neural network, no
+        GPU: it's a batch tool, not a computation step — the matrix itself comes from a
+        registration you ran somewhere else.</p>
+      </header>
+
+      <h2 id="quand">When to use it</h2>
+      <p>You ran a registration module (AREG, ASO, FlexReg…) and got a transformation matrix
+      (<code>.tfm</code>) out of it. Now you want to apply that same matrix to other files for
+      the same patient — a segmentation, a second volume, a set of landmarks — without opening
+      each one in Slicer by hand. Or you ran that registration on a whole series of patients
+      and want to process the entire folder in one go. That's what AutoMatrix is for: it
+      doesn't register anything itself, it replays a transformation you already computed.</p>
+
+      <div class="callout">
+        <div class="callout-title">One matrix, one motion</div>
+        <p>Applied to a volume, the matrix moves its content. Applied to a landmark file, it
+        moves the points by exactly the same motion. That's what keeps a scan and its
+        landmarks aligned after going through AutoMatrix — as long as you use the same matrix
+        for both.</p>
+      </div>
+
+      <h2 id="appariement">How files and matrices get matched</h2>
+      <p>AutoMatrix never asks you to point out by hand which matrix goes with which patient.
+      It guesses the pairing by comparing file names: it strips a list of known keywords
+      (<code>_Seg</code>, <code>_Or</code>, <code>_MAND</code>, <code>_CB</code>, a timestamp
+      like <code>_T1</code>, <code>_T2</code>…) from the scan's name, and a slightly different
+      list from the matrix's name, until it's left with a patient identifier on each side. If
+      the two identifiers match, the file and the matrix are paired.</p>
+      <p>The catch: those two keyword lists aren't the same. The rule that works reliably: start
+      every file name with the patient identifier, then an underscore, then whatever else you
+      need. Example that works: <code>patient1_T1_MA.nii.gz</code> and
+      <code>patient1_left_MA.tfm</code> both reduce to <code>patient1</code>, because
+      <code>_T1</code> is stripped on the scan side and <code>_left</code> on the matrix side.
+      Example that fails: <code>patient1_MA.nii.gz</code> with no timestamp reduces to
+      <code>patient1_MA</code> on the scan side but <code>patient1</code> on the matrix side —
+      the two no longer match, and that file gets no matrix at all.</p>
+      <p>There's a shortcut: point to a single matrix file, rather than a folder, and it gets
+      applied as-is to every patient in the input folder — no name matching needed.</p>
+
+      <h2 id="besoin">What it needs, what you get</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>What to provide</h4>
+          <ul>
+            <li>A folder of volumes as <code>.nii</code>, <code>.nii.gz</code> or
+            <code>.nrrd</code>, and/or Slicer landmark files (<code>.mrk.json</code>)</li>
+            <li>An ITK matrix (<code>.tfm</code>, <code>.h5</code> or <code>.mat</code>), or a
+            folder of matrices named following the same rule as the scans</li>
+            <li>Check this if your volumes are segmentations: the dedicated box, so labels
+            don't get smoothed out by interpolation</li>
+            <li>Optional: a reference file to force the output grid (size, orientation)</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>What comes out</h4>
+          <ul>
+            <li>A transformed copy of each matched file, laid out in the same folder structure
+            as the input</li>
+            <li>Your original files are never modified</li>
+            <li>In a landmark file, only the points marked as defined get moved</li>
+            <li>No new matrix is ever produced: AutoMatrix consumes transformations, it
+            doesn't write them</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Steps</h2>
+      <ol class="steps">
+        <li><strong>Point it to the input folder.</strong> Scans and/or landmark files to
+        transform; the whole folder is processed in one go.</li>
+        <li><strong>Point it to the matrix, or a folder of matrices.</strong> Check that the
+        names follow the patient + suffix rule above, or point straight at a single file to
+        apply it to everyone.</li>
+        <li><strong>Check the segmentation box</strong> if your volumes are labelmaps.</li>
+        <li><strong>Give it a reference file</strong> if you want to force the output grid;
+        otherwise each file keeps its own input volume's grid, and anything pushed outside the
+        field of view by the transform is lost.</li>
+        <li><strong>Pick an output suffix</strong>, and decide whether the matrix name should
+        be appended to it — needed as soon as a patient has more than one matrix (see
+        below).</li>
+        <li><strong>Set an output folder</strong>, then run it. A progress bar tracks the
+        files as they go through.</li>
+      </ol>
+
+      <h2 id="miroir">Flipping left/right without hunting for a matrix</h2>
+      <p>If all you need is a left/right mirror, there's no need to build your own matrix: the
+      Mirror mode downloads a ready-made reflection matrix and fills it into the matrix field
+      for you, with its own output suffix (<code>_mir</code>).</p>
+      <div class="callout warn">
+        <div class="callout-title">The mirror isn't centered on your patient</div>
+        <p>The reflection happens across the sagittal plane of the scene's origin, not the
+        patient's own sagittal plane. If your patient isn't already centered in the scene, the
+        result will come out both mirrored and shifted — plan on a registration step afterward
+        to correct the offset.</p>
+      </div>
+
+      <h2 id="coince">If something's off</h2>
+      <div class="callout warn">
+        <div class="callout-title">Some advertised formats no longer work</div>
+        <p>The interface still offers meshes (<code>.vtk</code>, <code>.vtp</code>,
+        <code>.stl</code>, <code>.off</code>, <code>.obj</code>) as input scans for intraoral
+        surfaces, and matrices as <code>.npy</code> — both get counted in the progress bar, but
+        neither produces any output: each file of that kind is simply skipped, with a line in
+        the error log. A <code>.txt</code> matrix only works if it's an actual ITK transform
+        file, not a plain 4×4 array.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">A failed match gives no warning</div>
+        <p>If a scan's name and a matrix's name don't reduce to the same patient identifier
+        (see above), that file is simply never transformed — no error message, no visible
+        warning. If a patient is missing from the output, the first thing to check is that
+        patient's file names.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">One output can overwrite another</div>
+        <p>If you uncheck the option that appends the matrix name to the output file, and a
+        patient has more than one matrix, every result gets the same file name: each one
+        overwrites the last, and only the final matrix processed survives. Keep this option
+        checked whenever you're applying more than one matrix per patient.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">A landmark file can vanish silently</div>
+        <p>Some transformations (dense deformation fields, B-splines) can't be inverted
+        mathematically. When that happens, the matching landmark file is skipped with just a
+        warning in the log, while the volume itself still gets transformed — so a scan and its
+        landmarks can end up out of sync with nothing on screen to flag it.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Matrices aren't chained</div>
+        <p>When a patient has several matrices, each one is applied separately to the original
+        input file: you get one output file per matrix, never a composition of one after the
+        other.</p>
+      </div>
+
+      <a class="deep-link" href="../AutoMatrix/AutoMatrix.html">
+        <b>How it actually works →</b>
+        <span>The Atlas page: the ITK transformation convention, the file-to-matrix matching
+        logic in detail, the formats actually read, and every pitfall found in the code.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← All guides</a> ·
+        <a href="../AutoMatrix/AutoMatrix.html">Atlas page</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

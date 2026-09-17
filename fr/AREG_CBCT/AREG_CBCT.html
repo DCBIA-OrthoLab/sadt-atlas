@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AREG_CBCT — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="recalage">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+    <div class="lang-switch">
+      <span class="cur">FR</span><a href="../../en/index.html" title="English">EN</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html"><b>Guide</b><small>pour utiliser les outils</small></a>
+      <a href="../index.html" aria-current="true"><b>Atlas</b><small>comment ça marche dans le code</small></a>
+    </div>
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html" aria-current="page">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Recalage</div>
+        <h1>AREG_CBCT</h1>
+        <p class="lede">Recalage rigide T1/T2 de CBCT sur une région de référence osseuse (base du crâne, mandibule ou maxillaire) : un <a class="gterm" href="../glossaire.html#g-elastix" title="Voir au glossaire">elastix</a> classique, information mutuelle, sans réseau — tout ce qui est appris se trouve en amont, dans les masques et les landmarks.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1007/978-3-031-45249-9_5" target="_blank" rel="noopener" title="Le papier décrit deux passes SimpleElastix ; le code en fait une, sous itk-elastix.">Anchling 2023 · LNCS 14242</a>
+          <span class="badge cli">areg_cbct</span>
+          <span class="badge neutral">Python de Slicer — pas de conda, CPU seul</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliographie</a>
+        </div>
+      </header>
+
+      <h2 id="situation">1. Situation dans la chaîne</h2>
+
+      <p><code>AREG/AREG.py</code> est un widget unique qui pilote trois modalités :
+      CBCT (<code>AREG/AREG_Method/CBCT.py</code>), IOS (<code>AREG/AREG_Method/IOS.py</code>)
+      et IOS-sur-CBCT (<code>AREG/AREG_Method/IOSCBCT.py</code>). Il ne calcule rien :
+      chaque <code>Method.Process()</code> retourne une <strong>liste de dictionnaires de steps</strong>, et le
+      widget les exécute l'un après l'autre.</p>
+
+      <p>Un step est toujours de la forme :</p>
+
+      <pre><code>{"Process": slicer.modules.areg_cbct,   # module CLI Slicer
+ "Parameter": {...},                    # dict passé tel quel à slicer.cli.run
+ "Module": "AREG_CBCT for Mandible",    # libellé affiché
+ "ReviewId": "cbct_registration",       # pause de revue éventuelle
+ "ReviewFolder": ".../Mandible",
+ "ReviewReferenceFolder": "&lt;dossier T1&gt;",
+ "Display": DisplayAREGCBCT(nb_scan)}   # traduction progression -&gt; barre</code></pre>
+
+      <p>Appels sortants du mode CBCT, dans l'ordre d'exécution :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Module appelé</th><th>Modes</th><th>Rôle</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge cli">pre_aso_cbct</span><br><code>ASO_CBCT/PRE_ASO_CBCT/PRE_ASO_CBCT.py</code></td><td>les 3</td><td>centrer T2 (et T1 en mode Orientation)</td></tr>
+            <tr><td><span class="badge cli">ali_cbct</span><br><code>ALI_CBCT/ALI_CBCT.py</code></td><td>Orientation seul</td><td>placer 6 ou 7 landmarks sur T1 <span class="badge predit">prédit</span></td></tr>
+            <tr><td><span class="badge cli">semi_aso_cbct</span><br><code>ASO_CBCT/SEMI_ASO_CBCT/SEMI_ASO_CBCT.py</code></td><td>Orientation seul</td><td>orienter T1 sur un gold standard (<a class="gterm" href="../glossaire.html#g-icp" title="Voir au glossaire">ICP</a> landmarks) <span class="badge calcule">calculé</span></td></tr>
+            <tr><td><span class="badge cli">amasss_cli</span><br><code>AMASSS_CLI/AMASSS_CLI.py</code></td><td>Fully-Auto, Orientation</td><td>produire les <strong>masques</strong> de la région de référence sur T1 <span class="badge predit">prédit</span></td></tr>
+            <tr><td><span class="badge cli">areg_cbct</span><br><code>AREG_CBCT/AREG_CBCT.py</code></td><td>les 3</td><td><strong>le recalage</strong>, une fois par région cochée <span class="badge calcule">calculé</span></td></tr>
+            <tr><td><span class="badge cli">amasss_cli</span></td><td>les 3 (optionnel)</td><td>segmentations finales T1 et T2 recalé <span class="badge predit">prédit</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Rien dans le dépôt n'appelle AREG : c'est un outil terminal. Ses <code>.tfm</code> sont en
+      revanche réutilisables par <a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a> et les modules d'analyse.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1520 260" role="img" aria-label="Chaîne d'appels du mode CBCT d'AREG, avec la branche d'orientation en option" style="width:100%;height:auto;display:block">
+          <rect x="150" y="14" width="500" height="96" fill="none" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="4 4" rx="8"/>
+          <text class="d-label-s" x="400" y="28" text-anchor="middle">mode Orientation &amp; Registration uniquement</text>
+
+          <rect class="d-box-n" x="170" y="38" width="200" height="52" rx="6"/>
+          <text class="d-label" x="270" y="60" text-anchor="middle">ALI_CBCT</text>
+          <text class="d-label-s" x="270" y="76" text-anchor="middle">6-7 landmarks, réseau</text>
+
+          <path class="d-arrow" d="M370 64 H430"/>
+          <text class="d-label-s" x="400" y="28" text-anchor="middle">landmarks</text>
+          <path class="d-arrow-head" d="M430 64 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="430" y="38" width="200" height="52" rx="6"/>
+          <text class="d-label" x="530" y="60" text-anchor="middle">SEMI_ASO_CBCT</text>
+          <text class="d-label-s" x="530" y="76" text-anchor="middle">ICP rigide sur landmarks</text>
+
+          <path class="d-arrow" d="M530 90 V150"/>
+          <text class="d-label-s" x="540" y="122" text-anchor="start">orientation</text>
+          <path class="d-arrow-head" d="M530 150 l-5 -8 h10 z"/>
+
+          <rect class="d-box" x="10" y="150" width="150" height="56" rx="6"/>
+          <text class="d-label" x="85" y="172" text-anchor="middle">Entrées</text>
+          <text class="d-label-s" x="85" y="188" text-anchor="middle">T1 + T2 (nii/nrrd/gipl)</text>
+
+          <path class="d-arrow" d="M160 178 H210"/>
+          <text class="d-label-s" x="185" y="225" text-anchor="middle">T1 / T2 bruts</text>
+          <path class="d-arrow-head" d="M210 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="210" y="150" width="180" height="56" rx="6"/>
+          <text class="d-label" x="300" y="172" text-anchor="middle">PRE_ASO_CBCT</text>
+          <text class="d-label-s" x="300" y="188" text-anchor="middle">centre T2 (translation)</text>
+
+          <path class="d-arrow" d="M390 178 H440"/>
+          <text class="d-label-s" x="415" y="225" text-anchor="middle">pré-orientés</text>
+          <path class="d-arrow-head" d="M440 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="440" y="150" width="180" height="56" rx="6"/>
+          <text class="d-label" x="530" y="172" text-anchor="middle">AMASSS</text>
+          <text class="d-label-s" x="530" y="188" text-anchor="middle">masques CB/MAND/MAX, réseau</text>
+
+          <path class="d-arrow" d="M620 178 H680"/>
+          <text class="d-label-s" x="650" y="225" text-anchor="middle">orientés + masques</text>
+          <path class="d-arrow-head" d="M680 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box-a" x="680" y="150" width="200" height="56" rx="6"/>
+          <text class="d-label" x="780" y="172" text-anchor="middle">AREG_CBCT</text>
+          <text class="d-label-s" x="780" y="188" text-anchor="middle">elastix rigide, 1 passe</text>
+
+          <path class="d-arrow" d="M880 178 H940"/>
+          <text class="d-label-s" x="910" y="225" text-anchor="middle">.tfm + volume recalé</text>
+          <path class="d-arrow-head" d="M940 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="940" y="150" width="220" height="56" rx="6"/>
+          <text class="d-label" x="1050" y="172" text-anchor="middle">Sortie</text>
+          <text class="d-label-s" x="1050" y="188" text-anchor="middle">T2 recalé (int16) + .tfm</text>
+
+          <path class="d-arrow" d="M1160 178 H1220" stroke-dasharray="4 4"/>
+          <text class="d-label-s" x="1190" y="225" text-anchor="middle">volume recalé — étape optionnelle</text>
+          <path class="d-arrow-head" d="M1220 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="1220" y="150" width="290" height="56" rx="6"/>
+          <text class="d-label" x="1365" y="172" text-anchor="middle">AMASSS (optionnel)</text>
+          <text class="d-label-s" x="1365" y="188" text-anchor="middle">segmentations finales T1 + T2 recalé, réseau</text>
+        </svg>
+        <figcaption>Enchaînement réel du mode CBCT. La branche du haut (ALI_CBCT → SEMI_ASO_CBCT) n'existe qu'en mode « Orientation &amp; Registration » ; AMASSS tourne alors sur le T1 orienté. Le recalage lui-même (AREG_CBCT, encadré) est la seule étape non prédite du bloc central.</figcaption>
+      </figure>
+
+      <h2 id="fichiers">2. Fichiers en jeu</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fichier</th><th>Rôle</th><th>Où ça tourne</th></tr></thead>
+          <tbody>
+            <tr><td><code>AREG/AREG.py</code></td><td>widget, 3336 lignes : UI, enchaînement des steps, pauses de revue, installation des libs</td><td>Python de Slicer</td></tr>
+            <tr><td><code>AREG/AREG_Method/CBCT.py</code></td><td>les 3 modes CBCT, construction des listes de steps, appariement T1/T2</td><td>idem</td></tr>
+            <tr><td><code>AREG/AREG_Method/Review.py</code></td><td>pauses de revue : file de patients, chargement, écriture des corrections, rollback</td><td>idem</td></tr>
+            <tr><td><code>AREG/AREG_Method/Progress.py</code></td><td>traduction <code>&lt;filter-progress&gt;</code> → barre</td><td>idem</td></tr>
+            <tr><td><code>AREG_CBCT/AREG_CBCT.py</code></td><td>le CLI : boucle patients, écriture des sorties</td><td><strong>processus séparé</strong>, <code>python-real</code> de Slicer</td></tr>
+            <tr><td><code>AREG_CBCT/AREG_CBCT_utils/utils.py</code></td><td>appariement, masquage, elastix, matrices</td><td>idem</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Contrairement à la voie IOS, <strong>rien du CBCT ne passe par conda</strong> : <code>AREGLogic</code>
+      et son env <code>shapeaxi</code> (<code>AREG.py:3087</code>) ne servent qu'à IOS.
+      Le CBCT est lancé par <code>slicer.cli.run</code> (<code>AREG.py:1552</code>,
+      <code>AREG.py:1804</code>) et les paquets sont <code>pip_install</code>és dans
+      Slicer lui-même.</p>
+
+      <div class="callout">
+        <div class="callout-title">Note</div>
+        <p>Aucun GPU n'est requis par AREG_CBCT (<a href="../AMASSS/AMASSS.html">AMASSS</a>, lui, en veut un).</p>
+      </div>
+
+      <p><code>import slicer</code> dans <code>AREG_CBCT.py:6</code> n'est jamais
+      utilisé ; <code>LoadOnlyLandmarks</code>, <code>applyTransformLandmarks</code> et <code>WriteJson</code> sont
+      importés et jamais appelés — restes du paramètre <code>reg_lm</code>, commenté dans
+      <code>AREG_CBCT.xml</code>.</p>
+
+      <h2 id="modes">3. Les trois modes et la chaîne exacte</h2>
+
+      <p>Le mode est choisi par <code>CbModeType</code> ; <code>SwitchType()</code>
+      (<code>AREG.py:930</code>) instancie la classe correspondante. Les trois
+      partagent la même fin de chaîne — centrage T2, AREG par région, <a href="../AMASSS/AMASSS.html">AMASSS</a> final — et
+      ne diffèrent que par l'amont :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mode</th><th>Classe</th><th>Amont</th><th>Masques T1</th></tr></thead>
+          <tbody>
+            <tr><td>Semi-Automated</td><td><code>Semi_CBCT</code> (<code>CBCT.py:266</code>)</td><td>rien</td><td><strong>fournis par l'opérateur</strong> (champ « T1 Masks »)</td></tr>
+            <tr><td>Fully-Automated</td><td><code>Auto_CBCT</code> (<code>CBCT.py:446</code>)</td><td>rien</td><td>AMASSS <code>CBMASK</code>/<code>MANDMASK</code>/<code>MAXMASK</code>, écrits <strong>dans le dossier T1 d'entrée</strong> <span class="badge predit">prédit</span></td></tr>
+            <tr><td>Orientation &amp; Registration</td><td><code>Or_Auto_CBCT</code> (<code>CBCT.py:731</code>)</td><td>PRE_ASO → <a href="../ALI/ALI.html">ALI_CBCT</a> → SEMI_ASO sur T1, vers <code>&lt;dossier T1&gt;Or</code></td><td>AMASSS sur <code>&lt;dossier T1&gt;Or</code> <span class="badge predit">prédit</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>La région de référence est un <strong>choix de l'opérateur</strong>, pas une déduction :
+      cases à cocher « Regions of Reference for Registration » = Cranial Base,
+      Mandible, Maxilla (<code>CBCT.py:198</code>), traduites en
+      <code>CB</code> / <code>MAND</code> / <code>MAX</code> par <code>TranslateModels</code>. Cocher deux
+      régions lance <strong>deux recalages indépendants</strong>, chacun avec son dossier de sortie.</p>
+
+      <h2 id="entrees">4. Entrées, appariement, prétraitements</h2>
+
+      <p><strong>Formats.</strong> <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>. En
+      entrée DICOM, <code>convertdicom2nifti</code> (<code>utils.py:720</code>)
+      convertit un sous-dossier par patient via <code>sitk.ImageSeriesReader</code>, repli
+      <code>dicom2nifti</code>, vers <code>&lt;dossier&gt;/NIFTI/&lt;patient&gt;.nii.gz</code>.</p>
+
+      <p><strong>Appariement T1/T2</strong> — <code>GetPatients</code>
+      (<code>utils.py:91</code>). L'identifiant patient
+      est ce qui reste du nom de fichier après une chaîne de <code>split()</code> sur une liste
+      fixe de marqueurs (<code>_Scan</code>, <code>_Or</code>, <code>_MAND</code>, <code>_CB</code>, <code>_lm</code>, <code>_T2</code>, <code>_T1</code>, <code>_Cl</code>…).
+      Puis :</p>
+
+      <ul>
+        <li>fichier image dont le nom contient <code>mask</code>, <code>seg</code> ou <code>pred</code> → segmentation ;</li>
+        <li>sinon → <code>scanT1</code> / <code>scanT2</code> ;</li>
+        <li>si <code>segmentationType</code> est donné, une seconde passe cherche dans
+        <code>mask_folder_t1</code> (ou à défaut le dossier T1) les fichiers dont le nom contient
+        <code>cb</code>, <code>mand</code>/<code>md</code>, ou <code>max</code>/<code>mx</code> selon la région, et <strong>le premier trouvé
+        gagne</strong>. Cette passe ne vérifie pas que le fichier est un masque : un scan
+        nommé <code>P1_T1_MAX.nii.gz</code> serait pris pour la segmentation.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>La recherche de masque par mot-clé (<code>cb</code>, <code>mand</code>/<code>md</code>, <code>max</code>/<code>mx</code>) ne vérifie
+        jamais que le fichier trouvé est réellement une segmentation : un scan nommé
+        <code>P1_T1_MAX.nii.gz</code> serait pris pour la segmentation, en silence.</p>
+      </div>
+
+      <p>Le T2 est lu avec <code>segmentationType=None</code> : <strong>seul le fixe est masqué</strong>, jamais
+      le mobile.</p>
+
+      <p><strong>Centrage de T2</strong> — <code>pre_aso_cbct</code>. Malgré son nom et son paramètre
+      <code>model_folder</code> pointant sur <code>Models/Orientation/PreASO</code>, ce CLI <strong>n'utilise
+      aucun réseau</strong> : il calcule <code>T = -centre_physique_de_l_image</code>
+      (<code>PRE_ASO_CBCT.py:163</code>), resample
+      avec l'inverse et écrit la <code>TranslationTransform</code> en <code>.tfm</code> à côté. La prédiction
+      de direction par un <code>DenseNet</code> existait, commentée, et a été supprimée
+      (commit <code>4296774</code>). Les arguments <code>model_folder</code> et <code>SmallFOV</code> sont <strong>morts</strong>,
+      mais les poids PreASO sont toujours téléchargés.</p>
+
+      <p><strong>Masquage du fixe</strong> — <code>MaskedImage</code>
+      (<code>utils.py:584</code>) :</p>
+
+      <pre><code>fixed_seg_sitk.SetOrigin(fixed_image_sitk.GetOrigin())   # origine forcée
+fixed_image_masked = applyMask(fixed_image_sitk, fixed_seg_sitk, label=SegLabel)
+sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
+                os.path.join(temp_folder, "fixed_image_masked.nii.gz"))</code></pre>
+
+      <p><code>applyMask</code> binarise si un label est demandé, sinon passe le masque tel quel à
+      <code>sitk.Mask</code> (tout voxel non nul est conservé). Le fichier temporaire porte
+      <strong>toujours le même nom</strong> : le dossier temporaire est unique pour la totalité du
+      batch (<code>CBCT.py:306</code>), donc chaque patient écrase
+      le précédent — sans conséquence en séquentiel, fatal si le CLI était parallélisé.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>Le dossier temporaire du masquage est unique pour tout le batch et le fichier
+        s'appelle toujours <code>fixed_image_masked.nii.gz</code> : chaque patient écrase le
+        précédent — sans conséquence en séquentiel, fatal si le CLI était parallélisé.</p>
+      </div>
+
+      <p><code>SegLabel</code> est en pratique toujours <code>None</code> : le combo <code>LabelSelectcomboBox</code> est
+      masqué en dur (<code>AREG.py:548</code>) et <code>SegmentationLabels</code> reste
+      <code>[0]</code>, que le CLI retraduit en <code>None</code>. <code>GetSegmentationLabel</code>
+      (<code>CBCT.py:177</code>), qui lisait les labels présents
+      dans le masque, n'est appelé nulle part : <strong>code mort</strong>.</p>
+
+      <h2 id="recalage">5. Le cœur algorithmique — le recalage</h2>
+
+      <p>Tout est dans <code>VoxelBasedRegistration</code>
+      (<code>utils.py:598</code>) :</p>
+
+      <ol>
+        <li>lecture du mobile T2 en <code>itk.F</code> ;</li>
+        <li>masquage du fixe T1 (ci-dessus), relecture en <code>itk.F</code> ;</li>
+        <li><strong>un seul</strong> <code>ElastixReg(fixed_image_masked, moving_image, initial_transform=None)</code> ;</li>
+        <li><code>MatrixRetrieval</code> → transform SimpleITK ;</li>
+        <li><code>ComputeFinalMatrix([t])</code> → <code>Euler3DTransform</code> ;</li>
+        <li>resampling du T2.</li>
+      </ol>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1520 150" role="img" aria-label="Les six étapes internes de VoxelBasedRegistration" style="width:100%;height:auto;display:block">
+          <rect class="d-box" x="10" y="35" width="190" height="56" rx="6"/>
+          <text class="d-label" x="105" y="58" text-anchor="middle">① Lecture T2 mobile</text>
+          <text class="d-label-s" x="105" y="74" text-anchor="middle">itk.F</text>
+
+          <path class="d-arrow" d="M200 63 H240"/>
+          <path class="d-arrow-head" d="M240 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="240" y="35" width="200" height="56" rx="6"/>
+          <text class="d-label" x="340" y="58" text-anchor="middle">② Masquage T1 fixe</text>
+          <text class="d-label-s" x="340" y="74" text-anchor="middle">MaskedImage, sitk.Mask</text>
+
+          <path class="d-arrow" d="M440 63 H480"/>
+          <path class="d-arrow-head" d="M480 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box-a" x="480" y="35" width="230" height="56" rx="6"/>
+          <text class="d-label" x="595" y="58" text-anchor="middle">③ ElastixReg</text>
+          <text class="d-label-s" x="595" y="74" text-anchor="middle">itk-elastix, 1 passe, 1500 it.</text>
+
+          <path class="d-arrow" d="M710 63 H750"/>
+          <path class="d-arrow-head" d="M750 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="750" y="35" width="230" height="56" rx="6"/>
+          <text class="d-label" x="865" y="58" text-anchor="middle">④ MatrixRetrieval</text>
+          <text class="d-label-s" x="865" y="74" text-anchor="middle">TransformParameters seul</text>
+
+          <path class="d-arrow" d="M980 63 H1020"/>
+          <path class="d-arrow-head" d="M1020 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="1020" y="35" width="230" height="56" rx="6"/>
+          <text class="d-label" x="1135" y="58" text-anchor="middle">⑤ ComputeFinalMatrix</text>
+          <text class="d-label-s" x="1135" y="74" text-anchor="middle">liste à 1 élément = recopie</text>
+
+          <path class="d-arrow" d="M1250 63 H1290"/>
+          <path class="d-arrow-head" d="M1290 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="1290" y="35" width="220" height="56" rx="6"/>
+          <text class="d-label" x="1400" y="58" text-anchor="middle">⑥ ResampleImage</text>
+          <text class="d-label-s" x="1400" y="74" text-anchor="middle">grille du mobile T2, int16</text>
+        </svg>
+        <figcaption>Les six étapes de <code>VoxelBasedRegistration</code>. Une seule passe elastix (③, encadrée) — aucune étape grossière ne précède plus le recalage masqué.</figcaption>
+      </figure>
+
+      <p>La bibliothèque est <strong>itk-elastix</strong> (<code>itk.ElastixRegistrationMethod</code>), pas
+      SimpleITK ni ANTs. Paramètres, tous explicites dans
+      <code>make_rigid_param_map_deterministic</code> (<code>utils.py:527</code>),
+      au-dessus de la <code>"rigid"</code> par défaut d'elastix :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Paramètre</th><th>Valeur</th><th>Commentaire</th></tr></thead>
+          <tbody>
+            <tr><td>Transform</td><td><code>EulerTransform</code> (défaut du map <code>rigid</code>)</td><td>6 ddl, pas d'échelle</td></tr>
+            <tr><td><code>Metric</code></td><td><code>AdvancedMattesMutualInformation</code>, 64 bins</td><td>information mutuelle</td></tr>
+            <tr><td><code>Optimizer</code></td><td><code>ConjugateGradient</code></td><td>pas de descente stochastique</td></tr>
+            <tr><td><code>MaximumNumberOfIterations</code></td><td><strong>1500</strong></td><td>par niveau</td></tr>
+            <tr><td><code>MaximumStepLength</code> / <code>MinimumStepLength</code></td><td>2.0 / 0.001</td><td></td></tr>
+            <tr><td><code>ValueTolerance</code> / <code>GradientTolerance</code></td><td>1e-6 / 1e-6</td><td></td></tr>
+            <tr><td><code>NumberOfResolutions</code></td><td><strong>3</strong></td><td>pyramide lissante fixe et mobile</td></tr>
+            <tr><td><code>ImagePyramidSchedule</code></td><td><code>8 8 / 4 4 / 2 2</code></td><td><strong>seulement 2 valeurs par niveau pour un volume 3D</strong></td></tr>
+            <tr><td><code>ImageSampler</code></td><td><code>Grid</code></td><td>échantillonnage déterministe</td></tr>
+            <tr><td><code>NewSamplesEveryIteration</code></td><td><code>false</code></td><td></td></tr>
+            <tr><td><code>NumberOfSpatialSamples</code></td><td>30000</td><td>ignoré par le sampler <code>Grid</code> (commentaire du code)</td></tr>
+            <tr><td><code>NumberOfThreads</code></td><td>1</td><td>déterminisme au prix de la vitesse</td></tr>
+            <tr><td><code>AutomaticTransformInitialization</code></td><td><code>true</code></td><td>pré-alignement des centres</td></tr>
+            <tr><td><code>AutomaticScalesEstimation</code></td><td><code>true</code></td><td></td></tr>
+            <tr><td><code>ErodeMask</code></td><td><code>true</code></td><td></td></tr>
+            <tr><td><code>Interpolator</code></td><td><code>LinearInterpolator</code></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Il n'y a plus d'étape grossière.</strong> Le paramètre <code>ApproxReg</code> de la case
+      « Include Approximation Step » descend jusqu'à <code>VoxelBasedRegistration(approx=...)</code>
+      et n'y est <strong>jamais lu</strong> : <code>ElastixApprox</code> et <code>make_rigid_param_map_stochastic</code>
+      (sampler <code>RandomCoordinate</code>, 10000 samples, <code>AdaptiveStochasticGradientDescent</code>,
+      2 niveaux, sur les images <strong>non masquées</strong>) ont été supprimés par le commit
+      <code>350a8de</code> du 23/09/2025, tout comme l'usage de <code>initial_transform</code> dans
+      <code>ElastixReg</code> (<code>utils.py:573</code>), appelé
+      avec <code>None</code> partout. Le seul « coarse to fine » restant est la pyramide à 3
+      niveaux ; le pré-alignement grossier est assuré par le centrage PRE_ASO de T2 et
+      par <code>AutomaticTransformInitialization</code>.</p>
+
+      <p><strong>Récupération de la matrice</strong> — <code>MatrixRetrieval</code>
+      (<code>utils.py:830</code>) lit
+      <code>TransformParameters</code> : 3 angles puis 3 translations, reversés dans un
+      <code>sitk.Euler3DTransform</code>. <code>ComputeFinalMatrix</code>
+      (<code>utils.py:851</code>) compose la liste
+      (rotations multipliées, translations <strong>additionnées</strong>) — avec une liste d'un
+      seul élément, c'est une recopie. Le code de composition n'est donc jamais
+      exercé, et l'addition des translations ne serait de toute façon valide que si
+      les rotations intermédiaires étaient l'identité.</p>
+
+      <p><strong>Resampling</strong> — <code>ResampleImage</code>
+      (<code>utils.py:472</code>) : interpolation
+      linéaire, <code>DefaultPixelValue = 0</code>, et <code>SetReferenceImage(image)</code> où <code>image</code> est
+      <strong>le mobile lui-même</strong>. Le volume recalé conserve donc la grille de T2 (taille,
+      spacing, origine), pas celle de T1. Sortie castée en <code>int16</code>.</p>
+
+      <h2 id="amont">6. Ce qui tourne en amont : arguments exacts</h2>
+
+      <p><strong><a href="../AMASSS/AMASSS.html">AMASSS</a> — masques de recalage</strong> (<code>CBCT.py:456</code>) :</p>
+
+      <pre><code>{"inputVolume": &lt;dossier T1&gt;,                  # ou &lt;dossier T1&gt;Or
+ "modelDirectory": &lt;model_folder_1&gt;/AMASSS_Models,
+ "skullStructure": "CBMASK,MANDMASK,MAXMASK",  # selon les cases cochées
+ "merge": "SEPARATE", "genVtk": False, "save_in_folder": False,
+ "output_folder": &lt;dossier T1&gt;,                # à côté des scans
+ "vtk_smooth": 5, "prediction_ID": "seg",
+ "temp_fold": &lt;Documents&gt;/Slicer_temp_AMASSS,
+ "SegmentInput": False, "DCMInput": False}</code></pre>
+
+      <p>Le nom écrit est <code>&lt;base&gt;_seg_&lt;STRUCT&gt;.&lt;ext&gt;</code>
+      (<code>AMASSS_CLI.py:600</code>) — donc <code>P1_T1_seg_MANDMASK.nii.gz</code>,
+      que la seconde passe de <code>GetPatients</code> retrouve par le mot-clé <code>mand</code>. AMASSS est
+      aujourd'hui un <strong><a class="gterm" href="../glossaire.html#g-nnunet" title="Voir au glossaire">nnU-Net</a> v2</strong> appelé en process
+      (<code>AMASSS_CLI.py:54</code>), avec un modèle distinct
+      par groupe (<code>FF</code>, <code>SKIN</code>, <code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code>) <span class="badge predit">prédit</span>.</p>
+
+      <p><strong>AMASSS — segmentations finales.</strong> Deux steps, <code>inputVolume = &lt;dossier T1&gt;</code>
+      puis <code>inputVolume = &lt;dossier de sortie&gt;</code>, <code>genVtk=True</code>, <code>merge</code> selon la case
+      « Merge Segmentations », <code>save_in_folder=True</code> en mode Semi et <code>False</code> ailleurs.
+      Le second parcourt récursivement l'arborescence <code>&lt;Region&gt;/&lt;patient&gt;_OutReg/</code> et
+      saute ses propres sorties grâce au suffixe <code>_seg_</code>.</p>
+
+      <p><strong><a href="../ALI/ALI.html">ALI_CBCT</a></strong> (mode Orientation seulement, <code>CBCT.py:756</code>) :</p>
+
+      <pre><code>{"input": &lt;temp&gt;, "dir_models": &lt;model_folder_3&gt;,
+ "lm_type": "'N', 'S', 'Ba', 'RPo', 'LPo', 'LOr', 'ROr'",
+ "output_dir": &lt;temp&gt;, "temp_fold": &lt;Documents&gt;/Slicer_temp_ALI,
+ "DCMInput": False, "spacing": "[1,0.3]", "speed_per_scale": "[1,1]",
+ "agent_FOV": "[64,64,64]", "spawn_radius": "10"}</code></pre>
+
+      <p>Agents de renforcement multi-échelle (1 mm puis 0.3 mm), <a class="gterm" href="../glossaire.html#g-fov" title="Voir au glossaire">FOV</a> 64³ voxels,
+      réseau <code>DNet</code> = <code>DenseNet</code> <a class="gterm" href="../glossaire.html#g-monai" title="Voir au glossaire">MONAI</a> 3D (<code>growth_rate=34</code>, blocs <code>(6,12,24,16)</code>)
+      suivi d'un MLP à 6 sorties = les 6 directions de déplacement
+      (<code>brain.py:48</code>) <span class="badge predit">prédit</span>. La liste dépend du plan de
+      référence : <code>IF ANS PNS UR1O UR6O UL6O</code> (<a class="gterm" href="../glossaire.html#g-occlusal" title="Voir au glossaire">occlusal</a>) ou <code>N S Ba RPo LPo LOr ROr</code>
+      (Frankfort).</p>
+
+      <p><strong>SEMI_ASO_CBCT</strong> : <code>gold_folder</code> = <code>&lt;model_folder_2&gt;/&lt;référence&gt;</code>,
+      <code>output_folder</code> = <code>&lt;dossier T1&gt;Or</code>, <code>add_inname</code> = <code>"Or"</code>. Alignement par
+      <code>vtkIterativeClosestPointTransform</code> rigide sur les landmarks (1000 itérations,
+      <code>StartByMatchingCentroidsOn</code>), après élimination des landmarks aberrants <span class="badge calcule">calculé</span>.</p>
+
+      <h2 id="sorties">7. Sorties</h2>
+
+      <p>Écrites par <code>AREG_CBCT.py:152</code> :</p>
+
+      <pre><code>&lt;output&gt;/&lt;Cranial Base|Mandible|Maxilla&gt;/&lt;patient&gt;_OutReg/
+    &lt;patient&gt;_&lt;CB|MAND|MAX&gt;Scan&lt;add_name&gt;.nii.gz    # T2 recalé, int16
+    &lt;patient&gt;_&lt;CB|MAND|MAX&gt;&lt;add_name&gt;_matrix.tfm    # la transformation</code></pre>
+
+      <p>Le nom du sous-dossier vient de <code>translate()</code>
+      (<code>utils.py:714</code>) : <code>CB</code> → <code>Cranial Base</code>.
+      <code>add_name</code> est concaténé <strong>sans séparateur</strong>.</p>
+
+      <p>Conventions du <code>.tfm</code> : <code>sitk.WriteTransform</code> d'un <code>Euler3DTransform</code>, donc
+      <strong><a class="gterm" href="../glossaire.html#g-lps" title="Voir au glossaire">LPS</a></strong> et convention ITK (le transform va de l'espace de sortie vers l'espace
+      d'entrée). Aucun flip n'est nécessaire dans le CLI, tout y est SimpleITK/elastix ;
+      le seul endroit de la chaîne CBCT qui conjugue par <code>diag(-1,-1,1,1)</code> est la
+      correction manuelle, qui part d'une matrice Slicer en <a class="gterm" href="../glossaire.html#g-ras" title="Voir au glossaire">RAS</a>
+      (<code>Review.py:489</code>).</p>
+
+      <p>Le <code>.tfm</code> de centrage écrit par PRE_ASO à côté du T2 centré n'est <strong>pas composé</strong>
+      avec celui d'AREG : pour ramener le T2 d'origine sur T1, il faut enchaîner les
+      deux fichiers à la main.</p>
+
+      <h2 id="revue">8. Les pauses de revue et la navigation batch</h2>
+
+      <p>Ajoutées par le commit <code>2609bc4</code> (« Pause <a href="../VFACE/VFACE.html">VFACE</a> at chosen steps »… et AREG avant
+      lui). L'opérateur coche dans « Review and manual adjustment » les étapes où le
+      run doit s'arrêter ; la sélection est mémorisée dans <code>QSettings</code> sous
+      <code>AREG/ReviewSteps</code> (<code>AREG.py:1922</code>).</p>
+
+      <p><strong>Les points d'arrêt disponibles en CBCT</strong> (<code>getReviewSteps</code>, <code>CBCT.py:258</code>),
+      et ce qu'ils permettent (<code>CATALOGUE</code>, <code>Review.py:568</code>) :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Id</th><th>Après</th><th>Nature</th></tr></thead>
+          <tbody>
+            <tr><td><code>cbct_landmarks_orientation</code></td><td><a href="../ALI/ALI.html">ALI_CBCT</a> (mode Orientation)</td><td><strong>éditable</strong> : les points se déplacent et sont réécrits</td></tr>
+            <tr><td><code>cbct_oriented</code></td><td>SEMI_ASO</td><td>vue seule</td></tr>
+            <tr><td><code>cbct_masks</code></td><td><a href="../AMASSS/AMASSS.html">AMASSS</a> masques</td><td>vue seule</td></tr>
+            <tr><td><code>cbct_centered_t2</code></td><td>PRE_ASO T2</td><td>vue seule</td></tr>
+            <tr><td><code>cbct_registration</code></td><td><strong>AREG_CBCT</strong></td><td><strong>ajustable</strong> : on déplace le scan recalé</td></tr>
+            <tr><td><code>cbct_segmentation</code></td><td>AMASSS final T2</td><td>vue seule</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Mécanique de la pause.</strong> <code>markProcessesForReview</code>
+      (<code>AREG.py:1936</code>) pose <code>ReviewPause=True</code> sur les steps dont
+      le <code>ReviewId</code> est coché. À la fin d'un CLI, <code>enterReviewPause</code>
+      (<code>AREG.py:1949</code>) renvoie <code>True</code> et diffère <code>beginReview</code> par
+      <code>QTimer.singleShot(0, ...)</code> — obligatoire : on est dans un callback d'observateur
+      VTK, où la boucle Qt ne tourne pas et où charger un volume remplirait le pipe de
+      stdout que Slicer ne draine plus.</p>
+
+      <p><code>ReviewSession.build</code> (<code>Review.py:118</code>) construit
+      la file : un item par patient trouvé dans <code>ReviewFolder</code>, restreint aux patients
+      de <strong>ce</strong> run (<code>runPatientIds()</code> lit le dossier T1 d'entrée — un dossier de sortie
+      réutilisé contient les résultats de mois de travail). Pour AREG, <code>ReviewFolder</code>
+      est scopé à <code>&lt;output&gt;/&lt;Région&gt;</code> : sinon la pause de la mandibule afficherait aussi
+      la base du crâne, et le déplacement de l'opérateur serait replié dans la première
+      matrice venue.</p>
+
+      <p>Pour <code>cbct_registration</code>, le scan recalé est chargé au-dessus du T1
+      (<code>foregroundOpacity=0.5</code>) et rattaché à un <code>vtkMRMLLinearTransformNode</code> avec ses
+      poignées d'interaction (<code>Review.py:366</code>). À la
+      sortie, <code>_saveAdjustment</code> (<code>Review.py:457</code>)
+      convertit le déplacement RAS en LPS (<code>flip @ ras @ flip</code>), l'inverse, et écrit
+      <code>sitk.CompositeTransform([original, nudge.GetInverse()])</code> <strong>dans le .tfm
+      existant</strong> — ce qui vient après applique une seule matrice par patient et ne sait
+      pas chaîner. Le scan est ensuite durci et réécrit sur place
+      (<code>Review.py:510</code>). Si la matrice est l'identité
+      à 1e-9 près, rien n'est écrit.</p>
+
+      <p><strong>Navigation batch</strong> :</p>
+
+      <ul>
+        <li><em>Previous / Next patient</em> (<code>AREG.py:2117</code>) : parcourent la
+        file sans jamais avancer le run ; <code>saveEdits()</code> est appelé avant chaque
+        changement, donc les corrections sont conservées.</li>
+        <li><em>Flag</em> (<code>AREG.py:2131</code>) : marque un patient « à refaire ».
+        Le bouton n'apparaît que s'il existe une étape corrigeable en arrière.</li>
+        <li><em>Go back</em> (<code>AREG.py:2138</code>) : <code>previousCorrectableStep()</code>
+        (<code>AREG.py:2052</code>) remonte <code>executed_steps</code> jusqu'au dernier
+        step de type <code>LANDMARKS</code> ou <code>REGISTRATION</code> — les étapes en lecture seule sont
+        sautées. Les steps intermédiaires sont <strong>rejoués uniquement pour les patients
+        marqués</strong> : <code>restrictStepToPatients</code> (<code>Review.py:727</code>)
+        crée un dossier temporaire ne contenant que ces patients, en <strong>liens
+        symboliques</strong> (un CBCT pèse 200 Mo), arborescence préservée, puis réécrit la
+        clé d'entrée du step (<code>t1_folder</code>, <code>t2_folder</code>, <code>input</code>, <code>inputVolume</code>… :
+        <code>INPUT_KEYS</code>, <code>Review.py:717</code>). Les steps
+        narrowed sont insérés en tête de <code>list_Processes_Parameters</code>. Les liens sont
+        effacés en fin de run par <code>clearReviewTempFolders</code>.</li>
+        <li><em>Next step</em> (<code>AREG.py:2181</code>) : sauvegarde le patient
+        courant, journalise combien de patients ont été acceptés sans être ouverts, et
+        reprend le run.</li>
+      </ul>
+
+      <p><code>ReviewMatrixFolder</code> et <code>ReviewKind</code> sont lus par <code>Review.build</code> mais <strong>définis
+      nulle part</strong> : points d'extension inutilisés (la matrice est donc toujours
+      cherchée dans le <code>ReviewFolder</code> lui-même).</p>
+
+      <h2 id="predit-calcule">9. Ce qui est prédit vs ce qui est calculé</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bloc</th><th>Nature</th><th>Où</th></tr></thead>
+          <tbody>
+            <tr><td>Centrage T1/T2 (PRE_ASO)</td><td><span class="badge calcule">calculé</span> géométrique, translation du centre</td><td>CLI Slicer</td></tr>
+            <tr><td>Landmarks d'orientation (<a href="../ALI/ALI.html">ALI_CBCT</a>)</td><td><span class="badge predit">prédit</span> réseau DenseNet 3D, agents RL multi-échelle</td><td>CLI Slicer, CUDA si dispo</td></tr>
+            <tr><td>Orientation (SEMI_ASO)</td><td><span class="badge calcule">calculé</span> ICP rigide VTK sur landmarks</td><td>CLI Slicer</td></tr>
+            <tr><td>Masques de région de référence (<a href="../AMASSS/AMASSS.html">AMASSS</a>)</td><td><span class="badge predit">prédit</span> réseau nnU-Net v2 3d_fullres</td><td>CLI Slicer, GPU</td></tr>
+            <tr><td><strong>Recalage T1/T2 (AREG_CBCT)</strong></td><td><span class="badge calcule">calculé</span> elastix rigide, information mutuelle</td><td>CLI Slicer, CPU</td></tr>
+            <tr><td>Segmentations finales (AMASSS)</td><td><span class="badge predit">prédit</span> réseau nnU-Net v2</td><td>CLI Slicer, GPU</td></tr>
+            <tr><td>Correction manuelle</td><td><span class="badge calcule">calculé</span> transform Slicer composé dans le .tfm</td><td>widget</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1560 190" role="img" aria-label="Chaîne complète colorée par nature : calculé, prédit par un réseau, ou cœur du module" style="width:100%;height:auto;display:block">
+          <rect class="d-box" x="10" y="20" width="190" height="56" rx="6"/>
+          <text class="d-label" x="105" y="43" text-anchor="middle">Centrage T1/T2</text>
+          <text class="d-label-s" x="105" y="59" text-anchor="middle">PRE_ASO, géométrique</text>
+
+          <path class="d-arrow" d="M200 48 H240"/>
+          <path class="d-arrow-head" d="M240 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="240" y="20" width="200" height="56" rx="6"/>
+          <text class="d-label" x="340" y="43" text-anchor="middle">Landmarks (ALI_CBCT)</text>
+          <text class="d-label-s" x="340" y="59" text-anchor="middle">DenseNet 3D, agents RL</text>
+
+          <path class="d-arrow" d="M440 48 H480"/>
+          <path class="d-arrow-head" d="M480 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="480" y="20" width="180" height="56" rx="6"/>
+          <text class="d-label" x="570" y="43" text-anchor="middle">Orientation (SEMI_ASO)</text>
+          <text class="d-label-s" x="570" y="59" text-anchor="middle">ICP rigide VTK</text>
+
+          <path class="d-arrow" d="M660 48 H700"/>
+          <path class="d-arrow-head" d="M700 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="700" y="20" width="210" height="56" rx="6"/>
+          <text class="d-label" x="805" y="43" text-anchor="middle">Masques (AMASSS)</text>
+          <text class="d-label-s" x="805" y="59" text-anchor="middle">nnU-Net v2 3d_fullres</text>
+
+          <path class="d-arrow" d="M910 48 H950"/>
+          <path class="d-arrow-head" d="M950 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box-a" x="950" y="20" width="220" height="56" rx="6"/>
+          <text class="d-label" x="1060" y="43" text-anchor="middle">Recalage (AREG_CBCT)</text>
+          <text class="d-label-s" x="1060" y="59" text-anchor="middle">elastix rigide, inf. mutuelle</text>
+
+          <path class="d-arrow" d="M1170 48 H1210"/>
+          <path class="d-arrow-head" d="M1210 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="1210" y="20" width="180" height="56" rx="6"/>
+          <text class="d-label" x="1300" y="43" text-anchor="middle">Seg. finales</text>
+          <text class="d-label-s" x="1300" y="59" text-anchor="middle">AMASSS, nnU-Net v2</text>
+
+          <path class="d-arrow" d="M1390 48 H1430"/>
+          <path class="d-arrow-head" d="M1430 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="1430" y="20" width="120" height="56" rx="6"/>
+          <text class="d-label" x="1490" y="43" text-anchor="middle">Correction</text>
+          <text class="d-label-s" x="1490" y="59" text-anchor="middle">manuelle</text>
+
+          <rect class="d-box" x="10" y="130" width="26" height="18" rx="3"/>
+          <text class="d-label-s" x="44" y="144">calculé</text>
+          <rect class="d-box-n" x="150" y="130" width="26" height="18" rx="3"/>
+          <text class="d-label-s" x="184" y="144">prédit par un réseau</text>
+          <rect class="d-box-a" x="380" y="130" width="26" height="18" rx="3"/>
+          <text class="d-label-s" x="414" y="144">cœur du module (calculé)</text>
+        </svg>
+        <figcaption>Sur sept blocs de la chaîne AREG_CBCT, trois sont prédits par un réseau (landmarks, deux jeux de masques/segmentations) ; le recalage lui-même, encadré, est entièrement calculé par elastix.</figcaption>
+      </figure>
+
+      <div class="callout ok">
+        <div class="callout-title">Vérifié</div>
+        <p>AREG_CBCT ne contient aucun réseau : pas de <code>torch</code>, pas de
+        <code>monai</code>, pas de <code>.pth</code>. Le seul apprentissage de la chaîne sert à produire le masque qui délimite
+        la région de référence et, en mode Orientation, les landmarks.</p>
+      </div>
+
+      <h2 id="environnement">10. Environnement</h2>
+
+      <p>Tout est installé dans le Python de Slicer par <code>install_function</code>
+      (<code>AREG.py:86</code>) au clic sur le bouton de lancement, après une
+      boîte de dialogue de confirmation :</p>
+
+      <p><code>itk==5.4.0</code>, <strong><code>itk-elastix==0.19.2</code></strong> (le moteur de recalage),
+      <code>dicom2nifti==2.6.2</code>, <code>torch==2.2.0</code> (wheel <code>cu118</code> sous Windows),
+      <code>monai==1.3.2</code>, <code>nnunetv2&gt;=2.8.0</code> et <code>torchvision</code> (<strong>Linux/macOS seulement</strong>),
+      <code>numpy&lt;2.0.0</code> re-forcé après coup si numpy ≥ 2 est détecté, plus
+      <code>connected-components-3d</code>, <code>einops</code>, <code>nibabel</code>, <code>pandas</code>. <code>pydicom</code> est épinglé
+      à <code>==3.0.2</code>, la version de Slicer : le rétrograder casse <code>dicomweb-client</code> et
+      <code>highdicom</code>, donc tous les modules DICOM de Slicer.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><code>check_lib_installed</code> (<code>AREG.py:68</code>) <strong>ne compare pas les
+        versions</strong> : la contrainte est ignorée dès que le paquet est présent, quelle que
+        soit sa version.</p>
+      </div>
+
+      <h2 id="pieges">11. Pièges et points fragiles</h2>
+
+      <p><strong>Les suffixes <code>_T1</code> / <code>_T2</code>.</strong> Le commit <code>05d1fec</code> a marqué chaque site par le
+      mot-clé <code>TIMEPOINT-SUFFIX</code>. La note de référence est au-dessus de <code>GetPatients</code>
+      (<code>utils.py:68</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>Le problème : l'id patient est le reste du nom après découpe d'une liste fixe de
+        marqueurs, et les seuls points temporels de cette liste sont <code>_T1</code> et <code>_T2</code>. Un
+        <code>P001_T3.nii.gz</code> garde l'id <code>P001_T3</code>, ne s'apparie avec rien, et la paire est
+        <strong>silencieusement ignorée</strong> — pas d'exception. Le point temporel réel ne vient pas
+        du nom mais de l'argument <code>time_point</code>, c'est-à-dire du dossier ; seule
+        l'extraction de l'id est en cause.</p>
+      </div>
+
+      <p>Les sites, dans le périmètre AREG :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fichier</th><th>Ligne</th><th>Forme</th></tr></thead>
+          <tbody>
+            <tr><td><code>AREG_CBCT/AREG_CBCT_utils/utils.py</code></td><td>101</td><td>chaîne de <code>split()</code>, scans et landmarks</td></tr>
+            <tr><td><code>AREG_CBCT/AREG_CBCT_utils/utils.py</code></td><td>144</td><td>la même, recopiée pour la passe masques</td></tr>
+            <tr><td><code>AREG/AREG_Method/CBCT.py</code></td><td>1014</td><td>copie côté widget (comptage, <code>TestScan</code>)</td></tr>
+            <tr><td><code>AREG/AREG_Method/Review.py</code></td><td>39</td><td><code>patientIdFromFileName</code>, liste étendue (<code>_Center</code>, <code>_Pred</code>, <code>_U</code>, <code>_L</code>…)</td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS.py</code></td><td>318</td><td>suppose que le scan T2 est nommé <code>_T2</code></td></tr>
+            <tr><td><code>AREG_IOSCBCT/AREG_IOSCBCT.py</code></td><td>376</td><td>regex <code>[Tt][0-2]</code> : un <code>_T3</code> ne matche rien, le patient est sauté</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Hors AREG, les mêmes chaînes vivent dans <code>ASO/ASO_Method/CBCT.py</code> (ligne 42),
+      <code>MRI2CBCT/MRI2CBCT_utils/utils_CBCT.py</code> (ligne 41),
+      <code>MRI2CBCT_CLI/MRI2CBCT_CLI_utils/TMJ_crop.py</code> (ligne 21)
+      et deux fois dans <code>VFACE/VFACE_utils/createlistprocess.py</code> (ligne 2099).
+      La correction proposée dans la note est <code>re.sub(r"_[Tt]\d+$", "", ...)</code> appliquée
+      partout, <strong>en respectant l'ordre des découpes</strong> (un marqueur long doit être coupé
+      avant un marqueur court qui matcherait dedans). Elle n'est pas faite
+      délibérément : la réponse supportée aujourd'hui est de renommer les entrées.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmé</div>
+        <p><strong>Le centre de rotation d'elastix est perdu.</strong> <code>MatrixRetrieval</code> ne lit que
+        <code>TransformParameters</code> et <strong>jamais <code>CenterOfRotationPoint</code></strong>. Un <code>EulerTransform</code>
+        elastix vaut <code>R·(x − c) + t + c</code> ; le <code>sitk.Euler3DTransform</code> reconstruit a son
+        centre à l'origine et vaut <code>R·x + t</code>. Les deux ne coïncident que si <code>c</code> est
+        l'origine ou si <code>R = I</code>. Comme <code>AutomaticTransformInitialization</code> est actif et
+        que le centre de rotation est dérivé de l'image <strong>fixe</strong> (T1, qui n'est centrée
+        que dans le mode Orientation), l'écart <code>(I − R)·c</code> n'est pas nul en général.
+        Et l'écart ne se limite pas au <code>.tfm</code> : le volume de sortie <strong>n'est pas l'image
+        résultat d'elastix</strong>, il est reconstruit par
+        <code>ResampleImage(sitk.ReadImage(moving_image_path), transform)</code>
+        (<code>utils.py:686</code>) à partir de cette même
+        matrice. <code>.tfm</code> et volume recalé sont donc cohérents entre eux, mais tous deux
+        s'écartent de ce qu'elastix a effectivement optimisé.</p>
+        <p><code>CenterOfRotationPoint</code> n'apparaît <strong>nulle part dans le dépôt</strong> (vérifié par grep),
+        et <code>MatrixRetrieval</code> est <strong>dupliqué à l'identique</strong> dans
+        <code>MRI2CBCT_CLI/MRI2CBCT_CLI_utils/AREG_MRI.py:78</code> :
+        le même écart s'applique au recalage IRM↔CBCT.</p>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Note</div>
+        <p>Hypothèse à tester plutôt qu'à croire : si le module donne malgré tout des
+        résultats corrects en pratique, c'est vraisemblablement parce que les volumes
+        arrivent déjà proches de l'origine — PRE_ASO recentre le T2 et <a href="../ASO/ASO.html">ASO</a> oriente le T1 —
+        de sorte que <code>c ≈ 0</code> et que <code>(I − R)·c</code> reste petit. Cela rend le résultat
+        dépendant d'un centrage préalable qui n'est garanti nulle part. Mesurer l'écart
+        sur un cas réel avant de conclure.</p>
+      </div>
+
+      <p><strong>Autres points :</strong></p>
+
+      <ul>
+        <li><code>ApproxReg</code> / « Include Approximation Step » ne fait <strong>rien</strong> depuis septembre
+        2025. La case reste cochée par défaut dans l'UI.</li>
+        <li>Le dossier <code>&lt;dossier T2&gt;_Center</code> est créé <strong>à côté du dossier d'entrée</strong> de
+        l'utilisateur, comme <code>&lt;dossier T1&gt;Or</code>. PRE_ASO saute les fichiers déjà
+        présents : un second run avec des entrées modifiées réutilise les anciens.</li>
+        <li>En mode Fully-Auto, <a href="../AMASSS/AMASSS.html">AMASSS</a> écrit les masques <strong>dans le dossier T1 d'entrée</strong>.
+        À la pause <code>cbct_registration</code>, <code>ReviewReferenceFolder</code> étant ce même dossier,
+        tous les masques du patient sont chargés dans la scène en plus du scan.</li>
+        <li>Le fichier <code>fixed_image_masked.nii.gz</code> est réécrit pour chaque patient dans le
+        même dossier temporaire.</li>
+        <li><code>SwitchType</code> (<code>AREG.py:1030</code>) réaffiche le sélecteur
+        NIFTI/DCM après que <code>SwitchModeCBCT</code> l'a masqué : le résultat net est que
+        <strong>l'entrée DICOM n'est offerte qu'en mode Orientation</strong>, à l'inverse de ce que
+        <code>SwitchModeCBCT</code> semble vouloir. Et dans ce mode, <code>DCMInput</code> est passé au step
+        AREG dont les dossiers contiennent déjà du NIfTI.</li>
+        <li><code>startStep</code> est appelé deux fois pour le premier step en CBCT
+        (<code>AREG.py:1542</code> puis <code>AREG.py:1557</code>) :
+        <code>executed_steps</code> contient un doublon, que <code>previousCorrectableStep</code> absorbe
+        parce qu'il cherche la <strong>dernière</strong> occurrence.</li>
+        <li>Le <code>.tfm</code> corrigé manuellement devient un <code>CompositeTransform</code>, pas un
+        <code>Euler3DTransform</code> : un consommateur qui suppose une transformation simple
+        peut ne pas le relire.</li>
+        <li>Code mort relevé : <code>TestReference</code> (<code>CBCT.py:61</code>,
+        qui appellerait <code>NumberScan</code> avec un seul argument et lèverait un <code>TypeError</code>),
+        <code>GetSegmentationLabel</code>, <code>getGPUUsage</code>, <code>GetMatrixPatients</code> et <code>ModifiedDictPatients</code>
+        (aucun appelant ne passe <code>matrix_folder</code> ni <code>todo_str</code>), <code>ElastixReg(initial_transform=...)</code>,
+        et <code>DisplayAREGIOSCBCT</code> défini deux fois dans
+        <code>Progress.py</code> (ligne 135).</li>
+      </ul>
+
+      <h2 id="litterature">12. Littérature</h2>
+
+      <p>Le papier de référence est <strong>Anchling, Hutin, Huang, Barone, Roberts, Miranda,
+      Gurgel, Al Turkestani, Tinawi, Bianchi, Yatabe, Ruellas, Prieto, Cevidanes,
+      « Automated Orientation and Registration of Cone-Beam Computed Tomography
+      Scans », LNCS 14242, 2023, p. 43-58</strong> —
+      <a href="https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5">Springer</a>,
+      <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11104011/">PMC11104011</a>.
+      Précision annoncée : &lt; 3° et &lt; 2 mm par rapport aux experts, moins de 5 min par cas.</p>
+
+      <p><strong>Le code diverge du papier sur trois points vérifiés :</strong></p>
+
+      <ol>
+        <li>le papier décrit un recalage en deux temps — « VBR entre les images complètes,
+        puis avec l'image masquée comme étape de raffinement », 10 000 itérations sur
+        la passe masquée. Le code n'a plus qu'une passe masquée à 1500 itérations ;</li>
+        <li>le papier annonce <strong>SimpleElastix</strong> ; le code utilise <code>itk-elastix</code>
+        (<code>itk.ElastixRegistrationMethod</code>) ;</li>
+        <li>le papier obtient les masques par <strong><a href="../AMASSS/AMASSS.html">AMASSS</a> / <a class="gterm" href="../glossaire.html#g-unetr" title="Voir au glossaire">UNETR</a> MONAI</strong> ; AMASSS est
+        aujourd'hui un <strong>nnU-Net v2</strong>.</li>
+      </ol>
+
+      <p>Sur la question de fond — superposition voxel-based sur la base du crâne — la
+      référence historique du laboratoire est Cevidanes et al., <em>Superimposition of 3D
+      cone-beam CT models of orthognathic surgery patients</em> (2005,
+      <a href="https://pubmed.ncbi.nlm.nih.gov/16227481/">PubMed 16227481</a>).</p>
+
+      <p>À ne pas confondre avec
+      <a href="https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0016520">Accuracy and Reproducibility of Voxel Based Superimposition…, PLOS One 2011</a>,
+      qui n'est <strong>pas</strong> du laboratoire : il est de Nada, Maal, Kuijpers-Jagtman et al.
+      (Radboud UMC, Nimègue). C'est une validation indépendante de la méthode, ce qui
+      lui donne plus de poids, pas moins — mais l'attribuer au groupe serait une
+      erreur.</p>
+
+      <p>Dépôts : <a href="https://github.com/lucanchling/AREG">lucanchling/AREG</a>,
+      <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">DCBIA-OrthoLab/SlicerAutomatedDentalTools</a>.
+      Les pauses de revue et la navigation batch ne sont décrites dans aucune
+      publication : développement interne.</p>
+
+      <p>Références complètes, PDF récupérés et liens à consulter : <a href="SOURCES.html">SOURCES.html</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Toutes les fiches</a> ·
+        <a href="SOURCES.html">Bibliographie de cet outil</a> ·
+        Source : <code>AREG_CBCT.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>
