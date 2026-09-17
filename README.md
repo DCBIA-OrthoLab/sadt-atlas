@@ -79,8 +79,16 @@ THEME = "papier"      # éditorial, sérif, filets plutôt que cadres
 THEME = "clinique"    # applicatif, bleuté, cartes ombrées, coins ronds
 ```
 
-puis `python3 build.py`, qui pose ou retire le lien dans les 141 pages. Chaque thème
-gère ses propres variantes claire et sombre.
+puis `python3 build.py`, qui pose ou retire le lien dans les 141 pages.
+
+Pour comparer sans éditer le fichier, l'option a priorité le temps d'un run :
+
+```bash
+python3 build.py --theme papier     # essayer
+python3 build.py --theme none       # revenir au défaut
+```
+
+Chaque thème gère ses propres variantes claire et sombre.
 
 **La sidebar ne se modifie que dans `nav.py`.** `build.py` la réécrit ensuite dans
 chaque page. C'est ce qui évite qu'une centaine de copies divergent.

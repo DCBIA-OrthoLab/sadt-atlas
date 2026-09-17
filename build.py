@@ -456,10 +456,12 @@ THEME_RX = re.compile(r'\n\s*<link rel="stylesheet" href="[^"]*assets/themes/[^"
 BASE_RX = re.compile(r'(<link rel="stylesheet" href="((?:\.\./)*)assets/style\.css">)')
 
 
-def sync_theme():
+def sync_theme(name="__use_nav__"):
     """Pose (ou retire) le lien du thème juste après la feuille de base.
-    Idempotent : l'ancien lien est toujours enlevé avant d'écrire le nouveau."""
-    name = getattr(nav, "THEME", None)
+    Idempotent : l'ancien lien est toujours enlevé avant d'écrire le nouveau.
+    `name` vient de la ligne de commande si elle en donne un, sinon de nav.THEME."""
+    if name == "__use_nav__":
+        name = getattr(nav, "THEME", None)
     if name and name not in nav.THEMES:
         raise SystemExit(f"THEME inconnu : {name!r} — attendus {nav.THEMES} ou None")
     n = 0
@@ -483,6 +485,22 @@ def sync_theme():
     print(f"thème : {name or 'aucun (feuille de base seule)'} — {n} pages mises à jour")
 
 
+def theme_from_argv():
+    """--theme <nom> | --theme none  — surcharge nav.THEME le temps d'un run."""
+    import sys
+    if "--theme" not in sys.argv:
+        return "__use_nav__"
+    i = sys.argv.index("--theme")
+    if i + 1 >= len(sys.argv):
+        raise SystemExit(f"--theme attend un nom : {', '.join(nav.THEMES)} ou none")
+    v = sys.argv[i + 1]
+    if v in ("none", "aucun", "default"):
+        return None
+    if v not in nav.THEMES:
+        raise SystemExit(f"thème inconnu : {v!r} — disponibles : {', '.join(nav.THEMES)}, none")
+    return v
+
+
 if __name__ == "__main__":
     write_landing()
     for _l in nav.LANGS:
@@ -493,4 +511,4 @@ if __name__ == "__main__":
         if os.path.isdir(os.path.join(ROOT, _l)):
             _idx, _c = build_lang(_l)
             write_constats(_l, _c)
-    sync_theme()          # en dernier : les pages générées viennent d'être réécrites
+    sync_theme(theme_from_argv())   # en dernier : les pages générées viennent d'être réécrites
