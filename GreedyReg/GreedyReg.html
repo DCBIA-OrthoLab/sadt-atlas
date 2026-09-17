@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GreedyReg — SADT Atlas</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/site.js"></script>
+</head>
+<body data-cat="recalage">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html" aria-current="page">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Recalage</div>
+        <h1>GreedyReg</h1>
+        <p class="lede">Recalage affine/rigide de CBCT T1/T2 en pilotant en sous-processus le binaire <code>greedy</code> d'ITK-SNAP, sans réseau dans le chemin principal et sans environnement conda dédié.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://arxiv.org/abs/1904.11929" target="_blank" rel="noopener" title="Le moteur greedy est publié ; le module Slicer ne l'est pas.">Venet 2019 · arXiv</a>
+          <span class="badge cli">GreedyReg_CLI</span>
+          <span class="badge neutral">env conda : aucun (Python de Slicer)</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliographie</a>
+        </div>
+      </header>
+
+      <p>Recalage de CBCT T1/T2 en appelant le binaire <strong>greedy</strong> d'ITK-SNAP en
+      sous-processus. Aucun réseau n'est entraîné ni appelé dans le chemin principal : le seul
+      réseau du module sert à l'initialisation « distante » et c'est <a href="../ALI/ALI.html">ALI_CBCT</a>, emprunté tel quel.</p>
+
+      <h2 id="situation">1. Situation dans la chaîne</h2>
+
+      <p>Rien dans le dépôt n'appelle GreedyReg. C'est un outil terminal, piloté par l'opérateur,
+      et il ne produit l'entrée d'aucun autre module.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Appelé</th><th>Comment</th><th>Quand</th></tr></thead>
+          <tbody>
+            <tr><td><code>GreedyReg_CLI</code></td><td><code>slicer.cli.run(slicer.modules.greedyreg_cli, …)</code></td><td>tout recalage automatique, mono-cas ou batch</td></tr>
+            <tr><td>binaire <code>greedy</code></td><td><code>subprocess.run</code> <strong>depuis le CLI</strong></td><td>deux invocations par cas (recalage puis rééchantillonnage)</td></tr>
+            <tr><td><code>ALI_CBCT</code></td><td><code>slicer.cli.run(slicer.modules.ali_cbct, …)</code></td><td>mode « Distant Registration » uniquement</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 640 220" role="img" aria-label="Qui appelle quoi dans GreedyReg : le widget passe par GreedyReg_CLI pour lancer greedy, et par ALI_CBCT uniquement en mode Distant.">
+          <rect class="d-box-a" x="10" y="15" width="190" height="50" rx="6"/>
+          <text class="d-label" x="105" y="36" text-anchor="middle">GreedyReg</text>
+          <text class="d-label-s" x="105" y="52" text-anchor="middle">widget Slicer</text>
+
+          <path class="d-arrow" d="M200 40 H243"/>
+          <path class="d-arrow-head" d="M250 40 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="250" y="15" width="190" height="50" rx="6"/>
+          <text class="d-label" x="345" y="36" text-anchor="middle">GreedyReg_CLI</text>
+          <text class="d-label-s" x="345" y="52" text-anchor="middle">python-real · 2 subprocess/cas</text>
+
+          <path class="d-arrow" d="M440 40 H473"/>
+          <path class="d-arrow-head" d="M480 40 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="480" y="15" width="150" height="50" rx="6"/>
+          <text class="d-label" x="555" y="36" text-anchor="middle">greedy</text>
+          <text class="d-label-s" x="555" y="52" text-anchor="middle">binaire natif, CPU</text>
+
+          <path class="d-arrow" d="M105 65 V123"/>
+          <path class="d-arrow-head" d="M105 130 l-4 -8 h8 z"/>
+
+          <rect class="d-box-n" x="10" y="140" width="260" height="60" rx="6"/>
+          <text class="d-label" x="140" y="164" text-anchor="middle">ALI_CBCT</text>
+          <text class="d-label-s" x="140" y="180" text-anchor="middle">réseau (RL, DNet) — prédit les landmarks</text>
+          <text class="d-label-s" x="140" y="194" text-anchor="middle">mode « Distant Registration » seulement</text>
+        </svg>
+        <figcaption>Le widget assemble les paramètres puis délègue : le CLI lance <code>greedy</code>, et ALI_CBCT n'est sollicité qu'en mode Distant.</figcaption>
+      </figure>
+
+      <div class="callout ok">
+        <div class="callout-title">Vérifié</div>
+        <p>Le module Slicer ne lance jamais <code>greedy</code> lui-même : il assemble les
+        paramètres (<code>Logic.py:286</code>) et laisse le CLI faire. La docstring de
+        <code>GreedyRegLogic</code> l'affirme explicitement et c'est vérifié : aucun
+        <code>subprocess</code> dans le widget hors téléchargement du binaire.</p>
+      </div>
+
+      <h2 id="fichiers">2. Fichiers en jeu</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fichier</th><th>Rôle</th><th>Où ça tourne</th></tr></thead>
+          <tbody>
+            <tr><td><code>GreedyReg/GreedyReg.py</code></td><td>widget, 1704 lignes dont ~700 de UI Qt (molette de rotation, overlay de slice, feuilles de style)</td><td>Python de Slicer</td></tr>
+            <tr><td><code>GreedyReg_Method/Logic.py</code></td><td>téléchargement du binaire, paramètres CLI, appariement, <a class="gterm" href="../glossaire.html#g-kabsch" title="Voir au glossaire">Kabsch</a>, parsing <a href="../ALI/ALI.html">ALI</a></td><td>Python de Slicer</td></tr>
+            <tr><td><code>GreedyReg_CLI/GreedyReg_CLI.py</code></td><td>boucle sur les paires, construit et lance les deux commandes <code>greedy</code></td><td><code>python-real</code>, c'est-à-dire <strong>le Python de Slicer</strong></td></tr>
+            <tr><td><code>GreedyReg_CLI/bin/&lt;plateforme&gt;/greedy</code></td><td>l'exécutable, <strong>absent du dépôt</strong>, téléchargé à la demande</td><td>natif</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Note</div>
+        <p>Point important pour un repreneur : il n'y a <strong>pas d'environnement conda</strong>.
+        Le commentaire de <code>Logic.py:76</code> le dit — le CLI tourne dans le Python de
+        Slicer, donc un <code>slicer.util.pip_install</code> fait depuis le widget est
+        immédiatement visible du sous-processus. Pas de GPU non plus : greedy est CPU.</p>
+      </div>
+
+      <p>Les deux premières lignes de <code>GreedyReg.py</code> effacent le
+      <code>__pycache__</code> du module à chaque import — reliquat de développement.</p>
+
+      <h2 id="binaire">3. Le binaire greedy : d'où il vient</h2>
+
+      <p><code>greedyBinaryPath()</code> cherche <code>GreedyReg_CLI/bin/{linux|mac|windows}/greedy[.exe]</code>.
+      S'il manque, un bandeau rouge propose <code>downloadGreedyBinary()</code>
+      (<code>Logic.py:106</code>) qui va chercher une archive <strong>ITK-SNAP 4.2.2</strong> sur
+      SourceForge et n'en extrait que <code>bin/greedy</code> :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plateforme</th><th>Source</th><th>Extraction</th></tr></thead>
+          <tbody>
+            <tr><td>Linux</td><td><code>itksnap-4.2.2-20241202-Linux-x86_64.tar.gz</code></td><td><code>tarfile</code>, membre <code>…/bin/greedy</code>, <code>chmod 755</code></td></tr>
+            <tr><td>macOS (arm64)</td><td><code>itksnap-4.2.2-20241202-MacOS-arm64.tar.gz</code></td><td>idem</td></tr>
+            <tr><td>Windows</td><td><code>itksnap-4.2.2-20241202-win64-AMD64.exe</code> (installeur NSIS)</td><td>7-Zip si présent, sinon <strong>installation silencieuse</strong> puis désinstallation</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Le chemin Windows est le plus fragile et le code le documente bien
+      (<code>Logic.py:161</code>) : <code>/D=</code> de NSIS ne supporte pas les guillemets,
+      donc l'installation se fait dans <code>%SystemDrive%\_greedyreg_nsis_tmp</code> (chemin
+      sans espace), on copie <code>greedy.exe</code>, puis <code>Uninstall.exe /S</code>.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>Aucune vérification d'intégrité (pas de somme de contrôle) sur l'archive téléchargée.</p>
+      </div>
+
+      <h2 id="modes">4. Les trois modes, et ce qui les distingue réellement</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mode</th><th>Ce qui est calculé</th><th>Qui le calcule</th><th>Sortie</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Manual Alignment</strong></td>
+              <td>rien : l'opérateur bouge un <code>vtkMRMLLinearTransformNode</code></td>
+              <td>widget</td>
+              <td>matrice dans la scène, servant d'<code>-ia</code></td>
+            </tr>
+            <tr>
+              <td><strong>Automatic Registration</strong></td>
+              <td>affine ou rigide par optimisation d'une métrique d'intensité</td>
+              <td><span class="badge calcule">calculé</span> binaire <code>greedy</code> via le CLI</td>
+              <td><code>.nii.gz</code> recalé + <code>.mat</code></td>
+            </tr>
+            <tr>
+              <td><strong>Distant Registration</strong></td>
+              <td>rigide en fermé (<a class="gterm" href="../glossaire.html#g-svd" title="Voir au glossaire">SVD</a>/Kabsch) sur 3–5 landmarks prédits</td>
+              <td><span class="badge predit">prédit</span> <span class="badge calcule">calculé</span> widget + <a href="../ALI/ALI.html">ALI_CBCT</a></td>
+              <td><strong>seulement</strong> une matrice, à raffiner ensuite</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège de vocabulaire</div>
+        <p><strong>Le mot « Distant » ne désigne pas du calcul à distance.</strong> Le panneau
+        s'intitule « Distant Registration (Large Misalignment) » : il s'agit de deux scans
+        <em>éloignés géométriquement</em> (grand désalignement initial). Tout tourne en local.
+        <strong>Aucun réseau, aucun socket, aucun chiffrement, aucune attestation</strong> : il
+        n'y a pas une seule requête sortante dans le module hors <code>urllib.request.urlretrieve</code>
+        vers SourceForge (binaire greedy) et vers les releases GitHub du dépôt (poids <a href="../ALI/ALI.html">ALI</a>). Le
+        seul contact avec l'extérieur est donc le téléchargement d'outils, jamais l'envoi de
+        données patient.</p>
+      </div>
+
+      <h3 id="mode-manuel">4.1 Mode manuel</h3>
+
+      <p>Deux jeux de commandes agissent sur le <strong>même</strong> nœud de transformation :</p>
+
+      <ul>
+        <li>six <code>ctkSliderWidget</code> (rotations ±180°, translations ±200 mm), composées
+        dans cet ordre : <code>Translate</code> puis <code>RotateX</code>, <code>RotateY</code>,
+        <code>RotateZ</code> (<code>GreedyReg.py:1192</code>) ;</li>
+        <li>« Center T2 on T1 » : translation pure entre les centres des deux volumes, calculés
+        en IJK puis passés en <a class="gterm" href="../glossaire.html#g-ras" title="Voir au glossaire">RAS</a> par <code>GetIJKToRASMatrix</code> (<code>Logic.py:381</code>) ;</li>
+        <li>les poignées natives de Slicer (<code>SetEditorScalingEnabled(False)</code> → jamais
+        d'échelle) ;</li>
+        <li>un prototype assumé, « Sensitivity Demo » : une molette Qt reparentée sur les vues
+        Red/Yellow/Green. L'axe de rotation dépend de la vue (Red→Z, Yellow→X, Green→Y), le
+        glissé hors molette translate dans le plan de coupe (0.5 mm/pixel × gain), et la taille
+        de la molette suit le zoom (<code>baseFov / fovMean</code>, borné à 0.55–1.90). Le
+        commentaire <code>GreedyReg.py:499</code> explique pourquoi : les poignées natives
+        recalculent leur delta depuis la souris brute, donc amortir la matrice après coup n'a
+        aucun effet visible.</li>
+      </ul>
+
+      <p>Le volume mobile n'est <strong>pas</strong> durci avant l'export :
+      <code>slicer.util.exportNode(node, path)</code> a <code>world=False</code> par défaut
+      (vérifié dans <code>slicer/util.py</code>), donc la transformation manuelle atteint greedy
+      <strong>uniquement</strong> par le fichier <code>-ia</code>. Voir <a href="#convention">§9</a>
+      pour le problème de convention que cela pose.</p>
+
+      <h3 id="mode-auto">4.2 Mode automatique</h3>
+
+      <p><code>onRunRegistration()</code> (<code>GreedyReg.py:1204</code>) fabrique une
+      arborescence dans <code>tempfile.mkdtemp()</code> : <code>T1/</code>, <code>T2/</code>,
+      <code>INIT/</code>, <code>MASK/</code>, <code>OUTPUT/</code>, exporte les deux volumes sous
+      le faux identifiant <code>CASE0001</code>, écrit l'init, puis appelle le CLI en <strong>mode
+      batch d'une seule paire</strong>. Le mono-cas n'a pas de chemin de code propre : c'est le
+      batch avec un dossier d'un fichier.</p>
+
+      <p>Un <code>QTimer</code> de 1 s interroge le <code>cliNode</code> ; à la fin, le volume
+      recalé est chargé depuis le dossier temporaire. Ce dossier n'est <strong>jamais
+      effacé</strong> (aucun <code>rmtree</code> dans le widget) : les résultats survivent jusqu'au
+      nettoyage système, ce dont dépend d'ailleurs le bouton « Save Registered Volume », qui se
+      contente d'un <code>shutil.copy</code>.</p>
+
+      <h3 id="mode-distant">4.3 Mode distant</h3>
+
+      <p><code>onRunDistantRegistration()</code> (<code>GreedyReg.py:1406</code>) :</p>
+
+      <ol>
+        <li>une seule région est retenue, par ordre de priorité <strong>base crânienne &gt;
+        mandibule &gt; maxillaire</strong> (<code>_selectedDistantRegion</code>,
+        <code>GreedyReg.py:1397</code>) : cocher plusieurs cases n'additionne pas les landmarks,
+        la première trouvée gagne ;</li>
+        <li>les deux volumes sont exportés en <code>.nii.gz</code> dans un dossier temporaire ;</li>
+        <li>une <strong>file de jobs</strong> ALI est construite : un job par (scan × sous-dossier
+        de modèles), exécutés en série par chaînage d'observateurs <code>ModifiedEvent</code>
+        (<code>GreedyReg.py:1493</code>) ;</li>
+        <li>les json de sortie sont relus, coordonnées <strong><a class="gterm" href="../glossaire.html#g-lps" title="Voir au glossaire">LPS</a> → RAS</strong>
+        (<code>[-x, -y, z]</code>, <code>Logic.py:517</code>) ;</li>
+        <li>si ≥ 3 landmarks sont communs aux deux scans, <code>rigidFromLandmarks()</code>
+        calcule un rigide par SVD ; sinon échec explicite.</li>
+      </ol>
+
+      <p>Régions et landmarks (<code>REGION_CONFIG</code>, <code>Logic.py:20</code>) :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Région</th><th>Landmarks</th><th>Dossiers de poids</th></tr></thead>
+          <tbody>
+            <tr><td><code>MANDMASK</code></td><td>RGo, LGo, Gn, Me, Pog</td><td><code>Lower_Bones_1</code>, <code>Lower_Bones_2</code></td></tr>
+            <tr><td><code>MAXMASK</code></td><td>A, ANS, LOr, ROr, PNS</td><td><code>Upper_Bones_v2</code></td></tr>
+            <tr><td><code>CBMASK</code></td><td>S, N, RPo, LPo</td><td><code>Cranial_Base</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Les poids viennent de la release <code>v0.1-v2.0_models</code> du dépôt, un
+      <code>.zip</code> par dossier, extraits sous
+      <code>Documents/SlicerDownloads/GreedyReg/ALIModels/&lt;dossier&gt;/</code>.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 770 220" role="img" aria-label="Pipeline du mode Distant Registration : ALI_CBCT prédit des landmarks, un Kabsch/SVD en déduit une matrice rigide, sans image de sortie.">
+          <rect class="d-box" x="15" y="30" width="120" height="36" rx="6"/>
+          <text class="d-label" x="75" y="53" text-anchor="middle">T1 (.nii.gz)</text>
+
+          <rect class="d-box" x="15" y="80" width="120" height="36" rx="6"/>
+          <text class="d-label" x="75" y="103" text-anchor="middle">T2 (.nii.gz)</text>
+
+          <path class="d-arrow" d="M135 48 L163 78"/>
+          <path class="d-arrow" d="M135 98 L163 82"/>
+          <path class="d-arrow-head" d="M170 80 l-9 -2 l3 -8 z"/>
+
+          <rect class="d-box-n" x="170" y="35" width="170" height="90" rx="6"/>
+          <text class="d-label" x="255" y="66" text-anchor="middle">ALI_CBCT</text>
+          <text class="d-label-s" x="255" y="82" text-anchor="middle">agent RL par landmark</text>
+          <text class="d-label-s" x="255" y="96" text-anchor="middle">réseau DNet — prédit</text>
+          <text class="d-label-s" x="255" y="110" text-anchor="middle">spacing 1 / 0.3 mm</text>
+
+          <path class="d-arrow" d="M340 80 H373"/>
+          <path class="d-arrow-head" d="M380 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="380" y="55" width="160" height="50" rx="6"/>
+          <text class="d-label" x="460" y="76" text-anchor="middle">landmarks (3–5)</text>
+          <text class="d-label-s" x="460" y="91" text-anchor="middle">LPS → RAS</text>
+
+          <path class="d-arrow" d="M540 80 H573"/>
+          <path class="d-arrow-head" d="M580 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="580" y="55" width="160" height="60" rx="6"/>
+          <text class="d-label" x="660" y="80" text-anchor="middle">SVD / Kabsch</text>
+          <text class="d-label-s" x="660" y="96" text-anchor="middle">rigide, calculé (numpy)</text>
+
+          <path class="d-arrow" d="M660 115 V143"/>
+          <path class="d-arrow-head" d="M660 150 l-4 -8 h8 z"/>
+
+          <rect class="d-box" x="580" y="150" width="160" height="50" rx="6"/>
+          <text class="d-label" x="660" y="171" text-anchor="middle">matrice rigide</text>
+          <text class="d-label-s" x="660" y="186" text-anchor="middle">mobile → fixe, RAS</text>
+
+          <text class="d-label-s" x="660" y="213" text-anchor="middle">sert d'-ia ; aucune image produite</text>
+        </svg>
+        <figcaption>Le seul réseau du module : ALI_CBCT prédit des landmarks, un Kabsch/SVD calculé les convertit en matrice rigide d'initialisation.</figcaption>
+      </figure>
+
+      <p><strong>Le réseau appelé.</strong> ALI_CBCT ne produit pas de <a class="gterm" href="../glossaire.html#g-heatmap" title="Voir au glossaire">heatmap</a> : c'est de
+      l'<strong>apprentissage par renforcement</strong>. Un agent par landmark navigue dans le
+      volume, observe un cube de <code>agent_FOV = [64,64,64]</code> voxels, et choisit un
+      déplacement parmi <code>MOVEMENTS</code> ; le réseau <code>DNet</code> (couche de
+      transition à 1024 canaux, <code>out_channels = len(MOVEMENTS["id"])</code>) est rechargé
+      par landmark depuis les <code>.pth</code> du dossier (<code>ALI_CBCT.py:159</code>).
+      Paramètres imposés par GreedyReg (<code>Logic.py:471</code>) : <code>spacing = [1, 0.3]</code>
+      mm (recherche grossière puis fine), <code>speed_per_scale = [1,1]</code>,
+      <code>spawn_radius = 10</code>, <code>DCMInput = false</code>.</p>
+
+      <p><strong>Le calcul rigide</strong> (<code>Logic.py:535</code>) est un
+      <span class="badge calcule">calculé</span> Kabsch classique : centrage,
+      <code>H = movingᵀ·fixed</code>, SVD, <code>R = Vᵀ·Uᵀ</code>, correction de réflexion si
+      <code>det(R) &lt; 0</code>, <code>t = c_fixed − R·c_moving</code>. La matrice obtenue va
+      donc de <strong>mobile vers fixe, en RAS</strong> — exactement la convention d'un nœud de
+      transformation Slicer, où elle est posée telle quelle.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Vérifié</div>
+        <p>Le message de fin est honnête : « Distant registration complete! Now run Automatic
+        Registration to refine ». Ce mode ne recale pas, il initialise.</p>
+      </div>
+
+      <h2 id="commande">5. La ligne de commande greedy</h2>
+
+      <p><code>buildRegistrationCommand()</code> (<code>GreedyReg_CLI.py:100</code>) produit
+      toujours exactement ceci, aucune option n'est exposée en dehors de la métrique et du
+      nombre de degrés de liberté :</p>
+
+      <pre><code>greedy -d 3 -a \
+  -m NMI | -m NCC 4x4x4 | -m SSD \
+  -i &lt;T1.nii.gz&gt; &lt;T2.nii.gz&gt; \
+  -o &lt;ID&gt;_warp.mat \
+  -n 100x100x50x25 \
+  -e 0.5 \
+  -search 100 10 20 \
+  -dof 6|12 \
+  -ia &lt;init.mat&gt; \
+  [-gm &lt;mask binarisé&gt;]</code></pre>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Flag</th><th>Valeur</th><th>Signification (doc greedy)</th></tr></thead>
+          <tbody>
+            <tr><td><code>-d 3</code></td><td>fixe</td><td>dimension de l'image</td></tr>
+            <tr><td><code>-a</code></td><td>fixe</td><td><strong>mode affine/rigide</strong>. Le mode difféomorphe de greedy, qui est son mode par défaut et sa raison d'être, n'est jamais utilisé ici</td></tr>
+            <tr><td><code>-m NMI</code></td><td>index 0 (défaut UI)</td><td>information mutuelle normalisée, pour intensités hétérogènes</td></tr>
+            <tr><td><code>-m NCC 4x4x4</code></td><td>index 1</td><td>corrélation croisée locale, rayon <strong>en voxels</strong></td></tr>
+            <tr><td><code>-m SSD</code></td><td>index 2</td><td>somme des carrés des différences, même modalité</td></tr>
+            <tr><td><code>-i fixe mobile</code></td><td>T1 puis T2</td><td>ordre imposé : <code>-i &lt;fixed&gt; &lt;moving&gt;</code></td></tr>
+            <tr><td><code>-o</code></td><td><code>&lt;ID&gt;_warp.mat</code></td><td>matrice affine 4×4 (texte)</td></tr>
+            <tr><td><code>-n 100x100x50x25</code></td><td>fixe</td><td><strong>4 niveaux</strong> de pyramide multi-résolution, 100/100/50/25 itérations du plus grossier au plus fin (le défaut de greedy est <code>100x100</code>, 2 niveaux)</td></tr>
+            <tr><td><code>-e 0.5</code></td><td>fixe</td><td>pas de temps — <strong>sans effet en mode affine</strong> : la doc greedy dit noir sur blanc « <code>-s</code> and <code>-e</code> have no effect » pour <code>-a</code>. Ligne morte</td></tr>
+            <tr><td><code>-search 100 10 20</code></td><td>fixe</td><td>recherche aléatoire de 100 transformations rigides avant l'optimisation : σ_angle = 10°, σ_offset = 20 (voxels selon la prose de la doc, unités physiques selon son texte d'usage — l'ambiguïté est dans greedy, pas ici)</td></tr>
+            <tr><td><code>-dof 6</code> / <code>12</code></td><td>combo « Rigid »/« Affine »</td><td>6 = rigide, 12 = affine complet. <code>-dof 7</code> (rigide + échelle uniforme) n'est pas proposé</td></tr>
+            <tr><td><code>-ia</code></td><td>toujours fourni</td><td>matrice d'initialisation. Jamais <code>-ia-identity</code>, jamais <code>-ia-image-centers</code></td></tr>
+            <tr><td><code>-gm</code></td><td>si masque</td><td>masque <strong>du volume fixe</strong> : les gradients de la métrique ne sont calculés que dedans</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Puis un second appel, systématique, en mode rééchantillonnage :</p>
+
+      <pre><code>greedy -d 3 -rf &lt;T1&gt; -rm &lt;T2&gt; &lt;ID&gt;_registered.nii.gz -r &lt;ID&gt;_warp.mat</code></pre>
+
+      <p><code>-rf</code> définit l'espace de référence (le fixe), <code>-rm</code> la paire
+      entrée/sortie. Le volume de sortie est donc <strong>le T2 d'origine rééchantillonné dans
+      la grille du T1</strong>, interpolation linéaire (défaut de <code>-ri</code>). Chaque appel
+      est borné par <code>timeout = 600 s</code>.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 770 320" role="img" aria-label="Pipeline du mode Automatic Registration : entrées vers greedy -a, puis la matrice obtenue sert au rééchantillonnage greedy -rf/-rm.">
+          <rect class="d-box" x="15" y="20" width="140" height="34" rx="5"/>
+          <text class="d-label" x="85" y="41" text-anchor="middle">T1 (.nii.gz) — fixe</text>
+
+          <rect class="d-box" x="15" y="64" width="140" height="34" rx="5"/>
+          <text class="d-label" x="85" y="85" text-anchor="middle">T2 (.nii.gz) — mobile</text>
+
+          <rect class="d-box" x="15" y="108" width="140" height="34" rx="5"/>
+          <text class="d-label" x="85" y="129" text-anchor="middle">masque (optionnel)</text>
+
+          <rect class="d-box" x="15" y="152" width="140" height="34" rx="5"/>
+          <text class="d-label" x="85" y="173" text-anchor="middle">init .mat (optionnel)</text>
+
+          <path class="d-arrow" d="M155 37 L193 103"/>
+          <path class="d-arrow" d="M155 81 L193 105"/>
+          <path class="d-arrow" d="M155 125 L193 107"/>
+          <path class="d-arrow" d="M155 169 L193 109"/>
+          <path class="d-arrow-head" d="M200 108 l-9 -1 l2 -8 z"/>
+
+          <rect class="d-box-a" x="225" y="65" width="170" height="90" rx="6"/>
+          <text class="d-label" x="310" y="95" text-anchor="middle">greedy -a</text>
+          <text class="d-label-s" x="310" y="112" text-anchor="middle">-dof 6|12 · NMI/NCC/SSD</text>
+          <text class="d-label-s" x="310" y="126" text-anchor="middle">recalage par intensité, CPU</text>
+          <text class="d-label-s" x="310" y="140" text-anchor="middle">calculé (LBFGS côté greedy)</text>
+
+          <path class="d-arrow" d="M395 105 H423"/>
+          <path class="d-arrow-head" d="M430 105 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="430" y="88" width="150" height="34" rx="5"/>
+          <text class="d-label" x="505" y="109" text-anchor="middle">&lt;ID&gt;_warp.mat</text>
+
+          <path class="d-arrow" d="M505 122 V180 H325 V218"/>
+          <path class="d-arrow-head" d="M325 225 l-4 -8 h8 z"/>
+
+          <rect class="d-box" x="225" y="225" width="200" height="70" rx="6"/>
+          <text class="d-label" x="325" y="250" text-anchor="middle">greedy -rf/-rm</text>
+          <text class="d-label-s" x="325" y="266" text-anchor="middle">-rf T1 (référence) -rm T2→sortie</text>
+          <text class="d-label-s" x="325" y="280" text-anchor="middle">interpolation linéaire</text>
+
+          <path class="d-arrow" d="M425 260 H453"/>
+          <path class="d-arrow-head" d="M460 260 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="460" y="225" width="210" height="70" rx="6"/>
+          <text class="d-label" x="565" y="252" text-anchor="middle">&lt;ID&gt;_registered.nii.gz</text>
+          <text class="d-label-s" x="565" y="268" text-anchor="middle">grille de T1</text>
+          <text class="d-label-s" x="565" y="282" text-anchor="middle">interpolation linéaire</text>
+        </svg>
+        <figcaption>Deux appels systématiques : <code>greedy -a</code> calcule la matrice, puis <code>greedy -rf/-rm</code> rééchantillonne le T2 dans la grille du T1.</figcaption>
+      </figure>
+
+      <h2 id="entrees">6. Entrées, appariement, masques, initialisation</h2>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong>Appariement.</strong> <code>ID_PATTERN = ^([A-Za-z]+\d+)</code> appliqué au
+        nom de fichier, en majuscules (<code>GreedyReg_CLI.py:37</code>). <code>A01_t1.nii.gz</code>
+        → identifiant <code>A01</code>. Une paire existe si le même identifiant est trouvé dans
+        le dossier T1 et dans le dossier T2 ; masques (<code>.nii</code>/<code>.nii.gz</code>) et
+        inits (<code>.mat</code>) sont optionnels et rattachés par le même identifiant. Un fichier
+        <code>01_T1.nii.gz</code> (chiffres d'abord) ou <code>Patient-01.nii.gz</code> n'est
+        jamais apparié, <strong>silencieusement</strong>.</p>
+      </div>
+
+      <p><code>findBatchPairs()</code> dans le widget duplique cette logique pour le libellé
+      « Found N pairs » ; le commentaire prévient que les deux implémentations doivent rester
+      synchronisées.</p>
+
+      <p><strong>Masque.</strong> Exporté depuis un <code>vtkMRMLSegmentationNode</code> ou un
+      labelmap vers <code>.nii.gz</code>, puis binarisé côté CLI :
+      <code>(get_fdata() &gt; 0).astype(float32)</code> (<code>GreedyReg_CLI.py:92</code>). Tous
+      les segments d'une segmentation multi-labels sont donc fusionnés en un seul masque. C'est
+      le seul usage réel de <code>nibabel</code>, avec l'application d'affine du batch distant.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong>Initialisation.</strong> Sans fichier d'init, <code>writeIdentityInit()</code>
+        écrit l'identité avec <code>matrix[0,3] = 0.001</code> — un micron de translation. Le
+        commentaire explique le pourquoi : « so Greedy doesn't treat it as identity ». Ce
+        comportement n'est documenté nulle part côté greedy ; c'est un contournement empirique,
+        à considérer comme tel.</p>
+      </div>
+
+      <p><strong>Aucun prétraitement d'intensité</strong> : pas de normalisation, pas de
+      recadrage, pas de rééchantillonnage préalable, pas de conversion d'orientation. Les NIfTI
+      sont passés tels quels, et greedy travaille dans l'espace physique RAS des en-têtes.</p>
+
+      <h2 id="batch">7. Le mode batch</h2>
+
+      <p>Deux batchs indépendants, qui ne font pas la même chose.</p>
+
+      <p><strong>Batch automatique</strong> (<code>GreedyReg.py:1537</code>). Le widget ne boucle
+      pas : il lance <strong>un seul</strong> <code>GreedyReg_CLI</code> sur les dossiers, et
+      c'est le CLI qui itère (<code>main()</code>, <code>GreedyReg_CLI.py:141</code>), en
+      émettant des balises <code>&lt;filter-progress&gt;</code> / <code>&lt;filter-comment&gt;</code>
+      lues par l'infrastructure CLI de Slicer. Le dossier de sortie est <strong>le dossier T2
+      lui-même</strong>. Aucun masque n'est binarisé en amont, aucun init n'est passé
+      (<code>initFolder=""</code>) : le batch part toujours de l'identité nudgée. Premier cas en
+      échec → <code>sys.exit(1)</code> → tout le batch s'arrête.</p>
+
+      <p><strong>Batch distant</strong> (<code>GreedyReg.py:1606</code>). Là, le widget boucle
+      cas par cas, avec une file <a href="../ALI/ALI.html">ALI</a> par paire. Le résultat n'est pas un volume recalé mais un
+      <strong>en-tête réécrit</strong> (<code>GreedyReg.py:1690</code>) :</p>
+
+      <pre><code>newAffine[:3, :3] = R @ movingImg.affine[:3, :3]
+newAffine[:3, 3]  = R @ movingImg.affine[:3, 3] + t
+nib.save(nib.Nifti1Image(movingImg.get_fdata(), newAffine, movingImg.header), out)</code></pre>
+
+      <div class="callout ok">
+        <div class="callout-title">Vérifié</div>
+        <p>Les voxels ne bougent pas, seule l'affine voxel→monde change. C'est correct : l'affine
+        NIfTI est en RAS, comme la matrice de Kabsch. Sortie : <code>&lt;ID&gt;_t2_aligned.nii.gz</code>,
+        écrite <strong>dans le dossier T2</strong>. Greedy n'est pas appelé du tout dans ce
+        batch.</p>
+      </div>
+
+      <h2 id="sorties">8. Sorties</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fichier</th><th>Contenu</th><th>Où</th></tr></thead>
+          <tbody>
+            <tr><td><code>&lt;ID&gt;_registered.nii.gz</code></td><td>T2 rééchantillonné dans la grille T1</td><td>mono-cas : dossier temporaire ; batch : dossier T2</td></tr>
+            <tr><td><code>&lt;ID&gt;_warp.mat</code></td><td>matrice affine 4×4 greedy</td><td>idem</td></tr>
+            <tr><td><code>&lt;ID&gt;_t2_aligned.nii.gz</code></td><td>T2 voxels inchangés, affine corrigée</td><td>dossier T2 (batch distant)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Format de la transformation, et la conversion qui n'existe pas.</strong>
+      <code>&lt;ID&gt;_warp.mat</code> est un fichier <strong>texte de quatre lignes</strong>,
+      dans la convention greedy : une matrice 4×4 qui envoie les coordonnées <strong>RAS du fixe
+      vers les coordonnées RAS du mobile</strong> (<code>[ras(mobile);1] = M · [ras(fixe);1]</code>,
+      doc greedy, section « Affine mode »).</p>
+
+      <p>Le bouton « Save Transform Matrix » fait un <code>shutil.copy</code> brut de ce fichier
+      (<code>GreedyReg.py:1288</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong>Il n'y a aucune conversion vers <code>.tfm</code> ni vers quoi que ce soit
+        d'ITK dans tout le module.</strong> Un repreneur doit le savoir :</p>
+        <ul>
+          <li>ce n'est pas un fichier de transformation ITK (<code>TxtTransform</code>), donc il
+          ne se charge pas comme transformation dans Slicer malgré son extension <code>.mat</code> ;</li>
+          <li>une transformation ITK/Slicer sur disque est en <strong>LPS</strong>, celle-ci est
+          en <strong>RAS</strong> : il faut conjuguer par <code>diag(-1,-1,1,1)</code> en plus
+          d'un éventuel inverse ;</li>
+          <li>la conversion attendue passe par <code>c3d_affine_tool</code> (recommandé par la
+          doc greedy), ou par le même code que <code>FlexReg_CLI.py:186</code>, qui fait
+          exactement ça pour ses propres matrices.</li>
+        </ul>
+      </div>
+
+      <p>Comparé à <a href="../FlexReg/FlexReg.html">FlexReg</a>, qui produit un <code>.tfm</code> SimpleITK réutilisable par les
+      autres modules du dépôt, GreedyReg est un cul-de-sac : sa matrice n'est consommée par
+      personne.</p>
+
+      <h2 id="convention">9. Convention d'initialisation : très probable inversion</h2>
+
+      <p>Le mode manuel écrit dans <code>&lt;ID&gt;_init.mat</code> la matrice du nœud de
+      transformation Slicer, telle quelle (<code>Logic.py:277</code>).</p>
+
+      <ul>
+        <li>Cette matrice est un <code>MatrixTransformToParent</code> appliqué au volume
+        <strong>mobile</strong> : elle envoie les coordonnées propres du mobile vers le monde,
+        donc <strong>mobile → fixe</strong>.</li>
+        <li><code>-ia</code> attend une matrice de la même nature que celle produite par
+        <code>-o</code>, donc <strong>fixe → mobile</strong>.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège probable, non confirmé</div>
+        <p>Les deux sont inverses l'une de l'autre. Le pré-alignement manuel est donc très
+        vraisemblablement fourni à greedy à l'envers (rotation transposée, translation de signe
+        opposé). Le reste du dépôt connaît la convention : <code>FlexReg_CLI.py:186</code>
+        inverse explicitement, avec le commentaire « convention ITK : fixed -&gt; moving ».</p>
+        <p>Pourquoi ça ne se voit pas toujours : <code>-search 100 10 20</code> échantillonne 100
+        rigides aléatoires avant l'optimisation et 4 niveaux de pyramide pardonnent beaucoup. Un
+        mauvais point de départ ralentit et fragilise, il n'interdit pas de converger. À
+        vérifier par un test simple (translation pure de 20 mm en X, comparer l'init écrit et la
+        matrice renvoyée) avant de corriger.</p>
+      </div>
+
+      <h2 id="predit-calcule">10. Ce qui est prédit vs ce qui est calculé</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bloc</th><th>Nature</th><th>Où</th></tr></thead>
+          <tbody>
+            <tr><td>Pré-alignement manuel</td><td>interaction, aucune inférence</td><td>widget</td></tr>
+            <tr><td>Centrage T2 sur T1</td><td><span class="badge calcule">calculé</span> géométrique (centres d'images)</td><td>widget</td></tr>
+            <tr><td>Recalage rigide/affine</td><td><span class="badge calcule">calculé</span> optimisation d'intensité (NMI/NCC/SSD, LBFGS côté greedy)</td><td>binaire natif, CPU</td></tr>
+            <tr><td>Rééchantillonnage</td><td><span class="badge calcule">calculé</span> interpolation linéaire</td><td>binaire natif</td></tr>
+            <tr><td>Landmarks du mode distant</td><td><span class="badge predit">prédit</span> réseau, apprentissage par renforcement (<a href="../ALI/ALI.html">ALI_CBCT</a>, <code>DNet</code>)</td><td><code>slicer.cli.run(ali_cbct)</code>, GPU si dispo</td></tr>
+            <tr><td>Rigide sur landmarks</td><td><span class="badge calcule">calculé</span> géométrique, SVD/Kabsch</td><td>widget (numpy)</td></tr>
+            <tr><td>Binarisation du masque</td><td><span class="badge calcule">calculé</span> seuillage <code>&gt; 0</code></td><td>CLI (nibabel)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="environnement">11. Environnement</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Élément</th><th>Valeur</th><th>Source</th></tr></thead>
+          <tbody>
+            <tr><td>Interpréteur</td><td>Python de Slicer, pour le widget <strong>et</strong> le CLI (<code>#!/usr/bin/env python-real</code>)</td><td><code>GreedyReg_CLI.py:1</code></td></tr>
+            <tr><td>Dépendance du CLI</td><td><code>nibabel</code> seul, installé par <code>ensureNibabelInstalled()</code> après confirmation</td><td><code>Logic.py:82</code></td></tr>
+            <tr><td>Dépendances du mode distant</td><td><code>itk</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code>, <code>monai</code> (<code>1.3.2</code> si Python ≥ 3.10, sinon <code>0.7.0</code>)</td><td><code>Logic.py:336</code></td></tr>
+            <tr><td>torch</td><td><strong>supposé déjà présent</strong> par la chaîne NNUNet/PyTorch de l'extension, jamais installé ici</td><td>commentaire <code>Logic.py:331</code></td></tr>
+            <tr><td>GPU</td><td>inutile pour greedy ; utile pour <a href="../ALI/ALI.html">ALI</a> (<code>torch.cuda.empty_cache()</code> côté ALI)</td><td>—</td></tr>
+            <tr><td>conda / WSL</td><td><strong>aucun</strong>, contrairement à la plupart des modules du dépôt</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout ok">
+        <div class="callout-title">Vérifié</div>
+        <p>Les versions épinglées de <code>pydicom</code>/<code>dicom2nifti</code> ne sont pas
+        cosmétiques : le commit <code>b25a83e</code> (« Keep pydicom 3 and dicom2nifti 2.6.2 so
+        Slicer DICOM modules still load ») indique qu'un autre choix casse les modules DICOM de
+        Slicer.</p>
+      </div>
+
+      <h2 id="pieges">12. Pièges et points fragiles</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmé</div>
+        <p><strong>Le batch écrit ses sorties dans le dossier d'entrée T2.</strong>
+        <code>A01_registered.nii.gz</code> et <code>A01_t2_aligned.nii.gz</code> correspondent
+        tous deux à l'identifiant <code>A01</code> selon <code>ID_PATTERN</code>. Au second
+        lancement, le dictionnaire <code>{id: chemin}</code> ne garde qu'une entrée par
+        identifiant, <strong>celle rencontrée en dernier dans <code>os.listdir</code></strong> :
+        on peut donc recaler le résultat du run précédent, de manière non déterministe. Il n'y a
+        aucun filtre d'exclusion sur les suffixes produits.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>Le <code>.mat</code> produit n'est pas une transformation Slicer (<a href="#sorties">§8</a>) :
+        RAS, sens fixe→mobile, format texte brut.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>L'init du mode manuel est probablement inversé (<a href="#convention">§9</a>).</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><code>-e 0.5</code> est un no-op en mode affine. Confusion possible pour qui croit
+        régler un pas d'optimisation.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmé</div>
+        <p><strong>Bouton mort</strong> : « Save Registered Volume » du panneau Distant lit
+        <code>self._distantResult</code>, qui n'est <strong>jamais</strong> assigné — il
+        répondra toujours « No result to save! ». Le mode distant ne produit d'ailleurs pas de
+        volume.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmé</div>
+        <p><strong>Cases à cocher trompeuses</strong> dans le mode distant : les trois structures
+        sont des cases indépendantes mais <code>_selectedDistantRegion()</code> en retourne une
+        seule, par ordre de priorité fixe. Cocher « Mandibule + Maxillaire » ne combine pas les
+        10 landmarks.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong>Échec <a href="../ALI/ALI.html">ALI</a> silencieux</strong> : <a href="../ALI/ALI.html">ALI_CBCT</a> loggue les problèmes de poids en
+        avertissement et sort en code 0. Le code s'en protège en imprimant systématiquement
+        <code>GetOutputText()</code> (<code>GreedyReg.py:1508</code>), mais l'utilisateur ne voit
+        que « only 0 matched landmarks ».</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmé</div>
+        <p><strong>Les dossiers temporaires ne sont jamais nettoyés</strong> côté widget
+        (<code>mkdtemp</code> ×3, aucun <code>rmtree</code>). Le CLI, lui, nettoie bien son
+        <code>caseTmpDir</code> par cas.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong>Un échec arrête tout le batch</strong> (<code>sys.exit(1)</code> dans la
+        boucle du CLI), sans reprise ni liste des cas restants.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong>Masque multi-segments aplati</strong> par le <code>&gt; 0</code>, et le
+        masque doit être dans l'espace du <strong>fixe</strong> : <code>-gm</code> s'applique au
+        fixe, ce que l'UI indique (« Mask (T1) ») mais que rien ne vérifie.</p>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Note</div>
+        <p><strong>Métadonnées du module non renseignées</strong> : <code>contributors = ["Your Lab"]</code>,
+        <code>acknowledgementText = ""</code>.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>Le widget contient environ 500 lignes de feuilles de style et de widgets Qt
+        (<code>StandaloneRotationWheel</code>, <code>SliceTranslationOverlay</code>) explicitement
+        qualifiés de prototype dans les commentaires ; ils modifient le même nœud de
+        transformation que les curseurs, donc les deux jeux de commandes se marchent dessus sans
+        se resynchroniser (les curseurs ne sont pas remis à jour après un mouvement de molette).</p>
+      </div>
+
+      <h2 id="litterature">13. Littérature</h2>
+
+      <p>Le moteur est publié, le module ne l'est pas.</p>
+
+      <ul>
+        <li><strong>greedy</strong> : outil de Paul Yushkevich (PICSL, UPenn), intégré à
+        ITK-SNAP. La référence usuelle pour le citer est
+        <a href="https://arxiv.org/abs/1904.11929">Venet, Pati, Yushkevich, Bakas, <em>Accurate
+        and Robust Alignment of Variable-Stained Histologic Images Using a General-Purpose
+        Greedy Diffeomorphic Registration Tool</em> (arXiv:1904.11929)</a>. Documentation :
+        <a href="https://greedy.readthedocs.io/en/latest/reference.html">greedy.readthedocs.io</a>,
+        code : <a href="https://github.com/pyushkevich/greedy">pyushkevich/greedy</a>. Attention :
+        le papier et l'outil portent sur le recalage <strong>difféomorphe</strong> ; GreedyReg
+        n'utilise que le mode affine/rigide (<code>-a</code>), qui n'en est que l'étape
+        d'initialisation.</li>
+        <li><strong><a href="../ALI/ALI.html">ALI_CBCT</a></strong> :
+        <a href="https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642">Gillot et al.,
+        <em>Automatic landmark identification in cone-beam computed tomography</em>,
+        Orthodontics &amp; Craniofacial Research, 2023</a> — agents virtuels naviguant dans un
+        espace volumétrique multi-échelle, erreur moyenne annoncée de 1.54 ± 0.87 mm sur 32
+        landmarks. Dépôt d'origine :
+        <a href="https://github.com/Maxlo24/ALI_CBCT">Maxlo24/ALI_CBCT</a>.</li>
+        <li><strong>GreedyReg lui-même</strong> : aucune publication. L'approche
+        « pré-alignement manuel puis affine par intensité, avec masque » est celle du panneau
+        <em>Registration</em> d'ITK-SNAP, dont ce module est une transposition dans Slicer ;
+        c'est la seule filiation revendiquable depuis le code.</li>
+      </ul>
+
+      <p><strong>Bibliographie complète : <a href="SOURCES.html">SOURCES.html</a></strong> —
+      références vérifiées, fichiers récupérés dans ce dossier (papier greedy, papier ALI_CBCT),
+      et la distinction, détaillée, entre ce que le papier greedy décrit et ce que ce module
+      exécute réellement.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Toutes les fiches</a> ·
+        <a href="SOURCES.html">Bibliographie de cet outil</a> ·
+        Source : <code>GreedyReg.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

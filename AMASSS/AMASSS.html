@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMASSS — SADT Atlas</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/site.js"></script>
+</head>
+<body data-cat="segmentation">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html" aria-current="page">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Segmentation</div>
+        <h1>AMASSS</h1>
+        <p class="lede">Segmentation automatique multi-structures de CBCT crânio-faciaux : un réseau binaire <a class="gterm" href="../glossaire.html#g-nnunet" title="Voir au glossaire">nnU-Net</a> v2 par structure anatomique, assemblé et fusionné par le CLI.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1371/journal.pone.0275033" target="_blank" rel="noopener" title="Le papier décrit une UNETR MONAI ; le code tourne en nnU-Net v2.">Gillot 2022 · PLOS ONE</a>
+          <span class="badge cli">AMASSS_CLI</span>
+          <span class="badge neutral">Python de Slicer, pas de conda</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliographie</a>
+        </div>
+      </header>
+
+      <h2 id="situation">1. Situation dans la chaîne</h2>
+
+      <p>AMASSS est à la fois un module terminal (le widget AMASSS) et une <strong>brique
+      réutilisée par trois autres outils</strong>, qui appellent tous le même CLI via
+      <code>slicer.modules.amasss_cli</code>.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Appelant</th><th>Fichier</th><th>Usage</th></tr></thead>
+          <tbody>
+            <tr><td>widget AMASSS</td><td><code>AMASSS.py:1638</code></td><td>segmentation pilotée par l'opérateur</td></tr>
+            <tr><td><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a> (semi-auto, fully-auto, orienté)</td><td><code>CBCT.py:341</code>, <code>470</code>, <code>555</code>, <code>840</code>, <code>918</code></td><td>deux rôles distincts : <strong>masques</strong> de recalage (<code>merge=SEPARATE</code>, <code>genVtk=False</code>) avant AREG, puis <strong>segmentations</strong> livrables après</td></tr>
+            <tr><td><a href="../VFACE/VFACE.html">VFACE</a></td><td><code>createlistprocess.py:126</code></td><td>segmentation dans la chaîne d'analyse d'asymétrie</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>AMASSS n'appelle rien d'autre : pas de sous-processus conda, pas d'autre module.
+      Son unique dépendance externe est le paquet pip <code>nnunetv2</code>, importé
+      <strong>paresseusement</strong> dans les fonctions qui l'utilisent.</p>
+
+      <p>Distinction importante pour AREG : les codes <code>CBMASK</code> / <code>MANDMASK</code> / <code>MAXMASK</code>
+      ne sont pas des post-traitements des segmentations <code>CB</code> / <code>MAND</code> / <code>MAX</code>, ce sont
+      <strong>des modèles entraînés séparément</strong>, sur d'autres données et à une autre
+      résolution (§4).</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 760 200" role="img" aria-label="Vue d'ensemble du pipeline AMASSS, des entrées aux sorties">
+          <rect class="d-box" x="10" y="78" width="130" height="44" rx="6"/>
+          <text class="d-label" x="75" y="96" text-anchor="middle">Scan(s) CBCT</text>
+          <text class="d-label-s" x="75" y="110" text-anchor="middle">fichier ou dossier</text>
+
+          <path class="d-arrow" d="M145 100 H190"/>
+          <text class="d-label-s" x="167" y="142" text-anchor="middle">scan .nii.gz</text>
+          <path class="d-arrow-head" d="M190 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="195" y="78" width="140" height="44" rx="6"/>
+          <text class="d-label" x="265" y="96" text-anchor="middle">Conversion nnU-Net</text>
+          <text class="d-label-s" x="265" y="110" text-anchor="middle">p_NNN_0000.nii.gz</text>
+
+          <path class="d-arrow" d="M340 100 H385"/>
+          <text class="d-label-s" x="362" y="142" text-anchor="middle">cas au format nnU-Net</text>
+          <path class="d-arrow-head" d="M385 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="390" y="30" width="160" height="140" rx="6"/>
+          <text class="d-label" x="470" y="55" text-anchor="middle">nnU-Net v2</text>
+          <text class="d-label-s" x="470" y="70" text-anchor="middle">PlainConvUNet</text>
+          <text class="d-label-s" x="470" y="88" text-anchor="middle">resampling + CTNormalization</text>
+          <text class="d-label-s" x="470" y="104" text-anchor="middle">1 réseau binaire / structure</text>
+          <text class="d-label-s" x="470" y="120" text-anchor="middle">fenêtre glissante, pas 0,5</text>
+          <text class="d-label-s" x="470" y="136" text-anchor="middle">gaussienne, sans TTA miroir</text>
+          <text class="d-label-s" x="470" y="152" text-anchor="middle">resampling de sortie (torch/scipy)</text>
+
+          <path class="d-arrow" d="M555 100 H600"/>
+          <text class="d-label-s" x="577" y="142" text-anchor="middle">masques par structure</text>
+          <path class="d-arrow-head" d="M600 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="605" y="78" width="150" height="44" rx="6"/>
+          <text class="d-label" x="680" y="96" text-anchor="middle">Assemblage + fusion</text>
+          <text class="d-label-s" x="680" y="110" text-anchor="middle">binarisation, labels, VTK</text>
+        </svg>
+        <figcaption>Entrée CBCT → conversion → inférence nnU-Net (une structure = un réseau binaire) → assemblage et sorties. Tout tourne dans le Python de Slicer, sans conda.</figcaption>
+      </figure>
+
+      <h2 id="fichiers">2. Fichiers en jeu</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fichier</th><th>Rôle</th><th>Où ça tourne</th></tr></thead>
+          <tbody>
+            <tr><td><code>AMASSS/AMASSS.py</code></td><td>widget Slicer, 1654 lignes dont ~450 de feuilles de style clair/sombre</td><td>Python de Slicer</td></tr>
+            <tr><td><code>AMASSS_CLI/AMASSS_CLI.py</code></td><td>toute la logique : découverte des modèles, inférence, assemblage des sorties</td><td>Python de Slicer, via <code>slicer.cli.run</code></td></tr>
+            <tr><td><code>AMASSS_CLI/AMASSS_CLI.xml</code></td><td>déclaration des <strong>12 paramètres positionnels</strong></td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Le CLI <strong>n'est pas</strong> lancé dans un environnement conda : <code>slicer.cli.run</code> le
+      démarre dans le Python de Slicer, et depuis le portage de septembre 2026
+      (<code>109e1ed</code>) l'inférence nnU-Net tourne <strong>dans ce
+      processus</strong>, et non plus dans un <code>nnUNetv2_predict</code> fils.</p>
+
+      <p>CUDA n'est pas requis : <code>ResolveDevice()</code>
+      (<code>AMASSS_CLI.py:81</code>) retombe sur CPU en le
+      signalant. En pratique le CPU est inutilisable sur un batch (le resampling
+      scipy mono-cœur domine, cf. §5.1).</p>
+
+      <p><strong>Les arguments sont positionnels et lus par index</strong> dans <code>sys.argv</code>
+      (<code>AMASSS_CLI.py:922</code>), sans <code>argparse</code> malgré
+      l'import. L'ordre du XML fait donc foi : <code>inputVolume</code> (fichier <strong>ou</strong> dossier),
+      <code>modelDirectory</code>, <code>skullStructure</code> (codes séparés par virgule), <code>merge</code>
+      (<code>MERGE</code> / <code>SEPARATE</code> / les deux, découpé sur <code>[, ]+</code>), <code>genVtk</code>,
+      <code>save_in_folder</code>, <code>output_folder</code>, <code>vtk_smooth</code>, <code>prediction_ID</code> (défaut <code>Pred</code>),
+      <code>temp_fold</code> (<strong>effacé au démarrage</strong>), <code>SegmentInput</code>, <code>DCMInput</code> (<strong>jamais
+      utilisé</strong>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>Le widget construit aussi <code>param["highDefinition"]</code>
+        (<code>AMASSS.py:935</code>) : <strong>ce paramètre n'existe pas dans le
+        XML</strong>, il est silencieusement jeté. Voir §9.</p>
+      </div>
+
+      <h2 id="entrees">3. Entrées et prétraitements</h2>
+
+      <h3>3.1 Découverte des fichiers</h3>
+
+      <p><code>main()</code> accepte un fichier ou un dossier, parcouru en <strong><code>os.walk</code> récursif</strong>
+      (<code>AMASSS_CLI.py:676</code>) — nécessaire parce qu'AREG
+      écrit ses scans recalés dans <code>&lt;output&gt;/&lt;Region&gt;/&lt;patient&gt;_OutReg/</code>. Extensions
+      retenues : <code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>. Deux filtres : tout nom
+      contenant <code>MASK</code> est ignoré, et si <code>isSegmentInput</code> est faux, tout nom contenant
+      <code>_&lt;prediction_ID&gt;_</code> l'est aussi — c'est la sortie d'un passage précédent, la
+      re-segmenter donnerait un masque vide.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>Le widget, lui, compte les fichiers avec une liste d'extensions <strong>différente</strong>
+        (<code>.gipl</code> inclus) et des exceptions <code>["Seg","seg","Pred"]</code>
+        (<code>AMASSS.py:682</code>) : le compteur « Number of scans to
+        process » et ce que le CLI traite peuvent diverger.</p>
+      </div>
+
+      <h3>3.2 Conversion</h3>
+
+      <p><code>PrepareScanForNnunet()</code> (<code>AMASSS_CLI.py:557</code>)
+      copie chaque scan dans un dossier unique <code>&lt;temp&gt;/nnunet_input/</code> sous le nom
+      <code>p_&lt;NNN&gt;_0000.nii.gz</code> (<code>NNN</code> = index à trois chiffres, l'ordre de découverte).
+      Un <code>.nii.gz</code> est copié tel quel ; <strong>tout le reste est relu et réécrit par
+      SimpleITK</strong>. Ce n'est pas cosmétique : la version antérieure faisait un
+      <code>shutil.copy</code> d'un NRRD vers un nom <code>.nii.gz</code>, et le lecteur de nnU-Net choisit
+      son format sur l'extension — le NRRD, format par défaut de Slicer, était donc en
+      pratique cassé. Le type de voxel est laissé intact, nnU-Net castant en float32
+      lui-même.</p>
+
+      <h3>3.3 Ce qu'AMASSS ne fait plus</h3>
+
+      <p>Aucune normalisation d'intensité, aucun fenêtrage, aucun resampling <strong>n'est
+      écrit dans ce dépôt</strong>. <code>CorrectHisto()</code>
+      (<code>AMASSS_CLI.py:271</code>) subsiste, corps vidé : elle
+      lit l'image, la caste en float32 et la retourne — ni percentiles, ni clipping, ni
+      écriture, malgré sa signature <code>(min_porcent, max_porcent, i_min, i_max)</code>. <strong>Elle
+      n'est appelée nulle part</strong> : code mort.</p>
+
+      <p>Tout le prétraitement effectif est celui de nnU-Net, décrit par le <code>plans.json</code>
+      de chaque modèle (§4.2) : resampling vers le spacing cible, puis
+      <code>CTNormalization</code> (clip aux percentiles 0,5 % / 99,5 % des intensités de
+      premier plan du jeu d'entraînement, puis centrage-réduction par la moyenne et
+      l'écart-type de ce même jeu). Les valeurs par modèle sont dans le <code>plans.json</code>
+      du bundle, pas dans le dépôt.</p>
+
+      <h2 id="modeles">4. Les modèles</h2>
+
+      <h3>4.1 Le bundle et sa découverte</h3>
+
+      <p><code>FindModelFolder()</code> (<code>AMASSS_CLI.py:89</code>) cherche,
+      pour chaque code de structure :</p>
+
+      <pre class="ascii"><code>&lt;modelDirectory&gt;/&lt;CODE&gt;/**/&lt;Dataset...&gt;__nnUNetPlans__3d_fullres/fold_0/checkpoint_final.pth</code></pre>
+
+      <p>Un candidat n'est accepté qu'une fois le checkpoint <code>fold_0</code> <strong>confirmé
+      présent</strong>, sinon la structure est déclarée indisponible et le run continue avec
+      les autres. La découverte a lieu <strong>une seule fois pour tout le run</strong>.</p>
+
+      <p>Téléchargement : le bouton <em>Download latest models</em> ouvre simplement un
+      navigateur (<code>AMASSS.py:738</code>) sur <code>MODEL_LINK</code>, la page
+      <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/tag/AMASSS_CBCT">releases/tag/AMASSS_CBCT</a> —
+      <strong>aucun téléchargement automatique</strong> côté AMASSS. L'archive est
+      <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/AMASSS_CBCT/AMASSS_Models.zip">AMASSS_Models.zip</a>,
+      que AREG (<code>CBCT.py:124</code>,
+      <code>617</code>) et <a href="../VFACE/VFACE.html">VFACE</a>
+      (<code>VFACE.py:959</code>), eux, téléchargent bien. <a href="../ALI/ALI.html">ALI</a> passe encore
+      par un dépôt personnel, <a href="https://github.com/lucanchling/AMASSS_CBCT/releases/tag/v1.0.2">lucanchling/AMASSS_CBCT v1.0.2</a>
+      (<code>AMASSS_Models.zip</code> + <code>Masks_Models.zip</code>,
+      <code>CBCT.py:107</code>). Le README pointe encore vers
+      <code>ALL_NEW_MODELS.zip</code> et une ligne commentée vers <code>ALL_MODELS.zip</code> : reliques de
+      l'époque monai, ces archives contenaient des <code>.pth</code> bruts.</p>
+
+      <h3>4.2 Ce que contient réellement le bundle</h3>
+
+      <p>Relevé sur le bundle décompressé (<code>AMASSS_Models.zip</code>, hors dépôt) : <strong>neuf
+      dossiers</strong>, un par code, chacun contenant
+      <code>Dataset001_myseg/nnUNetTrainer__nnUNetPlans__3d_fullres/</code> avec <code>dataset.json</code>,
+      <code>plans.json</code> et <code>fold_0/checkpoint_final.pth</code>. Un seul fold.</p>
+
+      <p>Deux familles, distinguées par leur <code>plans.json</code> : <strong>full-FOV</strong> (<code>MAND</code>, <code>MAX</code>,
+      <code>CB</code>, <code>CV</code>, <code>UAW</code>, <code>SKIN</code>) à 0,4 mm isotrope, patch 128³, <code>numTraining = 76</code> ; et
+      <strong>masques</strong> (<code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code>) à 0,3 mm isotrope, patch
+      112 × 160 × 128, <code>numTraining = 50</code>.</p>
+
+      <p>Architecture, identique aux deux familles (champ <code>architecture</code> du <code>plans.json</code>) :</p>
+
+      <pre class="ascii"><code>dynamic_network_architectures.architectures.unet.PlainConvUNet
+n_stages = 6            features_per_stage = [32, 64, 128, 256, 320, 320]
+kernel_sizes = 6 x [3,3,3]          n_conv_per_stage = [2,2,2,2,2,2]
+n_conv_per_stage_decoder = [2,2,2,2,2]
+norm_op = InstanceNorm3d (eps 1e-5, affine)   conv_bias = True</code></pre>
+
+      <div class="callout warn">
+        <div class="callout-title">Divergence code / papier</div>
+        <p>Ce n'est <strong>pas</strong> un <code>monai.networks.nets.UNet</code> : ni <code>channels</code>, ni <code>strides</code>, ni
+        <code>num_res_units</code> n'apparaissent nulle part. <code>PlainConvUNet</code> est le U-Net
+        convolutionnel que nnU-Net configure lui-même, sans blocs résiduels ; les
+        <code>strides</code> viennent du plan (<code>[1,1,1]</code> puis 5 × <code>[2,2,2]</code> en full-FOV, dernier
+        étage <code>[1,2,2]</code> pour les masques, à cause de l'anisotropie du patch).
+        <code>batch_size = 2</code>, <code>use_mask_for_norm = [false]</code> partout. Le papier PLOS ONE 2022
+        décrit une <a class="gterm" href="../glossaire.html#g-unetr" title="Voir au glossaire">UNETR</a> <a class="gterm" href="../glossaire.html#g-monai" title="Voir au glossaire">MONAI</a> avec crop 128³ (encodeur transformer + décodeur
+        convolutionnel) ; le code exécuté aujourd'hui est un nnU-Net v2 <code>PlainConvUNet</code>
+        purement convolutionnel. Voir §10.</p>
+      </div>
+
+      <p><strong>Chaque modèle est binaire.</strong> Les <code>dataset.json</code> ne déclarent que
+      <code>{background: 0, &lt;une structure&gt;: 1}</code> — et pour les six modèles full-FOV le nom
+      du label est resté <code>"Skin"</code> par copier-coller, y compris pour <code>MAND</code> ou <code>CB</code>. Ce
+      nom n'est jamais lu : la sortie est binarisée par <code>(arr &gt; 0)</code>
+      (<code>AMASSS_CLI.py:586</code>) et c'est le CLI qui attribue
+      la valeur finale.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 720 210" role="img" aria-label="Découverte du bundle de modèles et inférence par structure">
+          <rect class="d-box" x="10" y="20" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="40" text-anchor="middle">modelDirectory</text>
+          <text class="d-label-s" x="100" y="55" text-anchor="middle">un dossier par code</text>
+
+          <path class="d-arrow" d="M100 75 V100"/>
+          <path class="d-arrow-head" d="M100 100 l-4 -7 h8 z"/>
+
+          <rect class="d-box" x="10" y="105" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="125" text-anchor="middle">FindModelFolder()</text>
+          <text class="d-label-s" x="100" y="140" text-anchor="middle">checkpoint fold_0 requis</text>
+
+          <path class="d-arrow" d="M195 130 H240"/>
+          <path class="d-arrow-head" d="M240 130 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="245" y="95" width="170" height="90" rx="6"/>
+          <text class="d-label" x="330" y="118" text-anchor="middle">1 réseau binaire</text>
+          <text class="d-label" x="330" y="134" text-anchor="middle">par structure</text>
+          <text class="d-label-s" x="330" y="152" text-anchor="middle">MAND CB UAW MAX CV SKIN</text>
+          <text class="d-label-s" x="330" y="166" text-anchor="middle">CBMASK MANDMASK MAXMASK</text>
+
+          <path class="d-arrow" d="M420 130 H465"/>
+          <path class="d-arrow-head" d="M465 130 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="470" y="95" width="160" height="90" rx="6"/>
+          <text class="d-label" x="550" y="118" text-anchor="middle">Boucle par</text>
+          <text class="d-label" x="550" y="134" text-anchor="middle">structure</text>
+          <text class="d-label-s" x="550" y="152" text-anchor="middle">predict_from_files_sequential</text>
+          <text class="d-label-s" x="550" y="166" text-anchor="middle">checkpoint chargé S fois</text>
+        </svg>
+        <figcaption>La découverte des modèles est faite une fois pour tout le run ; l'inférence boucle par structure sur le dossier entier des scans, pas par scan.</figcaption>
+      </figure>
+
+      <h3>4.3 Structures et labels</h3>
+
+      <p><code>LABELS["LARGE"]</code> (<code>AMASSS_CLI.py:43</code>) fait foi pour
+      les sorties fusionnées, et <code>LABEL_COLORS</code> donne la couleur des surfaces :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Label</th><th>Code</th><th>Structure</th><th>Couleur RVB</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><code>MAND</code></td><td>Mandible</td><td>216, 101, 79</td></tr>
+            <tr><td>2</td><td><code>CB</code></td><td>Cranial base</td><td>128, 174, 128</td></tr>
+            <tr><td>3</td><td><code>UAW</code></td><td>Upper airway</td><td>0, 0, 0 (noir)</td></tr>
+            <tr><td>4</td><td><code>MAX</code></td><td>Maxilla</td><td>230, 220, 70</td></tr>
+            <tr><td>5</td><td><code>CV</code></td><td>Cervical vertebra</td><td>111, 184, 210</td></tr>
+            <tr><td>6</td><td><code>SKIN</code></td><td>Skin</td><td>172, 122, 101</td></tr>
+            <tr><td>7, 8, 9</td><td><code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code></td><td>masques de recalage</td><td>blanc (<code>LABEL_COLORS</code> s'arrête à 6)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Codes <strong>sans modèle dans le bundle</strong> : <code>RC</code> (canal radiculaire), <code>TEETH</code>, <code>MCAN</code>.
+      Les deux derniers sont désactivés dans l'UI (<code>UNAVAILABLE_MODELS</code>) ; <code>RC</code> non, il
+      est même dans <code>DEFAULT_SELECT</code> (<code>AMASSS.py:256</code>) — coché
+      par défaut, il finit dans <code>missing_structures</code> avec un <code>logger.warning</code>.</p>
+
+      <p><code>LABELS["SMALL"]</code> (<code>MAND:1, RC:2, MAX:4</code>), <code>MODELS_GROUP</code>
+      (<code>AMASSS_CLI.py:256</code>) — qui décrivait les modèles
+      multi-classes de l'ancienne version, <code>FF</code> sortant MAND/CB/UAW/MAX/CV en un seul
+      réseau — et <code>NTRANSLATE</code> ne sont plus lus nulle part : <strong>code mort</strong>.</p>
+
+      <h3>4.4 L'inférence</h3>
+
+      <p>Aucun <code>sliding_window_inference</code> n'est écrit ici : c'est nnU-Net qui gère la
+      fenêtre glissante, à partir du <code>patch_size</code> de son plan. Le seul paramètre que le
+      CLI choisit est le pas.</p>
+
+      <p><code>BuildPredictor()</code> (<code>AMASSS_CLI.py:114</code>) fixe
+      <code>tile_step_size = 0.5</code> (50 % de chevauchement, codé en dur dans la signature),
+      <code>use_gaussian = True</code> (pondération gaussienne des patches),
+      <code>use_mirroring = False</code> (équivalent de <code>--disable_tta</code> : pas d'augmentation
+      miroir au test), <code>device</code> issu de <code>ResolveDevice()</code>, et <code>verbose</code> /
+      <code>verbose_preprocessing</code> / <code>allow_tqdm</code> à <code>False</code>. Le kwarg
+      <code>perform_everything_on_device</code> (renommé depuis <code>perform_everything_on_gpu</code> en
+      cours de série 2.x) est <strong>choisi par introspection</strong> de la signature.</p>
+
+      <p><code>PredictFolder()</code> (<code>AMASSS_CLI.py:206</code>) charge le
+      checkpoint (<code>initialize_from_trained_model_folder(..., use_folds=(0,),
+      checkpoint_name="checkpoint_final.pth")</code>) puis appelle
+      <strong><code>predict_from_files_sequential</code></strong> sur le dossier entier. Trois choix
+      structurants, tous commentés dans le code :</p>
+
+      <ol>
+        <li><strong>Chemin explicite du modèle</strong>, pas de <code>nnUNet_results</code>. <code>os.environ</code> est
+        global au processus : deux runs AMASSS simultanés s'écrasaient mutuellement
+        leur chemin de modèle.</li>
+        <li><strong>Boucle par structure, pas par scan</strong> : tous les scans dans un seul dossier
+        d'entrée, une prédiction de dossier par structure. Le checkpoint est chargé
+        <code>S</code> fois au lieu de <code>N × S</code>.</li>
+        <li><strong>Version séquentielle</strong> : <code>predict_from_files</code> fait du <code>spawn</code>, et sous
+        Slicer un worker ré-importe ce module et repaie tout l'import de torch ;
+        il lui faudrait de plus son propre contexte CUDA pour le resampling GPU.</li>
+      </ol>
+
+      <p>La progression reste comptée en pas <code>scan × structure</code>
+      (<code>AMASSS_CLI.py:815</code>) pour ne pas changer
+      l'échelle attendue par les widgets, alors que le travail est groupé par
+      structure : la barre avance par paliers de <code>scan_count</code>.</p>
+
+      <p>Une structure qui échoue est enregistrée dans <code>failed_structures</code> et le run
+      continue ; le run n'échoue que si <strong>toutes</strong> échouent.</p>
+
+      <h2 id="coeur">5. Le cœur algorithmique (non appris)</h2>
+
+      <h3>5.1 Resampling sur GPU</h3>
+
+      <p><code>EnableGpuResampling()</code> (<code>AMASSS_CLI.py:150</code>) est
+      la principale optimisation du CLI. D'après le commentaire du code, le resampling
+      scipy mono-cœur pèse <strong>environ sept fois</strong> le coût du réseau.</p>
+
+      <p>Le mécanisme : nnU-Net résout ses fonctions de resampling <strong>par leur nom</strong>, via
+      <code>recursive_find_resampling_fn_by_name</code>, à partir du dict de configuration.
+      Réécrire les deux noms redirige les deux extrémités, sans monkeypatch :</p>
+
+      <pre><code>configuration["resampling_fn_data"]          = "resample_torch_fornnunet"
+configuration["resampling_fn_probabilities"] = "resample_torch_fornnunet"
+configuration[f"{key}_kwargs"] = {"is_seg": False, "device": torch.device(device), "mode": "linear"}</code></pre>
+
+      <p>Trois garde-fous : la substitution n'a lieu que si les deux clés valent
+      exactement <code>resample_data_or_seg_to_shape</code> (un plan qui demande autre chose est
+      laissé intact) ; <code>PlansManager</code> distribue un <code>deepcopy</code>, donc muter le dict ne
+      touche ni les plans partagés ni un run concurrent ; les deux propriétés sont des
+      <code>@property @lru_cache</code>, d'où le <code>getattr(manager_class, key).fget.cache_clear()</code>,
+      sans lequel une valeur lue avant la bascule survivrait. Différence numérique
+      assumée : les données passent de l'ordre 3 à l'ordre 1 (torch n'a pas
+      d'interpolation cubique 3D) ; les probabilités étaient déjà en ordre 1.</p>
+
+      <p><strong>Repli automatique</strong> sur <code>torch.cuda.OutOfMemoryError</code> → <code>empty_cache()</code> puis
+      rejeu de la structure avec le resampler scipy
+      (<code>AMASSS_CLI.py:244</code>) : la version cloud a un
+      argument <code>gpu_resampling</code> explicite, impossible ici, la liste de paramètres étant
+      figée par le XML et ses appelants.</p>
+
+      <h3>5.2 Assemblage et écriture</h3>
+
+      <p><code>AssembleScanOutputs()</code> (<code>AMASSS_CLI.py:575</code>),
+      par scan : lecture de <code>p_&lt;NNN&gt;.nii.gz</code> dans chaque dossier <code>pred_&lt;STRUCT&gt;</code>
+      (absent → avertissement, structure sautée), binarisation <code>(arr &gt; 0)</code>, puis</p>
+
+      <ul>
+        <li><strong>SEPARATE</strong> si demandé <em>ou</em> s'il n'y a qu'une structure (un « merged » d'une
+        seule structure n'est que cette structure) ;</li>
+        <li><strong>MERGE</strong> si demandé et ≥ 2 structures : <code>np.where(mask == 1, label, merged)</code>
+        dans l'ordre de <code>merging_order</code> =
+        <code>["SKIN","CV","UAW","CB","MAX","MAND","CAN","RC","CBMASK","MANDMASK","MAXMASK"]</code>.
+        <strong>C'est un ordre de priorité</strong> : la dernière structure écrite écrase les
+        précédentes sur les voxels partagés. <code>"CAN"</code> n'existe dans aucun dictionnaire
+        (le code du canal est <code>MCAN</code>), entrée morte ; <code>.get(struct, 1)</code> ferait tomber
+        un code inconnu sur le label 1.</li>
+      </ul>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 700 190" role="img" aria-label="Assemblage des prédictions par structure et fusion selon l'ordre de priorité">
+          <rect class="d-box-n" x="10" y="10" width="150" height="36" rx="6"/>
+          <text class="d-label" x="85" y="33" text-anchor="middle">pred_MAND</text>
+          <rect class="d-box-n" x="10" y="55" width="150" height="36" rx="6"/>
+          <text class="d-label" x="85" y="78" text-anchor="middle">pred_MAX</text>
+          <rect class="d-box-n" x="10" y="100" width="150" height="36" rx="6"/>
+          <text class="d-label" x="85" y="123" text-anchor="middle">pred_CB, pred_UAW…</text>
+          <text class="d-label-s" x="85" y="150" text-anchor="middle">un dossier par structure</text>
+
+          <path class="d-arrow" d="M165 28 H220 M165 73 H220 M165 118 H220"/>
+          <path class="d-arrow-head" d="M220 28 l-7 -4 v8 z"/>
+          <path class="d-arrow-head" d="M220 73 l-7 -4 v8 z"/>
+          <path class="d-arrow-head" d="M220 118 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="225" y="45" width="150" height="60" rx="6"/>
+          <text class="d-label" x="300" y="68" text-anchor="middle">binarisation</text>
+          <text class="d-label-s" x="300" y="84" text-anchor="middle">(arr &gt; 0)</text>
+
+          <path class="d-arrow" d="M380 75 H420"/>
+          <path class="d-arrow-head" d="M420 75 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="425" y="10" width="120" height="60" rx="6"/>
+          <text class="d-label" x="485" y="33" text-anchor="middle">SEPARATE</text>
+          <text class="d-label-s" x="485" y="49" text-anchor="middle">1 masque / structure</text>
+          <text class="d-label-s" x="485" y="63" text-anchor="middle">int16</text>
+
+          <rect class="d-box-a" x="425" y="85" width="120" height="80" rx="6"/>
+          <text class="d-label" x="485" y="105" text-anchor="middle">MERGE</text>
+          <text class="d-label-s" x="485" y="120" text-anchor="middle">np.where(label, merged)</text>
+          <text class="d-label-s" x="485" y="134" text-anchor="middle">ordre = priorité</text>
+          <text class="d-label-s" x="485" y="148" text-anchor="middle">dernier écrase le reste</text>
+
+          <path class="d-arrow" d="M550 40 H595 M550 125 H595"/>
+          <path class="d-arrow-head" d="M595 40 l-7 -4 v8 z"/>
+          <path class="d-arrow-head" d="M595 125 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="600" y="60" width="90" height="45" rx="6"/>
+          <text class="d-label" x="645" y="79" text-anchor="middle">VTK</text>
+          <text class="d-label-s" x="645" y="94" text-anchor="middle">si genVtk</text>
+        </svg>
+        <figcaption>Assemblage par scan : chaque dossier de prédiction est binarisé, puis écrit séparé et/ou fusionné selon <code>merging_order</code> (la dernière structure de la liste écrase les précédentes sur les voxels partagés), puis surfacé en VTK si demandé.</figcaption>
+      </figure>
+
+      <p><code>SaveSeg()</code> (<code>AMASSS_CLI.py:524</code>) caste en int16,
+      recopie <strong>explicitement</strong> spacing, direction et origine du scan de référence,
+      puis passe par <code>MatchReferenceGeometry()</code>
+      (<code>AMASSS_CLI.py:502</code>), qui ne resample (plus
+      proche voisin) que si la géométrie diffère — no-op dans le cas normal. La version
+      antérieure écrivait un volume temporaire et le relisait pour forcer la géométrie :
+      deux allers-retours gzip d'un CBCT complet par structure, pour rien.</p>
+
+      <h3>5.3 Post-traitement : ce qu'il n'y a plus</h3>
+
+      <p>Aucun remplissage de trous, aucune sélection de composante connexe, aucune
+      morphologie n'est appliquée. Deux fonctions subsistent, <strong>appelées nulle part</strong> :</p>
+
+      <ul>
+        <li><code>CleanArray()</code> (<code>AMASSS_CLI.py:422</code>) — dilatation
+        binaire de rayon <code>r</code>, <code>BinaryFillhole</code>, érosion de rayon <code>r</code>, puis
+        <code>cc3d.connected_components</code> et conservation de la plus grosse composante ;</li>
+        <li><code>CropSkin()</code> (<code>AMASSS_CLI.py:489</code>) — remplissage,
+        érosion d'épaisseur <code>thickness</code>, différence des deux pour ne garder que la
+        coque, puis plus grosse composante.</li>
+      </ul>
+
+      <p>Dans la version monai, <code>CleanArray(sep_arr, 2)</code> était appliquée à toutes les
+      structures sauf <code>CV</code> et <code>RC</code>, et <code>CropSkin(sep_arr, 5)</code> à la peau. Le portage
+      nnU-Net a supprimé ces appels : le nettoyage repose entièrement sur le
+      post-traitement interne de nnU-Net (le <code>postprocessing.pkl</code> du bundle, s'il
+      existe). <code>cc3d</code> reste importé pour ces deux fonctions mortes, et <code>Write()</code>
+      (<code>AMASSS_CLI.py:287</code>) l'est aussi.</p>
+
+      <h3>5.4 Génération des surfaces VTK</h3>
+
+      <p><code>SavePredToVTK()</code> (<code>AMASSS_CLI.py:305</code>), appelée
+      depuis <code>SaveSeg</code> quand <code>genVtk</code> est vrai. Par label : écriture d'un NRRD
+      temporaire <code>&lt;temp&gt;/temp.nrrd</code> du masque binaire, <code>vtkNrrdReader</code> →
+      <code>vtkDiscreteMarchingCubes</code> avec <code>GenerateValues(1, 1, 1)</code> (un seul contour de
+      valeur 1 — d'où le passage par un masque binaire plutôt que par la carte de
+      labels) → <code>vtkSmoothPolyDataFilter</code> à <code>vtk_smooth</code> itérations (5 partout dans le
+      dépôt) → <code>vtkUnsignedCharArray</code> « Colors », <strong>une couleur constante par cellule</strong>
+      tirée de <code>LABEL_COLORS</code>.</p>
+
+      <p>Deux modes, choisis sur le suffixe <code>_MERGED</code> du nom de fichier : en <strong>merged</strong>,
+      boucle sur <code>np.unique(arr)</code> et concaténation par <code>vtkAppendPolyData</code> en <strong>un
+      seul</strong> <code>.vtk</code> ; en <strong>séparé</strong>, <code>struct = base.split('_')[-1]</code> — le code de
+      structure est <strong>re-extrait du nom de fichier</strong> pour retrouver la couleur.</p>
+
+      <p>Les maillages sont écrits <strong>dans le système de coordonnées de l'image</strong>, sans
+      flip <a class="gterm" href="../glossaire.html#g-lps" title="Voir au glossaire">LPS</a>/<a class="gterm" href="../glossaire.html#g-ras" title="Voir au glossaire">RAS</a> : ce sont des <code>vtkPolyData</code> issus des indices du NRRD.</p>
+
+      <h2 id="sorties">6. Post-traitements et sorties</h2>
+
+      <p>Nommage — <code>base</code> = nom du scan sans extension, <code>ext</code> = extension d'origine :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mode</th><th>Fichier</th><th>Contenu</th></tr></thead>
+          <tbody>
+            <tr><td>SEPARATE</td><td><code>&lt;base&gt;_&lt;prediction_ID&gt;_&lt;STRUCT&gt;&lt;ext&gt;</code></td><td><span class="badge calcule">calculé</span> masque binaire int16, un par structure</td></tr>
+            <tr><td>MERGE</td><td><code>&lt;base&gt;_&lt;prediction_ID&gt;_MERGED&lt;ext&gt;</code></td><td><span class="badge calcule">calculé</span> carte de labels int16 selon <code>LABELS["LARGE"]</code></td></tr>
+            <tr><td><code>genVtk</code></td><td><code>&lt;même nom&gt;.vtk</code></td><td><span class="badge calcule">calculé</span> surface(s) colorée(s)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>save_in_folder</code> ⇒ le tout va dans
+      <code>&lt;output_folder&gt;/&lt;base&gt;_&lt;prediction_ID&gt;_SegOut/</code> ; sinon directement dans
+      <code>&lt;output_folder&gt;</code>.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmé</div>
+        <p>Le dossier temporaire est <strong>effacé puis recréé au démarrage et à la fin</strong>.
+        <code>nnunet_input</code> est supprimé dès la fin des inférences, avant l'assemblage —
+        sinon un batch garderait une copie NIfTI complète de chaque CBCT jusqu'au bout ;
+        les prédictions d'un scan sont supprimées au fil de l'assemblage. <code>temp_fold</code> est
+        <code>rmtree</code> sans condition au démarrage (<code>AMASSS_CLI.py:648</code>), et widget, AREG et
+        <a href="../VFACE/VFACE.html">VFACE</a> passent tous <code>&lt;Documents&gt;/Slicer_temp_AMASSS</code> : deux runs concurrents
+        s'effacent mutuellement leur dossier de travail. Détails en §9.</p>
+      </div>
+
+      <p>Côté widget, <code>OnEndProcess()</code> (<code>AMASSS.py:1089</code>) charge
+      les <code>.vtk</code> du dossier de sortie dans la scène (opacité 0,1 pour la peau, 0,2 pour
+      mandibule/maxillaire si un canal radiculaire est présent). Ce chargement n'a lieu
+      que si <code>vtk_output_folder</code> est non nul, donc <strong>seulement</strong> pour une entrée
+      « fichier unique » sauvegardée dans son dossier d'origine avec la case surface
+      cochée (<code>AMASSS.py:944</code>). <code>LOADED_VTK_FILES</code> est un
+      <strong>global de module</strong> : les nœuds y restent référencés toute la session, même
+      après fermeture de la scène.</p>
+
+      <h2 id="predit-calcule">7. Ce qui est prédit vs ce qui est calculé</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bloc</th><th>Nature</th><th>Où</th></tr></thead>
+          <tbody>
+            <tr><td>Prétraitement (resampling, <code>CTNormalization</code>)</td><td><span class="badge calcule">calculé</span> déterministe, piloté par <code>plans.json</code></td><td>nnU-Net, in-process</td></tr>
+            <tr><td>Segmentation de chaque structure</td><td><span class="badge predit">prédit</span> réseau <code>PlainConvUNet</code> 3D, un par structure, binaire</td><td>nnU-Net, in-process, GPU si dispo</td></tr>
+            <tr><td>Fenêtre glissante, gaussienne, pas 0,5</td><td><span class="badge calcule">calculé</span> déterministe</td><td>nnU-Net</td></tr>
+            <tr><td>Resampling de sortie</td><td><span class="badge calcule">calculé</span> déterministe, torch (GPU) ou scipy</td><td>nnU-Net, resampler substitué par AMASSS</td></tr>
+            <tr><td>Binarisation + fusion par labels</td><td><span class="badge calcule">calculé</span> géométrique trivial (<code>np.where</code>)</td><td>CLI</td></tr>
+            <tr><td>Recalage de géométrie sur le scan</td><td><span class="badge calcule">calculé</span> ITK, plus proche voisin, no-op en pratique</td><td>CLI</td></tr>
+            <tr><td>Surfaces VTK</td><td><span class="badge calcule">calculé</span> <a class="gterm" href="../glossaire.html#g-marching-cubes" title="Voir au glossaire">marching cubes</a> + lissage laplacien</td><td>CLI</td></tr>
+            <tr><td>Nettoyage morphologique</td><td><strong>supprimé du pipeline</strong> (code mort)</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="environnement">8. Environnement</h2>
+
+      <p>Tout tourne dans le Python de Slicer. L'installation est déclenchée par le
+      bouton <em>Predict</em> (<code>AMASSS.py:851</code>), pas à l'ouverture du
+      module, et passe par une boîte de dialogue de confirmation.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Paquet</th><th>Version imposée</th><th>Raison lisible dans le code</th></tr></thead>
+          <tbody>
+            <tr><td><code>torch</code>, <code>torchvision</code>, <code>torchaudio</code></td><td><code>&gt;=2.2.0</code> (roues CUDA)</td><td>index <code>download.pytorch.org/whl/cu118</code> ou <code>cu121</code> selon la version CUDA détectée</td></tr>
+            <tr><td><code>nnunetv2</code></td><td><code>2.8.0</code></td><td>backend d'inférence</td></tr>
+            <tr><td><code>numpy</code></td><td><strong><code>1.26.4</code></strong> (<code>NUMPY_PINNED_VERSION</code>)</td><td>torch 2.2.0 est compilé contre numpy 1.x ; numpy ≥ 2 casse tout import torch avec <code>_ARRAY_API not found</code></td></tr>
+            <tr><td><code>pydicom</code></td><td><code>3.0.2</code></td><td><strong>ne pas rétrograder</strong> : pydicom 2.x casse <code>dicomweb-client</code> et <code>highdicom</code>, donc tous les modules DICOM de Slicer</td></tr>
+            <tr><td><code>dicom2nifti</code></td><td><code>2.6.2</code></td><td>compatibilité avec pydicom 3</td></tr>
+            <tr><td><code>itk</code>, <code>blosc2</code>, <code>einops</code>, <code>nibabel</code></td><td>libre</td><td>dépendances de nnU-Net</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>fix_numpy_version()</code> (<code>AMASSS.py:55</code>) est rappelée <strong>après</strong>
+      toutes les installations : pip résout chaque install indépendamment, et
+      <code>nnunetv2</code> (qui demande <code>numpy&gt;=1.24</code>) peut tirer numpy 2.x au passage.</p>
+
+      <p>Sous Windows, <code>check_lib_installed()</code> compare les suffixes <code>cuXXX</code> des trois
+      paquets torch et ne valide l'installation que s'ils concordent ; la détection de
+      version CUDA plafonne à <code>cu121</code> et retombe sur <code>cu118</code> en dessous de 12.1.</p>
+
+      <p>Pas de WSL, pas de conda : contrairement aux modules IOS (<a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a>,
+      <a href="../ALI/ALI.html">ALI_IOS</a>), AMASSS n'utilise aucun environnement externe.</p>
+
+      <h2 id="pieges">9. Pièges et points fragiles</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmé — small <a class="gterm" href="../glossaire.html#g-fov" title="Voir au glossaire">FOV</a> cassé</div>
+        <p><strong><code>highDefinition</code> / « small FOV » ne fait plus rien de ce qu'il prétend.</strong>
+        La case <code>smallFOVCheckBox</code> bascule la liste des structures proposées vers
+        <code>GROUPS_HD_SEG</code> (<code>AMASSS.py:747</code>) — mandibule,
+        maxillaire, dents, canal radiculaire, canal mandibulaire, dont trois n'ont pas
+        de modèle. Le flag <code>param["highDefinition"]</code> <strong>n'est pas déclaré dans le XML</strong>,
+        <code>slicer.cli.run</code> le jette, et le CLI n'a de toute façon plus aucun chemin
+        <code>SMALL</code> (spacing <code>[0.16, 0.16, 0.32]</code> et <code>MODELS_GROUP["SMALL"]</code> ont disparu
+        avec le portage). Cocher la case ne change que la liste de cases à cocher.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmé — entrée DICOM ignorée</div>
+        <p><strong><code>isDCMInput</code> est lu puis ignoré</strong> : <code>dicom2nifti</code> est importé en tête de
+        fichier et jamais utilisé, aucune conversion DICOM → NIfTI n'existe dans le
+        CLI, alors que l'UI propose « DICOM Files » comme type d'entrée. Une entrée
+        DICOM ne produit rien — aucun fichier n'a d'extension reconnue.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong><code>RC</code> coché par défaut sans modèle disponible</strong> : <code>DEFAULT_SELECT</code> inclut
+        « Root canal », le bundle publié n'a pas de dossier <code>RC</code>. Échec silencieux.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmé — dossier temporaire partagé</div>
+        <p><strong>Écrasement du dossier temporaire.</strong> <code>temp_fold</code> est <code>rmtree</code> sans condition
+        au démarrage (<code>AMASSS_CLI.py:648</code>), et widget,
+        AREG et <a href="../VFACE/VFACE.html">VFACE</a> passent tous <code>&lt;Documents&gt;/Slicer_temp_AMASSS</code> : <strong>deux runs
+        concurrents s'effacent mutuellement leur dossier de travail</strong>.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong>Index de case fragile</strong> : la correspondance <code>p_NNN</code> → fichier ne vit que dans
+        <code>scan_records</code>, en mémoire ; un crash en cours d'assemblage laisse des
+        prédictions anonymes dans le dossier temporaire.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong><code>struct = base.split('_')[-1]</code></strong> dans <code>SavePredToVTK</code> : un <code>prediction_ID</code>
+        ou un nom de scan contenant un underscore après le code de structure fait
+        lever un <code>KeyError</code> sur <code>LABELS["LARGE"][struct]</code>.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong>Divergence de comptage</strong> entre le widget (extensions <code>.gipl</code> incluses,
+        exceptions <code>Seg</code>/<code>seg</code>/<code>Pred</code>) et le CLI (<code>.gipl</code> non reconnu, exception sur
+        <code>_&lt;prediction_ID&gt;_</code> et <code>MASK</code>).</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong><code>cleanup()</code> du widget</strong> (<code>AMASSS.py:1348</code>) fait
+        <code>shutil.rmtree(os.path.join("..", "temp"))</code> : chemin relatif au répertoire
+        courant de Slicer, sans rapport avec <code>temp_fold</code>. L'exception est avalée.</p>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Note — code mort à connaître</div>
+        <p>CLI : <code>CorrectHisto</code>, <code>CleanArray</code>, <code>CropSkin</code>,
+        <code>Write</code>, <code>MODELS_GROUP</code>, <code>LABELS["SMALL"]</code>, <code>NTRANSLATE</code>. Widget :
+        <code>GetSegGroup</code>, <code>createProgressDialog</code>, <code>UpdateRunBtn</code> (qui lirait
+        <code>self.scan_ready</code>, <strong>jamais défini</strong> → <code>AttributeError</code>), <code>self.center_all</code>,
+        <code>self.save_adjusted</code> et leurs deux cases à cocher, rendues visibles et jamais
+        lues.</p>
+      </div>
+
+      <h2 id="litterature">10. Littérature</h2>
+
+      <p>AMASSS est publié, une fois :</p>
+
+      <blockquote>
+        <p>Gillot M., Baquero B., Le C., Deleat-Besson R., Bianchi J., Ruellas A., …,
+        Cevidanes L., Prieto J.C. <em>Automatic multi-anatomical skull structure
+        segmentation of cone-beam computed tomography scans using 3D UNETR.</em>
+        PLOS ONE 17(10):e0275033, 2022.
+        <a href="https://doi.org/10.1371/journal.pone.0275033">doi:10.1371/journal.pone.0275033</a>
+        — PMID 36223330, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9555672/">PMC9555672</a></p>
+      </blockquote>
+
+      <div class="callout warn">
+        <div class="callout-title">Divergence code / papier</div>
+        <p><strong>Le code a divergé du papier, complètement.</strong> Le papier décrit un <strong>UNETR</strong>
+        (encodeur transformer + décodeur convolutionnel, bibliothèque MONAI) : patches
+        128³, <code>feature_size=16</code>, <code>hidden_size=768</code>, <code>mlp_dim=3072</code>, 12 têtes d'attention,
+        dropout 5 %, entraîné sur 618 CBCT de 7 centres pour <strong>cinq</strong> structures, avec
+        resampling isotrope <strong>0,4 mm</strong> et ajustement de contraste par histogramme cumulé
+        aux percentiles 1 % / 99 %. Dice rapportés : peau 0,971, mandibule 0,962,
+        maxillaire 0,853, base du crâne 0,788, vertèbre cervicale 0,760.</p>
+      </div>
+
+      <p>C'est ce que faisait la version historique du CLI — <code>Create_UNETR(...)</code>,
+      <code>sliding_window_inference(input_img, [128,128,128], nbr_GPU_worker, net,
+      overlap=precision/100, sw_device=DEVICE, ...)</code>, <code>CorrectHisto</code> +
+      <code>ScaleIntensityd(0,1)</code> + <code>Spacingd(pixdim=[0.4,0.4,0.4])</code> ou <code>[0.16,0.16,0.32]</code>
+      en haute définition, puis <code>CleanArray</code>/<code>CropSkin</code> — lisible dans le dépôt
+      jusqu'au commit <code>61bbb15</code> « ENH: AMASSS with nnunet ». Le spacing haute
+      définition et le <code>precision</code> de l'UI étaient des paramètres du code, pas du
+      papier ; un <code>Create_SwinUNETR(feature_size=48)</code> y coexistait, commenté.</p>
+
+      <p>Le code actuel n'a plus rien de cela : <strong>nnU-Net v2, <code>PlainConvUNet</code>, un réseau
+      binaire par structure</strong>. Le spacing 0,4 mm survit, mais vient du <code>plans.json</code> des
+      poids ; la voie haute définition et le post-traitement morphologique ont disparu.
+      <strong>Aucune publication ne décrit la version nnU-Net d'AMASSS</strong> : citer le papier
+      PLOS ONE pour décrire le module tel qu'il tourne aujourd'hui revient à décrire
+      une architecture qui n'est plus exécutée.</p>
+
+      <ul>
+        <li><a href="https://doi.org/10.1038/s41592-020-01008-z">nnU-Net (Nat Methods, 2021)</a></li>
+        <li><a href="https://arxiv.org/abs/2103.10504">UNETR: Transformers for 3D Medical Image Segmentation (WACV 2022)</a></li>
+        <li><a href="https://github.com/Maxlo24/AMASSS_CBCT">Maxlo24/AMASSS_CBCT (dépôt d'origine)</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>Références complètes, PDF récupérés et liens à consulter : <a href="SOURCES.html">SOURCES.html</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Toutes les fiches</a> ·
+        <a href="SOURCES.html">Bibliographie de cet outil</a> ·
+        Source : <code>AMASSS.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

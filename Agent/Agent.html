@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent — SADT Atlas</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/site.js"></script>
+</head>
+<body data-cat="texte">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html" aria-current="page">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+
+    <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Texte &amp; langage</div>
+        <h1>Agent — pipeline complet</h1>
+        <p class="lede">Assistant en langage naturel qui choisit un module de l'extension, en extrait les
+        paramètres, construit la ligne de commande et la lance. Aucun réseau de neurones médical n'est appelé
+        ici — l'Agent ne fait que du routage et du remplissage de formulaire.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="Non publié — seul un rapport NA-MIC PW45 existe.">non publié</a>
+          <span class="badge cli">Agent_CLI</span>
+          <span class="badge neutral">Python de Slicer</span>
+          <span class="badge predit">qwen3:8b via <a class="gterm" href="../glossaire.html#g-ollama" title="Voir au glossaire">Ollama</a></span>
+          <span class="badge predit"><a class="gterm" href="../glossaire.html#g-cross-encoder" title="Voir au glossaire">cross-encoder</a> MiniLM-L6</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliographie</a>
+        </div>
+      </header>
+
+      <p>Tout tourne en local : un LLM 8B servi par Ollama, plus un petit cross-encoder pour présélectionner les
+      outils candidats.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 760 210" role="img" aria-label="Chaîne de routage : cross-encoder, LLM, extraction, commande">
+          <rect class="d-box"   x="14"  y="76" width="112" height="46" rx="5"/>
+          <text class="d-label" x="70"  y="96" text-anchor="middle">Demande</text>
+          <text class="d-label-s" x="70" y="111" text-anchor="middle">+ dossiers déposés</text>
+          <path class="d-arrow" d="M126 99 H156"/><path class="d-arrow-head" d="M156 99 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="158" y="70" width="140" height="58" rx="5"/>
+          <text class="d-label" x="228" y="90" text-anchor="middle">cross-encoder</text>
+          <text class="d-label-s" x="228" y="105" text-anchor="middle">23 outils scorés</text>
+          <text class="d-mono"  x="228" y="119" text-anchor="middle">top-3 en dur</text>
+          <path class="d-arrow" d="M298 99 H328"/><path class="d-arrow-head" d="M328 99 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="330" y="70" width="140" height="58" rx="5"/>
+          <text class="d-label" x="400" y="90" text-anchor="middle">LLM — routage</text>
+          <text class="d-label-s" x="400" y="105" text-anchor="middle">qwen3:8b, JSON</text>
+          <text class="d-mono"  x="400" y="119" text-anchor="middle">1 outil choisi</text>
+          <path class="d-arrow" d="M470 99 H500"/><path class="d-arrow-head" d="M500 99 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="502" y="70" width="140" height="58" rx="5"/>
+          <text class="d-label" x="572" y="90" text-anchor="middle">LLM — extraction</text>
+          <text class="d-label-s" x="572" y="105" text-anchor="middle">paramètres + chemins</text>
+          <path class="d-arrow" d="M642 99 H672"/><path class="d-arrow-head" d="M672 99 l-7 -4 v8 z"/>
+
+          <rect class="d-box"   x="674" y="76" width="74" height="46" rx="5"/>
+          <text class="d-label" x="711" y="96" text-anchor="middle">validation</text>
+          <text class="d-label-s" x="711" y="111" text-anchor="middle">Python pur</text>
+
+          <path class="d-arrow" d="M711 122 V152 H400"/>
+          <path class="d-arrow-head" d="M400 152 l7 -4 v8 z"/>
+          <rect class="d-box-a" x="248" y="158" width="300" height="42" rx="6"/>
+          <text class="d-label" x="398" y="176" text-anchor="middle">confirmation modale → subprocess.run</text>
+          <text class="d-label-s" x="398" y="191" text-anchor="middle">thread GUI bloqué pendant tout le job</text>
+          <text class="d-label-s" x="14" y="30">Le LLM contrôle les valeurs,</text>
+          <text class="d-label-s" x="14" y="44">jamais le binaire lancé.</text>
+        </svg>
+        <figcaption>Trois appels au même modèle — routage, extraction, réparation. Le choix du binaire, lui,
+        vient du manifeste.</figcaption>
+      </figure>
+
+      <h2 id="situation">1. Situation dans la chaîne</h2>
+
+      <p><strong>Personne n'appelle Agent.</strong> Un <code>grep</code> sur <code>slicer.modules.agent</code> ne
+      trouve aucun appelant hors du module lui-même. C'est un point d'entrée terminal.</p>
+
+      <p>Dans le sens sortant, deux niveaux :</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Appelé</th><th>Comment</th><th>Où</th></tr></thead>
+        <tbody>
+          <tr><td>Agent_CLI</td><td><code>slicer.cli.run(slicer.modules.agent_cli, ...)</code> (<code>Agent/Agent.py:798</code>)</td><td>processus CLI séparé, Python de Slicer</td></tr>
+          <tr><td>le module cible (ALI_CBCT.py, AMASSS_CLI.py, …)</td><td><code>subprocess.run(cli_args)</code> (<code>Agent/Agent.py:962</code>)</td><td>processus fils du widget, Python de Slicer</td></tr>
+          <tr><td>Ollama</td><td>client python <code>ollama</code>, HTTP sur <code>127.0.0.1:11434</code></td><td>serveur local, lancé/installé par le module</td></tr>
+        </tbody>
+      </table></div>
+
+      <p>L'inventaire des cibles est purement déclaratif : il vit dans <code>Agent_CLI/manifest.yaml</code>, un
+      YAML de 23 entrées <code>scripts</code>. L'Agent ne découvre rien tout seul, il ne connaît que ce
+      fichier.</p>
+
+      <div class="callout">
+        <div class="callout-title">Code mort</div>
+        <p><code>AgentLogic.process()</code> (<code>Agent.py:1315</code>) relance le CLI avec seulement
+        <code>folders</code> et <code>prompt</code> (il manque <code>modeagent</code> et
+        <code>temp_folder</code>, tous deux obligatoires côté XML) et lit <code>GetOutputText()</code>
+        immédiatement après un <code>wait=False</code>. Jamais appelé.
+        <code>Agent_CLI/Resources/UI/Agent_CLI.ui</code> est également inerte : un module CLI ne charge pas de
+        <code>.ui</code>.</p>
+      </div>
+
+      <h2 id="fichiers">2. Fichiers en jeu</h2>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Fichier</th><th>Rôle</th><th>Où ça tourne</th></tr></thead>
+        <tbody>
+          <tr><td><code>Agent/Agent.py</code></td><td>widget : chat, drop zone, installation d'Ollama, confirmation, exécution réelle, boucle de réparation</td><td>Python de Slicer</td></tr>
+          <tr><td><code>Agent_CLI/Agent_CLI.py</code></td><td>routage + extraction ; <strong>imprime du JSON sur stdout</strong>, n'exécute rien</td><td>processus CLI, Python de Slicer</td></tr>
+          <tr><td><code>Agent_CLI/Agent_CLI_utils/utils.py</code></td><td>manifeste, cross-encoder, appel Ollama, résolution de chemin, fabrication de la commande</td><td>idem</td></tr>
+          <tr><td><code>parameter_extraction_improved.py</code></td><td>construction du prompt d'extraction, rien d'autre</td><td>idem</td></tr>
+          <tr><td><code>parameter_validator.py</code></td><td>coercition de types, vérifs required / enum / range / extension</td><td>idem</td></tr>
+          <tr><td><code>Agent_CLI/manifest.yaml</code></td><td>les 23 outils adressables, leurs paramètres, leur ordre positionnel</td><td>donnée</td></tr>
+        </tbody>
+      </table></div>
+
+      <p>Pas de conda, pas de CUDA obligatoire. L'ensemble du module tourne dans le Python de Slicer ; le seul
+      GPU sollicité l'est indirectement, par le serveur Ollama.</p>
+
+      <h2 id="modeles">3. Les modèles</h2>
+
+      <h3 id="llm">3.1 Le LLM — qwen3:8b via Ollama</h3>
+
+      <p>Une seule constante, dupliquée aux deux bouts : <code>DEFAULT_MODEL = "qwen3:8b"</code>
+      (<code>utils.py:21</code>) et <code>MODEL_NAME = "qwen3:8b"</code> (<code>Agent.py:18</code>).
+      <code>get_router_model()</code> honore une variable d'environnement <code>ROUTER_MODEL</code> qui permet de
+      substituer n'importe quel modèle Ollama sans toucher au code.</p>
+
+      <p>Le <strong>même modèle sert aux trois appels</strong> : routage, extraction de paramètres, réparation.
+      Aucun modèle spécialisé, aucun fine-tuning.</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Point</th><th>Valeur</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>Moteur d'inférence</td><td><strong>Ollama</strong> (donc <a class="gterm" href="../glossaire.html#g-llamacpp" title="Voir au glossaire">llama.cpp</a> en dessous), API HTTP locale</td><td><code>import ollama</code>, port 11434</td></tr>
+          <tr><td>Format des poids</td><td><strong><a class="gterm" href="../glossaire.html#g-gguf" title="Voir au glossaire">GGUF</a></strong> — imposé par Ollama, pas de checkpoint transformers</td><td>déduit du moteur</td></tr>
+          <tr><td>Téléchargement</td><td><code>ollama pull qwen3:8b</code> depuis le registre ollama.com</td><td><code>Agent.py:1266</code>, et repli automatique dans <code>chat_with_auto_pull</code></td></tr>
+          <tr><td>Taille / <a class="gterm" href="../glossaire.html#g-quantification" title="Voir au glossaire">quantification</a></td><td>tag par défaut : <strong>5.2 Go, Q4_K_M, 8.19 G paramètres</strong></td><td>non déterminable depuis le dépôt : lu sur <a href="https://ollama.com/library/qwen3">ollama.com/library/qwen3</a></td></tr>
+          <tr><td>CPU ou GPU</td><td><strong>décidé par Ollama, pas par le code</strong></td><td>voir ci-dessous</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="callout warn">
+        <div class="callout-title">Ollama installé par snap = CPU</div>
+        <p>Le module ne passe jamais de directive de device. C'est le binaire Ollama qui décide, et le code en
+        tire une conséquence explicite : sur Linux, un Ollama installé par <strong>snap</strong> est sandboxé, ne
+        voit pas le GPU NVIDIA et retombe sur CPU — <strong>80–90 s par réponse</strong> pour un 8B, chiffre
+        mesuré et inscrit dans le code (<code>Agent.py:1231</code>). Le module détecte <code>/snap/</code> dans
+        le <code>realpath</code> du binaire et avertit, sans pouvoir corriger (le serveur snap tient déjà le port
+        11434, et le retirer demande sudo).</p>
+      </div>
+
+      <p>Quand aucun Ollama n'est trouvé, <code>install_official_ollama()</code> (<code>Agent.py:101</code>)
+      télécharge l'archive portable officielle dans <code>~/.slicer_agent/ollama</code> (surchargeable par
+      <code>SLICER_AGENT_HOME</code>) : <code>ollama-linux-{amd64,arm64}.tgz</code>,
+      <code>ollama-windows-{amd64,arm64}.zip</code>, ou <code>Ollama-darwin.zip</code> extrait avec
+      <code>ditto</code> puis dé-quarantainé avec <code>xattr</code>. Ces archives embarquent les bibliothèques
+      CUDA/Metal, d'où le choix délibéré de ne pas utiliser <code>curl | sudo sh</code> (pas de mot de passe root
+      depuis la GUI) ni le paquet snap. <code>LD_LIBRARY_PATH</code> est pointé sur
+      <code>&lt;install&gt;/lib/ollama</code> pour que le binaire trouve ses propres libs
+      (<code>Agent.py:56</code>).</p>
+
+      <p>Deux réglages d'appel seulement, dans <code>chat_with_auto_pull</code> (<code>utils.py:96</code>) :</p>
+      <ul>
+        <li><code>keep_alive="30m"</code> au lieu des 5 min par défaut, pour ne pas recharger 5 Go en VRAM entre
+        deux messages ;</li>
+        <li><code>format="json"</code> pour le routeur, l'extraction et la réparation (contrainte de grammaire
+        côté Ollama) — <strong>pas</strong> pour le mode consultant.</li>
+      </ul>
+
+      <p>Aucun <code>temperature</code>, <code>seed</code>, <code>num_ctx</code> ni <code>think</code> n'est
+      passé. qwen3 étant un modèle à raisonnement hybride, le mode consultant peut donc laisser passer du texte
+      de réflexion selon la version d'Ollama ; le seul post-traitement est
+      <code>output.replace("*","").replace("#","")</code> (<code>Agent_CLI.py:215</code>), qui supprime le
+      markdown en supprimant les caractères.</p>
+
+      <p>Si le modèle n'est pas présent, <code>chat_with_auto_pull</code> intercepte le message
+      <code>not found</code>, lance <code>ollama.pull(model, stream=True)</code> en imprimant la progression,
+      puis rejoue le chat. Toute autre erreur est relancée telle quelle.</p>
+
+      <h3 id="cross-encoder">3.2 Le cross-encoder — ms-marco-MiniLM-L-6-v2</h3>
+
+      <p>C'est le seul vrai réseau chargé dans le processus.
+      <code>CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")</code> (<code>utils.py:53</code>), via
+      <code>sentence-transformers</code> — donc poids <strong>transformers/safetensors</strong> téléchargés
+      depuis le Hub Hugging Face et mis en cache dans <code>~/.cache/huggingface</code>.</p>
+
+      <p>MiniLM 6 couches, 22,7 M paramètres, distillé de <code>MiniLM-L12-H384-uncased</code>, entraîné sur MS
+      MARCO Passage Ranking. Ce n'est <strong>pas</strong> un modèle d'embeddings : il n'y a pas de vecteurs ni
+      de similarité cosinus. La requête et le document sont concaténés et passés ensemble dans le transformer,
+      qui sort <strong>un scalaire de pertinence</strong> non borné (typiquement −10 à +10). Le device est celui
+      que <code>sentence-transformers</code> choisit tout seul selon le wheel torch installé.</p>
+
+      <p>Le cache <code>_cross_encoder_model</code> ne sert à rien en pratique : Agent_CLI.py est un
+      <strong>processus neuf à chaque requête</strong>, donc le modèle est rechargé à chaque message. Le
+      commentaire du code l'admet.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Repli silencieux du cross-encoder</div>
+        <p>En cas d'échec de chargement, le repli est brutal : <code>scripts[:k]</code>, c'est-à-dire <strong>les
+        trois premiers outils du manifeste</strong> (ali_cbct, ali_ios, amasss_cli) quelle que soit la question
+        (<code>utils.py:90</code>). L'opérateur n'en est pas informé.</p>
+      </div>
+
+      <h2 id="routage">4. Le routage</h2>
+
+      <p>Deux étages, et le LLM n'intervient qu'au second.</p>
+
+      <p><strong>Étage 1 — présélection par cross-encoder.</strong>
+      <code>cross_encoder_retrieve_candidates(manifest, prompt, k=3)</code> construit un document par outil :</p>
+
+      <pre><code>docs.append(f"{s['name']}: {s['description']} (tags: {tags})")
+scores = model.predict([(user_text, doc) for doc in docs])
+ranked = sorted(zip(scores, scripts), reverse=True)
+return [s for _, s in ranked[:k]]</code></pre>
+
+      <p>23 paires scorées, tri décroissant, <strong>top-3 en dur</strong> (<code>k=3</code> n'est jamais
+      paramétré). Le champ <code>priority</code> du manifeste (valeurs 1 à 23) n'est <strong>jamais lu</strong> —
+      la ligne qui le lirait est commentée (<code>utils.py:216</code>). Le bon outil qui sortirait 4ᵉ est
+      définitivement perdu ; le LLM ne le verra jamais.</p>
+
+      <p><strong>Étage 2 — choix par le LLM.</strong> Le prompt système (<code>Agent_CLI.py:105</code>) :</p>
+
+      <pre><code>You are a tool router. Output ONLY one JSON object.
+Schema:
+{"tool": string|null, "confidence": number, "reason": string}
+
+Rules:
+- Choose tool ONLY from the candidate list provided by the user message.
+- If none match, set tool = null and confidence &lt;= 0.4.
+- Do not invent tool names.
+- Keep reason short (max 1 sentence).</code></pre>
+
+      <p>Le message utilisateur est <code>USER_REQUEST: &lt;prompt&gt;</code> suivi de
+      <code>CANDIDATES (choose exactly one name from this list):</code> et du bloc construit par
+      <code>build_candidates_block</code> : une ligne par candidat,
+      <code>i) nom — description (tronquée à 140 caractères) | tags: t1, t2, … (8 max)</code>.</p>
+
+      <p>Trois choses à retenir :</p>
+      <ul>
+        <li><strong>Le contexte des dossiers n'est pas donné au routeur.</strong> <code>folders_context</code>
+        n'est ajouté qu'au prompt d'extraction.</li>
+        <li><strong>L'historique de conversation est injecté entre le système et l'utilisateur</strong>
+        (<code>*history</code>), et il contient les bulles de chat brutes du widget (« After reflection, I would
+        like to run … »). Le routeur JSON reçoit donc de la prose d'interface comme tours « assistant ».</li>
+        <li><strong><code>confidence</code> et <code>reason</code> ne servent à rien.</strong>
+        <code>confidence</code> est parsée, arrondie, sérialisée dans le JSON de sortie sous
+        <code>tool_confidence</code>… et jamais relue par le widget. Aucun seuil nulle part. La consigne
+        « confidence ≤ 0.4 » n'est pas une contrainte, juste une suggestion au modèle.</li>
+      </ul>
+
+      <p>Le seul filet est textuel : <code>if selected_tool and selected_tool != "null" and selected_tool !=
+      "None"</code>. Un nom d'outil halluciné qui ne serait pas dans le manifeste passe ce test, puis fait
+      échouer <code>build_cli_args</code> avec un <code>KeyError</code>, attrapé par le <code>try</code> global
+      de <code>main()</code> et renvoyé comme <code>{"error": …}</code>.</p>
+
+      <p><code>tools = build_tool_spec(manifest)</code> (<code>Agent_CLI.py:72</code>) est calculé puis
+      <strong>jamais utilisé</strong> : code mort, avec toute la gestion de l'« ancienne structure »
+      (<code>patterns</code>, <code>defaults</code>) qu'aucune entrée du manifeste actuel n'utilise.</p>
+
+      <h2 id="extraction">5. L'extraction des paramètres</h2>
+
+      <p>Un second appel LLM, un outil déjà choisi, dans <code>extract_parameters</code>
+      (<code>utils.py:220</code>).</p>
+
+      <p><strong>Masquage des paramètres techniques.</strong> Les paramètres nommés <code>temp_fold</code>,
+      <code>tmp_folder</code>, <code>temp_folder</code>, <code>log_path</code> ou <code>logPath</code> sont
+      retirés de la spec avant de construire le prompt — inutile de demander au modèle d'inventer un dossier
+      temporaire. Ils sont réinjectés après coup avec la valeur <code>input.temp_folder</code>, c'est-à-dire le
+      <code>slicer.util.tempDirectory()</code> créé par le widget à chaque clic (<code>Agent_CLI.py:153</code>),
+      et retirés de <code>missing_required</code>.</p>
+
+      <p><strong>Le prompt d'extraction</strong> (<code>parameter_extraction_improved.py:40</code>) liste chaque
+      paramètre sous la forme <code>- nom (type) [REQUIRED|optional] (encode: …): description</code>, puis impose
+      sept règles : format des listes selon <code>encode</code> (<code>comma_no_brackets</code>,
+      <code>space_separated</code>, <code>comma_separated</code>, <code>python_literal</code>), booléens et
+      nombres en JSON nu, « si le nom contient <em>folder</em> ou <em>dir</em>, donner un dossier sans nom de
+      fichier », et surtout :</p>
+
+      <pre><code>7. ONLY extract parameters mentioned in the user request
+   - Do NOT invent values
+   - Leave unmentioned optional parameters absent</code></pre>
+
+      <p>Sortie imposée :
+      <code>{"extracted": {...}, "confidence": 0.0-1.0, "missing_required": [...], "notes": "..."}</code>. Le
+      <code>missing_required</code> produit par le modèle est ignoré — c'est le validateur qui fait foi.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">La résolution des chemins est entièrement déléguée au LLM</div>
+        <p>Le widget passe la liste des éléments déposés dans la drop zone, jointe par des virgules
+        (<code>Agent.py:790</code>) ; le CLI la redécoupe sur <code>,</code> et l'enrobe :</p>
+        <pre><code>FOLDERS_CONTEXT:
+&lt;un chemin par ligne&gt;
+
+Rules:
+- Treat FOLDERS_CONTEXT as the source of truth for paths.
+- If a required path parameter is missing, try to infer it from FOLDERS_CONTEXT.
+- If multiple candidates exist, pick the most specific match and explain briefly in 'reason'.</code></pre>
+        <p>Ce bloc est <strong>concaténé au prompt utilisateur</strong>, pas passé séparément. Il n'y a ni
+        appariement heuristique, ni inspection du contenu des dossiers, ni vérification d'existence : c'est au
+        modèle de deviner lequel des chemins déposés est le T1, lequel est le T2, lequel est le dossier de
+        modèles. Un chemin contenant une virgule est coupé en deux par le <code>split(",")</code>.</p>
+      </div>
+
+      <p><strong>La validation</strong> (<code>parameter_validator.py</code>) enchaîne six passes : required
+      manquants, coercition de type (<code>bool</code>/<code>int</code>/<code>float</code>/<code>list</code>/<code>path</code>/<code>string</code>),
+      syntaxe de chemin, <code>choices</code>, <code>min</code>/<code>max</code>, paramètres hors spec. Deux
+      détails utiles :</p>
+      <ul>
+        <li><code>encode: lower_str_bool</code> force la chaîne <code>"true"</code>/<code>"false"</code> en
+        minuscules, parce que plusieurs CLI comparent l'argument brut sans <code>.lower()</code> —
+        <code>str(True)</code> donnerait <code>"True"</code> et ne matcherait jamais.</li>
+        <li><code>_check_paths</code> ne vérifie <strong>que</strong> deux choses : que
+        <code>Path(str(value))</code> ne lève pas (il ne lève quasiment jamais) et qu'un paramètre dont le nom
+        contient <code>folder</code>/<code>dir</code> ne finit pas par une extension connue. <strong>L'existence
+        du chemin n'est jamais testée.</strong></li>
+      </ul>
+
+      <p>Le résultat de la validation est presque entièrement jeté : <code>errors</code> et <code>warnings</code>
+      ne remontent nulle part. Leur seul effet est <code>final_confidence = confidence * 0.6</code> si invalide —
+      et cette confiance n'est lue par personne. Seuls <code>params</code> et <code>missing_required</code>
+      survivent.</p>
+
+      <h2 id="execution">6. Construction et exécution de la commande</h2>
+
+      <p><strong>Oui, le module est réellement lancé.</strong> Sans ambiguïté.</p>
+
+      <p>Le CLI ne fait que <strong>construire</strong> la commande. <code>build_cli_args</code>
+      (<code>utils.py:350</code>) fusionne les valeurs par défaut du manifeste avec les paramètres extraits,
+      puis :</p>
+
+      <pre><code>return [sys.executable, tool_path] + cli</code></pre>
+
+      <p><code>sys.executable</code> est l'interpréteur du processus Agent_CLI, donc le Python de Slicer. Pour
+      <code>cli_style: positional</code> (21 outils sur 23), les valeurs sont concaténées dans l'ordre de
+      déclaration du manifeste — <code>positional_order</code> est supporté mais <strong>aucune entrée ne le
+      renseigne</strong>. Pour tout autre <code>cli_style</code>, on tombe dans la branche
+      <code>--flag valeur</code>, en itérant sur <code>merged</code> : les paramètres hallucinés hors spec y sont
+      donc bel et bien émis.</p>
+
+      <p>La liste est renvoyée au widget dans le champ <code>command</code> du JSON. C'est
+      <code>AgentWidget</code> qui exécute, et seulement si <code>missing_required == []</code> :</p>
+      <ol>
+        <li>bulle de chat « After reflection, I would like to run X » ;</li>
+        <li><strong><code>QMessageBox.question</code></strong> listant <code>clé=valeur</code> pour chaque
+        paramètre (<code>Agent.py:864</code>) ;</li>
+        <li>sur Yes → <code>runToolWithRepair</code> → <code>subprocess.run(cli_args, capture_output=True)</code>.</li>
+      </ol>
+
+      <p>Si <code>missing_required</code> n'est pas vide, l'agent ne lance rien : il affiche la liste des
+      manquants et les valeurs déjà connues, et attend un message de suivi (que l'historique de conversation
+      permettra de raccrocher).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Slicer est gelé pendant le job</div>
+        <p><code>subprocess.run</code> est <strong>synchrone et sur le thread GUI</strong> : Slicer est gelé
+        pendant toute la durée du job — ce qui, pour une segmentation <a href="../AMASSS/AMASSS.html">AMASSS</a> ou un recalage AREG, se compte en
+        dizaines de minutes.</p>
+      </div>
+
+      <h2 id="reparation">7. La boucle de réparation</h2>
+
+      <p>Sur code de retour non nul, <code>runToolWithRepair</code> (<code>Agent.py:943</code>) demande au LLM de
+      corriger les paramètres, au plus <code>MAX_REPAIR_ATTEMPTS = 2</code> fois.
+      <code>build_repair_prompt</code> (<code>utils.py:282</code>) envoie les définitions de paramètres, les
+      valeurs utilisées, la commande complète et les <strong>2000 derniers caractères de stderr</strong>, et
+      demande de ne renvoyer que les paramètres à changer.</p>
+
+      <p>Ce chemin-là tourne <strong>dans le processus Slicer</strong>, pas dans le CLI :
+      <code>_proposeRepair</code> ajoute le dossier d'Agent_CLI à <code>sys.path</code> et réimporte
+      <code>Agent_CLI_utils</code> pour ne pas dupliquer la logique. La correction repasse par
+      <code>ParameterValidator</code> puis <code>build_cli_args</code>, un diff
+      <code>ancien -&gt; nouveau</code> est affiché, et <strong>une nouvelle confirmation Yes/No</strong> est
+      exigée. Si le diff est vide, la boucle s'arrête.</p>
+
+      <p><code>_suggestFixFor</code> (<code>Agent.py:903</code>) complète avec un diagnostic par mots-clés,
+      non-LLM : modèle Ollama absent, <code>ModuleNotFoundError</code>,
+      <code>NameError: name 'nn' is not defined</code> (régression connue de <code>transformers&gt;=4.53.0</code>,
+      huggingface/transformers#43784), <code>Numpy is not available</code> (ABI numpy 2 contre les wheels torch),
+      ou échec de connexion Ollama.</p>
+
+      <h2 id="modules">8. Les modules adressables — et leur état réel</h2>
+
+      <p>Les 23 entrées de <code>Agent_CLI/manifest.yaml</code>. La colonne de droite compare l'ordre positionnel
+      du manifeste à la signature <code>argparse</code> réelle du script cible, vérifiée fichier par fichier.</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Outil (manifest)</th><th>Script cible</th><th>Params manifeste / réels</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>ali_cbct</td><td><code>ALI_CBCT/ALI_CBCT.py</code></td><td>6 / 10</td><td>manquent <code>spacing</code>, <code>speed_per_scale</code>, <code>agent_fov</code>, <code>spawn_radius</code></td></tr>
+          <tr><td>ali_ios</td><td><code>ALI_IOS/ALI_IOS.py</code></td><td>6 / 10</td><td>décalage dès la position 5 (<code>teeth_mg</code> absent)</td></tr>
+          <tr><td>amasss_cli</td><td><code>AMASSS_CLI/AMASSS_CLI.py</code></td><td>5 / 12</td><td>le script refuse : « Expected 13 arguments »</td></tr>
+          <tr><td>areg_cbct</td><td><code>AREG_CBCT/AREG_CBCT.py</code></td><td>7 / 10</td><td><code>DCMInput</code> atterrit dans <code>add_name</code></td></tr>
+          <tr><td>areg_ios</td><td><code>AREG_IOS/AREG_IOS.py</code></td><td>6 / 7 requis</td><td><code>suffix</code> absent → <code>log_path</code> lu comme suffixe</td></tr>
+          <tr><td>autocrop3d</td><td><code>AutoCrop3D/Crop_Volumes_CLI/AutoCrop3D_CLI.py</code></td><td>5 / 6</td><td><code>suffix</code> absent → décalage</td></tr>
+          <tr><td>automatrix</td><td><code>Automatrix_CLI/Automatrix_CLI.py</code></td><td>7 / 9</td><td><code>suffix</code> et <code>matrix_name</code> absents</td></tr>
+          <tr><td>batchdentalseg</td><td><code>BATCHDENTALSEG/BATCHDENTALSEG.py</code></td><td><code>cli_style: ui_module</code></td><td><strong>module Slicer scripté, aucun <code>__main__</code></strong> — injouable</td></tr>
+          <tr><td>clic</td><td><code>CLIC/CLIC.py</code></td><td><code>cli_style: ui_module</code></td><td>idem, importe <code>slicer</code>, <code>qt</code>, <code>CondaSetUp</code></td></tr>
+          <tr><td>docshapeaxi</td><td><code>DOCShapeAXI_CLI/DOCShapeAXI_CLI.py</code></td><td>8 / 8</td><td><strong>signature correcte</strong></td></tr>
+          <tr><td>flexreg</td><td><code>FlexReg_CLI/FlexReg_CLI.py</code></td><td>21 / 23</td><td><code>shift_lr</code>, <code>shift_ap</code> absents</td></tr>
+          <tr><td>medx_dashboard</td><td><code>MedX_CLI/MedX_Dashboard/MedX_Dashboard.py</code></td><td>2 / 3</td><td><code>log_path</code> absent</td></tr>
+          <tr><td>medx_summarize</td><td><code>MedX_CLI/MedX_Summarize/MedX_Summarize.py</code></td><td>4 / 4</td><td><strong>signature correcte</strong></td></tr>
+          <tr><td>mri2cbct_approx</td><td><code>MRI2CBCT_CLI/MRI2CBCT_APPROX/MRI2CBCT_APPROX.py</code></td><td>3 / 5</td><td><code>model_folder</code>, <code>tmp_folder</code> absents</td></tr>
+          <tr><td>mri2cbct_reg</td><td><code>MRI2CBCT_CLI/MRI2CBCT_REG/MRI2CBCT_REG.py</code></td><td>4 / 6</td><td><code>normalization</code>, <code>tempo_fold</code> absents</td></tr>
+          <tr><td>mri2cbct_lr_crop</td><td><code>MRI2CBCT_CLI/MRI2CBCT_LR_CROP/MRI2CBCT_LR_CROP.py</code></td><td>4 / 4</td><td><strong>signature correcte</strong></td></tr>
+          <tr><td>mri2cbct_orient_center</td><td><code>MRI2CBCT_CLI/MRI2CBCT_ORIENT_CENTER_MRI/MRI2CBCT_ORIENT_CENTER_MRI.py</code></td><td>4 / 4</td><td><strong>signature correcte</strong></td></tr>
+          <tr><td>mri2cbct_resample</td><td><code>MRI2CBCT_CLI/MRI2CBCT_RESAMPLE_CBCT_MRI/MRI2CBCT_RESAMPLE_CBCT_MRI.py</code></td><td>10 / 10</td><td><strong>signature correcte</strong></td></tr>
+          <tr><td>mri2cbct_tmj_crop</td><td><code>MRI2CBCT_CLI/MRI2CBCT_TMJ_CROP/MRI2CBCT_TMJ_CROP.py</code></td><td>6 / 6</td><td><strong>signature correcte</strong></td></tr>
+          <tr><td>pre_aso_cbct</td><td><code>ASO_CBCT/PRE_ASO_CBCT/PRE_ASO_CBCT.py</code></td><td>5 / 6</td><td><code>SmallFOV</code> absent (position 4)</td></tr>
+          <tr><td>pre_aso_ios</td><td><code>ASO_IOS/PRE_ASO_IOS/PRE_ASO_IOS.py</code></td><td>7 / 9</td><td><code>add_inname</code>, <code>folder_error</code> absents</td></tr>
+          <tr><td>semi_aso_cbct</td><td><code>ASO_CBCT/SEMI_ASO_CBCT/SEMI_ASO_CBCT.py</code></td><td>4 / 5</td><td><code>add_inname</code> absent</td></tr>
+          <tr><td>semi_aso_ios</td><td><code>ASO_IOS/SEMI_ASO_IOS/SEMI_ASO_IOS.py</code></td><td>7 / 9</td><td><code>add_inname</code>, <code>folder_error</code> absents</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="callout bug">
+        <div class="callout-title">6 signatures sur 23 sont correctes</div>
+        <p>Comme aucun paramètre n'est nommé côté CLI (tout est positionnel), une signature trop courte ne donne
+        pas une erreur franche mais un <strong>décalage silencieux</strong> : sur <code>areg_ios</code>, le
+        chemin du fichier de log part comme suffixe de nom de fichier.</p>
+      </div>
+
+      <p>Absents du manifeste, donc inaccessibles à l'Agent : <a href="../VFACE/VFACE.html">VFACE</a>, <a href="../GreedyReg/GreedyReg.html">GreedyReg</a>, <a href="../CNE/CNE.html">CNE</a>, <a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a>, <a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a>,
+      Medical_Data_Anonymizer.</p>
+
+      <h3 id="resolve-path">Le chemin des scripts ne se résout pas</h3>
+
+      <p>Problème plus fondamental que les signatures. Le manifeste ne donne que des noms nus
+      (<code>path: "ALI_CBCT.py"</code>). <code>resolve_tool_path</code> (<code>utils.py:143</code>) cherche,
+      dans l'ordre : <code>$AGENT_CLI_TOOLS_DIR/&lt;nom&gt;</code>,
+      <code>&lt;manifest_dir&gt;/CLI files/&lt;nom&gt;</code>, <code>&lt;manifest_dir&gt;/&lt;nom&gt;</code>,
+      puis <code>&lt;ancêtre&gt;/CLI files/&lt;nom&gt;</code> en remontant 4 niveaux.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 700 176" role="img" aria-label="resolve_tool_path échoue sur les quatre candidats">
+          <text class="d-label-s" x="14" y="20">resolve_tool_path — quatre candidats, aucun ne matche</text>
+          <rect class="d-box" x="14"  y="32" width="158" height="34" rx="4"/>
+          <text class="d-mono" x="93" y="53" text-anchor="middle">$AGENT_CLI_TOOLS_DIR</text>
+          <text class="d-label-s" x="180" y="53">non défini</text>
+          <rect class="d-box" x="14"  y="72" width="158" height="34" rx="4"/>
+          <text class="d-mono" x="93" y="93" text-anchor="middle">&lt;manifest&gt;/CLI files/</text>
+          <text class="d-label-s" x="180" y="93">n'existe pas dans ce dépôt</text>
+          <rect class="d-box" x="14"  y="112" width="158" height="34" rx="4"/>
+          <text class="d-mono" x="93" y="133" text-anchor="middle">&lt;manifest&gt;/</text>
+          <text class="d-label-s" x="180" y="133">les scripts sont ailleurs</text>
+          <path class="d-arrow" d="M400 89 H446"/><path class="d-arrow-head" d="M446 89 l-7 -4 v8 z"/>
+          <rect class="d-box-a" x="448" y="60" width="238" height="58" rx="6"/>
+          <text class="d-label" x="567" y="82" text-anchor="middle">retourne candidates[0]</text>
+          <text class="d-label-s" x="567" y="98" text-anchor="middle">chemin inexistant → Python sort en code 2</text>
+          <text class="d-label-s" x="567" y="112" text-anchor="middle">→ déclenche la boucle de réparation</text>
+        </svg>
+        <figcaption>La réparation corrige des <em>paramètres</em> : elle ne peut structurellement rien contre un
+        chemin de script introuvable, et brûle deux allers-retours LLM.</figcaption>
+      </figure>
+
+      <div class="callout bug">
+        <div class="callout-title">Sans <code>AGENT_CLI_TOOLS_DIR</code>, l'Agent ne peut lancer aucun module</div>
+        <p><strong>Il n'existe aucun dossier <code>CLI files</code> dans SlicerAutomatedDentalTools.</strong> Le
+        commentaire du code cite le layout <code>AI_Agent/Agent_CLI/ + .../CLI files/</code>, celui du dépôt
+        d'origine dont Agent_CLI a été extrait. Ici, chaque script vit dans le dossier de son propre module
+        (<code>ALI_CBCT/ALI_CBCT.py</code>, …). Aucun candidat ne matche, la fonction retourne
+        <code>candidates[0]</code> « pour que le message d'erreur pointe un chemin debuggable », soit
+        <code>&lt;Agent_CLI&gt;/CLI files/ALI_CBCT.py</code>.</p>
+        <p><code>subprocess.run</code> ne lève pas (l'exécutable, <code>sys.executable</code>, existe) ; c'est
+        Python qui sort en code 2 sur un fichier introuvable, ce qui déclenche la boucle de réparation —
+        laquelle, en corrigeant des <em>paramètres</em>, ne peut structurellement rien y faire.</p>
+      </div>
+
+      <p>Et même chemins résolus, une partie des cibles échouerait : <code>DOCShapeAXI_CLI.py</code> importe
+      <code>shapeaxi</code>, <code>MRI2CBCT_TMJ_CROP.py</code> importe <code>nnunetv2</code>. Ces paquets vivent
+      dans des environnements conda que leurs modules Slicer respectifs invoquent par <code>conda run -n …</code>
+      ou <code>CondaSetUpCall</code>. L'Agent, lui, lance tout avec <code>sys.executable</code>, c'est-à-dire le
+      Python de Slicer, <strong>jamais conda</strong>.</p>
+
+      <h2 id="modes">9. Les deux modes</h2>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Mode (combo <code>comboBox</code>)</th><th>Sortie d'Agent_CLI</th><th>Exécution</th></tr></thead>
+        <tbody>
+          <tr><td><code>Agent (Automated)</code></td><td>JSON <code>{tool, tool_confidence, parameters_confidence, parameters, missing_required, command}</code></td><td>oui, après confirmation</td></tr>
+          <tr><td><code>Ask (Interactive)</code></td><td>texte libre</td><td><strong>aucune</strong></td></tr>
+        </tbody>
+      </table></div>
+
+      <p>En mode <code>Ask</code>, <code>build_candidates_block(..., include_parameters=True)</code> ajoute à
+      chaque ligne <code>| parameters:&lt;liste YAML brute de dicts&gt;</code> — le repr Python de la structure
+      du manifeste est injecté tel quel dans le prompt système d'un « expert medical image analysis
+      consultant ». Aucun <code>format="json"</code>, la réponse est affichée après suppression des
+      <code>*</code> et des <code>#</code>.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Trois noms pour deux modes</div>
+        <p>Le README appelle ce mode « Consultant », l'UI dit « Ask (Interactive) ». Le code ne teste que
+        <code>== "Agent (Automated)"</code>, donc n'importe quelle autre valeur tombe en mode consultant.</p>
+      </div>
+
+      <h2 id="garde-fous">10. Garde-fous</h2>
+
+      <p>Ce qui existe :</p>
+      <ul>
+        <li><strong>Une confirmation modale obligatoire</strong> avant chaque exécution, listant tous les
+        paramètres, et <strong>une seconde</strong> avant chaque tentative de réparation.</li>
+        <li><strong>Blocage sur paramètres requis manquants</strong> : rien n'est lancé tant que
+        <code>missing_required</code> n'est pas vide.</li>
+        <li><strong>Coercition de types</strong> et vérification <code>choices</code> / <code>min</code> /
+        <code>max</code> / extension-sur-dossier.</li>
+        <li><strong>Masquage des dossiers temporaires</strong>, remplis depuis
+        <code>slicer.util.tempDirectory()</code> plutôt que par le modèle.</li>
+        <li><strong>Bornage</strong> : <code>MAX_REPAIR_ATTEMPTS = 2</code>, historique tronqué à
+        <code>MAX_HISTORY_ENTRIES = 40</code> tours.</li>
+        <li><strong><code>try</code> global</strong> dans <code>main()</code> : stdout reste toujours du JSON
+        parsable, la traceback part sur stderr.</li>
+      </ul>
+
+      <p>Ce qui n'existe pas :</p>
+      <ul>
+        <li><strong>Aucun seuil de confiance.</strong> <code>tool_confidence</code> et
+        <code>parameters_confidence</code> sont calculés et sérialisés, puis ignorés. Un routage à 0.1 est traité
+        comme un routage à 0.95.</li>
+        <li><strong>Aucune vérification d'existence des chemins.</strong> Un chemin halluciné passe validation,
+        passe la confirmation (l'opérateur doit le repérer à l'œil dans la boîte de dialogue), et n'échoue qu'au
+        lancement du module cible.</li>
+        <li><strong>Les erreurs du validateur ne sont jamais affichées.</strong> <code>errors</code>,
+        <code>warnings</code> et <code>extra_params</code> sont produits puis jetés.</li>
+        <li><strong>Aucune protection sur les dossiers de sortie.</strong> Si le modèle choisit comme
+        <code>output_folder</code> un dossier de données d'entrée, rien ne s'y oppose. Plusieurs CLI du dépôt
+        écrasent leur fichier d'entrée.</li>
+        <li><strong>Les paramètres hors spec ne sont pas filtrés</strong> en mode <code>--flag</code>.</li>
+        <li><strong><code>log_path</code> reçoit un dossier</strong>, pas un fichier : les noms
+        <code>log_path</code> et <code>logPath</code> sont dans la liste des paramètres remplacés par
+        <code>input.temp_folder</code>. Les CLI qui ouvrent ce chemin en écriture échoueront.</li>
+        <li><strong>Aucune liste blanche d'exécutables.</strong> <code>subprocess.run</code> prend la liste telle
+        que construite. La protection réelle est que <code>tool_path</code> vient du manifeste, pas du LLM — le
+        modèle contrôle les <em>valeurs</em>, pas le binaire.</li>
+      </ul>
+
+      <h2 id="environnement">11. Environnement</h2>
+
+      <p><code>CheckDependencies</code> (<code>Agent.py:1141</code>) fait un <code>slicer.util.pip_install</code>
+      dans le Python de Slicer, <strong>dans cet ordre, qui compte</strong> :</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Paquet</th><th>Raison du pin</th></tr></thead>
+        <tbody>
+          <tr><td><code>ollama</code></td><td>client python seulement — pip ne fournit pas le serveur</td></tr>
+          <tr><td><code>pyyaml</code></td><td>lecture du manifeste</td></tr>
+          <tr><td><code>transformers&lt;4.53.0</code></td><td>régression <code>NameError: name 'nn' is not defined</code> dans <code>integrations/accelerate.py</code>, casse l'import du cross-encoder</td></tr>
+          <tr><td><code>numpy&lt;2</code></td><td>numpy ≥ 2 casse l'ABI des wheels torch pip (<code>RuntimeError: Numpy is not available</code>)</td></tr>
+          <tr><td><code>sentence-transformers</code></td><td>tire torch ; installé en dernier pour ne pas remonter les pins</td></tr>
+        </tbody>
+      </table></div>
+
+      <p>Agent_CLI.py tourne dans un processus séparé mais <strong>partage les site-packages de Slicer</strong>,
+      d'où l'installation côté widget. Aucun environnement conda n'est créé ni utilisé.</p>
+
+      <p>Le serveur Ollama est vérifié par une simple sonde socket sur <code>127.0.0.1:11434</code>
+      (<code>_ollama_responding</code>, timeout 0.5 s), relancé si besoin par <code>Popen([binary, "serve"])</code>
+      avec attente jusqu'à ~30 s par pas de 500 ms en gardant l'UI vivante.
+      <code>ensure_agent_ollama_running()</code> est rappelé <strong>avant chaque message</strong>
+      (<code>Agent.py:772</code>), parce qu'un serveur lancé par le module ne survit pas au redémarrage de
+      Slicer.</p>
+
+      <p>Windows : <code>CREATE_NO_WINDOW</code> pour ne pas faire clignoter une console. Pas de WSL,
+      contrairement au reste du dépôt.</p>
+
+      <h2 id="pieges">12. Pièges et points fragiles</h2>
+
+      <ul>
+        <li><strong><code>resolve_tool_path</code> ne trouve rien dans ce dépôt</strong> (§8). C'est le blocage
+        numéro un. Correctifs possibles : créer un dossier <code>CLI files</code> avec des liens, définir
+        <code>AGENT_CLI_TOOLS_DIR</code>, ou mettre des chemins relatifs au dépôt dans le manifeste et étendre la
+        recherche.</li>
+        <li><strong>17 signatures sur 23 sont fausses</strong>, et le décalage est silencieux.</li>
+        <li><strong><code>batchdentalseg</code> et <code>clic</code> ne sont pas des CLI.</strong> Le
+        <code>cli_style: ui_module</code> n'est traité nulle part : il tombe dans la branche <code>--flag</code>,
+        laquelle produit une commande qui ne peut pas fonctionner sur un module Slicer scripté.</li>
+        <li><strong><code>input.folders.split(",")</code></strong> casse tout chemin contenant une virgule, aussi
+        bien pour la liste de dossiers que pour le <code>join(",")</code> côté widget.</li>
+        <li><strong>Le cross-encoder est rechargé à chaque message</strong> (processus neuf), et son échec
+        dégrade vers les trois premiers outils du manifeste sans que l'opérateur en soit informé.</li>
+        <li><strong><code>k=3</code> en dur.</strong> 23 outils, 3 candidats : un mauvais scoring du
+        cross-encoder est irrattrapable par le LLM.</li>
+        <li><strong><code>priority</code> est inerte</strong>, ce qui rend le classement du manifeste
+        trompeur.</li>
+        <li><strong><code>subprocess.run</code> bloque le thread GUI</strong> pendant toute l'exécution du
+        module.</li>
+        <li><strong>L'historique mélange prose d'UI et contexte de routage</strong> : les bulles de chat sont
+        renvoyées telles quelles comme tours <code>assistant</code> à un routeur contraint en JSON.</li>
+        <li><strong><code>OnRetrieveButton</code> reconstruit l'historique en découpant sur les émojis</strong>
+        <code>👨:</code> / <code>🤖:</code> (<code>Agent.py:1126</code>) : un message contenant ces caractères
+        désynchronise l'alternance.</li>
+        <li><strong>Détection de thème par échantillonnage de pixels</strong> (<code>widget.grab()</code>,
+        luminance du pixel (5,5)), parce que <code>QPalette</code> renvoie les couleurs du thème clair même en
+        thème sombre dans Slicer (<code>Agent.py:656</code>). Fonctionne, mais dépend du moment du premier rendu
+        — d'où le <code>QTimer.singleShot(0, ...)</code> du <code>setup</code>.</li>
+        <li><strong>Code mort</strong> : <code>AgentLogic.process()</code>, <code>build_tool_spec()</code> (et
+        tout le support <code>patterns</code>/<code>defaults</code>), <code>ValidationReport</code>,
+        <code>positional_order</code>, le champ <code>examples</code> du manifeste,
+        <code>_cross_encoder_model</code>, <code>Agent_CLI/Resources/UI/Agent_CLI.ui</code>.</li>
+        <li><strong><code>extract_parameters</code> retourne 4 valeurs</strong> alors que son annotation en
+        déclare 3.</li>
+      </ul>
+
+      <h2 id="predit-calcule">13. Ce qui est prédit vs ce qui est calculé</h2>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Bloc</th><th>Nature</th><th>Où</th></tr></thead>
+        <tbody>
+          <tr><td>Présélection des 3 candidats</td><td><span class="badge predit">réseau</span> (cross-encoder MiniLM-L6, 22,7 M)</td><td>processus Agent_CLI, CPU ou GPU selon torch</td></tr>
+          <tr><td>Choix final de l'outil</td><td><span class="badge predit">LLM</span> qwen3:8b, JSON contraint</td><td>serveur Ollama</td></tr>
+          <tr><td>Extraction des paramètres</td><td><span class="badge predit">LLM</span> qwen3:8b, JSON contraint</td><td>serveur Ollama</td></tr>
+          <tr><td>Résolution des chemins</td><td><span class="badge predit">LLM</span>, depuis <code>FOLDERS_CONTEXT</code></td><td>serveur Ollama</td></tr>
+          <tr><td>Validation / coercition</td><td><span class="badge calcule">déterministe</span>, Python pur</td><td>Agent_CLI</td></tr>
+          <tr><td>Dossiers temporaires</td><td><span class="badge calcule">déterministe</span>, <code>slicer.util.tempDirectory()</code></td><td>widget</td></tr>
+          <tr><td>Construction de la commande</td><td><span class="badge calcule">déterministe</span>, ordre du manifeste</td><td>Agent_CLI</td></tr>
+          <tr><td>Réparation après échec</td><td><span class="badge predit">LLM</span> qwen3:8b, depuis stderr</td><td>processus Slicer</td></tr>
+          <tr><td>Diagnostic d'erreur d'environnement</td><td><span class="badge calcule">mots-clés</span>, pas de LLM</td><td>widget</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="litterature">14. Littérature</h2>
+
+      <div class="callout">
+        <div class="callout-title">Aucun papier</div>
+        <p>Ni sur ce module, ni sur l'approche. Une recherche sur SlicerAutomatedDentalTools + agent LLM ne
+        remonte que la documentation du dépôt et de la littérature générale sur les LLM en dentisterie, sans
+        rapport avec ce code. Les seules références externes réelles sont celles des deux modèles utilisés, tous
+        deux génériques et non entraînés pour ce domaine.</p>
+      </div>
+
+      <ul>
+        <li><a href="https://ollama.com/library/qwen3">Qwen3 sur Ollama</a> — modèle de routage et
+        d'extraction</li>
+        <li><a href="https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-6-v2">cross-encoder/ms-marco-MiniLM-L-6-v2</a>
+        — reranker MS MARCO utilisé pour la présélection</li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>L'historique git du module tient en trois commits (<code>aa3330d</code> ADD: Add the new agentic module,
+      <code>b463312</code>, <code>2a91e33</code>) : c'est un ajout récent, importé d'un dépôt
+      <code>AI_Agent</code> séparé — d'où la désynchronisation entre le manifeste et les signatures réelles des
+      CLI de ce dépôt-ci.</p>
+
+      <p><strong>Bibliographie complète : <a href="SOURCES.html">SOURCES</a></strong> — recherche faite, résultat
+      négatif sur le plan des publications, mais un <strong>rapport NA-MIC Project Week PW45 (Boston, 2026) signé
+      par les auteurs du module</strong> a été retrouvé et récupéré dans ce dossier, avec les papiers des deux
+      modèles (Qwen3, MiniLM/MS MARCO) et de la méthode cross-encoder.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Toutes les fiches</a> ·
+        <a href="SOURCES.html">Bibliographie de cet outil</a> ·
+        <a href="2026_NAMIC_PW45_ai_agent_slicer_dental_tools.html">Rapport NA-MIC PW45</a> ·
+        Source : <code>Agent.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

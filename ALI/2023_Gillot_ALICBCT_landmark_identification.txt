@@ -1,0 +1,185 @@
+Gillot M, Miranda F, Baquero B, Ruellas A, Gurgel M, Al Turkestani N, Anchling L,
+Hutin N, Biggs E, Yatabe M, Paniagua B, Fillion-Robin JC, Allemang D, Bianchi J,
+Cevidanes L, Prieto JC.
+Automatic landmark identification in cone-beam computed tomography.
+Orthod Craniofac Res. 2023;26(4):560-567. doi:10.1111/ocr.12642
+PMID 36811276 - PMCID PMC10440369 - CC BY-NC-ND 4.0
+Texte integral recupere via Europe PMC (fullTextXML).
+
+Objective:
+To present and validate an open-source fully automated landmark placement (ALICBCT) tool for cone-beam computed tomography scans.
+
+Materials and Methods:
+One hundred and forty-three large and medium field of view cone-beam computed tomography (CBCT) were used to train and test a novel approach, called ALICBCT that reformulates landmark detection as a classification problem through a virtual agent placed inside volumetric images. The landmark agents were trained to navigate in a multi-scale volumetric space to reach the estimated landmark position. The agent movements decision relies on a combination of DenseNet feature network and fully connected layers. For each CBCT, 32 ground truth landmark positions were identified by 2 clinician experts. After validation of the 32 landmarks, new models were trained to identify a total of 119 landmarks that are commonly used in clinical studies for the quantification of changes in bone morphology and tooth position.
+
+Results:
+Our method achieved a high accuracy with an average of 1.54±0.87 mm error for the 32 landmark positions with rare failures, taking an average of 4.2 second computation time to identify each landmark in one large 3D-CBCT scan using a conventional GPU.
+
+Conclusion:
+The ALICBCT algorithm is a robust automatic identification tool that has been deployed for clinical and research use as an extension in the 3D Slicer platform allowing continuous updates for increased precision.
+
+1 ∣
+INTRODUCTION
+As artificial intelligence (AI) technology is evolving and being adopted in clinical practice and new workflows, the greatest challenges are to evaluate and monitor the agility, stability, adaptability and robustness of AI algorithms, towards ensuring clinical quality and patient safety. The best practices for AI infrastructure include clinical imaging data access and security, integration across platforms and domains, clinical translation and delivery, and a culture of inclusive participation and continuous updates. However, the rapid increase in the number of commercially available algorithms and the variety of ways in which each algorithm can affect clinical workflows adds complexity to the AI implementation process.,
+The accurate anatomical landmark localization for medical imaging data is a challenging problem due to the frequent ambiguity of their appearance and the rich variability of the anatomical structures. Landmark detection represents a prerequisite for medical image analysis. It supports entire clinical workflows from diagnosis, treatment planning, intervention, follow-up of anatomical changes, or disease conditions, and simulations. Landmark identification may serve as initialization to other algorithms such as segmentation algorithms, or image-to-image registration., Most of the available solutions for landmark detection rely on machine learning,- however, previous methods have been proposed for other image modalities and have not been validated for Cone-beam computed tomography (CBCT) scans with various imaging acquisition protocols to lower radiation dose in dentistry. Other approaches for landmark identification rely on sub-optimal search strategies, i.e., exhaustive scanning,, one-shot displacement estimation,, or end-to-end image mapping techniques., In many cases, these methods can lead to false-positive detection results and excessively high computation times.
+The application of AI technology for the automatic landmark identification in CBCT can help to promote precise and more efficient landmark location in different craniofacial structures of interest for oral research and clinical aspects. In the present study, the landmark detection task is set up as a behaviour classification problem for an artificial agent that navigates through the voxel grid of the image at different spatial resolutions. The aim of this study was to present and validate a new automated landmark identification method for CBCT (ALICBCT) inspired by a deep reinforcement learning system (DRL) technique.
+
+2 ∣
+MATERIALS AND METHODS
+This secondary data analysis was approved by the Institutional Review Board of the University of Michigan, School of Dentistry (HUM00217436). The sample was composed by 143 de-identified CBCT scans of patients acquired in 6 different University Centers (University of Michigan - School of Dentistry, University of University of Pacific - School of Dentistry, Scientific University of the South in Peru, National University of Colombia, CES University and Federal University of Ceará). The inclusion criteria were permanent dentition and image availability acquired for dental clinical purposes. The exclusion criteria were patients with craniofacial anomalies or syndromes and scans with artefacts produced by orthodontic appliances.
+Two open-source software packages, ITK-SNAP, version 3.8 (www.itksnap.org) and 3D Slicer, version 4.11 (www.slicer.org) were used by clinician experts to orient the scans and place the landmarks. Head orientation was performed accordingly with a previous study. For the large field of view, CBCT scans orientation was standardized across patients with Frankfort horizontal plane matching the axial plane, and the midsagittal plane matching the sagittal plane in a common coordinate system. For the small/medium field of view, the axial plane orientation was determined by the occlusal plane and the midsagittal plane by the midpalatal suture. A set of 32 landmarks located in different anatomical structures, including the cranial base, maxilla, mandible, an teeth () was created by the clinician experts, which was considered the ground truth (GT) fiducial list.
+The present method relies on two principles: a multi-scale environment and a search agent inspired by the behavioural problem solved as described in DRL Systems.
+2.1 ∣
+Environment
+The sample consisted of 77 large field of view CBCTs with voxel sizes varying from 0.3 to 0.4 mm, and 66 small/medium field of view CBCTs with voxel sizes varying from 0.08 to 0.16 mm. In order to obtain environments with the finest scale level, the large field of view scans were re-sampled to an isotropic resolution of 0.3 mm and the small/medium field of view scans were re-sampled to 0.08 mm. We wanted the agent to learn different scales of the structures of interest. For our multi scale-space, we used an additional low-resolution level at an isotropic spatial resolution of 1 mm. The image histograms were re-scaled to have better contrast and the data was normalized to a [−1.0, 1.0] interval. A multi-scale environment can be seen in . For each CBCT, the 32 landmark were marked by clinicians and stored as a fiducial list. During the training, the landmark's position from the list was mapped to the discrete image coordinates for each resolution and stored in the environment memory.
+
+2.2 ∣
+Agent
+The protagonist of this work was the agent. The agent is a virtual object whose goal is to reach a target position (the landmark) by moving inside an environment. The agent has a set of 6 possible actions, to move from one voxel to another by going superiorly, interiorly, anteriorly, posteriorly, left or right.
+The agent state is a 3D box around the agent position that has been cropped inside the environment (). The size of the FOV is an important parameter, and we have to make sure that enough relevant image features can be extracted at the current location while limiting memory usage. The agents use deep networks for feature extraction (FeatNet), followed by fully connected layers that predict the best action to take at any given step. A Densely connected convolution network (DenseNet) was used. The FeatNet is made of convolution layers that are trained to capture the different image features. It takes as input the agent's state and outputs a vector describing relevant image features. This vector is then fed into the fully connected dense layers that output a probability vector (P ∈ R) of the best movement to reach the final landmark position. The agent moves following the highest probability.
+
+2.3 ∣
+Training the agents
+Our data was split by scans, 70% for training, 10% for validation and 20% for testing. An environment was generated for each scan, and the position of corresponding landmarks was loaded. One agent was created for each landmark, and their network weights were initialized using a Xavier uniform function. For minimizing the distance between the agent and the landmark, each agent was trained using a combination of a state and the best action to take from the 6 possible movements described before.
+The high-resolution and low-resolution scans had an average size of 180×180×180 and 600×600×600 voxels, respectively. It means that for each environment, we had more than 200000000 possible states that could be used to train the agent. However, the higher the number of states an agent needs to be trained, the higher would be the memory usage and the training time. We used the following strategy to generate outputs for each agent and limit the memory usage and training time:
+At the low-resolution level, we initialized K random position with a 20% chance to be within a radius Rlow of a ground truth landmark (a region where more precision is needed). The remaining 80% could be anywhere in the scan. The agent is supposed to find the landmark from any starting point at this level.
+
+At the high-resolution level, we initialized K random position within a radius Rhigh of a ground truth landmark, knowing that the agent should be in this radius after the search at the low resolution.
+
+The K positions for both resolution level were generated evenly in the N environments selected for the training. At every training epoch, we updated 50% of the K positions with new randomly selected ones. This is one of the most important parts of our training strategy because it allowed the agent to be trained in most of the scan regions while reducing memory usage. The agent had a different network for each scale. These networks were optimized using the PyTorch library using a combination of algorithms and optimizer. The training was done on an NVIDIA Quadro RTX 6000/8000 GPU with a batch size of 100, Lx = Ly = Lz = 64, K = 10 000, N = 2, and Rlow = Rhigh = 30 voxels. It took about 4 h for one agent to be trained and reach a good accuracy.
+
+2.4 ∣
+Prediction of the landmarks' position
+To predict the landmark positions in a CBCT, we rescaled it to the resolutions used during training. The landmark location is predicted through the following steps ():
+Step 1: The prediction begins at the low-resolution level. The agent is placed in the middle of the scan to optimize the search time. Once the agent reaches a confident zone, it goes to the high-resolution layer.
+
+Step 2: The agent moves in the high-resolution layer until it sets a preliminary estimation of the landmark location.
+
+Step 3: Now, a verification step is applied. This step consists of another search in the high-resolution layer starting from the 6 possible positions in a small radius from the predicted location in Step 2. The final result is an average of the 6 predicted positions.
+
+During landmark position prediction, the stopping criteria is active and was implemented using a visitation map. The agent stops if it tries to reach a previously visited voxel. Fiducial lists are generated with the predicted positions of the landmarks and saved as JSON files.
+After the initial training and validation, the agents were trained to predict a list of 119 landmark located in the cranial base, maxilla, mandible and dental structures commonly used for quantification of skeletal and dental changes in clinical studies ().
+
+2.5 ∣
+Statistical analysis
+To assess the prediction accuracy, the distance between each landmark in the ground truth fiducial list and the predicted one was computed by using the root mean square error., A 5-folds cross-validation was performed. For each landmark group, the placement errors and percentage of fails are presented. The error is the distance of the predicted landmark to the ground truth in mm and the distribution of the prediction error for each landmark was tested. A prediction was considered failed when the agent did not find the landmark or when the error was greater than 5 mm.
+
+3 ∣
+RESULTS
+The results are summarized in that shows the errors (in mm) and fails (in %) for each landmark group. An average error of 1.54 mm was found for the landmark's prediction. A prediction is considered a failure when the agent did not reach the ground truth landmark region. Most of the landmarks have a 0% fail rate. shows the distribution of the prediction error (in mm) for each landmark. Only landmarks that presented percentages of failures are shown in .
+It took approximately 4.2 second on GPU for each landmark prediction. The prediction on the testing scans required 8.8 GB of cache memory and 2.1 GB of GPU memory. Each agent did 90 moves on average to reach the landmark position using a DenseNet. In addition, new agents were trained to locate an extended list of 119 landmarks in different craniofacial structures. Adequate landmark identification was observed with the final trained model with 119 landmarks ( and ).
+
+4 ∣
+DISCUSSION
+This study presents a novel method for robust and accurate anatomical landmarks localization for 3D medical imaging data. The addition of dental records into healthcare data ecosystems and infrastructure is challenging, time-consuming, and dependent on clinician expertise. To leverage unstructured information in imaging data, we proposed and validated a method for automatic landmark identification in CBCT targeting clinical applications for dental, oral, and craniofacial clinical conditions that require quantitative landmark-based phenotyping. Previous studies using CBCT scans have demonstrated that manual landmark placement is a precise but time-consuming process., Landmark placement using both surface models and MPR images took an average of 10:41 ± 4:01 minutes to trace each patient. In this study, the proposed open-source method combined the concept of scanning-based systems with smart displacement inside the scan using an agent. The training on a multi-resolution image enabled the artificial agent to systematically learn to find the targeted anatomical structures. The behaviour classification was solved using imitation learning, as this approach is easier to implement and train. It allows the use of deeper neural networks that encode a wider range of image features. The average automatic detection speed of 4.2 second for landmark was adequate considering the size of the CBCT volumes used.
+Our results showed that this novel approach is robust and finds landmarks in CBCT scans accurately and automatically. An average error of 1.54 ± 0.87 mm was found for the assessed landmarks. This error is below the clinician's average error limit of 2 mm.- In contrast, a previous study that tested an automatic landmark identification tool for CBCT showed a mean error distance of 3.19 ± 2.6 mm. Cranial base landmarks showed better accuracy than the maxillary and mandibular landmarks ( and ). Also, a smaller failure rate was found for the cranial base landmarks that included only landmarks placed in the midsagittal plane (). Previous studies with manual landmark identification have shown that variables located in edges, crests or apices and between structures with different densities were easier to identify and therefore can present higher levels of accuracy. Conversely, landmarks located on flat surfaces, curved bone structures, areas of low density, neighbouring areas of two dense structures or dental restorations are subjected to greater levels of error. This can explain the smaller accuracy found for some dental landmarks, which also includes greater individual variation in tooth position that may require additional training. Additionally, 4 dental landmarks in the present study had errors greater than 5 mm in 25% of the cases, probably due to crowns and restoration artefacts or impacted/ectopic teeth in the CBCTs scans. This is in accordance with a previous study that found greater errors for automatic landmark identification in dental landmarks when compared to manual landmark placement using computed tomography scans.
+Previous studies in 2D and 3D have demonstrated that landmark placement can present different level of errors in the three spatial dimensions (x, y and z)., Landmarks placed on curved structures, such as Gonion, can present greater levels of errors during placement and these errors can differ in the three spatial dimensions. In a 3D evaluation, a higher reliability along the X direction was found for Gonion, whereas this landmark presented poor reliability along the Y and Z directions. In the present study, the landmark placement accuracy was assessed using the root mean square error. The root mean square error is one of the top performance metric systems used to assess the precision of machine learning approaches., However, this method does not allow to assess the differences in error in the three spatial dimensions.
+A limitation of this study is the small sample size. However, this is an open-source code and software, where the machine learning models can be continuously updated to better assist clinicians and researchers in this crucial but time-consuming task. After validation of the proposed method, the clinical application was extended to 119 landmarks () annotated by clinician experts. Twenty-seven additional large field of view scans were used for initial location training of 119 landmarks, commonly required for 3D quantification of skeletal and dental structures. Future studies are needed to train a more robust generation of agents with larger datasets towards refining, testing and improving landmark placement accuracy with decreased failures in landmark location.
+Given the preliminary robustness and good timing performance, the algorithm has been deployed for clinical and research use in an open-source web-based clinical decision support system (https://dsci.dent.umich.edu), and in a user-friendly open-source 3D Slicer module, with the code and detailed read me files available in Github (https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentaITools) and video tutorials posted in Youtube (https://www.youtube.com/@DCBIA/playlists). Our models are developed with the Pytorch framework and monai library which facilitates reusability of the code and continuous improvement of the models. The current robustness of ALICBCT tool still requires clinical adjustments/verification from the users after the AI prediction. Continuous training of the ALICBCT will help increment the performance of the agents in future versions. We train separate model for each landmark, once that having separate machine learning models for each agent allows the clinician to make custom lists of landmarks and facilitates the periodic retraining of new agents separately without compromising the previously trained models.
+
+5 ∣
+CONCLUSION
+The ALICBCT algorithm presented an adequate level of accuracy in automatic landmark placement in CBCT scans. The precision and performance of this novel automated tool make it an important contribution to 3D imaging analysis in clinical and research studies. ALICBCT's open-source code and machine learning models offer the capability of continuous retraining with additional datasets to improve its performance. We expect to continue adding landmarks for future studies that require automated measurement and/or diagnostics.
+
+Supplementary Material
+Supplemental Table
+
+ACKNOWLEDGEMENTS
+Supported by NIDCR R01 024450 and AAOF - Graber Family Teaching and Research Award - Orthodontic Faculty Development Fellowship.
+Funding information
+American Association of Orthodontists Foundation; National Institute of Dental and Craniofacial Research
+
+CONFLICT OF INTEREST STATEMENT
+The authors have no conflict of interest to declare.
+*
+
+https://pytorch.org/
+
+†
+
+https://monai.io/
+
+SUPPORTING INFORMATION
+Additional supporting information can be found online in the section at the end of this article.
+DATA AVAILABILITY STATEMENT
+The data that support the findings of this study are available upon reasonable request from the corresponding author. The data are not publicly available due to privacy or ethical restrictions.
+
+REFERENCES
+1.
+DayeD, WigginsWF, LungrenMP, 
+Implementation of clinical artificial intelligence in radiology: who decides and how?
+Radiology. 2022;305(1):212151.10.1148/radiol.229021PMC971344436154286
+2.
+GhowsiA, HatcherD, SuhH, 
+Automated landmark identification on cone-beam computed tomography: accuracy and reliability. Angle Orthod. 2022;92(5):642–654.3565322610.2319/122121-928.1PMC9374352
+3.
+ZhangJ, LiuM, LeA, GaoY, ShenD. Alzheimer's disease diagnosis using landmark-based features from longitudinal structural MR images. IEEE J Biomed Health Inform. 2017;21(6):1607–1616.2853479810.1109/JBHI.2017.2704614PMC5685894
+4.
+YuJI, KimJS, ParkHC, 
+Evaluation of anatomical landmark position differences between respiration-gated MRI and four-dimensional CT for radiation therapy in patients with hepatocellular carcinoma. Br J Radiol. 2013;86(1021):20120221.2323969410.1259/bjr.20120221PMC3615390
+5.
+YangL, GeorgescuB, ZhengY, WangY, MeerP, ComaniciuD. Prediction based collaborative trackers (PCT): a robust and accurate approach toward 3D medical object tracking. IEEE Trans Med Imaging. 2011;30(11):1921–1932.2164204010.1109/TMI.2011.2158440
+6.
+CebralJR, LohnerR. Efficient simulation of blood flow past complex endovascular devices using an adaptive embedding technique. IEEE Trans Med Imaging. 2005;24(4):468–476.1582280510.1109/tmi.2005.844172
+7.
+PouchAM, WangH, TakabeM, 
+Fully automatic segmentation of the mitral leaflets in 3D transesophageal echocardiographic images using multi-atlas joint label fusion and deformable medial modeling. Med Image Anal. 2014;18(1):118–129.2418443510.1016/j.media.2013.10.001PMC3897209
+8.
+GlockerB, ZikicD, HaynorDR. Robust registration of longitudinal spine CT. Med Image Comput Comput Assist Interv. 2014;17(Pt 1):251–258.2533312510.1007/978-3-319-10404-1_32
+9.
+LüthiM, JudC, VetterT. Using landmarks as a deformation prior for hybrid image registration. In: MesterR, FelsbergM, eds. Pattern Recognition. DAGM. Vol 6835. Springer; 2011. Lecture Notes in Computer Science.
+10.
+CuingnetR, PrevostR, LesageD, CohenLD, MoryB, ArdonR. Automatic detection and segmentation of kidneys in 3D CT images using random forests. Med Image Comput Comput Assist Interv. 2012;15:66–74.10.1007/978-3-642-33454-2_923286115
+11.
+DonnerR, MenzeBH, BischofH, LangsG. Global localization of 3D anatomical structures by pre-filtered Hough forests and discrete optimization. Med Image Anal. 2013;17(8):1304–1314.2366445010.1016/j.media.2013.02.004PMC3807803
+12.
+GhesuFC, KrubasikE, GeorgescuB, 
+Marginal space deep learning: efficient architecture for volumetric image parsing. IEEE Trans Med Imaging. 2016;35(5):1217–1228.2704684610.1109/TMI.2016.2538802
+13.
+CriminisiA, ShottonJ, RobertsonD, KonukogluE. Regression forests for efficient anatomy detection and localization in CT studies. In: MenzeB, LangsG, TuZ, CriminisiA, eds. Medical Computer Vision. Recognition Techniques and Applications in Medical Imaging. MCV 2010. Lecture Notes in Computer Science. Vol 6533. Springer; 2011.
+14.
+ŠternD, EbnerT, UrschlerM. From local to global random regression forests: exploring anatomical landmark localization. In: OurselinS, JoskowiczL, SabuncuM, UnalG, WellsW, eds. Medical Image Computing and Computer-Assisted Intervention – MICCAI 2016. Lecture Notes in Computer Science. Vol 9901. Springer; 2016:221–229.
+15.
+DaiJ, LiY, HeK, SunJ. R-FCN: Object detection via region-based fully convolutional networks. Advances in Neural Information Processing Systems NIPS. 2016; 379–387.
+16.
+PayerC, ŠternD, BischofH, UrschlerM. Regressing heatmaps for multiple landmark localization using CNNs. In: OurselinS, JoskowiczL, SabuncuM, UnalG, WellsW, eds. Medical Image Computing and Computer-Assisted Intervention – MICCAI 2016. Lecture Notes in Computer Science. Vol 9901. Springer; 2016:230–238.
+17.
+YushkevichPA, PivenJ, HazlettHC. 
+User-guided 3D active contour segmentation of anatomical structures: significantly improved efficiency and reliability. Neuroimage. 2006;31(3):1116–1128.1654596510.1016/j.neuroimage.2006.01.015
+18.
+FedorovA, BeichelR, Kalpathy-CramerJ, 
+3D slicer as an image computing platform for the quantitative imaging network. Magn Reson Imaging. 2012;30(9):1323–1341.2277069010.1016/j.mri.2012.05.001PMC3466397
+19.
+RuellasAC, TonelloC, GomesLR, 
+Common 3-dimensional co-ordinate system for assessment of directional changes. Am J Orthod Dentofacial Orthop. 2016;149(5):645–656.2713124610.1016/j.ajodo.2015.10.021PMC4959834
+20.
+GhesuFC, GeorgescuB, ZhengY, 
+Multi-scale deep reinforcement learning for real-time 3D-landmark detection in CT scans. IEEE Trans Pattern Anal Mach Intell. 2019;41(1):176–189.2999001110.1109/TPAMI.2017.2782687
+21.
+HuangG, LiuZ, Van Der MaatenL, WeinbergerKQ. Densely connected convolutional networks. In: Proceedings of the IEEE conference on computer vision and pattern recognition. 2017:4700–4708.
+22.
+LangY, LianC, XiaoD, 
+Automatic localization of landmarks in craniomaxillofacial CBCT images using a local attention-based graph convolution network. Med Image Comput Comput Assist Interv. 2020;12264:817–826.3492717510.1007/978-3-030-59719-1_79PMC8675277
+23.
+BotchkarevA. A new typology design of performance metrics to measure errors in machine learning regression algorithms. Interdiscip J Inf Knowl Manag. 2019;14:45–76.
+24.
+BoroumandM, ChenM, FridrichJ. Deep residual network for Steganalysis of digital images. IEEE Trans Inf Forens Sec. 2019;14(5):1181–1193.
+25.
+HassanB, NijkampP, VerheijH, 
+Precision of identifying cephalometric landmarks with cone beam computed tomography in vivo. Eur J Orthod. 2013;35(1):38–44.2144778110.1093/ejo/cjr050
+26.
+LudlowJB, GublerM, CevidanesL, MolA. Precision of cephalometric landmark identification: cone-beam computed tomography vs conventional cephalometric views. Am J Orthod Dentofacial Orthop. 2009;136(3):312e1–10.10.1016/j.ajodo.2008.12.018PMC275384019732656
+27.
+KragskovJ, BoschC, GyldenstedC, Sindet-PedersenS. Comparison of the reliability of craniofacial anatomic landmarks based on cephalometric radiographs and three-dimensional CT scans. Cleft Palate Craniofac J. 1997;34(2):111–116.913850410.1597/1545-1569_1997_034_0111_cotroc_2.3.co_2
+28.
+PeriagoDR, ScarfeWC, MoshiriM, ScheetzJP, SilveiraAM, FarmanAG. Linear accuracy and reliability of cone beam CT derived 3-dimensional images constructed using an orthodontic volumetric rendering program. Angle Orthod. 2008;78(3):387–395.1841663210.2319/122106-52.1
+29.
+LagravereMO, LowC, Flores-MirC, 
+Intraexaminer and interexaminer reliabilities of landmark identification on digitized lateral cephalograms and formatted 3-dimensional cone-beam computerized tomography images. Am J Orthod Dentofacial Orthop. 2010;137(5):598–604.2045177810.1016/j.ajodo.2008.07.018
+30.
+DotG, SchoumanT, ChangS, 
+Automatic 3-dimensional cephalometric landmarking via deep learning. J Dent Res. 2022;101(11):1380–1387.3598264610.1177/00220345221112333
+31.
+BaumrindS, FrantzRC. The reliability of head film measurements. 1. Landmark identification. Am J Orthod. 1971;60(2):111–127.528399610.1016/0002-9416(71)90028-5
+32.
+CattaneoPM, YungAKC, HolmA, MashalyOM, CornelisMA. 3D landmarks of craniofacial imaging and subsequent considerations on superimpositions in orthodontics-the Aarhus perspective. Orthod Craniofac Res. 2019;22(Suppl 1):21–29.3107414310.1111/ocr.12299

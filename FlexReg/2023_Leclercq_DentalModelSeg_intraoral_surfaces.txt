@@ -1,0 +1,96 @@
+DENTALMODELSEG: FULLY AUTOMATED SEGMENTATION OF UPPER AND LOWER 3D INTRA-ORAL SURFACES
+
+RESUME / ABSTRACT
+In this paper, we present a deep learning-based method for surface segmentation. This technique consists of acquiring 2D views and extracting features from the surface such as the normal vectors. The rendered images are analyzed with a 2D convolutional neural network, such as a UNET. We test our method in a dental application for the segmentation of dental crowns. The neural network is trained for multi-class segmentation, using image labels as ground truth. A 5-fold cross-validation was performed, and the segmentation task achieved an average Dice of 0.97, sensitivity of 0.98 and precision of 0.98. Our method and algorithms are available as a 3DSlicer extension.
+1.
+
+## INTRODUCTION
+Developments in dentistry led to an improved application of 3D technologies such as intra-oral surface (IOS) scanners which are used to design ceramic crowns, veneers, inlays, and occlusal guards, as well as assist with implants. IOS are being used more often for automated diagnosis such as caries detection [1], analysis of risk factors of tooth movement[2], and treatment planning[3]. These 3D surface models require shape analysis techniques for analyzing and understanding the geometry and performing segmentation, classification, and/or retrieval tasks among others. In this paper, we present a novel method for 3D surface segmentation based on a multiview approach. Fast and accurate segmentation of the IOS remains a challenge due to various geometrical shapes of teeth, complex tooth arrangements, different dental model qualities, and varying degrees of crowding problems[4]. Our target application is the multi-class segmentation following the Universal Numbering System proposed by the American Dental Association (ADA), the dental notation system used in the United States.
+
+The multi-view approach consists of generating 2D images of the 3D surface from different viewpoints. The generated images serve as a training set for a neural network. We use Pytorch3D1 to generate images on the fly during training and a one-to-one mapping that relates faces in the 3D model and pixels in the generated images. This is useful in inference time when we have to put the resulting labels from the images back into the 3D model. The remainder of the manuscript is organized as follows: the materials used in this study, related work, details of our implementation, results, and conclusions.
+
+2.
+
+## MATERIALS
+The dataset consists of 78 mandibular IOS (40 for the upper and 38 for the lower dental arches). A digital dental model of the mandibular arch was acquired from intra-oral scanning with the TRIOS 3D intra-oral scanner. The TRIOS intra-oral scanner (IOS) utilizes ”ultrafast optical sectioning” and confocal microscopy to generate 3D images from multiple 2D images with an accuracy of 6.9 ± 0.9 μ m. All scans were obtained according to the manufacturer’s instructions, by one trained operator. The training was done on an NVIDIA TITAN V GPU with 12GB of memory. The intra-oral surfaces were manually segmented by 3 experts.
+
+2.1.
+
+## 3D shape analysis
+Learning-based methods for shape analysis use 3D models to learn descriptors directly from them. There are mainly 3 types of learning-based methods: multi-view, volumetric, and multi-layer-perceptrons (MLP).
+
+Multi-view approaches adapt state-of-the-art 2D CNNs to work on 3D shapes. The main impediment is the arbitrary structures of 3D models which are usually represented by point clouds or triangular meshes, whereas deep learning algorithms use the regular grid-like structures found in 2D/3D images[5, 6]. By rendering 3D objects from different viewpoints, features are extracted using 2D CNNs[7, 8, 9]. On the other hand, volumetric approaches use 3D voxel grids to represent the shape and apply 3D convolutions to learn shape features[10, 11, 12]. Finally, other approaches consume the point clouds directly and implement multi-layer-perceptrons and/or transformer architectures, or a generalization of typical CNNs [13, 14, 15, 16].
+
+2.2.
+
+## Related work
+MeshSegNet[14] uses raw surface attributes as inputs and integrates a graph-constrained learning module followed by a dense fusion strategy applied to combine local-to-global geometric features for the learning of higher-level features for mesh cell annotation. The predictions by MeshSegNet are further post-processed by a graph-cut refinement step for final segmentation. “Deep Learning Approach to Semantic Segmentation in 3D Point Cloud Intra-oral Scans of Teeth” [17] proposes an end-to-end deep learning framework for segmentation of teeth from point clouds representing IOS. TSegNet [18] developed a fully automatic algorithm to segment teeth on 3D dental models guided by the tooth centroid information. Mask-MCNet[19] localizes each individual tooth instance by predicting its 3D bounding box and segments the points that belong to each individual tooth instance. FlyByCNN[5, 6] is a multi-view based approach that uses UNETs[20] to segment each individual image. The merging and annotating teeth and root canals approach [6] uses a classification model to identify upper or lower jaws. Then, it proceeds to align the 3D objects to a template and then label each crown with the universal id.
+
+3.
+
+## METHOD
+3.1.
+
+## Rendering the 2D views
+The Pytorch3D framework allows the rendering of the 3D object from different viewpoints and extracts views that can be fed to a CNN in an end-to-end process. The rendering engine provides a map that relates pixels in the images to faces in the mesh and allows rapid extraction of point data (normals, curvatures, labels, etc.) as well as setting information back into the mesh after inference. In order to get different viewpoints, we apply random rotations to the camera, so that it moves on the surface of a unit sphere. For each snapshot, we generate two images. The first one contains the surface normals encoded in the RGB components. The second one is the label maps that are used as ground truth in the segmentation task. We set the resolution of the rendered images to 320px. We use ambient lights so that the rendered images don’t have any specular components.
+
+3.2.
+
+## Training the network
+We have in total 78 different IOS. To make the validation more accurate, we implemented a 5-fold cross-validation. For each fold, we used 55 scans for the training, 7 for validation, and 15 or 16 for testing. To create the neural networks we use MONAI2, an open-source Pytorch-based framework for deep learning in healthcare imaging. MONAI provides a complete framework to easily create Datasets and integrate neural networks such as a UNET. We use the DiceCELoss, which computes the Dice Loss as well as Cross-Entropy Loss and returns the weighted sum of these two. This loss is frequently used for segmentation tasks. The learning rate is set to 1e−4 using the Adam optimizer. The training learns to identify 34 different labels corresponding to the upper and lower crowns. We use one-hot encoding for the 34 different classes: 32 different crowns, in addition to the gum and the background. During training, one crown is randomly removed each time a sample is rendered. This step makes the model more robust as it learns how to deal with missing teeth.
+
+3.3.
+
+## Prediction
+The prediction is composed of three major steps: 1. Render 2D views from the 3D object; 2. Run inference on the 2D views. 3. map the information back into the 3D mesh. The approach allows rendering multiple views and aggregates the results. The reported metrics are calculated using 70 views with a resolution of 320px. The position of the camera is evenly distributed on the surface of the sphere following a Fibonacci lattice. A test is performed with 64 views, the prediction takes about 6 seconds to compute for all the views. After we run inference on the 2D views, we use a weighted majority voting scheme to put information back into the 3D mesh.
+
+3.4.
+
+## Post-Process
+In the event that some faces of the surface are not assigned to any output at the end of the prediction, we apply an ‘island removal’ approach, that assigns the closest-connected label. We also performed a closing operation (dilation + erosion) on the boundary of each tooth to smooth the boundary.
+
+3.5.
+
+## Distance metric
+One way to tell if our model is accurate is to compute the average distance between the borders of the ground truth and the predicted labels for every crown. We do this by isolating each crown with a threshold and then extracting the points on the border. We then compute the distance between each border point on the predicted label and the closest border point on the ground truth. Finally, we divide the sum of the distances for every point by the number of points to get the average distance for one specific crown.
+
+4.
+
+## RESULTS
+4.1.
+
+## Distance metric
+The model was trained with a majority of surfaces with only 14 crowns and no wisdom teeth. We thus decided to show the results for this kind of sample only. Some predictions with wisdom teeth tend to give less accurate predictions, not only for the wisdom teeth labels but also for those of neighbor crowns. Moreover, some IOS scans do not show the entirety of these wisdom teeth, as they are on the border of the jaw and sometimes not fully out. The poor results for the labels that are just next to the wisdom teeth come from the fact that most wisdom teeth got the label from the next crown. However, some predictions of models with wisdom teeth are still accurate.
+
+4.2.
+
+## Dice coefficients
+5 out of the 7 IOS for the upper jaw have Dice coefficients > 0.9. On these 5 scans all crowns are correctly labeled and the result is almost identical to the ground truth. The worse result for the 3rd scan may come from the fact that the IOS looks different from the training data (see Appendix). The 4th scan for the upper jaw and the 3rd, 5th, 8th and 9th for the lower jaw show worse Dice coefficients because they contain 16 teeth (wisdom teeth). As mentioned before, the training set contains a very few number of samples with wisdom teeth. With a wider range of training data we can expect much better results for these types of scans as well.
+
+Figure 3 shows that when the network makes predictions on data types for which it has trained on, it produces excellent results. The Dice coefficients are always above 0.9 and even above 0.95 for 25 out of the 28 different crowns.
+
+4.3.
+
+## Resulting labeled IOS
+Figure 4 shows the output segmentation for one of our test cases.
+
+4.4.
+
+## Comparison with competing methods
+MethodDSCSENPPVPN0.84±0.110.91±0.120.79±0.13PN++0.90±0.060.98±0.030.84±0.10PC0.93±0.060.98±0.040.90±0.08MS
+0.981 ± 0.028
+
+0.98 ± 0.03
+0.97±0.03Ours0.96±0.030.98±0.11
+0.98 ± 0.03
+This table shows results for 3 state-of-the-art deep learning methods ( PointNet (PN) [13], PointNet++ (PN++) [21] and PointConv(PC) [16]) as well as MeshSegNet (MS) [14]. The results for our segmentation method were obtained using the data set samples of the 5-fold cross-validation.
+
+5.
+
+## CONCLUSION
+This new method for automatic multi-class segmentation of 3D surfaces has proven to be accurate and effective, as well as easy to integrate into existing processing pipeline since the input and output surface have the same number of points and faces after inference, i.e, there is no sub-sampling of the surface as it is required by the competing approaches. A great advantage of this method is the ability to predict the universal ids of the crowns in the upper and lower jaws. The results reported by the competing approaches focused on upper models only or use a classification model to identify upper/lower jaws. Our approach is fully automated and labels both upper and lower crowns with a single model. The model learns to identify features specific to each jaw. We are aware that this model can still be improved with larger and more diverse data sets. However, the results obtained are competitive with existing methods such as MeshSegNet and PointConv. Prediction for jaws with no wisdom teeth is excellent, and we can safely expect better results for wisdom teeth segmentation as our sample size increases.
+
+Our method is available as a 3D Slicer3 extension.
+
+## Supplementary Material
+Appendix

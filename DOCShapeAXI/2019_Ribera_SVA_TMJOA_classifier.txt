@@ -1,0 +1,109 @@
+# Shape variation analyzer: a classifier for temporomandibular joint damaged by osteoarthritis
+
+Auteurs : Nina Tubau Ribera, Priscille de Dumast, Marilia Yatabe, Antonio Ruellas, Marcos Ioshida, Beatriz Paniagua, Martin Styner, João Roberto Gonçalves, Jonas Bianchi, Lucia Cevidanes, Juan-Carlos Prieto
+Support : Proceedings of SPIE--the International Society for Optical Engineering
+pmcid: PMC6663087
+pmcid-ver: PMC6663087.1
+pmcaid: 6663087
+pmcaiid: 6663087
+manuscript-id: NIHMS1021653
+pmid: 31359900
+doi: 10.1117/12.2506018
+manuscript-id-alternative: NIHMS1021653
+manuscript-id-alternative: NIHPA1021653
+Annee : 2019
+
+## Abstract
+We developed a deep learning neural network, the Shape Variation Analyzer (SVA), that allows disease staging of bony changes in temporomandibular joint (TMJ) osteoarthritis (OA). The sample was composed of 259 TMJ CBCT scans for the training set and 34 for the testing dataset. The 3D meshes had been previously classified in 6 groups by 2 expert clinicians. We improved the robustness of the training data using data augmentation, SMOTE, to alleviate over-fitting and to balance classes. We combined geometrical features and a shape descriptor, heat kernel signature, to describe every shape. The results were compared to nine different supervised machine learning algorithms. The deep learning neural network was the most accurate for classification of TMJ OA. In conclusion, SVA is a 3D Sheer extension that classifies pathology of the temporomandibular joint osteoarthritis cases based on 3D morphology.
+
+
+## INTRODUCTION
+Osteoarthritis (OA) is the most relevant arthritis worldwide. It is related with pain and disability affecting 13.9% of adults at any given time. The pathogenesis of temporomandibular joint remains unclear to this day and may involve repair and morphology adaptation but also bone destruction. Patient data in clinical research on temporomandibular joint osteoarthritis often includes large amounts of structured information, such as imaging data, biological marker levels, and clinical variables–. The present study proposes improvement in the unsupervised statistical machine learning classification proposed by Gomes et al., 2015 and de Dumast et al., 2018. Robust and comprehensive deep learning classification requires large sample size and well-controlled samples with regard to heterogeneity of pathologies. The neural network deep learning proposed in this manuscript classifies morphological variability extracting features from the mandibular condyle morphology to describe each patient 3D mesh. Because our training de-identified database contains uneven number of shapes in each stage of bone degeneration, the first challenge has been the simulation of variation in 3D meshes coordinates and features. Shape descriptors are also a solution when characterizing a 3D mesh. Thus, Heat Kernel Signature descriptor will be combined with geometric features for a better result. Because our sample size is small and neural networks require large amount of data, we will use an over-sampling algorithm SMOTE to balance our groups. We compared the neural network built with other machine learning methods such as SVM, Gaussian Process, Random Forest and implement the Shape Variation Analyzer (SVA) as a plugin for the open-source software 3D-Slicer. The neural network architecture of choice is more adjustable, innovative and robust to allow addition of larger datasets as this work progresses with future collaboration with other clinical centers
+
+
+## METHODS
+
+### Materials
+Following clinical diagnosis of TMJ osteoarthritis, a cone beam computed tomography (CBCT) scan was taken on all participants, with 0.08 mm isotropic voxel size and 4 cm × 4 cm field of view, using the 3D Accuitomo 170, Morita Corp. The study sample consists of 293 (259 training set and 34 testing set) mandibular condyle 3D surface meshes constructed from CBCT scans for the training dataset, 105 from control subjects and 154 from patients of TMJ OA. Those 3D meshes were classified in 6 groups, by consensus between 2 clinicians (MY and AR) as shown in . Thirty-four right and left condyles from 17 patients (39.9 ± 11.7 years), who experienced signs and symptoms of the disease for less than 5 years, were included as the testing dataset.
+
+
+### From CBCT scan to 3D mesh
+Many steps are accomplished () before having the 3D mesh corresponding to each CBCT scan as following.
+
+
+### Generation of synthetic data
+After the consensus between the 2 expert clinicians, the number of samples in every group is different. This problem is extremely common in machine learning. Most machine learning algorithms work better when the number of samples in every group is roughly equal. In 2002, a sampling-based algorithm called SMOTE (Synthetic Minority Over-Sampling Technique) was introduced to face imbalanced problems. This method is one of the most used thanks to its simplicity and effectiveness. The synthetic data is created by operating in “feature space” instead of “data space”. In traditional oversampling, minority class is replicated exactly. In SMOTE, new minority instances are constructed this way:
+
+For each minority class instance c:
+
+Neighbors = get k Nearest Neighbors (5 in our case)
+
+n = pick randomly one of the neighbors
+
+Creation of a new minority class r using c’s feature vector and the feature’s vector difference of n and c multiplied by a random number -> r.feats = c.feats + (c.feats - n.feats ) * rand(0,1)
+
+
+### Feature extraction and shape descriptors
+The SVA module computes the average shape of each group of condylar dysmorphology, as well as geometric features at each vertex of the mesh and a shape descriptor, heat kernel signature. The features are stored into arrays and linked to their corresponding vertices in the 3D meshes. Those vertex-wise features are: Normal vector: 3 scalars for the x, y, and z coordinatesDistances: As many components as classes
+
+The distance to every mean group is computed.
+
+  - Curvatures: 4 scalars for mean, minimum, maximum, and Gaussian curvature.
+  - Shape Index: 1 scalar
+
+The shape index and curvedness were computed using the principal curvatures (κ1, κ2) at every point in the surface. The shape index described local surface topology in terms of the principal curvatures, calculated as follows (): S=2πarctanκ1+κ2κ1−κ2
+
+  - Curvedness: 1 scalar
+
+The curvedness was calculated as a measurement of the amount or ‘intensity’ of the surface curvature as follows (): C=κ1+κ222
+
+  - Position: 3 scalars for the x, y, and z coordinates.
+  - Heat kernel signature
+
+The heat kernel signature (HKS) is a shape descriptor used in deformable shape analysis methods. For each point of the shape, HKS defines its feature vector representing the point’s global and local geometric features. It is based on heat kernel, fundamental solution of the heat equation. HKS uses Laplace Beltrami operator associated with the shape. Heat kernel signature should be scale invariant to deal with global and local scaling transformations. The patients of our study have different sizes of condyles depending on the gender and the age; we need to compare the 3D meshes without taking into account the scale differences. We used the heat conduction properties as shape descriptor with the heat diffusion equation as following (): (ΔX+∂∂t)u=0 where ΔX is the Laplace-Beltrami operator.
+
+Computation of the scale invariant HKS is done using heat kernel formula (solution of the heat diffusion ) in where continuous eigenfunctions and eigenvalues of the Laplace Beltrami operator are replaced by the discrete value (): KX,t(x,z)=∑i=0∞e−λitϕi(x)ϕi(z) where λ0, λ1, … ≥ 0 are eigenvalues and ϕ0, ϕ1, … are the corresponding eigenfunctions of the Laplace-Beltrami operator, satisfying ΔXϕi = λiϕi.
+
+The Laplace-Beltrami operator is discretized using cotangent weight scheme, defined for any function f on the mesh vertices as (): (ΔX^f)i=1ai∑jwij(fi−fj) where wij = cot aij + cot bij for j in the 1-ring neighborhood of vertex i and zero otherwise ( aij and bij are the two angles opposite to the edge between vertices i and j in the two triangles sharing edge) and ai are normalization coefficients proportional to the area of triangles sharing the vertex xi.
+
+The discrete heat kernel signature is approximated by (): h(xl,τ)≈∑l=0ke−λlατϕil2=Ψe−T∧ where T = diag(αT) and Ψ=(ϕil2)
+
+
+### Deep neural network
+Neural network architecture: The neural network learns tasks by considering examples. It is based on a collection of connected units called neurons organized in layers. We use a soft-max layer with one output per class. The output vector will be the probability for each shape to belong to a class. The algorithm extracts shape features to classify each sample in the training data in a class and can then classify new samples thanks to this probabilistic function (the soft-max function). The TensorFlow open-source library was used to train and test the neural network by constructing computational graphs. The neural network was trained to classify a given shape into one of the 6 groups indicating the severity of the disease. The input data to train the network was stored in a matrix with dimensions [number (nbr) of subjects, nbr of vertices, nbr of features]. By training a neural network we sought to identify discriminative patterns of these features and encoded them in the network (deep learning).
+
+
+### Comparison with machine learning algorithms
+We trained and optimized nine different supervised machine learning to compare to our current deep neural network: Nearest Neighbors, Linear Support Vector Machine, Radial Basis Function kernel Support Vector Machine, Gaussian Process, Decision Tree, Random Forest, AdaBoost, Naive Bayes and Quadratic Discriminant Analysis ().
+
+
+## RESULTS
+Using SMOTE algorithm creates balanced group as shown in . It allows training accuracy increasing from 86% to 92% and creates large amount of data in every group. Choosing features is decisive for the neural network to perform well. We had trained the neural network previously described with different combinations of features. We are using heat kernel signature as a shape descriptor. For each group, patterns are similar meaning a good understanding of the morphology variability ().
+
+We used a neural network having 4 hidden layers with [4096, 2048, 1024, 512] neurons, a dropout layer with probability 0.5 and softmax layer with 7 outputs. The learning rate was set to 1–5. The network was trained for 100 epochs and the batch size was set to 32. The SVA training is shown in . The maximum accuracy during training was 92%. The dataset was subdivided in two sets, training and testing in an 80/20 ratio. The testing data was not used at any point during training and it will be used to test if the trained network generalizes well for unseen data samples. After testing with 9 different machine learning algorithms, we chose the deep neural network because it’s more modulable and innovative and robust to allow addition of larger data sets as this work progresses with future collaboration with other clinical centers.
+
+The continued enrollment of subjects to adding more data will benefit from the deep learning approach to improve the ability of the neural network to learn abstract patterns and, thus, increase the classification accuracy. Furthermore, neural networks have been shown to perform better to build a predictive tool to assess disease progression and explain variability over time. After testing with the 34 testing condyles, we obtain an accuracy of 47% of exact classification and 91% if we take an error of +/− one group as shown in with the confusion matrix.
+
+
+## CONCLUSION
+SVA is a novel tool to TMJ condyle analyze shape variation using deep neural networks. The results presented indicate that using shape features only favors the classification task, i.e., we do not include any information about position or orientation of the model. This classification approach seems promising, as it may help us increase our understanding about shape changes that TMJ OA patients undergo during the course of the disease. The source code repository is available at https://github.com/DCBIA-OrthoLab/ShapeVariationAnalyzer. Future work will focus on including additional predictors/features of the disease in the neural network training (e.g., clinical data, behavioral or biochemical). Clinical and behavioral data has been acquired through questionnaires, while biochemical data has been acquired through a protein analysis in saliva and plasma samples. Including these may contribute to improve the classification power of the neural network.
+
+
+## References
+- LoeserRF, GoldringSR, ScanzelloCR and GoldringMB, “Osteoarthritis: a disease of the joint as an organ.,” Arthritis Rheum. 64(6), 1697–1707 (2012).2239253310.1002/art.34453PMC3366018
+- CevidanesLHS, HajatiA-K, PaniaguaB, LimPF, WalkerDG, PalconetG, NackleyAG, StynerM, LudlowJB, ZhuH and PhillipsC, “Quantification of condylar resorption in temporomandibular joint osteoarthritis,” Oral Surgery, Oral Med. Oral Pathol. Oral Radiol. Endodontology 110(1), 110–117 (2010).10.1016/j.tripleo.2010.01.008PMC290043020382043
+- EbrahimFH, RuellasACO, PaniaguaB, BenavidesE, JepsenK, WolfordL, GoncalvesJR and CevidanesLHS, “Accuracy of biomarkers obtained from cone beam computed tomography in assessing the internal trabecular structure of the mandibular condyle,” Oral Surg. Oral Med. Oral Pathol. Oral Radiol. (2017).10.1016/j.oooo.2017.08.013PMC570184629055644
+- PaniaguaB, RuellasAC, BenavidesE, MarronS, WolfordL, CevidanesL, WoldfordL and CevidanesL, “Validation of CBCT for the computation of textural biomarkers,” Proc. SPIE--the Int. Soc. Opt. Eng. 9417(March 2015), GimiB and MolthenRC, Eds., 94171B (2015).10.1117/12.2081859PMC446690526085710
+- GomesLR, GomesM, JungB, PaniaguaB, RuellasAC, GonçalvesJR, StynerMA, WolfordL and CevidanesL, “Diagnostic index of 3D osteoarthritic changes in TMJ condylar morphology,” Proc. SPIE--the Int. Soc. Opt. Eng. 9414, HadjiiskiLM and TourassiGD, Eds., 941405 (2015).10.1117/12.2082226PMC468932326709325
+- de DumastP, MirabelC, CevidanesL, RuellasA, YatabeM, IoshidaM, RiberaNT, MichoudL, GomesL, HuangC, ZhuH, MunizL, ShoukriB, PaniaguaB, StynerM, PieperS, BudinF, VimortJ-B, PascalL, , “A web-based system for neural network based classification in temporomandibular joint osteoarthritis.,” Comput. Med. Imaging Graph. 67, 45–54 (2018).2975396410.1016/j.compmedimag.2018.04.009PMC5987251
+- BronsteinMM and KokkinosI, “Scale-invariant heat kernel signatures for non-rigid shape recognition,” Proc. IEEE Comput. Soc. Conf. Comput. Vis. Pattern Recognit. (2010).
+- ChawlaNV, BowyerKW, HallLO and KegelmeyerWP, “SMOTE: Synthetic Minority Over-sampling Technique,” J. Artif. Intell. Res. 16, 321–357 (2002).
+- CortesC and VapnikV, “Support-Vector Networks,” Mach. Learn. 20(3), 273–297 (1995).
+- HyunJW, LiY, HuangC, StynerM, LinW and ZhuH, “STGP: Spatio-temporal Gaussian process models for longitudinal neuroimaging data,” Neuroimage (2016).10.1016/j.neuroimage.2016.04.023PMC491288127103140
+- LiawA and WienerM, “Classification and Regression by randomForest,” R news (2002).
+- FedorovA, BeichelR, Kalpathy-CramerJ, FinetJ, Fillion-RobinJC, PujolS, BauerC, JenningsD, FennessyF, SonkaM, BuattiJ, AylwardS, MillerJV, PieperS and KikinisR, “3D Sheer as an image computing platform for the Quantitative Imaging Network,” Magn. Reson. Imaging (2012).10.1016/j.mri.2012.05.001PMC346639722770690
+- KellerJM and GrayMR, “A Fuzzy K-Nearest Neighbor Algorithm,” IEEE Trans. Syst. Man Cybern (1985).
+- KohaviR, “Scaling Up the Accuracy of Naive-Bayes Classifiers: a Decision-Tree Hybrid,” Proc. 2nd Int. Conf. Knowl. Discov. Data Min (1996).
+- RätschG, OnodaT and MüllerKR, “Soft margins for AdaBoost,” Mach. Learn (2001).
+- VikramkumarB, V. and Trilochan., “Bayes and Naive Bayes Classifier,” arXiv (2014).
+- SrivastavaS, GuptaM and FrigyikB, “Bayesian Quadratic Discriminant Analysis,” J. Mach. Learn. Res. (2007).

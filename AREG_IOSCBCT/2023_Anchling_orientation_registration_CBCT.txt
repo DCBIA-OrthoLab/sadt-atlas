@@ -1,0 +1,114 @@
+AUTOMATED ORIENTATION AND REGISTRATION OF CONE-BEAM COMPUTED TOMOGRAPHY SCANS
+
+RESUME / ABSTRACT
+Automated clinical decision support systems rely on accurate analysis of three-dimensional (3D) medical and dental images to assist clinicians in diagnosis, treatment planning, intervention, and assessment of growth and treatment effects. However, analyzing longitudinal 3D images requires standardized orientation and registration, which can be laborious and error-prone tasks dependent on structures of reference for registration. This paper proposes two novel tools to automatically perform the orientation and registration of 3D Cone-Beam Computed Tomography (CBCT) scans with high accuracy (<3° and <2mm of angular and linear errors when compared to expert clinicians). These tools have undergone rigorous testing, and are currently being evaluated by clinicians who utilize the 3D Slicer open-source platform. Our work aims to reduce the sources of error in the 3D medical image analysis workflow by automating these operations. These methods combine conventional image processing approaches and Artificial Intelligence (AI) based models trained and tested on de-identified CBCT volumetric images. Our results showed robust performance for standardized and reproducible image orientation and registration that provide a more complete understanding of individual patient facial growth and response to orthopedic treatment in less than 5 min.
+1
+
+## Introduction
+In the current three-dimensional (3D) medical longitudinal image analysis workflow (Fig. 1), two steps are essential: orientation and registration. While the former consists of aligning the images to a common and standardized frame of reference, the latter enx == tails the visual task of reducing disparities between corresponding points in two images. This is achieved by determining a geometric transformation that enables their effective superimposition.
+
+Cone-beam computed tomography (CBCT) is a relatively low radiation dose imaging technique that is widely used in Dentistry due to its low cost and its detailed three-dimensional (3D) information about various craniofacial tissues and structures [14]. However, because of the inconsistency in imaging acquisition protocols, patient position during image acquisition, and settings used on scanners in different clinical centers, the volumetric CBCT scans are not acquired in a reproducible standardized position [24]. The patient head posture is also irregular across various acquisitions with variability in the head pitch, roll, and yaw position. Having a standardized orientation and head position is essential for any 3D imaging analysis workflow, as inconsistent orientation can affect both the downstream image registration task and the quality of measurements throughout the image analysis workflow [5].
+
+While standardized orientation is of primary importance to harmonize craniofacial imaging records, registration of images at multiple time points is also a crucial step in the medical image analysis workflow [2]. It is a prerequisite for several medical image applications [18], such as growth observation [28], followup [26] or simulations [19] of treatments. Depending on the area affected by the treatment, growth, and/or clinical condition, the alignment often should utilize specific stable craniofacial structures of reference: image changes over time should be analyzed relative to these references rather than considering the entire image best fit.
+
+These two fundamental steps in the image analysis workflow can be laborious, error-prone, and time-consuming for expert clinicians, averaging up to 45 min. The challenges for robust automated orientation and registration are numerous due to the variability of the morphology in the various craniofacial structures in CBCT.
+
+Our proposed tool implements all of the functionalities of both Automated Standardized Orientation (ASO), to automatically orient and position the scan, and Automated Registration (AReg), to register two time point CBCT scans according to the region of reference chosen, in a user-friendly plugin available in the 3D Slicer [10] software. The goal of this work is to propose a novel, free, open-source automatic workflow for medical image analysis that also includes automatic multi-anatomical skeletal structures segmentation (Fig. 1).
+
+2
+
+## Materials
+A total of 465 CBCT scans of the head in Digital Imaging and Communications in Medicine (DICOM) format were used in this work. The images were acquired at different clinical centers with different scanners, image acquisition protocols, and fields of view. All DICOM files were anonymized removing all identifiable personal information using the 3D Slicer Batch Anonymizer module. The University of Michigan Institutional Review Board (IRB) HUM00238037 waived the requirement for informed consent and granted IRB exemption. The machine learning models for the orientation (coarse orientation) and stable regions of reference (ROFs also called mask segmentation) were trained using the same CBCT scans. Clinical experts used two open-source software packages, ITKSNAP 3.8 [27] and 3D Slicer 5.2 [10], to interactively segment masks for each of the volumetric images and align the head in a common spatial orientation. This served as the ground truth for training our machine-learning models. A dataset consisting of 290 CBCT scans was used for training the orientation and different mask (cranial base, maxilla, and mandible) models, with manual segmentation performed on 135 CBCT scans. The remaining scans were reserved for testing the ASO (121 scans) and AReg (54 scans) tools.
+
+3
+
+## Proposed Method
+The different methods for automatic orientation and registration of 3D CBCT scans rely on a combination of algorithmic and deep-learning techniques to perform both the image orientation and the registration automatically.
+
+3.1
+
+## Automated Standardized Orientation (ASO)
+Our method starts with a rough alignment step performed by a trained Machine Learning (ML) model and a landmark-based image alignment method. The latter uses automatic landmark identification to predict the points of reference.
+
+## Coarse Orientation.
+To improve the precision of the orientation process with the ASO tool, we require a rough head orientation of the scan as an initialization, before fine-tuning it with the landmark-based registration.
+
+To standardize each 3D volumetric scan and establish a resilient ML model capable of identifying scan head orientation, an initial image preprocessing phase is executed. This step involves rescaling each image to a reduced resolution. The rescaling procedure encompasses isometric dimensions for both image size (1283) and voxel dimensions (1.5mm3). This approach ensures computational efficiency while maintaining essential structural information within the images.
+
+We then developed and trained a MONAI DenseNet [13] using 290 manually oriented by expert clinicians CBCT scans that we divided into 70% for training, 10% for validation, and 20% for testing using the architecture shown in Fig. 7. A random rotation transform was utilized as data augmentation to enlarge the dataset. The training hyperparameters were defined as follows: a batch size of 25, a learning rate of 1e−4, and a maximum angle of π/2 for random rotations. The loss function was the Cosine Similarity, which determines the angular difference between two vectors.
+
+## Automatic Landmark Identification (ALI-CBCT) [12].
+Automatic landmark identification is based on a multi-scale combination of a MONAI DenseNet and a fully-connected layers approach agent that is trained to make an initial estimate of the landmark position in the lower resolution scan and refined it using the higher resolution.
+
+The landmarks used for the ASO step are part of the different craniofacial structures. Depending on the orientation that is desired, either relative to the cranial base or the maxilla, various landmarks are then used for the process, as presented in Table 1.
+
+## Landmark Based Image Alignment.
+The alignment of the source image to a target image with a standard orientation (cranial base in Fig. 2 and maxilla in Fig. 6) is fine-tuned using the landmarks described above, which improves the precision of the orientation and position of the CBCT scan with the ASO tool.
+
+To automatically match the identified landmarks with a group of reference landmarks marked by a clinician, we applied the Iterative Closest Point (ICP) algorithm [17]. To obtain better accuracy, this required an initial alignment step [3], which we achieved by aligning three randomly chosen landmarks to minimize the distance between the two sets of landmarks.
+
+All the transformations computed during this process are concatenated and the final ASO transformation is then applied to the CBCT volume.
+
+3.2
+
+## Automated Registration (AReg)
+Our automatic alignment is based on a regional voxel-based registration (VBR) approach which automatically aligns mask segmentations that contains only stable ROFs within the cranial base, the mandible, or the maxilla.
+
+## Automatic Multi-anatomical Skull Structure Segmentation for Masks (AMASSS-CBCT) [11].
+AMASSS relies on a MONAI UNEt TRansformers initially trained to segment different craniofacial structures (hard and soft tissues). However, for the proposed registration approaches we then trained AMASSS models to segment stable ROFs within each craniofacial structure which are defined following works of reference for each region, cranial base [6], mandible [22], and maxilla [20] are described in Fig. 3. For this purpose, different mask segmentations were trained with 135 anonymized CBCTs for each of the three ROFs.
+
+## Flexible Voxel-Based Registration.
+Our algorithm utilized the Python library optimized for medical image registration for the desired voxel-based method: SimpleElastix [16].
+
+To perform the regional VBR, we applied the automatically-obtained segmentation as a mask to the fixed image, to only keep the important information from the scan within the delimited area. To have an accurate transformation between the moving and the fixed image, we initially run a VBR between the full images and then with the masked image as a fine-tuning step. The optimized parameters used for the two registration steps in this application for craniomaxillofacial CBCT imaging are described in Table 4. The tool then generates registered label maps and surface meshes using the AMASSS function.
+
+3.3
+
+## Evaluation Metrics
+The precision of the ASO and the AReg approaches was tested using 3D point-to-point measurements between our automated method and the manually oriented/registered scans by expert clinicians. The different quantifications were performed in the Automated Quantitative 3D Components (AQ3DC) tool in 3D Slicer, which is the automated version of the Q3DC tool previously validated for craniofacial quantification [7,8]. Two types of measurements were computed: linear (in millimeters) and angular (in degrees). For the former, the linear distance was calculated between each selected point for each component: right-left, anterior-posterior, superior-inferior, and the 3D Distance. For the latter, two lines were used two calculate the angular errors of the yaw, pitch, and roll of the facial structures (Table 6 for the orientation and Table 7 for the registration).
+
+## Orientation.
+The datasets used to test the precision of the automated orientation approach consisted of 121 CBCT scans. The ASO outputs were compared to previously manually oriented scans, 62 for the cranial base and 59 for the maxillary orientation. For the cranial base, only full-face large field-of-view (FOV) scans were used, while for the maxilla, the sample also included small FOV scans of the maxilla, which may be indicated depending on the clinical application.
+
+## Registration.
+Two approaches were compared to test AReg. The first approach tested only the flexible VBR algorithm by using manually-approximated scans and manually-segmented regions of reference as input for the registration of different time points. The second approach tested the full AReg pipeline for automated mask segmentation and registration. Both angular and linear changes were assessed for 27 patients comparing the two approaches with blinded user experts’ measurements.
+
+3.4
+
+## Implementation
+Our Python-based algorithm requires multiple libraries for the different image-processing tasks accomplished throughout the proposed method: SimpleITK [15], VTK [23], SimpleElastix [16]. To implement these tools, we used the Medical Open Network for Artificial Intelligence (MONAI) library, which is a PyTorch-based framework for medical image analysis. MONAI offers several advantages for our work, such as high performance, modularity, and interoperability with other libraries.
+
+4
+
+## Results
+The experiments have been carried out on a system with an NVIDIA Quadro RTX 6000/8000 GPU and an Intel(R) Xeon(R) Gold 6226R CPU.
+
+4.1
+
+## Orientation
+Table 2 shows the angular changes for the different types of orientation tested. The average computational time per patient to orient them with our novel proposed tool was 65s.
+
+4.2
+
+## Registration
+Table 3 shows the yaw, pitch, and roll difference relative to the user expert for each regional registration approach. The various linear displacements are described for the cranial base in Table 8, maxilla in Table 9, and mandible in Table 10. Also, the graphic display of the registered surface meshes with the different approaches is shown in Fig. 4. The average registration computational time per patient was 4 min.
+
+5
+
+## Discussion
+To the best of our knowledge, this is the first study that introduces a free open-source automated tool integrating multiple steps of the 3D medical imaging workflow, which can be challenging, error-prone, and time-consuming when done manually. We developed and validated an automatic tool that streamlines image orientation, segmentation of ROFs, registration, and generation of registered label maps and surface meshes. Although commercial companies such as 3Shape [1], and Dolphin [9] offer tools for orienting and registering CBCT, they are limited to a single-case use and are not open-source solutions.
+
+Standardized image orientation is crucial to eliminate errors from variable patient positioning during image acquisition, which may lead to differences in the measurements of directional changes in 3D space, and assessments of growth and treatment [21]. Automatic orientation as the initialization of the registration process is crucial for achieving reproducibility.
+
+Innovations in medical imaging workflow automation have increased in the last few decades, but they need to be validated to meet clinician standards for a precise automatic workflow. The significance thresholds are set to less than 2mm (linear) and 4° (angular) differences to be clinically acceptable [25]. The average ± standard deviations of errors observed for both the ASO and AReg algorithms are within these acceptable ranges to assess the accuracy of craniofacial growth and treatment changes. Moreover, having tested the two AReg approaches separately and then combined, the slight differences observed between them also validated the fully-automated pipeline.
+
+Although the proposed registration tool performs well for the angular and linear changes compared to the clinician expert that followed the manual registration steps [4], the mandibular registration of cases during the pubertal growth spurt presented approximately 2mm of 3D differences at the mandibular condyles that are the major growth site in the mandible. However, AP, vertical, and transverse linear differences were all smaller than 2 mm.
+
+The utilization of different frameworks, such as MONAI for training ML models and SimpleElastix for facilitating the registration process, has simplified the various steps of the novel tools.
+
+While the proposed novel tool was tested and implemented as functionalities of a free open-source module (available at https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools) with a user-friendly interface in 3D Slicer (Fig. 5) for CBCT images, our pipeline is generalizable and can be extended to other imaging modalities such as spiral CT, Magnetic Resonance Imaging, micro-CT, and ultrasound. Adding supplemental scans to the training of the different ML tools used can also be beneficial to increase the quality of the overall image processing. Additionally, comprehensive evaluation within clinical settings can be conducted to thoroughly assess the advantages under real-world practical conditions.
+
+6
+
+## Conclusion
+The results obtained with the ASO and AReg tools represent a significant advancement in automating the CBCT image analysis digital workflow, as two major processing tasks are incorporated and validated. These study results are particularly relevant considering that machine learning techniques are increasingly employed to achieve cost-effective dental image analysis.

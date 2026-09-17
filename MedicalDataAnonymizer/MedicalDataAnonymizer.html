@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MedicalDataAnonymizer — SADT Atlas</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/site.js"></script>
+</head>
+<body data-cat="texte">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, outil par outil</small></a>
+
+    <div class="nav-group"><h4>Recalage</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Analyse</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Utilitaires</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+
+    <div class="nav-group"><h4>Texte &amp; langage</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html" aria-current="page">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transverse</h4><ul>
+      <li><a href="../constats.html">Constats</a></li>
+      <li><a href="../glossaire.html">Glossaire</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Texte &amp; langage</div>
+        <h1>MedicalDataAnonymizer</h1>
+        <p class="lede">Détection et remplacement d'entités sensibles dans des <strong>documents texte</strong> (DOCX, TXT, PDF, CSV, XML, ODT) par Microsoft <a class="gterm" href="../glossaire.html#g-presidio" title="Voir au glossaire">Presidio</a> — le module ne touche à aucune image médicale : <strong>ce n'est pas un anonymiseur DICOM</strong>.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="Non publié, et aucune évaluation dans le dépôt.">non publié</a>
+          <span class="badge neutral">sans CLI (widget Slicer)</span>
+          <span class="badge neutral">thread UI, pas de conda</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliographie</a>
+        </div>
+      </header>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège de vocabulaire</div>
+        <p>Le nom laisse attendre un anonymiseur DICOM. Il n'en est rien : <strong>MedicalDataAnonymizer dé-identifie des documents texte</strong> via Presidio + <a class="gterm" href="../glossaire.html#g-spacy" title="Voir au glossaire">spaCy</a>. Aucun tag DICOM (<code>PatientName</code>, <code>PatientID</code>, UID…) n'est lu ni modifié, et aucun defacing n'est appliqué à une image — l'extension entière ne contient d'ailleurs aucun outil de defacing.</p>
+      </div>
+
+      <h2 id="pas-dicom">0. Ce que le module n'est pas</h2>
+
+      <p>Le nom laisse attendre un anonymiseur DICOM. Il n'en est rien, et c'est vérifiable en une commande :</p>
+
+      <pre><code>$ grep -rin "dicom\|pydicom\|deface" Medical_Data_Anonymizer_Module/
+(aucun résultat)
+$ grep -rlni "deface" --include="*.py" --include="*.md" .
+(aucun résultat dans tout le dépôt)</code></pre>
+
+      <p>Conséquences directes :</p>
+
+      <ul>
+        <li><strong>aucun tag DICOM n'est effacé ni remplacé</strong> : ni <code>PatientName</code> (0010,0010), ni <code>PatientID</code> (0010,0020), ni <code>PatientBirthDate</code>, ni <code>StudyDate</code>, ni <code>InstitutionName</code>, ni les UID, ni les <em>private tags</em>, ni les <code>BurnedInAnnotation</code> ;</li>
+        <li><strong>aucun defacing</strong> : le visage reconstructible d'un CBCT ou d'un scanner n'est jamais altéré, par aucune méthode (ni masque facial, ni flou, ni suppression de surface). Il n'existe aucun outil de defacing dans l'extension entière ;</li>
+        <li>les formats pris en charge (<code>.docx</code>, <code>.txt</code>, <code>.pdf</code>, <code>.csv</code>, <code>.xml</code>, <code>.odt</code>, <code>Medical_Data_Anonymizer_Module.py:506</code>) ne recouvrent ni <code>.dcm</code>, ni <code>.nii.gz</code>, ni <code>.nrrd</code>, ni <code>.vtk</code>, ni <code>.json</code> de landmarks.</li>
+      </ul>
+
+      <p>Un opérateur qui doit décider s'il peut partager des données lira directement la <a href="#limites">§7</a>.</p>
+
+      <h2 id="situation">1. Situation dans la chaîne</h2>
+
+      <p>Outil isolé, sans CLI. Rien ne l'appelle, il n'appelle rien du dépôt. Tout tient dans un seul fichier de 767 lignes, dont ~350 de feuilles de style Qt : <code>Medical_Data_Anonymizer_Module.py</code>.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 800 195" role="img" aria-label="Pipeline : document d'entrée, extraction par format, détection Presidio, remplacement, document reconstruit et table de correspondance">
+          <rect class="d-box" x="10" y="16" width="130" height="56" rx="6"/>
+          <text class="d-label" x="75" y="48" text-anchor="middle">Document source</text>
+
+          <path class="d-arrow" d="M140 44 H166"/>
+          <path class="d-arrow-head" d="M166 44 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="166" y="16" width="170" height="56" rx="6"/>
+          <text class="d-label" x="251" y="34" text-anchor="middle">Extraction texte</text>
+          <text class="d-label" x="251" y="48" text-anchor="middle">par format</text>
+          <text class="d-label-s" x="251" y="62" text-anchor="middle">déterministe</text>
+
+          <path class="d-arrow" d="M336 44 H362"/>
+          <path class="d-arrow-head" d="M362 44 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="362" y="16" width="190" height="56" rx="6"/>
+          <text class="d-label" x="457" y="34" text-anchor="middle">Presidio Analyzer</text>
+          <text class="d-label" x="457" y="48" text-anchor="middle">spaCy + règles</text>
+          <text class="d-label-s" x="457" y="62" text-anchor="middle">prédit + calculé</text>
+
+          <path class="d-arrow" d="M552 44 H578"/>
+          <path class="d-arrow-head" d="M578 44 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="578" y="16" width="210" height="56" rx="6"/>
+          <text class="d-label" x="683" y="34" text-anchor="middle">Anonymizer</text>
+          <text class="d-mono" x="683" y="49" text-anchor="middle">replace · redact · hash · mask</text>
+          <text class="d-label-s" x="683" y="63" text-anchor="middle">déterministe</text>
+
+          <path class="d-arrow" d="M683 72 V96"/>
+          <path class="d-arrow" d="M440 96 H683"/>
+          <path class="d-arrow" d="M440 96 V120"/>
+          <path class="d-arrow-head" d="M440 120 l-4 -7 h8 z"/>
+          <path class="d-arrow" d="M683 96 V120"/>
+          <path class="d-arrow-head" d="M683 120 l-4 -7 h8 z"/>
+
+          <rect class="d-box" x="335" y="120" width="210" height="56" rx="6"/>
+          <text class="d-mono" x="440" y="142" text-anchor="middle">file_mappings.csv</text>
+          <text class="d-label-s" x="440" y="158" text-anchor="middle">UUID jamais utilisé</text>
+
+          <rect class="d-box-a" x="578" y="120" width="210" height="56" rx="6"/>
+          <text class="d-label" x="683" y="142" text-anchor="middle">Document reconstruit</text>
+          <text class="d-mono" x="683" y="158" text-anchor="middle">x_anonymized.*</text>
+        </svg>
+        <figcaption>Chaque document est réduit à une chaîne de texte, analysée par Presidio (NER spaCy + règles), puis reconstruite après remplacement ; la table de correspondance <code>file_mappings.csv</code> est écrite à part, dans le même dossier de sortie.</figcaption>
+      </figure>
+
+      <p><code>Medical_Data_Anonymizer_ModuleLogic</code> et <code>…Test</code> sont des classes vides (<code>pass</code>) : toute la logique vit dans le widget, donc <strong>dans le thread principal de Slicer</strong> — l'interface gèle pendant le traitement, seul <code>slicer.app.processEvents()</code> rafraîchit la barre de progression.</p>
+
+      <h2 id="entrees">2. Entrées : extraction de texte, format par format</h2>
+
+      <p>Parcours <strong>récursif</strong> du dossier d'entrée (<code>os.walk</code>), les fichiers commençant par <code>~$</code> (verrous Word) sont ignorés. Chaque fichier est réduit à une <strong>chaîne de caractères unique</strong> avant analyse :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Format</th><th>Extraction</th><th>Ce qui est perdu au passage</th></tr></thead>
+          <tbody>
+            <tr><td><code>.docx</code></td><td><code>python-docx</code>, <code>"\n".join(p.text for p in doc.paragraphs)</code></td><td><strong>tableaux</strong>, en-têtes/pieds de page, notes, zones de texte, commentaires, métadonnées du fichier</td></tr>
+            <tr><td><code>.txt</code></td><td>lecture brute UTF-8</td><td>—</td></tr>
+            <tr><td><code>.pdf</code></td><td><code>pdfplumber</code>, <code>page.extract_text()</code> ; en cas d'exception, seconde tentative via <code>extract_tables()</code></td><td>images, PDF scannés (aucun OCR) → texte vide</td></tr>
+            <tr><td><code>.csv</code></td><td><code>csv.reader</code>, chaque ligne aplatie par <code>" ".join(row)</code></td><td><strong>la structure en colonnes</strong></td></tr>
+            <tr><td><code>.xml</code></td><td><code>ElementTree</code> + <code>extract_text_from_xml()</code> récursif (texte + <code>tail</code>)</td><td><strong>balises et attributs</strong> : les valeurs d'attributs ne sont jamais lues</td></tr>
+            <tr><td><code>.odt</code></td><td><code>odfpy</code>, nœuds texte des <code>text.P</code></td><td>tableaux, styles, métadonnées</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>La perte n'est pas qu'une question de fidélité : les documents de sortie sont <strong>reconstruits à partir de cette chaîne</strong>. Ce qui n'a pas été extrait n'est pas anonymisé, mais n'est pas non plus recopié — il disparaît. À l'inverse, un contenu sensible situé dans une partie non extraite (un tableau DOCX, un attribut XML) n'est ni détecté ni recopié : pas de fuite, mais perte de données silencieuse.</p>
+
+      <p>Exception notable : rien ne lit les <strong>métadonnées</strong> des fichiers (auteur DOCX, <code>Producer</code> d'un PDF). Elles disparaissent aussi, puisque les fichiers sont recréés de zéro.</p>
+
+      <h2 id="moteur">3. Le moteur de détection</h2>
+
+      <p>Pas de modèle dans le dépôt, pas de poids téléchargés par le module lui-même hormis le modèle spaCy. Deux moteurs Presidio sont instanciés <strong>à chaque clic</strong> sur « Anonymize Files » (<code>…py:493</code>), avec <code>stderr</code> court-circuité par une classe <code>SuppressStderr</code> :</p>
+
+      <pre><code>analyzer = AnalyzerEngine()      # config par défaut
+anonymizer = AnonymizerEngine()</code></pre>
+
+      <p><code>AnalyzerEngine()</code> sans argument utilise la configuration NLP par défaut de Presidio, c'est-à-dire <strong>spaCy <code>en_core_web_lg</code></strong> — c'est le seul modèle que <code>install_dependencies()</code> télécharge (<code>spacy.cli.download</code>, <code>…py:411</code>).</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 760 220" role="img" aria-label="Deux familles de reconnaisseurs Presidio, NER spaCy prédite et règles calculées, se combinent en une liste d'entités filtrée par score">
+          <rect class="d-box" x="10" y="85" width="150" height="50" rx="6"/>
+          <text class="d-label" x="85" y="108" text-anchor="middle">Texte extrait</text>
+          <text class="d-label-s" x="85" y="122" text-anchor="middle">(anglais forcé)</text>
+
+          <path class="d-arrow" d="M160 110 H190 V45 H220"/>
+          <path class="d-arrow-head" d="M220 45 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M160 110 H190 V175 H220"/>
+          <path class="d-arrow-head" d="M220 175 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="220" y="15" width="260" height="60" rx="6"/>
+          <text class="d-label" x="350" y="34" text-anchor="middle">NER spaCy (prédit)</text>
+          <text class="d-mono" x="350" y="48" text-anchor="middle">en_core_web_lg</text>
+          <text class="d-label-s" x="350" y="62" text-anchor="middle">PERSON · LOCATION · DATE_TIME</text>
+
+          <rect class="d-box" x="220" y="145" width="260" height="60" rx="6"/>
+          <text class="d-label" x="350" y="162" text-anchor="middle">Règles + sommes de contrôle</text>
+          <text class="d-label-s" x="350" y="176" text-anchor="middle">(calculé)</text>
+          <text class="d-label-s" x="350" y="190" text-anchor="middle">PHONE · EMAIL · SSN · carte · IP…</text>
+
+          <path class="d-arrow" d="M480 45 H510 V100 H540"/>
+          <path class="d-arrow-head" d="M540 100 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M480 175 H510 V120 H540"/>
+          <path class="d-arrow-head" d="M540 120 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="540" y="80" width="200" height="60" rx="6"/>
+          <text class="d-label" x="640" y="104" text-anchor="middle">Entités détectées</text>
+          <text class="d-label-s" x="640" y="120" text-anchor="middle">score ≥ seuil (0.5)</text>
+        </svg>
+        <figcaption>Les deux familles de reconnaisseurs Presidio se combinent avant le filtrage par score : NER spaCy (prédit) pour les entités floues, règles et sommes de contrôle (calculé) pour les identifiants formatés.</figcaption>
+      </figure>
+
+      <p>Deux familles de reconnaisseurs se combinent : la <strong>NER statistique</strong> de spaCy (<code>PERSON</code>, <code>LOCATION</code>, <code>DATE_TIME</code>) et des <strong>reconnaisseurs à motifs et sommes de contrôle</strong> (<code>PHONE_NUMBER</code>, <code>EMAIL_ADDRESS</code>, <code>US_SSN</code>, <code>MEDICAL_LICENSE</code>, <code>US_DRIVER_LICENSE</code>, <code>CREDIT_CARD</code>, <code>US_BANK_NUMBER</code>, <code>IP_ADDRESS</code>, <code>URL</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p><strong>La langue est figée à l'anglais</strong> : <code>analyzer.analyze(..., language='en')</code> (<code>…py:713</code>), malgré le commentaire « with automatic language detection » et l'installation de <code>langdetect</code>, qui n'est <strong>jamais importé</strong> — dépendance morte. Un dossier de notes en français passera par un modèle anglais, avec le rappel qu'on imagine.</p>
+      </div>
+
+      <p><strong>Seuil de confiance</strong> : <code>score_threshold</code>, curseur 0.0–1.0, défaut <strong>0.5</strong>. Les détections sous le seuil sont abandonnées sans trace.</p>
+
+      <h2 id="entites-methodes">4. Entités et méthodes de remplacement</h2>
+
+      <p>Douze cases à cocher, sept cochées par défaut (<code>…py:90</code>) :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Entité Presidio</th><th>Libellé UI</th><th>Défaut</th></tr></thead>
+          <tbody>
+            <tr><td><code>PERSON</code> <span class="badge predit">prédit</span></td><td>Names (patients, doctors)</td><td>✔</td></tr>
+            <tr><td><code>PHONE_NUMBER</code> <span class="badge calcule">calculé</span></td><td>Phone Numbers</td><td>✔</td></tr>
+            <tr><td><code>EMAIL_ADDRESS</code> <span class="badge calcule">calculé</span></td><td>Email Addresses</td><td>✔</td></tr>
+            <tr><td><code>DATE_TIME</code> <span class="badge predit">prédit</span></td><td>Dates and Times</td><td>✔</td></tr>
+            <tr><td><code>LOCATION</code> <span class="badge predit">prédit</span></td><td>Addresses and Locations</td><td>✔</td></tr>
+            <tr><td><code>US_SSN</code> <span class="badge calcule">calculé</span></td><td>Social Security Numbers</td><td>✔</td></tr>
+            <tr><td><code>MEDICAL_LICENSE</code> <span class="badge calcule">calculé</span></td><td>Medical License Numbers</td><td>✔</td></tr>
+            <tr><td><code>US_DRIVER_LICENSE</code>, <code>CREDIT_CARD</code>, <code>US_BANK_NUMBER</code>, <code>IP_ADDRESS</code>, <code>URL</code> <span class="badge calcule">calculé</span></td><td>—</td><td>✘</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Quatre méthodes, dans « Advanced Options » (<code>…py:720</code>) :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Méthode</th><th>Implémentation</th><th>Résultat</th></tr></thead>
+          <tbody>
+            <tr><td><code>replace</code> (défaut)</td><td><code>operators = {}</code> → passé à <code>None</code> → opérateur par défaut de Presidio</td><td><code>&lt;PERSON&gt;</code>, <code>&lt;DATE_TIME&gt;</code>, …</td></tr>
+            <tr><td><code>redact</code></td><td><code>OperatorConfig("redact")</code> par entité</td><td>l'occurrence disparaît, le texte se referme</td></tr>
+            <tr><td><code>hash</code></td><td><code>OperatorConfig("hash")</code></td><td><strong>SHA-256 non salé</strong> du texte détecté</td></tr>
+            <tr><td><code>mask</code></td><td><code>OperatorConfig("mask", {"masking_char": "*", "chars_to_mask": 100, "from_end": False})</code></td><td>astérisques sur toute l'occurrence</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Sur <code>hash</code> : le README parle de « cryptographic hashes for consistent anonymization ». La cohérence est vraie (le même nom donne toujours le même condensé), mais il n'y a <strong>ni sel ni clé</strong> : sur un espace de valeurs aussi petit qu'un nom, une date de naissance ou un numéro de sécurité sociale, le condensé se ré-identifie par force brute en quelques secondes. À considérer comme un pseudonyme public, pas comme une protection.</p>
+
+      <h2 id="sorties">5. Sorties et table de correspondance</h2>
+
+      <p>Écriture <strong>à plat</strong> dans le dossier de sortie — la hiérarchie de sous-dossiers de l'entrée n'est pas reproduite.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Entrée</th><th>Sortie</th><th>Remarque</th></tr></thead>
+          <tbody>
+            <tr><td><code>x.docx</code></td><td><code>x_anonymized.docx</code></td><td>document reconstruit, un paragraphe par ligne, sans style</td></tr>
+            <tr><td><code>x.txt</code></td><td><code>x_anonymized.txt</code></td><td>—</td></tr>
+            <tr><td><code>x.pdf</code></td><td><code>x_anonymized.pdf</code></td><td>régénéré par <code>reportlab</code>, un unique bloc <code>Preformatted</code></td></tr>
+            <tr><td><code>x.csv</code></td><td><code>x_anonymized.csv</code></td><td>voir ci-dessous</td></tr>
+            <tr><td><code>x.xml</code></td><td><code>x_anonymized.xml</code></td><td><strong>texte brut sous une extension <code>.xml</code></strong> : plus aucune balise, le commentaire du code l'assume (« XML anonymization is complex »)</td></tr>
+            <tr><td><code>x.odt</code></td><td><code>x_anonymized.txt</code></td><td>changement d'extension</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Le cas CSV est le plus destructeur : le fichier a été lu en aplatissant chaque ligne par des espaces, puis il est réécrit avec <code>writer.writerow(line.split())</code> (<code>…py:632</code>). Toute cellule contenant un espace est éclatée en plusieurs colonnes, les cellules vides disparaissent : <strong>l'alignement des colonnes n'est pas préservé</strong>. Un CSV de mesures ressort inexploitable.</p>
+
+      <p><strong>La table de correspondance</strong>, <code>file_mappings.csv</code>, écrite dans le dossier de sortie (<code>…py:648</code>) :</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Colonne</th><th>Contenu</th></tr></thead>
+          <tbody>
+            <tr><td><code>Original File Name</code></td><td>nom du fichier d'origine</td></tr>
+            <tr><td><code>Anonymized File Name</code></td><td>nom produit, ou <code>ERROR</code></td></tr>
+            <tr><td><code>UUID</code></td><td><code>uuid.uuid4()</code> tiré par fichier, ou le message d'exception en cas d'échec</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Ce n'est <strong>pas</strong> une table de ré-identification des personnes : elle ne contient aucune correspondance entre un nom détecté et son remplacement. Et l'UUID est purement décoratif — il est généré (<code>…py:531</code>) puis <strong>jamais utilisé</strong> : il n'apparaît ni dans le contenu, ni dans le nom du fichier de sortie. Il n'existe donc aucun mécanisme de pseudonymisation stable inter-documents.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Piège</div>
+        <p>Ce fichier <code>file_mappings.csv</code> est écrit <strong>au milieu des documents anonymisés</strong> : partager le dossier de sortie revient à partager la liste des noms de fichiers d'origine.</p>
+      </div>
+
+      <h2 id="predit-calcule">6. Ce qui est prédit vs ce qui est calculé</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bloc</th><th>Nature</th><th>Où</th></tr></thead>
+          <tbody>
+            <tr><td>Extraction de texte</td><td><span class="badge calcule">calculé</span> déterministe, par bibliothèque de format</td><td>widget, thread UI</td></tr>
+            <tr><td>Détection <code>PERSON</code> / <code>LOCATION</code> / <code>DATE_TIME</code></td><td><span class="badge predit">prédit</span> réseau : NER spaCy <code>en_core_web_lg</code> (CNN + embeddings), via Presidio</td><td>widget, CPU</td></tr>
+            <tr><td>Détection des numéros (SSN, téléphone, carte, licence…)</td><td><span class="badge calcule">calculé</span> expressions régulières + sommes de contrôle et mots-clés de contexte</td><td>idem</td></tr>
+            <tr><td>Remplacement</td><td><span class="badge calcule">calculé</span> déterministe (<code>replace</code> / <code>redact</code> / SHA-256 / masque)</td><td><code>presidio-anonymizer</code></td></tr>
+            <tr><td>Reconstruction du document</td><td><span class="badge calcule">calculé</span> déterministe, par format</td><td>widget</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Aucun modèle n'est entraîné ni embarqué dans le dépôt ; <code>en_core_web_lg</code> est tiré par <code>spacy.cli.download</code> à l'installation.</p>
+
+      <h2 id="limites">7. Limites : ce qui n'est PAS retiré</h2>
+
+      <p>Section la plus utile pour décider si un jeu de données peut être partagé.</p>
+
+      <p><strong>Par construction, hors périmètre</strong></p>
+
+      <ol>
+        <li><strong>Toutes les images.</strong> DICOM, NIfTI, NRRD, maillages : jamais lus, jamais modifiés. Aucun tag d'en-tête n'est nettoyé, aucun visage n'est effacé (<a href="#pas-dicom">§0</a>).</li>
+        <li><strong>Les noms de fichiers et de dossiers.</strong> <code>Dupont_Jean_2019.docx</code> devient <code>Dupont_Jean_2019_anonymized.docx</code>. Le nom du patient survit intégralement dans le nom du fichier, et il est recopié tel quel dans <code>file_mappings.csv</code>. La hiérarchie d'entrée, souvent nominative elle aussi (<code>.../Patients/Dupont_Jean/</code>), est aplatie — et si deux sous-dossiers contiennent un fichier de même nom, <strong>le second écrase silencieusement le premier</strong>.</li>
+      </ol>
+
+      <p><strong>Angles morts de la détection</strong></p>
+
+      <ol start="3">
+        <li><strong>Les identifiants hospitaliers.</strong> Aucun reconnaisseur pour un MRN, un numéro de dossier, un numéro d'accession, un identifiant d'étude, un numéro de lit. Ils ne figurent dans aucune des douze entités proposées, et Presidio n'en a pas par défaut.</li>
+        <li><strong>Tout ce qui n'est pas américain.</strong> Les entités sélectionnables sont <code>US_SSN</code>, <code>US_DRIVER_LICENSE</code>, <code>US_BANK_NUMBER</code> : un NIR français, un NHS number, un numéro de passeport ou un ITIN ne sont pas cherchés.</li>
+        <li><strong>Les identifiants indirects HIPAA</strong> ne sont pas traités : âge supérieur à 89 ans, dates rares, professions, appartenance à un petit groupe. Presidio ne fait aucune généralisation de dates — <code>DATE_TIME</code> est remplacé en bloc ou pas du tout.</li>
+        <li><strong>La langue.</strong> Analyse figée en anglais (<a href="#moteur">§3</a>) : sur un corpus non anglophone, le rappel de <code>PERSON</code>/<code>LOCATION</code>/<code>DATE_TIME</code> s'effondre, sans le moindre avertissement.</li>
+        <li><strong>Le seuil de 0.5</strong> écarte par défaut toutes les détections moins sûres — typiquement les noms rares, les noms non anglo-saxons et les formes abrégées.</li>
+        <li><strong>Le contenu non extrait</strong> (tableaux DOCX, attributs XML, PDF scannés, en-têtes et pieds de page) n'est pas analysé. Il ne fuite pas dans la sortie, mais si le destinataire reçoit <strong>aussi</strong> les originaux, l'anonymisation ne l'a pas couvert.</li>
+      </ol>
+
+      <p><strong>Défaillance silencieuse — le point le plus grave</strong></p>
+
+      <ol start="9">
+        <li id="bug-silencieux">
+          <p><code>anonymize_text_presidio()</code> se termine par (<code>…py:748</code>) :</p>
+
+          <div class="callout bug">
+            <div class="callout-title">Bug confirmé — échec silencieux</div>
+            <pre><code>except Exception as e:
+    logger.error(f"Error in Presidio anonymization: {e}")
+    return text  # Return original text if anonymization fails</code></pre>
+            <p>Toute erreur d'analyse (entité non reconnue par la version de Presidio installée, modèle spaCy absent, texte trop long) produit <strong>un fichier <code>_anonymized</code> contenant le texte d'origine intact</strong>, avec un statut « Complete! » dans l'interface et une simple ligne rouge dans la console Python. Il n'y a aucune vérification a posteriori, aucun compteur d'entités détectées, aucun rapport. Un document non anonymisé est indiscernable d'un document propre sans le relire.</p>
+          </div>
+        </li>
+      </ol>
+
+      <p><strong>Conclusion pratique.</strong> La sortie de ce module ne suffit pas à déclarer un jeu de données dé-identifié. Elle constitue une première passe sur du texte libre anglophone, à relire, et elle doit être complétée par : un renommage des fichiers, un anonymiseur DICOM dédié pour les images, et un defacing si les volumes couvrent la face.</p>
+
+      <h2 id="environnement">8. Environnement</h2>
+
+      <p>Tout dans le Python de Slicer, installé par le bouton « Install Dependencies » (<code>…py:392</code>), sans confirmation ni version épinglée :</p>
+
+      <pre><code>presidio-analyzer, presidio-anonymizer, pandas, python-docx, pdfplumber,
+odfpy, lxml, langdetect, reportlab    puis    spacy.cli.download("en_core_web_lg")</code></pre>
+
+      <p>Remarques :</p>
+
+      <ul>
+        <li><code>spacy</code> n'est pas dans la liste <code>pip_install</code> : il est seulement <strong>importé</strong> (<code>…py:409</code>). Ça fonctionne parce que <code>presidio-analyzer</code> le tire comme dépendance ; si cet import échoue, tout le bloc part dans le <code>except</code> et affiche « Error installing dependencies ».</li>
+        <li>Un <strong>redémarrage de Slicer</strong> est demandé après installation (boîte de dialogue), ce qui est cohérent avec le chargement d'un modèle spaCy.</li>
+        <li><code>lxml</code> est installé mais inutilisé (le code utilise <code>xml.etree.ElementTree</code>) ; <code>langdetect</code> est installé et jamais importé.</li>
+        <li><code>os.environ['PRESIDIO_SUPPRESS_WARNINGS'] = '1'</code> et <code>warnings.filterwarnings('ignore')</code> sont posés <strong>au niveau module</strong>, donc dès le chargement de l'extension : ils masquent les avertissements de <em>tout</em> Slicer, pas seulement ceux de Presidio.</li>
+        <li>Aucun GPU, aucun conda, aucun CLI : <code>AnalyzerEngine()</code> et le chargement de spaCy (quelques secondes) se font dans le thread de l'interface, à chaque lancement.</li>
+      </ul>
+
+      <h2 id="pieges">9. Pièges et points fragiles</h2>
+
+      <ul>
+        <li><strong>Échec silencieux</strong> renvoyant le texte d'origine (<a href="#bug-silencieux">§7.9</a>).</li>
+        <li><strong>Aplatissement du dossier de sortie</strong> : collisions de noms, écrasement sans message.</li>
+        <li><strong>CSV restructuré</strong> par <code>line.split()</code>, XML dégradé en texte, ODT renommé en <code>.txt</code>.</li>
+        <li><strong>UUID généré mais jamais appliqué</strong> : la « table de correspondance » ne permet aucune ré-identification contrôlée.</li>
+        <li><strong><code>file.replace(".docx", "_anonymized.docx")</code></strong> : <code>str.replace</code> remplace toutes les occurrences ; un nom contenant deux fois l'extension produit un nom inattendu.</li>
+        <li><strong>Le PDF de sortie n'a pas de pagination</strong> (<code>Preformatted</code> unique) : un long document peut dépasser le cadre ou lever une exception <code>reportlab</code>, auquel cas le fichier est compté en <code>ERROR</code> mais le traitement continue.</li>
+        <li><strong>Tout est sur le thread UI</strong> : sur un dossier volumineux, Slicer paraît figé.</li>
+        <li><strong>Le README surestime le module</strong> : il parle de conformité HIPAA et de « AI-powered text analysis » là où le code est un appel Presidio par défaut sur du texte anglais, sans validation.</li>
+        <li>Le README pointe <code>Medical_Data_Anonymizer_Module/Resources/Icons/icon.png</code> alors que le fichier présent s'appelle <code>Medical_Data_Anonymizer_Module.png</code>.</li>
+        <li><code>Medical_Data_Anonymizer_ModuleLogic</code> / <code>…Test</code> sont des coquilles vides : aucun test, et rien d'appelable par script.</li>
+      </ul>
+
+      <h2 id="references">10. Littérature et références</h2>
+
+      <p>Aucun papier ne porte sur ce module ; il n'y a pas non plus d'évaluation (rappel, précision) dans le dépôt, sur aucun corpus.</p>
+
+      <p>Les briques utilisées sont documentées :</p>
+
+      <ul>
+        <li><a href="https://microsoft.github.io/presidio/">Microsoft Presidio</a> — le moteur de détection et d'anonymisation, avec la liste exacte de ses reconnaisseurs prédéfinis et de ses opérateurs (<code>replace</code>, <code>redact</code>, <code>hash</code>, <code>mask</code>, <code>encrypt</code> — ce dernier, réversible avec une clé, n'est pas proposé par le module).</li>
+        <li><a href="https://spacy.io/models/en">spaCy <code>en_core_web_lg</code></a> — le modèle de NER anglais utilisé par défaut.</li>
+        <li><a href="https://www.hhs.gov/hipaa/for-professionals/privacy/special-topics/de-identification/index.html">HIPAA Safe Harbor, 45 CFR §164.514(b)(2)</a> — les 18 catégories d'identifiants à retirer. Utile comme grille de lecture de la <a href="#limites">§7</a> : les noms de fichiers, les identifiants de dossier médical et les identifiants d'images y figurent, et ce module ne les traite pas.</li>
+      </ul>
+
+      <p><strong>Bibliographie complète : <a href="SOURCES.html">SOURCES.html</a></strong> — recherche faite, résultat négatif sur le module lui-même. Le dossier contient la seule évaluation publiée de Presidio sur du texte clinique non structuré, et les liens vers les campagnes i2b2/n2c2 de dé-identification de texte, qui ne décrivent pas ce code mais en donnent la grille de lecture.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Toutes les fiches</a> ·
+        <a href="SOURCES.html">Bibliographie de cet outil</a> ·
+        Source : <code>MedicalDataAnonymizer.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>
