@@ -8,6 +8,23 @@ d'ici. Ne jamais éditer une sidebar dans un .html, elle sera écrasée.
 
 LANGS = ("fr", "en")
 
+# ─────────────────────────────────────────────────────────────
+#  THÈME — la seule variable à changer pour tester un style.
+#  None = la feuille de base seule. Sinon le nom d'un fichier de
+#  assets/themes/, sans l'extension. Relancer `python3 build.py`
+#  après modification : il repose le lien dans toutes les pages.
+#
+#      THEME = None          look par défaut
+#      THEME = "ardoise"     technique, sombre, chasse fixe, angles vifs
+#      THEME = "papier"      éditorial, sérif, filets plutôt que cadres
+#      THEME = "clinique"    applicatif, bleuté, cartes ombrées, coins ronds
+# ─────────────────────────────────────────────────────────────
+THEME = None
+
+THEMES = ("ardoise", "papier", "clinique")
+
+
+
 # clé de catégorie -> libellé par langue
 CATS = {
     "registration": {"fr": "Recalage",               "en": "Registration"},

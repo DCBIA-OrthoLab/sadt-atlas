@@ -51,7 +51,8 @@ langue. Seules les pages rendues se dédoublent.
 
 | | |
 |---|---|
-| [`nav.py`](nav.py) | **définition unique de la navigation.** La sidebar est identique sur une centaine de pages : ne l'édite jamais dans un `.html`, elle sera écrasée |
+| [`assets/themes/`](assets/themes/) | surcouches de style interchangeables — voir ci-dessous |
+| [`nav.py`](nav.py) | **définition unique de la navigation**, et la variable `THEME`. La sidebar est identique sur une centaine de pages : ne l'édite jamais dans un `.html`, elle sera écrasée |
 | [`build.py`](build.py) | réécrit les sidebars, génère l'index de recherche, les constats et les index de guides, par langue |
 
 Après avoir modifié une fiche :
@@ -62,6 +63,24 @@ python3 build.py
 
 Les fichiers générés sont versionnés à dessein — un clone doit fonctionner sans rien
 exécuter.
+
+### Changer de style
+
+La feuille de base `assets/style.css` est entièrement tokenisée : couleurs, polices,
+rayons, largeurs sont des variables CSS. Un thème est une **surcouche** qui redéfinit
+ces variables et quelques règles de forme — il ne duplique rien.
+
+Pour en essayer un, une seule ligne dans `nav.py` :
+
+```python
+THEME = None          # feuille de base seule
+THEME = "ardoise"     # technique, sombre, chasse fixe, angles vifs
+THEME = "papier"      # éditorial, sérif, filets plutôt que cadres
+THEME = "clinique"    # applicatif, bleuté, cartes ombrées, coins ronds
+```
+
+puis `python3 build.py`, qui pose ou retire le lien dans les 141 pages. Chaque thème
+gère ses propres variantes claire et sombre.
 
 **La sidebar ne se modifie que dans `nav.py`.** `build.py` la réécrit ensuite dans
 chaque page. C'est ce qui évite qu'une centaine de copies divergent.

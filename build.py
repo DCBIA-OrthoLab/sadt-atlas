@@ -452,6 +452,37 @@ def write_guide_index(lang):
     print(f"{lang}/guide/index.html : {len(nav.BLURBS)} outils")
 
 
+THEME_RX = re.compile(r'\n\s*<link rel="stylesheet" href="[^"]*assets/themes/[^"]*">')
+BASE_RX = re.compile(r'(<link rel="stylesheet" href="((?:\.\./)*)assets/style\.css">)')
+
+
+def sync_theme():
+    """Pose (ou retire) le lien du thème juste après la feuille de base.
+    Idempotent : l'ancien lien est toujours enlevé avant d'écrire le nouveau."""
+    name = getattr(nav, "THEME", None)
+    if name and name not in nav.THEMES:
+        raise SystemExit(f"THEME inconnu : {name!r} — attendus {nav.THEMES} ou None")
+    n = 0
+    for dp, dirs, fs in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d != ".git" and not d.startswith(".")]
+        for f in sorted(fs):
+            if not f.endswith(".html"):
+                continue
+            path = os.path.join(dp, f)
+            s = open(path, encoding="utf-8").read()
+            new = THEME_RX.sub("", s)
+            if name:
+                m = BASE_RX.search(new)
+                if not m:
+                    continue
+                link = f'\n<link rel="stylesheet" href="{m.group(2)}assets/themes/{name}.css">'
+                new = new[:m.end()] + link + new[m.end():]
+            if new != s:
+                open(path, "w", encoding="utf-8").write(new)
+                n += 1
+    print(f"thème : {name or 'aucun (feuille de base seule)'} — {n} pages mises à jour")
+
+
 if __name__ == "__main__":
     write_landing()
     for _l in nav.LANGS:
@@ -462,3 +493,4 @@ if __name__ == "__main__":
         if os.path.isdir(os.path.join(ROOT, _l)):
             _idx, _c = build_lang(_l)
             write_constats(_l, _c)
+    sync_theme()          # en dernier : les pages générées viennent d'être réécrites
