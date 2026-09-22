@@ -15,11 +15,25 @@ réseau, à quel moment le modèle est appelé, quels sont les prétraitements, 
 Site statique, sans dépendance, sans étape de compilation.
 
 ```bash
-python3 -m http.server 8080
-# puis http://127.0.0.1:8080
+python3 serve.py
 ```
 
-`index.html` s'ouvre aussi directement en `file://`, la recherche comprise.
+Sert le site sur **toutes les interfaces**, filtré par une liste blanche d'adresses
+définie dans [`serve.conf`](serve.conf) : la machine elle-même, tout le tailnet
+Tailscale, et les hôtes du réseau UNC repris des alias `ssh*` de `~/.bashrc`.
+
+Le fichier est **relu à chaud** : ajoute une adresse, enregistre, et la règle
+s'applique à la requête suivante — aucun redémarrage. Une ligne invalide est
+signalée dans le journal sans faire tomber la liste. Le contenu du site étant lu
+sur disque à chaque requête, une page régénérée par `build.py` est visible
+immédiatement.
+
+> Ce filtre est **applicatif, pas un pare-feu** : il répond 403 aux adresses non
+> listées, mais le port reste ouvert sur les interfaces. Pour un vrai cloisonnement,
+> doubler d'une règle `ufw`/`iptables`.
+
+Pour un usage purement local, `python3 -m http.server 8080` fait toujours l'affaire,
+et `index.html` s'ouvre aussi en `file://`, la recherche comprise.
 
 ## Ce qu'il y a dedans
 
