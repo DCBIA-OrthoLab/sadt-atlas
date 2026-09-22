@@ -255,7 +255,7 @@
           var ctx = r.x;
           var pos = norm(ctx).indexOf(terms[0]);
           if (pos > 60) ctx = "…" + ctx.slice(pos - 40);
-          return '<a href="' + rel(r.u) + '" role="option">' +
+          return '<a href="' + relLang(r.u) + '" role="option">' +
             '<span class="r-tool">' + highlight(r.t, terms) + "</span> " +
             '<span class="r-sec">› ' + highlight(r.s, terms) + "</span>" +
             '<span class="r-ctx">' + highlight(ctx.slice(0, 120), terms) + "</span></a>";
