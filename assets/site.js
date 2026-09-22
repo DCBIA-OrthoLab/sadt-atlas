@@ -15,14 +15,16 @@
           noResult: "Aucun résultat.", noIndex: "Index introuvable — lancer <code>python3 build.py</code>.",
           prev: "← précédent", next: "suivant →", top: "↑ haut",
           toTop: "Revenir en haut", skip: "Aller au contenu",
-          anchor: "Lien vers cette section", reading: "Ordre de lecture conseillé" },
+          anchor: "Lien vers cette section", reading: "Ordre de lecture conseillé",
+          menu: "Ouvrir le menu" },
     en: { dark: "☾ dark", light: "☀ light", onpage: "On this page",
           copy: "copy", copied: "copied", failed: "failed",
           search: "Search…  /", searchAria: "Search the site",
           noResult: "No results.", noIndex: "Index not found — run <code>python3 build.py</code>.",
           prev: "← previous", next: "next →", top: "↑ top",
           toTop: "Back to top", skip: "Skip to content",
-          anchor: "Link to this section", reading: "Suggested reading order" }
+          anchor: "Link to this section", reading: "Suggested reading order",
+          menu: "Open the menu" }
   }[LANG];
   try { var saved = localStorage.getItem(KEY); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
 
@@ -71,6 +73,84 @@
   function ready(fn) {
     if (document.readyState !== "loading") fn();
     else document.addEventListener("DOMContentLoaded", fn);
+  }
+
+
+  /* ---------------- Barre et tiroir (petits écrans) ---------------- */
+  function mobileNav() {
+    var side = document.querySelector(".sidebar");
+    if (!side || document.querySelector(".mbar")) return;
+
+    var bar = document.createElement("div");
+    bar.className = "mbar";
+    bar.innerHTML =
+      '<button class="mbar-burger" type="button" aria-expanded="false" ' +
+      'aria-controls="sadt-nav" aria-label="' + T.menu + '">' +
+      "<span></span><span></span><span></span></button>" +
+      '<span class="mbar-title"></span>';
+    if (!side.id) side.id = "sadt-nav";
+
+    var cur = document.querySelector('.sidebar a[aria-current="page"]');
+    var h1 = document.querySelector(".content h1");
+    var t = cur ? cur.textContent : (h1 ? h1.textContent.split("—")[0] : "SADT Atlas");
+    bar.querySelector(".mbar-title").textContent = t.trim();
+    document.body.insertBefore(bar, document.body.firstChild);
+
+    var veil = document.createElement("div");
+    veil.className = "mveil";
+    document.body.appendChild(veil);
+
+    var burger = bar.querySelector(".mbar-burger");
+    function open(on) {
+      document.body.classList.toggle("nav-open", on);
+      burger.setAttribute("aria-expanded", on ? "true" : "false");
+      /* le focus entre dans le tiroir sans ouvrir le clavier ni cercler un lien */
+      if (on) { side.setAttribute("tabindex", "-1"); side.focus(); }
+      else { burger.focus(); }
+    }
+    burger.addEventListener("click", function () {
+      open(!document.body.classList.contains("nav-open"));
+    });
+    veil.addEventListener("click", function () { open(false); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" || e.key === "Esc") open(false);
+    });
+    /* suivre un lien referme le tiroir */
+    side.addEventListener("click", function (e) {
+      var a = e.target && e.target.closest ? e.target.closest("a") : null;
+      if (a) open(false);
+    });
+  }
+
+  /* Sommaire repliable, posé dans le contenu : le sommaire latéral
+     disparaît sous 1100 px, et une page sans sommaire n'est pas navigable. */
+  function tocMobile() {
+    var content = document.querySelector(".content");
+    if (!content || content.querySelector(".toc-m")) return;
+    var hs = content.querySelectorAll("h2[id]");
+    if (hs.length < 2) return;
+
+    var d = document.createElement("details");
+    d.className = "toc-m";
+    var sum = document.createElement("summary");
+    sum.textContent = T.onpage;
+    d.appendChild(sum);
+
+    var ul = document.createElement("ul");
+    hs.forEach(function (h) {
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = "#" + h.id;
+      a.textContent = h.textContent.replace(/^\s*[¶#]\s*/, "").replace(/^\s*\d+\.\s*/, "");
+      a.addEventListener("click", function () { d.open = false; });
+      li.appendChild(a);
+      ul.appendChild(li);
+    });
+    d.appendChild(ul);
+
+    var head = content.querySelector(".page-head");
+    if (head && head.nextSibling) content.insertBefore(d, head.nextSibling);
+    else content.insertBefore(d, content.firstChild);
   }
 
   /* ---------------- Thème ---------------- */
@@ -396,7 +476,8 @@
        les suivants de s'exécuter. Le sommaire et la navigation passent avant
        les agréments (barre collante, copie, recherche). */
     var steps = [
-      ["skipLink", skipLink], ["anchors", anchors], ["toc", toc],
+      ["mobileNav", mobileNav], ["skipLink", skipLink],
+      ["anchors", anchors], ["tocMobile", tocMobile], ["toc", toc],
       ["theme", themeToggle], ["pager", pager], ["pageBar", pageBar],
       ["copy", copyButtons], ["search", search], ["constats", constats]
     ];

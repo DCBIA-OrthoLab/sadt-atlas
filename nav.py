@@ -128,9 +128,12 @@ def sidebar(lang, section, current=None, depth=1):
                f'<a href="{to_other}" title="{esc(ui["lang_other"])}">{other.upper()}</a>')
     out.append('    </div>')
 
-    # bascule Guide / Atlas
+    # bascule Guide / Atlas — sur une page d'outil, on reste sur le même outil
+    on_tool = current in {t for t, _ in TOOLS}
+    sw = (("guide", f"{up}guide/{current}.html" if on_tool else f"{up}guide/index.html"),
+          ("atlas", f"{up}{current}/{current}.html" if on_tool else f"{up}index.html"))
     out.append('    <div class="sec-switch">')
-    for key, path in (("guide", f"{up}guide/index.html"), ("atlas", f"{up}index.html")):
+    for key, path in sw:
         on = ' aria-current="true"' if key == section else ""
         out.append(f'      <a href="{path}"{on}><b>{esc(ui[key])}</b>'
                    f'<small>{esc(ui[key + "_hint"])}</small></a>')

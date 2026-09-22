@@ -8,6 +8,7 @@ import os, re, json, html
 from html.parser import HTMLParser
 
 import nav
+import papers
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SKIP_DIRS = {"assets"}
@@ -362,6 +363,110 @@ def sync_nav():
 
 
 
+PAPERS_RX = re.compile(r'\n*[ \t]*<!-- papers:start -->.*?<!-- papers:end -->\n*', re.S)
+
+PAPERS_UI = {
+ "fr": {"h2": "Pour aller plus loin",
+        "self": "Sur {tool} lui-même",
+        "around": "Autour de la méthode",
+        "free": "texte intégral libre",
+        "biblio": "La bibliographie complète de l'outil — ce qui a été trouvé, et ce qui a "
+                  "été cherché sans rien trouver — est dans "
+                  "<a href=\"{href}\">ses sources</a>."},
+ "en": {"h2": "Further reading",
+        "self": "On {tool} itself",
+        "around": "Around the method",
+        "free": "free full text",
+        "biblio": "The tool's full bibliography — what was found, and what was looked for "
+                  "without success — is in <a href=\"{href}\">its sources</a>."},
+}
+
+
+def papers_block(lang, tool):
+    """Section « Pour aller plus loin » d'une page du Guide, depuis papers.py."""
+    d = papers.PAPERS.get(tool)
+    if not d:
+        return None
+    ui = PAPERS_UI[lang]
+    out = ["      <!-- papers:start -->",
+           f'      <h2 id="lire-plus">{ui["h2"]}</h2>']
+    note = d.get("note")
+    if note:
+        out.append(f'      <p>{note[lang]}</p>')
+
+    def items(entries):
+        lines = ["      <ul>"]
+        for e in entries:
+            title = html.escape(e["title"], quote=False)
+            extra = ""
+            if e.get("free"):
+                extra = f' <a href="{e["free"]}">{ui["free"]}</a>.'
+            lines.append(
+                f'        <li><strong>{html.escape(e["ref"], quote=False)}</strong> — '
+                f'<a href="{e["url"]}"><em>{title}</em></a>. {e[lang]}{extra}</li>')
+        lines.append("      </ul>")
+        return lines
+
+    if d["self"]:
+        out.append(f'      <h3 id="sur-outil">{ui["self"].format(tool=tool)}</h3>')
+        out += items(d["self"])
+    if d["around"]:
+        out.append(f'      <h3 id="autour">{ui["around"]}</h3>')
+        out += items(d["around"])
+    out.append("      <p>" + ui["biblio"].format(href=f"../{tool}/SOURCES.html") + "</p>")
+    out.append("      <!-- papers:end -->")
+    return "\n".join(out) + "\n"
+
+
+def sync_papers():
+    """Écrit, dans chaque page du Guide, la section des références de papers.py.
+
+    Bloc délimité par <!-- papers:start/end -->, donc réécrit sans dupliquer.
+    Posé juste avant le lien « Comment ça marche vraiment » vers l'Atlas.
+    """
+    n = 0
+    for lang in nav.LANGS:
+        gdir = os.path.join(ROOT, lang, "guide")
+        if not os.path.isdir(gdir):
+            continue
+        for f in sorted(os.listdir(gdir)):
+            tool = os.path.splitext(f)[0]
+            if not f.endswith(".html") or tool not in papers.PAPERS:
+                continue
+            path = os.path.join(gdir, f)
+            s = open(path, encoding="utf-8").read()
+            blk = papers_block(lang, tool)
+            new = PAPERS_RX.sub("", s)
+            i = new.find('      <a class="deep-link"')
+            if i < 0:
+                print(f"  ! {lang}/guide/{f} : pas de deep-link, section non posée")
+                continue
+            new = new[:i].rstrip() + "\n\n" + blk + "\n" + new[i:]
+            if new != s:
+                open(path, "w", encoding="utf-8").write(new)
+                n += 1
+    print(f"références : {n} pages du Guide mises à jour")
+
+
+def check_papers():
+    """Aucune URL citée qui ne soit déjà dans la bibliographie de l'outil."""
+    bad = []
+    for tool, d in papers.PAPERS.items():
+        known = set()
+        for p in (os.path.join(ROOT, tool, "SOURCES.md"),
+                  os.path.join(ROOT, "fr", tool, "SOURCES.html")):
+            if os.path.exists(p):
+                t = open(p, encoding="utf-8").read()
+                known |= {u.rstrip(".,;") for u in re.findall(r'https?://[^\s\)\]\|>"]+', t)}
+        for e in d["self"] + d["around"]:
+            for u in (e["url"], e.get("free")):
+                if u and u not in known:
+                    bad.append((tool, u))
+    for tool, u in bad:
+        print(f"  ! {tool} : {u} absente de la bibliographie")
+    print(f"références : {len(bad)} URL hors bibliographie")
+
+
 LANDING = """<!doctype html>
 <html lang="fr">
 <head>
@@ -377,8 +482,8 @@ LANDING = """<!doctype html>
   <p>Comment fonctionne chaque outil de SlicerAutomatedDentalTools.<br>
      How each SlicerAutomatedDentalTools module works.</p>
   <div class="choices">
-    <a href="fr/index.html"><b>Français</b><small>Guide et Atlas</small></a>
-    <a href="en/index.html"><b>English</b><small>Guide and Atlas</small></a>
+    <a href="fr/guide/index.html"><b>Français</b><small>Guide et Atlas</small></a>
+    <a href="en/guide/index.html"><b>English</b><small>Guide and Atlas</small></a>
   </div>
 </div>
 </body>
@@ -401,11 +506,131 @@ GUIDE_INTRO = {
 }
 
 
+def guide_callouts(lang):
+    """Compte les avertissements posés dans les pages du Guide."""
+    d = os.path.join(ROOT, lang, "guide")
+    warn = bug = 0
+    for f in os.listdir(d):
+        if not f.endswith(".html") or f == "index.html":
+            continue
+        t = open(os.path.join(d, f), encoding="utf-8").read()
+        warn += len(re.findall(r'<div class="callout warn"', t))
+        bug += len(re.findall(r'<div class="callout bug"', t))
+    return warn, bug
+
+
+GUIDE_ABOUT = {
+ "fr": """      <h2 id="pour-qui">À qui s'adresse ce guide</h2>
+      <p>À qui ouvre SlicerAutomatedDentalTools dans 3D Slicer et veut s'en servir :
+      cliniciens, chercheurs, étudiants. Il ne suppose de savoir ni lire du code, ni ce
+      qu'est un réseau de neurones. Si c'est le fonctionnement interne qui vous intéresse —
+      quel modèle est appelé, à quel moment, sur quelles données — c'est
+      l'<a href="../index.html">Atlas</a> qu'il vous faut : les deux sections couvrent les
+      mêmes {n} modules, chacune par un bout opposé.</p>
+
+      <h2 id="pourquoi">Pourquoi il existe</h2>
+      <p>L'extension rassemble {n} modules écrits par des équipes différentes, à des
+      époques différentes. Leur documentation tient selon les cas en quelques lignes de
+      README, en une page de projet, ou en rien du tout. Plusieurs se comportent autrement
+      que ce que leur publication décrit : le papier date d'une version que le code
+      n'exécute plus.</p>
+      <p>Ce guide a été écrit en lisant le code de chaque module, pas sa documentation. Il
+      dit donc ce que l'outil fait réellement quand vous cliquez, y compris quand c'est
+      gênant : <strong>{warn} avertissements et {bug} bugs</strong> sont signalés à
+      l'endroit précis où vous risquez de tomber dessus. Rien n'est corrigé ici — le but
+      est que vous n'y perdiez pas une journée.</p>
+
+      <h2 id="plan">Ce que vous trouverez sur chaque page</h2>
+      <p>Toutes suivent le même plan, pour que vous sachiez où regarder sans tout relire :</p>
+      <ul>
+        <li><strong>Quand s'en servir</strong> — à quel problème l'outil répond, et les cas
+        où il ne sert à rien.</li>
+        <li><strong>Ce qu'il vous faut, ce que vous obtenez</strong> — les entrées
+        attendues, leur format, et ce qui ressort à la fin.</li>
+        <li><strong>Marche à suivre</strong> — les étapes dans l'ordre, champ par champ.</li>
+        <li><strong>Si ça coince</strong> — les échecs fréquents et ce qui les provoque.</li>
+        <li><strong>Pour aller plus loin</strong> — les publications derrière l'outil quand
+        il y en a, et le renvoi vers la fiche Atlas.</li>
+      </ul>
+
+      <h2 id="commencer">Par où commencer</h2>
+      <p>Si vous savez quel outil vous cherchez, prenez-le dans la liste plus bas. Sinon,
+      partez de ce que vous avez à faire :</p>
+      <ul>
+        <li>Comparer deux examens du même patient dans le temps →
+        <a href="#registration">Recalage</a></li>
+        <li>Isoler des structures dans un CBCT →
+        <a href="#segmentation">Segmentation</a></li>
+        <li>Poser des repères anatomiques, ou remettre un scan d'aplomb →
+        <a href="#landmarks">Landmarks &amp; orientation</a></li>
+        <li>Mesurer, classer ou prédire à partir d'une forme →
+        <a href="#analysis">Analyse</a></li>
+        <li>Recadrer ou appliquer une matrice, en série →
+        <a href="#utilities">Utilitaires</a></li>
+        <li>Extraire ou anonymiser du texte clinique →
+        <a href="#text">Texte &amp; langage</a></li>
+      </ul>
+""",
+ "en": """      <h2 id="pour-qui">Who this guide is for</h2>
+      <p>Anyone who opens SlicerAutomatedDentalTools in 3D Slicer and wants to use it:
+      clinicians, researchers, students. It assumes no ability to read code and no idea
+      what a neural network is. If what you want is the inner workings — which model is
+      called, when, on what data — you want the <a href="../index.html">Atlas</a> instead:
+      both sections cover the same {n} modules, each from the opposite end.</p>
+
+      <h2 id="pourquoi">Why it exists</h2>
+      <p>The extension gathers {n} modules written by different teams at different times.
+      Their documentation amounts, depending on the case, to a few lines of README, a
+      project page, or nothing at all. Several behave differently from what their
+      publication describes: the paper documents a version the code no longer runs.</p>
+      <p>This guide was written by reading each module's code, not its documentation. So it
+      says what the tool actually does when you click, including when that is inconvenient:
+      <strong>{warn} warnings and {bug} bugs</strong> are flagged at the exact point where
+      you are likely to hit them. Nothing is fixed here — the point is that you do not lose
+      a day to it.</p>
+
+      <h2 id="plan">What every page contains</h2>
+      <p>They all follow the same plan, so you know where to look without rereading:</p>
+      <ul>
+        <li><strong>When to use it</strong> — which problem the tool answers, and the cases
+        where it is of no help.</li>
+        <li><strong>What you need, what you get</strong> — the expected inputs, their
+        format, and what comes out at the end.</li>
+        <li><strong>Step by step</strong> — the steps in order, field by field.</li>
+        <li><strong>When it goes wrong</strong> — the common failures and what causes
+        them.</li>
+        <li><strong>Further reading</strong> — the publications behind the tool where there
+        are any, and the pointer to the Atlas page.</li>
+      </ul>
+
+      <h2 id="commencer">Where to start</h2>
+      <p>If you know which tool you are after, take it from the list below. Otherwise start
+      from what you have to do:</p>
+      <ul>
+        <li>Compare two scans of the same patient over time →
+        <a href="#registration">Registration</a></li>
+        <li>Isolate structures in a CBCT →
+        <a href="#segmentation">Segmentation</a></li>
+        <li>Place anatomical landmarks, or put a scan back upright →
+        <a href="#landmarks">Landmarks &amp; orientation</a></li>
+        <li>Measure, classify or predict from a shape →
+        <a href="#analysis">Analysis</a></li>
+        <li>Crop or apply a matrix, in batch →
+        <a href="#utilities">Utilities</a></li>
+        <li>Extract or anonymise clinical text →
+        <a href="#text">Text &amp; language</a></li>
+      </ul>
+""",
+}
+
+
 def write_guide_index(lang):
     d = os.path.join(ROOT, lang, "guide")
     os.makedirs(d, exist_ok=True)
     title, lede = GUIDE_INTRO[lang]
     ui = nav.UI[lang]
+    _w, _b = guide_callouts(lang)
+    about = GUIDE_ABOUT[lang].format(n=len(nav.TOOLS), warn=_w, bug=_b)
     cards = []
     for cat, labels in nav.CATS.items():
         tools = [t for t, c in nav.TOOLS if c == cat]
@@ -437,6 +662,8 @@ def write_guide_index(lang):
         <h1>{nav.esc(title)}</h1>
         <p class="lede">{nav.esc(lede)}</p>
       </header>
+
+{about}
 {chr(10).join(cards)}
       <footer class="footer">
         <a href="../index.html">{nav.esc(ui["toindex"])}</a>
@@ -507,6 +734,8 @@ if __name__ == "__main__":
         if os.path.isdir(os.path.join(ROOT, _l)):
             write_guide_index(_l)
     sync_nav()
+    check_papers()
+    sync_papers()
     for _l in nav.LANGS:
         if os.path.isdir(os.path.join(ROOT, _l)):
             _idx, _c = build_lang(_l)
