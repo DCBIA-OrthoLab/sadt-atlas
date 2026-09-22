@@ -739,3 +739,30 @@ PAPERS = {
           "improves what comes out on top."},
   ]},
 }
+
+
+# Vidéos de la chaîne YouTube « DCBIA Videos ».
+# Identifiant, titre et durée vérifiés un par un (oEmbed + page watch) le 22/09/2026.
+# « sec » sert à distinguer un vrai tutoriel d'un aperçu de trente secondes :
+# les deux sont utiles, mais pas au même moment.
+VIDEOS = {
+ "FlexReg":   [("Ye9KcT-2DCI", "Discover the new features of FlexReg", 112)],
+ "ALI":       [("A4NX1x7mEvo", "ALICBCT", 229),
+               ("BpsIt9zDr30", "ALIIOS", 172)],
+ "AMASSS":    [("Sg6oaOclOV8", "AMASSS - Automatic Multi-Anatomical Skull Structure Segmentation", 251),
+               ("d6penNStUQE", "AMASSS RC Seg tutorial", 308)],
+ "ASO":       [("91cnUpKiATc", "Automated Standardized Orientation (ASOCBCT) - Tutorial", 429)],
+ "AREG_CBCT": [("bHyEoNz-2yg", "Automated Registration for CBCT (ARegCBCT) - Tutorial", 839)],
+ "AREG_IOSCBCT": [("WIj6pCaRWhk", "Automated registration of intra oral scan with CBCT using an "
+                   "accurate and quick workflow", 45)],
+ "VFACE":     [("1nac4mn7S3E", "Classify facial Asymmetry and longitudinal studies, here is VFACE "
+                "the new tool who do both", 33)],
+ "SurgMovPred": [("Stg8eEg8UAA", "Surgical Movement Prediction: Machine learning model to help "
+                  "surgery preparation", 28)],
+ "CNE":       [("4I84dCcgRGw", "CNE (Clinical notes extraction) to summarize your notes and "
+                "extract common data elements", 34)],
+ "MedicalDataAnonymizer": [("5hZDaXGhPVY", "Medical Data Anonymizer: Your AI model who anonymize "
+                            "all your medical text files", 41)],
+ "Agent":     [("-CW8tnLyPHU", "AI Agent directly in 3D Slicer to help you learn dental and "
+                "cranofacial imaging", 30)],
+}

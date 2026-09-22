@@ -467,6 +467,64 @@ def check_papers():
     print(f"références : {len(bad)} URL hors bibliographie")
 
 
+VIDEO_RX = re.compile(r'\n*[ \t]*<!-- video:start -->.*?<!-- video:end -->\n*', re.S)
+
+VIDEO_UI = {
+ "fr": {"label": "En vidéo", "chan": "chaîne DCBIA Videos", "short": "aperçu",
+        "min": "{m} min {s:02d}", "sec": "{s} s"},
+ "en": {"label": "On video", "chan": "DCBIA Videos channel", "short": "overview",
+        "min": "{m} min {s:02d}", "sec": "{s} s"},
+}
+
+
+def video_block(lang, tool):
+    """Les vidéos DCBIA de l'outil, posées en tête de sa page du Guide."""
+    vids = papers.VIDEOS.get(tool)
+    if not vids:
+        return None
+    ui = VIDEO_UI[lang]
+    out = ["      <!-- video:start -->",
+           '      <div class="video-box">',
+           f'        <span class="vb-label">{ui["label"]}</span>',
+           "        <ul>"]
+    for vid, title, sec in vids:
+        dur = ui["min"].format(m=sec // 60, s=sec % 60) if sec >= 60 else ui["sec"].format(s=sec)
+        # sous une minute et demie, c'est une annonce : le dire plutôt que de laisser croire
+        qual = f" ({ui['short']})" if sec < 90 else ""
+        out.append(
+            f'          <li><a href="https://www.youtube.com/watch?v={vid}" '
+            f'target="_blank" rel="noopener">{html.escape(title, quote=False)}</a> '
+            f'<span class="vb-meta">{dur}{qual} · {ui["chan"]}</span></li>')
+    out += ["        </ul>", "      </div>", "      <!-- video:end -->"]
+    return "\n".join(out) + "\n"
+
+
+def sync_videos():
+    """Pose le bloc vidéo juste sous l'en-tête de chaque page du Guide concernée."""
+    n = 0
+    for lang in nav.LANGS:
+        gdir = os.path.join(ROOT, lang, "guide")
+        if not os.path.isdir(gdir):
+            continue
+        for f in sorted(os.listdir(gdir)):
+            tool = os.path.splitext(f)[0]
+            if not f.endswith(".html") or tool not in papers.VIDEOS:
+                continue
+            path = os.path.join(gdir, f)
+            s = open(path, encoding="utf-8").read()
+            new = VIDEO_RX.sub("\n", s)
+            i = new.find("</header>")
+            if i < 0:
+                print(f"  ! {lang}/guide/{f} : pas d'en-tête, bloc vidéo non posé")
+                continue
+            i += len("</header>")
+            new = new[:i] + "\n\n" + video_block(lang, tool) + new[i:].lstrip("\n")
+            if new != s:
+                open(path, "w", encoding="utf-8").write(new)
+                n += 1
+    print(f"vidéos : {n} pages du Guide mises à jour")
+
+
 LANDING = """<!doctype html>
 <html lang="fr">
 <head>
@@ -736,6 +794,7 @@ if __name__ == "__main__":
     sync_nav()
     check_papers()
     sync_papers()
+    sync_videos()
     for _l in nav.LANGS:
         if os.path.isdir(os.path.join(ROOT, _l)):
             _idx, _c = build_lang(_l)
