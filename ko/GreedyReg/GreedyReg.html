@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GreedyReg — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="recalage">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/GreedyReg/GreedyReg.html" hreflang="en" title="English">EN</a><a href="../../fr/GreedyReg/GreedyReg.html" hreflang="fr" title="Français">FR</a><a href="../../pt/GreedyReg/GreedyReg.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/GreedyReg/GreedyReg.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/GreedyReg.html"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../GreedyReg/GreedyReg.html" aria-current="true"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html" aria-current="page">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/GreedyReg/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › 정합</div>
+        <h1>GreedyReg</h1>
+        <p class="lede">ITK-SNAP의 <code>greedy</code> 바이너리를 서브프로세스로 구동하는 T1/T2 CBCT 어파인/강체 정합. 주 경로에 신경망이 없고, 전용 conda 환경도 없다.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://arxiv.org/abs/1904.11929" target="_blank" rel="noopener" title="greedy 엔진은 발표되었지만 Slicer 모듈은 발표되지 않았다.">Venet 2019 · arXiv</a>
+          <span class="badge cli">GreedyReg_CLI</span>
+          <span class="badge neutral">conda 환경: 없음 (Slicer의 Python)</span>
+          <a class="badge neutral" href="SOURCES.html">참고문헌</a>
+        </div>
+      </header>
+
+      <p>ITK-SNAP의 <strong>greedy</strong> 바이너리를 서브프로세스로 호출해 T1/T2 CBCT를
+      정합한다. 주 경로에서는 어떤 신경망도 학습되거나 호출되지 않는다. 모듈이 쓰는 유일한 신경망은
+      "원거리(distant)" 초기화용이며, 그대로 빌려 온 <a href="../ALI/ALI.html">ALI_CBCT</a>다.</p>
+
+      <h2 id="situation">1. 처리 사슬에서의 위치</h2>
+
+      <p>저장소에서 GreedyReg를 호출하는 것은 없다. 운영자가 직접 구동하는 말단 도구이며,
+      다른 어떤 모듈의 입력도 되지 않는다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>호출 대상</th><th>방식</th><th>시점</th></tr></thead>
+          <tbody>
+            <tr><td><code>GreedyReg_CLI</code></td><td><code>slicer.cli.run(slicer.modules.greedyreg_cli, …)</code></td><td>모든 자동 정합, 단일 증례든 일괄이든</td></tr>
+            <tr><td><code>greedy</code> 바이너리</td><td><code>subprocess.run</code>, <strong>CLI에서</strong> 실행</td><td>증례당 두 번 호출 (정합, 이어서 리샘플링)</td></tr>
+            <tr><td><code>ALI_CBCT</code></td><td><code>slicer.cli.run(slicer.modules.ali_cbct, …)</code></td><td>"Distant Registration" 모드에서만</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 640 220" role="img" aria-label="GreedyReg의 호출 관계: 위젯은 GreedyReg_CLI를 거쳐 greedy를 실행하고, Distant 모드에서만 ALI_CBCT를 거친다.">
+          <rect class="d-box-a" x="10" y="15" width="190" height="50" rx="6"/>
+          <text class="d-label" x="105" y="36" text-anchor="middle">GreedyReg</text>
+          <text class="d-label-s" x="105" y="52" text-anchor="middle">Slicer 위젯</text>
+
+          <path class="d-arrow" d="M200 40 H243"/>
+          <path class="d-arrow-head" d="M250 40 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="250" y="15" width="190" height="50" rx="6"/>
+          <text class="d-label" x="345" y="36" text-anchor="middle">GreedyReg_CLI</text>
+          <text class="d-label-s" x="345" y="52" text-anchor="middle">python-real · 증례당 서브프로세스 2개</text>
+
+          <path class="d-arrow" d="M440 40 H473"/>
+          <path class="d-arrow-head" d="M480 40 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="480" y="15" width="150" height="50" rx="6"/>
+          <text class="d-label" x="555" y="36" text-anchor="middle">greedy</text>
+          <text class="d-label-s" x="555" y="52" text-anchor="middle">네이티브 바이너리, CPU</text>
+
+          <path class="d-arrow" d="M105 65 V123"/>
+          <path class="d-arrow-head" d="M105 130 l-4 -8 h8 z"/>
+
+          <rect class="d-box-n" x="10" y="140" width="260" height="60" rx="6"/>
+          <text class="d-label" x="140" y="164" text-anchor="middle">ALI_CBCT</text>
+          <text class="d-label-s" x="140" y="180" text-anchor="middle">신경망 (RL, DNet) — 랜드마크 예측</text>
+          <text class="d-label-s" x="140" y="194" text-anchor="middle">"Distant Registration" 모드만</text>
+        </svg>
+        <figcaption>위젯은 파라미터를 조립한 뒤 위임한다. CLI가 <code>greedy</code>를 실행하며, ALI_CBCT는 Distant 모드에서만 호출된다.</figcaption>
+      </figure>
+
+      <div class="callout ok">
+        <div class="callout-title">확인됨</div>
+        <p>Slicer 모듈은 <code>greedy</code>를 직접 실행하지 않는다. 파라미터를
+        조립하고(<code>Logic.py:286</code>) CLI에 맡긴다.
+        <code>GreedyRegLogic</code>의 docstring이 이를 명시하며, 실제로도 그렇다. 바이너리 다운로드를 제외하면 위젯에는
+        <code>subprocess</code>가 없다.</p>
+      </div>
+
+      <h2 id="fichiers">2. 관련 파일</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>역할</th><th>실행 위치</th></tr></thead>
+          <tbody>
+            <tr><td><code>GreedyReg/GreedyReg.py</code></td><td>위젯, 1704줄, 그중 약 700줄이 Qt UI (회전 휠, 슬라이스 오버레이, 스타일 시트)</td><td>Slicer의 Python</td></tr>
+            <tr><td><code>GreedyReg_Method/Logic.py</code></td><td>바이너리 다운로드, CLI 파라미터, 짝짓기, <a class="gterm" href="../glossary.html#g-kabsch" title="용어집 보기">Kabsch</a>, <a href="../ALI/ALI.html">ALI</a> 결과 파싱</td><td>Slicer의 Python</td></tr>
+            <tr><td><code>GreedyReg_CLI/GreedyReg_CLI.py</code></td><td>쌍들을 순회하며 <code>greedy</code> 명령 두 개를 만들고 실행</td><td><code>python-real</code>, 즉 <strong>Slicer의 Python</strong></td></tr>
+            <tr><td><code>GreedyReg_CLI/bin/&lt;platform&gt;/greedy</code></td><td>실행 파일. <strong>저장소에 없으며</strong>, 필요할 때 다운로드된다</td><td>네이티브</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">참고</div>
+        <p>이 코드를 넘겨받는 사람에게 중요한 점: <strong>conda
+        환경이 없다</strong>. <code>Logic.py:76</code>의 주석이 이를 밝힌다 — CLI는
+        Slicer 자체의 Python에서 실행되므로, 위젯에서 호출한 <code>slicer.util.pip_install</code>이
+        서브프로세스에 곧바로 보인다. GPU도 없다. greedy는 CPU 전용이다.</p>
+      </div>
+
+      <p><code>GreedyReg.py</code>의 첫 두 줄은 import할 때마다 모듈의
+      <code>__pycache__</code>를 지운다 — 개발 중에 남은 흔적이다.</p>
+
+      <h2 id="binaire">3. greedy 바이너리: 어디서 오는가</h2>
+
+      <p><code>greedyBinaryPath()</code>는 <code>GreedyReg_CLI/bin/{linux|mac|windows}/greedy[.exe]</code>를 찾는다.
+      없으면 빨간 배너가 <code>downloadGreedyBinary()</code>
+      (<code>Logic.py:106</code>)를 제안한다. 이 함수는 SourceForge에서 <strong>ITK-SNAP 4.2.2</strong> 아카이브를
+      받아 <code>bin/greedy</code>만 추출한다:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>플랫폼</th><th>출처</th><th>추출</th></tr></thead>
+          <tbody>
+            <tr><td>Linux</td><td><code>itksnap-4.2.2-20241202-Linux-x86_64.tar.gz</code></td><td><code>tarfile</code>, 멤버 <code>…/bin/greedy</code>, <code>chmod 755</code></td></tr>
+            <tr><td>macOS (arm64)</td><td><code>itksnap-4.2.2-20241202-MacOS-arm64.tar.gz</code></td><td>동일</td></tr>
+            <tr><td>Windows</td><td><code>itksnap-4.2.2-20241202-win64-AMD64.exe</code> (NSIS 설치 프로그램)</td><td>7-Zip이 있으면 7-Zip, 없으면 <strong>무인 설치</strong> 후 제거</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Windows 경로가 가장 취약하며, 코드가 이를 잘 문서화하고 있다
+      (<code>Logic.py:161</code>). NSIS의 <code>/D=</code>는 따옴표를 지원하지 않으므로
+      설치는 <code>%SystemDrive%\_greedyreg_nsis_tmp</code>(공백 없는
+      경로)에서 이루어지고, <code>greedy.exe</code>를 밖으로 복사한 뒤 <code>Uninstall.exe /S</code>를 실행한다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>다운로드한 아카이브에 대한 무결성 검사(체크섬)가 없다.</p>
+      </div>
+
+      <h2 id="modes">4. 세 가지 모드, 그리고 실제로 무엇이 다른가</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>모드</th><th>계산하는 것</th><th>계산 주체</th><th>출력</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Manual Alignment</strong></td>
+              <td>없음: 운영자가 <code>vtkMRMLLinearTransformNode</code>를 움직인다</td>
+              <td>위젯</td>
+              <td>장면의 행렬, <code>-ia</code>로 사용</td>
+            </tr>
+            <tr>
+              <td><strong>Automatic Registration</strong></td>
+              <td>강도 메트릭을 최적화하는 어파인 또는 강체 정합</td>
+              <td><span class="badge calcule">계산</span> <code>greedy</code> 바이너리, CLI 경유</td>
+              <td>정합된 <code>.nii.gz</code> + <code>.mat</code></td>
+            </tr>
+            <tr>
+              <td><strong>Distant Registration</strong></td>
+              <td>예측된 랜드마크 3-5개에 대한 닫힌 형식(closed-form) 강체 정합(<a class="gterm" href="../glossary.html#g-svd" title="용어집 보기">SVD</a>/Kabsch)</td>
+              <td><span class="badge predit">예측</span> <span class="badge calcule">계산</span> 위젯 + <a href="../ALI/ALI.html">ALI_CBCT</a></td>
+              <td>행렬<strong>만</strong>. 이후 다듬어야 함</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">용어 함정</div>
+        <p><strong>"Distant"라는 말은 원격 계산을 뜻하지 않는다.</strong> 패널
+        제목은 "Distant Registration (Large Misalignment)"이다. 처음에
+        <em>기하학적으로 멀리 떨어진</em> 두 스캔(초기 어긋남이 큼)을 가리킨다. 모든 것이
+        로컬에서 실행된다. <strong>네트워크 통신도, 소켓도, 암호화도, 증명(attestation)도 없다</strong>.
+        모듈 안의 외부 요청은
+        <code>urllib.request.urlretrieve</code>뿐이며, 그 대상은 SourceForge(greedy 바이너리)와 저장소의 GitHub 릴리스(<a href="../ALI/ALI.html">ALI</a> 가중치)다. 따라서
+        외부와의 접촉은 도구 다운로드뿐이며, 환자 데이터를 보내는 일은 결코 없다.</p>
+      </div>
+
+      <h3 id="mode-manuel">4.1 수동 모드</h3>
+
+      <p>두 벌의 컨트롤이 <strong>같은</strong> 변환 노드에 작용한다:</p>
+
+      <ul>
+        <li><code>ctkSliderWidget</code> 슬라이더 여섯 개(회전 ±180°, 평행 이동 ±200 mm).
+        합성 순서: <code>Translate</code>, 이어서 <code>RotateX</code>,
+        <code>RotateY</code>, <code>RotateZ</code> (<code>GreedyReg.py:1192</code>);</li>
+        <li>"Center T2 on T1": 두 볼륨 중심 사이의 순수 평행 이동.
+        IJK에서 계산한 뒤 <a class="gterm" href="../glossary.html#g-ras" title="용어집 보기">RAS</a>로 변환한다. 변환에는 <code>GetIJKToRASMatrix</code>를 쓴다(<code>Logic.py:381</code>);</li>
+        <li>Slicer의 기본 핸들(<code>SetEditorScalingEnabled(False)</code> → 스케일링은
+        절대 없음);</li>
+        <li>스스로 프로토타입임을 인정한 "Sensitivity Demo": Red/Yellow/Green 뷰에
+        부모를 바꿔 붙인 Qt 휠. 회전축은 뷰에 따라 다르고(Red→Z, Yellow→X,
+        Green→Y), 휠 밖에서 드래그하면 슬라이스 평면 안에서 평행 이동하며(0.5 mm/pixel ×
+        gain), 휠 크기는 줌을 따른다(<code>baseFov / fovMean</code>, 0.55-1.90으로
+        제한). <code>GreedyReg.py:499</code>의 주석이 이유를 설명한다. 기본
+        핸들은 원시 마우스 위치로부터 변위를 다시 계산하므로, 나중에 행렬을 감쇠시켜도
+        눈에 보이는 효과가 없다.</li>
+      </ul>
+
+      <p>이동 볼륨은 내보내기 전에 harden되지 <strong>않는다</strong>.
+      <code>slicer.util.exportNode(node, path)</code>의 기본값은 <code>world=False</code>이므로
+      (<code>slicer/util.py</code>에서 확인), 수동 변환은
+      <strong>오직</strong> <code>-ia</code> 파일을 통해서만 greedy에 전달된다. 이로 인한 규약 문제는 <a href="#convention">§9</a>를
+      참고하라.</p>
+
+      <h3 id="mode-auto">4.2 자동 모드</h3>
+
+      <p><code>onRunRegistration()</code> (<code>GreedyReg.py:1204</code>)는
+      <code>tempfile.mkdtemp()</code> 안에 디렉터리 트리를 만든다: <code>T1/</code>, <code>T2/</code>,
+      <code>INIT/</code>, <code>MASK/</code>, <code>OUTPUT/</code>. 두 볼륨을 가짜 식별자
+      <code>CASE0001</code>로 내보내고, init을 기록한 뒤, CLI를
+      <strong>쌍 하나짜리 일괄 모드</strong>로 호출한다. 단일 증례 실행을 위한 별도의 코드 경로는
+      없다. 파일 하나가 든 폴더에 대한 일괄 실행일 뿐이다.</p>
+
+      <p>1 s 간격의 <code>QTimer</code>가 <code>cliNode</code>를 폴링하고, 끝나면 정합된
+      볼륨을 임시 폴더에서 불러온다. 이 폴더는 <strong>결코 삭제되지 않는다</strong>
+      (위젯에 <code>rmtree</code>가 없음). 결과는 시스템 정리 때까지 남으며,
+      "Save Registered Volume" 버튼도 이에 의존한다. 이 버튼은 단순한
+      <code>shutil.copy</code>이기 때문이다.</p>
+
+      <h3 id="mode-distant">4.3 원거리(Distant) 모드</h3>
+
+      <p><code>onRunDistantRegistration()</code> (<code>GreedyReg.py:1406</code>):</p>
+
+      <ol>
+        <li>우선순위 <strong>두개저 &gt; 하악골 &gt;
+        상악골</strong>에 따라 한 영역만 남긴다(<code>_selectedDistantRegion</code>, <code>GreedyReg.py:1397</code>).
+        여러 상자를 체크해도 랜드마크가 합산되지 않고, 처음 찾은 것이 이긴다;</li>
+        <li>두 볼륨을 <code>.nii.gz</code>로 임시 폴더에 내보낸다;</li>
+        <li>ALI용 <strong>작업 대기열</strong>을 만든다. (스캔 × 모델
+        하위 폴더)마다 작업 하나이며, <code>ModifiedEvent</code> 옵저버를 연쇄시켜 순차 실행한다
+        (<code>GreedyReg.py:1493</code>);</li>
+        <li>출력 json 파일을 다시 읽고, 좌표를 <strong><a class="gterm" href="../glossary.html#g-lps" title="용어집 보기">LPS</a> → RAS</strong>로 변환한다
+        (<code>[-x, -y, z]</code>, <code>Logic.py:517</code>);</li>
+        <li>두 스캔에 공통인 랜드마크가 3개 이상이면 <code>rigidFromLandmarks()</code>가
+        SVD로 강체 변환을 계산하고, 아니면 명시적으로 실패한다.</li>
+      </ol>
+
+      <p>영역과 랜드마크 (<code>REGION_CONFIG</code>, <code>Logic.py:20</code>):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>영역</th><th>랜드마크</th><th>가중치 폴더</th></tr></thead>
+          <tbody>
+            <tr><td><code>MANDMASK</code></td><td>RGo, LGo, Gn, Me, Pog</td><td><code>Lower_Bones_1</code>, <code>Lower_Bones_2</code></td></tr>
+            <tr><td><code>MAXMASK</code></td><td>A, ANS, LOr, ROr, PNS</td><td><code>Upper_Bones_v2</code></td></tr>
+            <tr><td><code>CBMASK</code></td><td>S, N, RPo, LPo</td><td><code>Cranial_Base</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>가중치는 저장소의 <code>v0.1-v2.0_models</code> 릴리스에서 오며, 폴더마다
+      <code>.zip</code> 하나씩,
+      <code>Documents/SlicerDownloads/GreedyReg/ALIModels/&lt;folder&gt;/</code>에 압축이 풀린다.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 770 220" role="img" aria-label="Distant Registration 모드 파이프라인: ALI_CBCT가 랜드마크를 예측하고, Kabsch/SVD가 이로부터 강체 행렬을 구한다. 출력 영상은 없다.">
+          <rect class="d-box" x="15" y="30" width="120" height="36" rx="6"/>
+          <text class="d-label" x="75" y="53" text-anchor="middle">T1 (.nii.gz)</text>
+
+          <rect class="d-box" x="15" y="80" width="120" height="36" rx="6"/>
+          <text class="d-label" x="75" y="103" text-anchor="middle">T2 (.nii.gz)</text>
+
+          <path class="d-arrow" d="M135 48 L163 78"/>
+          <path class="d-arrow" d="M135 98 L163 82"/>
+          <path class="d-arrow-head" d="M170 80 l-9 -2 l3 -8 z"/>
+
+          <rect class="d-box-n" x="170" y="35" width="170" height="90" rx="6"/>
+          <text class="d-label" x="255" y="66" text-anchor="middle">ALI_CBCT</text>
+          <text class="d-label-s" x="255" y="82" text-anchor="middle">랜드마크별 RL 에이전트</text>
+          <text class="d-label-s" x="255" y="96" text-anchor="middle">DNet 신경망 — 예측</text>
+          <text class="d-label-s" x="255" y="110" text-anchor="middle">spacing 1 / 0.3 mm</text>
+
+          <path class="d-arrow" d="M340 80 H373"/>
+          <path class="d-arrow-head" d="M380 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="380" y="55" width="160" height="50" rx="6"/>
+          <text class="d-label" x="460" y="76" text-anchor="middle">랜드마크 (3-5)</text>
+          <text class="d-label-s" x="460" y="91" text-anchor="middle">LPS → RAS</text>
+
+          <path class="d-arrow" d="M540 80 H573"/>
+          <path class="d-arrow-head" d="M580 80 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="580" y="55" width="160" height="60" rx="6"/>
+          <text class="d-label" x="660" y="80" text-anchor="middle">SVD / Kabsch</text>
+          <text class="d-label-s" x="660" y="96" text-anchor="middle">강체, 계산 (numpy)</text>
+
+          <path class="d-arrow" d="M660 115 V143"/>
+          <path class="d-arrow-head" d="M660 150 l-4 -8 h8 z"/>
+
+          <rect class="d-box" x="580" y="150" width="160" height="50" rx="6"/>
+          <text class="d-label" x="660" y="171" text-anchor="middle">강체 행렬</text>
+          <text class="d-label-s" x="660" y="186" text-anchor="middle">이동 → 고정, RAS</text>
+
+          <text class="d-label-s" x="660" y="213" text-anchor="middle">-ia로 사용, 영상 출력 없음</text>
+        </svg>
+        <figcaption>모듈의 유일한 신경망: ALI_CBCT가 랜드마크를 예측하고, 계산 단계인 Kabsch/SVD가 이를 강체 초기화 행렬로 바꾼다.</figcaption>
+      </figure>
+
+      <p><strong>호출되는 신경망.</strong> ALI_CBCT는 <a class="gterm" href="../glossary.html#g-heatmap" title="용어집 보기">히트맵</a>을 만들지 않는다.
+      <strong>강화학습</strong>이다. 랜드마크마다 에이전트 하나가 볼륨 안을 이동하며,
+      <code>agent_FOV = [64,64,64]</code> 복셀 크기의 정육면체를 관찰하고
+      <code>MOVEMENTS</code>에서 이동을 고른다. <code>DNet</code> 신경망(1024채널 전이 층,
+      <code>out_channels = len(MOVEMENTS["id"])</code>)은 랜드마크마다
+      폴더의 <code>.pth</code> 파일에서 다시 불러온다(<code>ALI_CBCT.py:159</code>).
+      GreedyReg가 지정하는 파라미터(<code>Logic.py:471</code>): <code>spacing = [1, 0.3]</code> mm(거친
+      탐색 후 정밀 탐색), <code>speed_per_scale = [1,1]</code>, <code>spawn_radius = 10</code>,
+      <code>DCMInput = false</code>.</p>
+
+      <p><strong>강체 계산</strong>(<code>Logic.py:535</code>)은
+      <span class="badge calcule">계산</span> 고전적 Kabsch다: 중심화,
+      <code>H = movingᵀ·fixed</code>, SVD, <code>R = Vᵀ·Uᵀ</code>,
+      <code>det(R) &lt; 0</code>이면 반사 보정, <code>t = c_fixed − R·c_moving</code>. 따라서 결과 행렬은
+      <strong>이동에서 고정으로, RAS에서</strong> 간다 — Slicer 변환 노드의 규약과 정확히 같으며,
+      행렬은 그대로 노드에 들어간다.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">확인됨</div>
+        <p>완료 메시지는 정직하다: "Distant registration complete! Now run Automatic
+        Registration to refine." 이 모드는 정합하지 않고 초기화한다.</p>
+      </div>
+
+      <h2 id="commande">5. greedy 명령줄</h2>
+
+      <p><code>buildRegistrationCommand()</code> (<code>GreedyReg_CLI.py:100</code>)는 항상
+      정확히 다음을 만든다. 메트릭과 자유도 수 외에는 노출된 옵션이
+      없다:</p>
+
+      <pre><code>greedy -d 3 -a \
+  -m NMI | -m NCC 4x4x4 | -m SSD \
+  -i &lt;T1.nii.gz&gt; &lt;T2.nii.gz&gt; \
+  -o &lt;ID&gt;_warp.mat \
+  -n 100x100x50x25 \
+  -e 0.5 \
+  -search 100 10 20 \
+  -dof 6|12 \
+  -ia &lt;init.mat&gt; \
+  [-gm &lt;binarized mask&gt;]</code></pre>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>플래그</th><th>값</th><th>의미 (greedy 문서)</th></tr></thead>
+          <tbody>
+            <tr><td><code>-d 3</code></td><td>고정</td><td>영상 차원</td></tr>
+            <tr><td><code>-a</code></td><td>고정</td><td><strong>어파인/강체 모드</strong>. greedy의 기본값이자 존재 이유인 미분동형(diffeomorphic) 모드는 여기서 전혀 쓰이지 않는다</td></tr>
+            <tr><td><code>-m NMI</code></td><td>인덱스 0 (UI 기본값)</td><td>정규화 상호 정보량, 강도가 이질적일 때</td></tr>
+            <tr><td><code>-m NCC 4x4x4</code></td><td>인덱스 1</td><td>국소 상호 상관, 반경은 <strong>복셀 단위</strong></td></tr>
+            <tr><td><code>-m SSD</code></td><td>인덱스 2</td><td>차이 제곱합, 같은 모달리티</td></tr>
+            <tr><td><code>-i fixed moving</code></td><td>T1, 이어서 T2</td><td>순서 고정: <code>-i &lt;fixed&gt; &lt;moving&gt;</code></td></tr>
+            <tr><td><code>-o</code></td><td><code>&lt;ID&gt;_warp.mat</code></td><td>4×4 어파인 행렬 (텍스트)</td></tr>
+            <tr><td><code>-n 100x100x50x25</code></td><td>고정</td><td>다중 해상도 피라미드 <strong>4단계</strong>, 가장 거친 단계부터 가장 정밀한 단계까지 100/100/50/25회 반복 (greedy의 기본값은 <code>100x100</code>, 2단계)</td></tr>
+            <tr><td><code>-e 0.5</code></td><td>고정</td><td>시간 간격 — <strong>어파인 모드에서는 효과가 없다</strong>. greedy 문서는 "<code>-s</code> and <code>-e</code> have no effect"라고 분명히 밝힌다(<code>-a</code>의 경우). 사용되지 않는 줄</td></tr>
+            <tr><td><code>-search 100 10 20</code></td><td>고정</td><td>최적화 전 강체 변환 100개에 대한 무작위 탐색: σ_angle = 10°, σ_offset = 20 (문서 본문에 따르면 복셀 단위, 사용법 텍스트에 따르면 물리 단위 — 모호함은 greedy 쪽에 있으며, 여기 문제가 아니다)</td></tr>
+            <tr><td><code>-dof 6</code> / <code>12</code></td><td>"Rigid"/"Affine" 콤보 박스</td><td>6 = 강체, 12 = 완전 어파인. <code>-dof 7</code>(강체 + 균일 스케일)은 제공되지 않는다</td></tr>
+            <tr><td><code>-ia</code></td><td>항상 제공</td><td>초기화 행렬. <code>-ia-identity</code>도, <code>-ia-image-centers</code>도 결코 쓰지 않는다</td></tr>
+            <tr><td><code>-gm</code></td><td>마스크가 주어진 경우</td><td><strong>고정 볼륨의</strong> 마스크: 메트릭의 기울기는 그 안에서만 계산된다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>이어서 항상 실행되는 두 번째 호출, 리샘플링 모드:</p>
+
+      <pre><code>greedy -d 3 -rf &lt;T1&gt; -rm &lt;T2&gt; &lt;ID&gt;_registered.nii.gz -r &lt;ID&gt;_warp.mat</code></pre>
+
+      <p><code>-rf</code>는 기준 공간(고정 볼륨)을, <code>-rm</code>은
+      입력/출력 쌍을 지정한다. 따라서 출력 볼륨은 <strong>T1 격자로 리샘플링된 원래의
+      T2</strong>이며, 선형 보간을 쓴다(<code>-ri</code>의 기본값). 각
+      호출은 <code>timeout = 600 s</code>로 제한된다.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 770 320" role="img" aria-label="Automatic Registration 모드 파이프라인: 입력이 greedy -a로 들어가고, 그 결과 행렬로 greedy -rf/-rm이 리샘플링한다.">
+          <rect class="d-box" x="15" y="20" width="140" height="34" rx="5"/>
+          <text class="d-label" x="85" y="41" text-anchor="middle">T1 (.nii.gz) — 고정</text>
+
+          <rect class="d-box" x="15" y="64" width="140" height="34" rx="5"/>
+          <text class="d-label" x="85" y="85" text-anchor="middle">T2 (.nii.gz) — 이동</text>
+
+          <rect class="d-box" x="15" y="108" width="140" height="34" rx="5"/>
+          <text class="d-label" x="85" y="129" text-anchor="middle">마스크 (선택)</text>
+
+          <rect class="d-box" x="15" y="152" width="140" height="34" rx="5"/>
+          <text class="d-label" x="85" y="173" text-anchor="middle">init .mat (선택)</text>
+
+          <path class="d-arrow" d="M155 37 L193 103"/>
+          <path class="d-arrow" d="M155 81 L193 105"/>
+          <path class="d-arrow" d="M155 125 L193 107"/>
+          <path class="d-arrow" d="M155 169 L193 109"/>
+          <path class="d-arrow-head" d="M200 108 l-9 -1 l2 -8 z"/>
+
+          <rect class="d-box-a" x="225" y="65" width="170" height="90" rx="6"/>
+          <text class="d-label" x="310" y="95" text-anchor="middle">greedy -a</text>
+          <text class="d-label-s" x="310" y="112" text-anchor="middle">-dof 6|12 · NMI/NCC/SSD</text>
+          <text class="d-label-s" x="310" y="126" text-anchor="middle">강도 기반 정합, CPU</text>
+          <text class="d-label-s" x="310" y="140" text-anchor="middle">계산 (greedy 내부 LBFGS)</text>
+
+          <path class="d-arrow" d="M395 105 H423"/>
+          <path class="d-arrow-head" d="M430 105 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="430" y="88" width="150" height="34" rx="5"/>
+          <text class="d-label" x="505" y="109" text-anchor="middle">&lt;ID&gt;_warp.mat</text>
+
+          <path class="d-arrow" d="M505 122 V180 H325 V218"/>
+          <path class="d-arrow-head" d="M325 225 l-4 -8 h8 z"/>
+
+          <rect class="d-box" x="225" y="225" width="200" height="70" rx="6"/>
+          <text class="d-label" x="325" y="250" text-anchor="middle">greedy -rf/-rm</text>
+          <text class="d-label-s" x="325" y="266" text-anchor="middle">-rf T1 (기준) -rm T2→출력</text>
+          <text class="d-label-s" x="325" y="280" text-anchor="middle">선형 보간</text>
+
+          <path class="d-arrow" d="M425 260 H453"/>
+          <path class="d-arrow-head" d="M460 260 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="460" y="225" width="210" height="70" rx="6"/>
+          <text class="d-label" x="565" y="252" text-anchor="middle">&lt;ID&gt;_registered.nii.gz</text>
+          <text class="d-label-s" x="565" y="268" text-anchor="middle">T1의 격자</text>
+          <text class="d-label-s" x="565" y="282" text-anchor="middle">선형 보간</text>
+        </svg>
+        <figcaption>항상 실행되는 두 호출: <code>greedy -a</code>가 행렬을 계산하고, 이어서 <code>greedy -rf/-rm</code>이 T2를 T1 격자로 리샘플링한다.</figcaption>
+      </figure>
+
+      <h2 id="entrees">6. 입력, 짝짓기, 마스크, 초기화</h2>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>짝짓기.</strong> <code>ID_PATTERN = ^([A-Za-z]+\d+)</code>를 대문자로 바꾼
+        파일 이름에 적용한다(<code>GreedyReg_CLI.py:37</code>). <code>A01_t1.nii.gz</code>
+        → 식별자 <code>A01</code>. 같은 식별자가 T1 폴더와 T2 폴더 양쪽에 있으면 쌍이
+        성립한다. 마스크(<code>.nii</code>/<code>.nii.gz</code>)와
+        init(<code>.mat</code>)은 선택 사항이며 같은 식별자로 매칭된다. 이름이
+        <code>01_T1.nii.gz</code>(숫자로 시작)이거나 <code>Patient-01.nii.gz</code>인 파일은 결코
+        짝지어지지 않으며, 이는 <strong>조용히</strong> 일어난다.</p>
+      </div>
+
+      <p>위젯의 <code>findBatchPairs()</code>는 "Found N
+      pairs" 레이블을 위해 이 로직을 중복 구현한다. 주석은 두 구현을 동기화된 상태로 유지해야 한다고 경고한다.</p>
+
+      <p><strong>마스크.</strong> <code>vtkMRMLSegmentationNode</code> 또는
+      레이블맵에서 <code>.nii.gz</code>로 내보낸 뒤, CLI 쪽에서 이진화한다:
+      <code>(get_fdata() &gt; 0).astype(float32)</code> (<code>GreedyReg_CLI.py:92</code>). 따라서
+      다중 레이블 분할의 모든 세그먼트가 하나의 마스크로 합쳐진다. 원거리 일괄 처리의 어파인 재기록과
+      더불어, 이것이 <code>nibabel</code>의 유일한 실제 용도다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>초기화.</strong> init 파일이 없으면 <code>writeIdentityInit()</code>이
+        <code>matrix[0,3] = 0.001</code>인 항등 행렬을 기록한다 — 1마이크론 평행 이동이다.
+        주석이 이유를 설명한다: "so Greedy doesn't treat it as identity." 이 동작은
+        greedy 쪽 어디에도 문서화되어 있지 않다. 경험적인 우회책이며, 그렇게
+        다루어야 한다.</p>
+      </div>
+
+      <p><strong>강도 전처리 없음</strong>: 정규화도, 잘라내기도, 사전
+      리샘플링도, 방향 변환도 없다. NIfTI 파일은 그대로 전달되며,
+      greedy는 헤더의 RAS 물리 공간에서 작업한다.</p>
+
+      <h2 id="batch">7. 일괄 모드</h2>
+
+      <p>서로 독립적이며 하는 일도 다른 일괄 처리 두 가지가 있다.</p>
+
+      <p><strong>자동 일괄 처리</strong>(<code>GreedyReg.py:1537</code>). 위젯은
+      반복하지 않는다. 폴더들에 대해 <strong>단 한 번</strong> <code>GreedyReg_CLI</code>를
+      실행하고, 반복은 CLI가 한다(<code>main()</code>,
+      <code>GreedyReg_CLI.py:141</code>). 이때 Slicer의 CLI 인프라가 읽는 <code>&lt;filter-progress&gt;</code> /
+      <code>&lt;filter-comment&gt;</code> 태그를 내보낸다. 출력
+      폴더는 <strong>T2 폴더 자체</strong>다. 상류에서 이진화되는 마스크도 없고, init도
+      전달되지 않는다(<code>initFolder=""</code>). 일괄 처리는 항상 살짝 비튼 항등 행렬에서 시작한다.
+      처음 실패한 증례 → <code>sys.exit(1)</code> → 일괄 처리 전체가 멈춘다.</p>
+
+      <p><strong>원거리 일괄 처리</strong>(<code>GreedyReg.py:1606</code>). 여기서는 위젯이
+      증례별로 반복하며, 쌍마다 <a href="../ALI/ALI.html">ALI</a> 작업 대기열을 둔다. 결과는 정합된
+      볼륨이 아니라 <strong>다시 쓴 헤더</strong>다(<code>GreedyReg.py:1690</code>):</p>
+
+      <pre><code>newAffine[:3, :3] = R @ movingImg.affine[:3, :3]
+newAffine[:3, 3]  = R @ movingImg.affine[:3, 3] + t
+nib.save(nib.Nifti1Image(movingImg.get_fdata(), newAffine, movingImg.header), out)</code></pre>
+
+      <div class="callout ok">
+        <div class="callout-title">확인됨</div>
+        <p>복셀은 움직이지 않고, 복셀→월드 어파인만 바뀐다. 이는 올바르다.
+        NIfTI 어파인은 Kabsch 행렬과 마찬가지로 RAS다. 출력:
+        <code>&lt;ID&gt;_t2_aligned.nii.gz</code>, <strong>T2 폴더에</strong> 기록된다.
+        이 일괄 처리에서는 greedy가 전혀 호출되지 않는다.</p>
+      </div>
+
+      <h2 id="sorties">8. 출력</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>내용</th><th>위치</th></tr></thead>
+          <tbody>
+            <tr><td><code>&lt;ID&gt;_registered.nii.gz</code></td><td>T1 격자로 리샘플링된 T2</td><td>단일 증례: 임시 폴더, 일괄: T2 폴더</td></tr>
+            <tr><td><code>&lt;ID&gt;_warp.mat</code></td><td>4×4 greedy 어파인 행렬</td><td>동일</td></tr>
+            <tr><td><code>&lt;ID&gt;_t2_aligned.nii.gz</code></td><td>T2 복셀은 그대로, 어파인만 보정</td><td>T2 폴더 (원거리 일괄 처리)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>변환 형식, 그리고 존재하지 않는 변환 과정.</strong>
+      <code>&lt;ID&gt;_warp.mat</code>은 greedy 고유 규약을 따르는 단순한 <strong>네 줄짜리 텍스트</strong> 파일이다.
+      4×4 행렬로, <strong>고정 볼륨의 RAS 좌표를
+      이동 볼륨의 RAS 좌표로</strong> 사상한다(<code>[ras(moving);1] = M · [ras(fixed);1]</code>,
+      greedy 문서 "Affine mode" 절).</p>
+
+      <p>"Save Transform Matrix" 버튼은 이 파일을 단순히 <code>shutil.copy</code>한다
+      (<code>GreedyReg.py:1288</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>모듈 어디에도 <code>.tfm</code>이나 ITK 관련 형식으로의 변환이
+        없다.</strong> 이 코드를 넘겨받는 사람이 알아야 할 것:</p>
+        <ul>
+          <li>ITK 변환 파일(<code>TxtTransform</code>)이 아니므로, 확장자가 <code>.mat</code>이어도
+          Slicer에서 변환으로 불러와지지 않는다;</li>
+          <li>디스크에 저장된 ITK/Slicer 변환은 <strong>LPS</strong>이고, 이것은
+          <strong>RAS</strong>다. 역변환이 필요할 수 있는 것에 더해 <code>diag(-1,-1,1,1)</code>에 의한
+          켤레 변환이 필요하다;</li>
+          <li>예상되는 변환 경로는 <code>c3d_affine_tool</code>(greedy 문서
+          권장), 또는 <code>FlexReg_CLI.py:186</code>과 같은 코드다. 후자는 자체 행렬에 대해
+          정확히 그 작업을 한다.</li>
+        </ul>
+      </div>
+
+      <p><a href="../FlexReg/FlexReg.html">FlexReg</a>는 저장소의 다른 모듈이 사용하는 재사용 가능한 SimpleITK <code>.tfm</code>을
+      만든다. 이에 비해 GreedyReg는 막다른 길이다. 아무도 그 행렬을
+      사용하지 않는다.</p>
+
+      <h2 id="convention">9. 초기화 규약: 거꾸로일 가능성이 매우 높다</h2>
+
+      <p>수동 모드는 Slicer 변환 노드의 행렬을 그대로
+      <code>&lt;ID&gt;_init.mat</code>에 기록한다(<code>Logic.py:277</code>).</p>
+
+      <ul>
+        <li>이 행렬은 <code>MatrixTransformToParent</code>이며, <strong>이동</strong> 볼륨에 적용된다.
+        이동 볼륨 자체의 좌표를 월드 좌표로 사상한다. 즉 <strong>이동 → 고정</strong>이다.</li>
+        <li><code>-ia</code>는 <code>-o</code>가 만드는 것과 같은 성격의 행렬,
+        즉 <strong>고정 → 이동</strong>을 기대한다.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">가능성 높은 함정, 미확인</div>
+        <p>둘은 서로의 역행렬이다. 따라서 수동 사전 정렬은 greedy에 거꾸로 전달될
+        가능성이 매우 높다(회전은 전치, 평행 이동은 부호 반대). 저장소의
+        다른 부분은 이 규약을 알고 있다. <code>FlexReg_CLI.py:186</code>은
+        "ITK convention: fixed -&gt; moving."이라는 주석과 함께 명시적으로 역변환한다.</p>
+        <p>항상 드러나지 않는 이유: <code>-search 100 10 20</code>이 최적화 전에 무작위
+        강체 변환 100개를 샘플링하고, 4단계 피라미드가 많은 것을 너그럽게 흡수한다. 나쁜
+        시작점은 수렴을 늦추고 더 취약하게 만들 뿐, 막지는 않는다. 수정하기 전에
+        간단한 테스트(X축 방향 순수 20 mm 평행 이동으로, 기록된
+        init과 반환된 행렬을 비교)로 확인해야 한다.</p>
+      </div>
+
+      <h2 id="predit-calcule">10. 무엇이 예측이고 무엇이 계산인가</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>블록</th><th>성격</th><th>위치</th></tr></thead>
+          <tbody>
+            <tr><td>수동 사전 정렬</td><td>상호작용, 추론 없음</td><td>위젯</td></tr>
+            <tr><td>T2를 T1 중심에 맞추기</td><td><span class="badge calcule">계산</span> 기하학적 (영상 중심)</td><td>위젯</td></tr>
+            <tr><td>강체/어파인 정합</td><td><span class="badge calcule">계산</span> 강도 최적화 (NMI/NCC/SSD, greedy 내부 LBFGS)</td><td>네이티브 바이너리, CPU</td></tr>
+            <tr><td>리샘플링</td><td><span class="badge calcule">계산</span> 선형 보간</td><td>네이티브 바이너리</td></tr>
+            <tr><td>원거리 모드의 랜드마크</td><td><span class="badge predit">예측</span> 신경망, 강화학습 (<a href="../ALI/ALI.html">ALI_CBCT</a>, <code>DNet</code>)</td><td><code>slicer.cli.run(ali_cbct)</code>, 가능하면 GPU</td></tr>
+            <tr><td>랜드마크로부터의 강체 변환</td><td><span class="badge calcule">계산</span> 기하학적, SVD/Kabsch</td><td>위젯 (numpy)</td></tr>
+            <tr><td>마스크 이진화</td><td><span class="badge calcule">계산</span> <code>&gt; 0</code> 임계값</td><td>CLI (nibabel)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="environnement">11. 실행 환경</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>값</th><th>출처</th></tr></thead>
+          <tbody>
+            <tr><td>인터프리터</td><td>위젯<strong>과</strong> CLI 모두 Slicer의 Python (<code>#!/usr/bin/env python-real</code>)</td><td><code>GreedyReg_CLI.py:1</code></td></tr>
+            <tr><td>CLI 의존성</td><td><code>nibabel</code> 하나뿐, 확인 후 <code>ensureNibabelInstalled()</code>가 설치</td><td><code>Logic.py:82</code></td></tr>
+            <tr><td>원거리 모드 의존성</td><td><code>itk</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code>, <code>monai</code> (Python ≥ 3.10이면 <code>1.3.2</code>, 아니면 <code>0.7.0</code>)</td><td><code>Logic.py:336</code></td></tr>
+            <tr><td>torch</td><td>확장의 NNUNet/PyTorch 체인을 통해 <strong>이미 있다고 가정</strong>하며, 여기서는 설치하지 않음</td><td><code>Logic.py:331</code>의 주석</td></tr>
+            <tr><td>GPU</td><td>greedy에는 무관, <a href="../ALI/ALI.html">ALI</a>에는 유용 (ALI 쪽의 <code>torch.cuda.empty_cache()</code>)</td><td>—</td></tr>
+            <tr><td>conda / WSL</td><td><strong>없음</strong>. 저장소의 대부분의 모듈과 다름</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout ok">
+        <div class="callout-title">확인됨</div>
+        <p>고정된 <code>pydicom</code>/<code>dicom2nifti</code> 버전은 겉치레가 아니다.
+        커밋 <code>b25a83e</code>("Keep pydicom 3 and dicom2nifti 2.6.2 so Slicer DICOM
+        modules still load")를 보면 다른 선택은 Slicer의 DICOM 모듈을 망가뜨린다.</p>
+      </div>
+
+      <h2 id="pieges">12. 함정과 취약 지점</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p><strong>일괄 처리가 출력을 T2 입력 폴더에 쓴다.</strong>
+        <code>A01_registered.nii.gz</code>와 <code>A01_t2_aligned.nii.gz</code>는 모두
+        <code>A01</code> 식별자로 대응된다 — 기준은 <code>ID_PATTERN</code>. 두 번째 실행에서
+        <code>{id: path}</code> 딕셔너리는 식별자마다 항목 하나만 유지하는데, 그것은 <strong>
+        <code>os.listdir</code>에서 마지막으로 만난 것</strong>이다. 따라서 이전 실행의 결과가
+        비결정적으로 다시 정합될 수 있다. 생성된 접미사를 걸러 내는
+        필터가 없다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>생성된 <code>.mat</code>은 Slicer 변환이 아니다(<a href="#sorties">§8</a>):
+        RAS, 고정→이동 방향, 단순 텍스트 형식.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>수동 모드의 init은 거꾸로일 가능성이 높다(<a href="#convention">§9</a>).</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><code>-e 0.5</code>는 어파인 모드에서 아무 효과가 없다. 최적화 스텝 크기를
+        조정한다고 생각하는 사람에게는 혼란스러울 수 있다.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p><strong>죽은 버튼</strong>: Distant 패널의 "Save Registered Volume"은
+        <code>self._distantResult</code>를 읽는데, 이 값은 <strong>한 번도</strong> 할당되지 않는다 — 항상
+        "No result to save!"라고 응답한다. 어차피 Distant 모드는 볼륨을 만들지 않는다.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p>원거리 모드의 <strong>오해를 부르는 체크박스</strong>: 세 구조는
+        독립된 체크박스이지만, <code>_selectedDistantRegion()</code>은 고정된 우선순위에 따라
+        그중 하나만 반환한다. "Mandible + Maxilla"를 체크해도 랜드마크 10개가
+        합쳐지지 않는다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>조용한 <a href="../ALI/ALI.html">ALI</a> 실패</strong>: <a href="../ALI/ALI.html">ALI_CBCT</a>는 가중치 문제를
+        경고로만 기록하고 코드 0으로 종료한다. 코드는
+        <code>GetOutputText()</code>를 체계적으로 출력해(<code>GreedyReg.py:1508</code>) 이를 방어하지만, 사용자에게는
+        "only 0 matched landmarks."만 보인다.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p>위젯 쪽의 <strong>임시 폴더는 결코 정리되지 않는다</strong>
+        (<code>mkdtemp</code> ×3, <code>rmtree</code> 없음). 반면 CLI는
+        증례마다 <code>caseTmpDir</code>를 정리한다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>한 번의 실패가 일괄 처리 전체를 멈춘다</strong>(CLI 루프 안의
+        <code>sys.exit(1)</code>). 재개도, 남은 증례 목록도 없다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>다중 세그먼트 마스크가 하나로 뭉개진다</strong>(<code>&gt; 0</code> 임계값 때문).
+        또한 마스크는 <strong>고정</strong> 볼륨의 공간에 있어야 한다. <code>-gm</code>은
+        고정 볼륨에 적용되며, UI가 이를 표시하지만("Mask (T1)") 아무것도
+        검증하지 않는다.</p>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">참고</div>
+        <p><strong>채워지지 않은 모듈 메타데이터</strong>: <code>contributors = ["Your Lab"]</code>,
+        <code>acknowledgementText = ""</code>.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>위젯에는 약 500줄의 Qt 스타일 시트와 위젯
+        (<code>StandaloneRotationWheel</code>, <code>SliceTranslationOverlay</code>)이 들어 있으며, 주석에서
+        명시적으로 프로토타입이라고 밝힌다. 이들은 슬라이더와 같은 변환 노드를 수정하므로,
+        두 벌의 컨트롤이 다시 동기화되지 않은 채 서로 간섭한다(휠을 움직인 뒤
+        슬라이더가 갱신되지 않는다).</p>
+      </div>
+
+      <h2 id="litterature">13. 문헌</h2>
+
+      <p>엔진은 발표되었고, 모듈은 발표되지 않았다.</p>
+
+      <ul>
+        <li><strong>greedy</strong>: Paul Yushkevich(PICSL, UPenn)의 도구로 ITK-SNAP에
+        포함되어 있다. 인용할 때 흔히 쓰는 문헌은
+        <a href="https://arxiv.org/abs/1904.11929">Venet, Pati, Yushkevich, Bakas, <em>Accurate
+        and Robust Alignment of Variable-Stained Histologic Images Using a General-Purpose
+        Greedy Diffeomorphic Registration Tool</em> (arXiv:1904.11929)</a>이다. 문서:
+        <a href="https://greedy.readthedocs.io/en/latest/reference.html">greedy.readthedocs.io</a>,
+        코드: <a href="https://github.com/pyushkevich/greedy">pyushkevich/greedy</a>. 참고:
+        논문과 도구는 <strong>미분동형</strong> 정합을 다룬다. GreedyReg는 그 초기화 단계에
+        불과한 어파인/강체 모드(<code>-a</code>)만
+        쓴다.</li>
+        <li><strong><a href="../ALI/ALI.html">ALI_CBCT</a></strong>:
+        <a href="https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642">Gillot et al.,
+        <em>Automatic landmark identification in cone-beam computed tomography</em>,
+        Orthodontics &amp; Craniofacial Research, 2023</a> — 다중 스케일 볼륨 공간을 탐색하는
+        가상 에이전트, 랜드마크 32개에서 보고된 평균 오차 1.54 ± 0.87 mm.
+        원 저장소:
+        <a href="https://github.com/Maxlo24/ALI_CBCT">Maxlo24/ALI_CBCT</a>.</li>
+        <li><strong>GreedyReg 자체</strong>: 발표 없음. 이 접근법 — "수동
+        사전 정렬 후 마스크를 쓰는 강도 기반 어파인" — 은 ITK-SNAP의
+        <em>Registration</em> 패널의 방식이며, 이 모듈은 이를 Slicer로 옮긴 것이다. 코드가
+        내세울 수 있는 계보는 이것뿐이다.</li>
+      </ul>
+
+      <p><strong>전체 참고문헌: <a href="SOURCES.html">SOURCES.html</a></strong> —
+      확인된 문헌, 이 폴더에 받아 둔 파일(greedy 논문, ALI_CBCT
+      논문), 그리고 greedy 논문이 설명하는 것과 이 모듈이 실제로 실행하는 것의
+      상세한 구분.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← 전체 페이지</a> ·
+        <a href="SOURCES.html">이 도구의 참고문헌</a> ·
+        출처: <code>GreedyReg.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

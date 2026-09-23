@@ -5,8 +5,8 @@
 
   var KEY = "sadt_atlas_theme";
   var root = document.documentElement;
-  var LANG = (root.getAttribute("lang") || "fr").slice(0, 2).toLowerCase();
-  if (LANG !== "en") LANG = "fr";
+  var LANG = (root.getAttribute("lang") || "en").slice(0, 2).toLowerCase();
+  if (["en", "fr", "pt", "ko", "th"].indexOf(LANG) < 0) LANG = "en";
 
   var T = {
     fr: { dark: "☾ sombre", light: "☀ clair", onpage: "Sur cette page",
@@ -24,7 +24,31 @@
           prev: "← previous", next: "next →", top: "↑ top",
           toTop: "Back to top", skip: "Skip to content",
           anchor: "Link to this section", reading: "Suggested reading order",
-          menu: "Open the menu" }
+          menu: "Open the menu" },
+    pt: { dark: "☾ escuro", light: "☀ claro", onpage: "Nesta página",
+          copy: "copiar", copied: "copiado", failed: "falhou",
+          search: "Buscar…  /", searchAria: "Buscar no site",
+          noResult: "Nenhum resultado.", noIndex: "Índice não encontrado — rode <code>python3 build.py</code>.",
+          prev: "← anterior", next: "próximo →", top: "↑ topo",
+          toTop: "Voltar ao topo", skip: "Ir para o conteúdo",
+          anchor: "Link para esta seção", reading: "Ordem de leitura sugerida",
+          menu: "Abrir o menu" },
+    ko: { dark: "☾ 어둡게", light: "☀ 밝게", onpage: "이 페이지에서",
+          copy: "복사", copied: "복사됨", failed: "실패",
+          search: "검색…  /", searchAria: "사이트 검색",
+          noResult: "결과 없음.", noIndex: "색인이 없습니다 — <code>python3 build.py</code>를 실행하십시오.",
+          prev: "← 이전", next: "다음 →", top: "↑ 위로",
+          toTop: "맨 위로", skip: "본문으로 건너뛰기",
+          anchor: "이 섹션 링크", reading: "권장 읽기 순서",
+          menu: "메뉴 열기" },
+    th: { dark: "☾ มืด", light: "☀ สว่าง", onpage: "ในหน้านี้",
+          copy: "คัดลอก", copied: "คัดลอกแล้ว", failed: "ล้มเหลว",
+          search: "ค้นหา…  /", searchAria: "ค้นหาในเว็บไซต์",
+          noResult: "ไม่พบผลลัพธ์", noIndex: "ไม่พบดัชนี — รัน <code>python3 build.py</code>",
+          prev: "← ก่อนหน้า", next: "ถัดไป →", top: "↑ บนสุด",
+          toTop: "กลับขึ้นบนสุด", skip: "ข้ามไปยังเนื้อหา",
+          anchor: "ลิงก์ไปยังหัวข้อนี้", reading: "ลำดับการอ่านที่แนะนำ",
+          menu: "เปิดเมนู" }
   }[LANG];
   try { var saved = localStorage.getItem(KEY); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
 
@@ -297,7 +321,9 @@
     }
 
     function norm(s) {
-      return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      /* retire les accents latins, puis recompose : NFD seul éclaterait le hangûl
+         en jamos, et le surlignage ne retrouverait plus le terme dans le texte */
+      return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").normalize("NFC");
     }
     function highlight(text, terms) {
       var esc = text.replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; });

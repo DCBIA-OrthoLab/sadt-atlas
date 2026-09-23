@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOCShapeAXI — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="analyse">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/DOCShapeAXI/DOCShapeAXI.html" hreflang="en" title="English">EN</a><a href="../../fr/DOCShapeAXI/DOCShapeAXI.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/DOCShapeAXI/DOCShapeAXI.html" hreflang="ko" title="한국어">KO</a><a href="../../th/DOCShapeAXI/DOCShapeAXI.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/DOCShapeAXI.html"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../DOCShapeAXI/DOCShapeAXI.html" aria-current="true"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html" aria-current="page">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/DOCShapeAXI/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Análise</div>
+        <h1>DOCShapeAXI</h1>
+        <p class="lede">Classificação de malhas <code>.vtk</code> por uma rede de dois ramos (nuvem de pontos com atenção multi-head + renderização multivista EfficientNet-B0), seguida sistematicamente de uma passada de <a class="gterm" href="../glossary.html#g-gradcam" title="Ver glossário">Grad-CAM</a> escrita como escalar por ponto na malha.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1117/12.3007053" target="_blank" rel="noopener" title="ShapeAXI, o framework. O artigo descreve uma ResNet-18 binária; o checkpoint é uma rede de dois ramos com 4 classes.">Prieto 2024 · SPIE</a>
+          <span class="badge cli">DOCShapeAXI_CLI</span>
+          <span class="badge neutral">ambiente conda: shapeaxi</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliografia</a>
+        </div>
+      </header>
+
+      <p><em>Dental Oral and Craniofacial Shape Analysis eXplainability and Interpretability.</em>
+      Uma única ação do usuário: escolher um tipo de dado, uma pasta de entrada, uma
+      pasta de saída. Todo o resto — qual checkpoint, qual arquitetura, quantas
+      classes — é deduzido do tipo de dado.</p>
+
+      <h2 id="situation">1. Lugar no pipeline</h2>
+
+      <p>Autônomo: nada no repositório chama o DOCShapeAXI. Supõe-se que as malhas de entrada
+      já tenham sido segmentadas e extraídas em outro lugar (<a href="../AMASSS/AMASSS.html">AMASSS</a> para os côndilos,
+      segmentação das vias aéreas etc.); <strong>o módulo não produz suas próprias superfícies</strong>.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 910 150" role="img" aria-label="Lugar do DOCShapeAXI no pipeline: malhas na entrada, CLI no ambiente shapeaxi, rede de dois ramos que prediz uma classe ou razão, passada sistemática de Grad-CAM, saídas gravadas em disco.">
+          <rect class="d-box" x="10" y="45" width="150" height="55" rx="6"/>
+          <text class="d-label" x="85" y="68" text-anchor="middle">malhas .vtk</text>
+          <text class="d-label-s" x="85" y="84" text-anchor="middle">já segmentadas</text>
+
+          <path class="d-arrow" d="M160 73 H195"/>
+          <path class="d-arrow-head" d="M195 73 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="195" y="45" width="150" height="55" rx="6"/>
+          <text class="d-label" x="270" y="68" text-anchor="middle">DOCShapeAXI_CLI</text>
+          <text class="d-label-s" x="270" y="84" text-anchor="middle">conda: shapeaxi</text>
+
+          <path class="d-arrow" d="M345 73 H380"/>
+          <path class="d-arrow-head" d="M380 73 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="380" y="45" width="150" height="55" rx="6"/>
+          <text class="d-label" x="455" y="68" text-anchor="middle">Rede de 2 ramos</text>
+          <text class="d-label-s" x="455" y="84" text-anchor="middle">classe ou razão</text>
+
+          <path class="d-arrow" d="M530 73 H565"/>
+          <path class="d-arrow-head" d="M565 73 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="565" y="45" width="150" height="55" rx="6"/>
+          <text class="d-label" x="640" y="68" text-anchor="middle">Grad-CAM</text>
+          <text class="d-label-s" x="640" y="84" text-anchor="middle">sistemático</text>
+
+          <path class="d-arrow" d="M715 73 H750"/>
+          <path class="d-arrow-head" d="M750 73 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="750" y="45" width="150" height="55" rx="6"/>
+          <text class="d-label" x="825" y="68" text-anchor="middle">Saídas</text>
+          <text class="d-label-s" x="825" y="84" text-anchor="middle">.vtk + .csv + .ckpt</text>
+        </svg>
+        <figcaption>Visão geral: o DOCShapeAXI não faz segmentação nem extração de superfície, ele classifica malhas que já estão prontas.</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Chamado</th><th>Quando</th><th>Como</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge cli">DOCShapeAXI_CLI</span></td><td>em cada tarefa</td><td><code>conda run -n shapeaxi python -m DOCShapeAXI_CLI &lt;8 args&gt;</code></td></tr>
+            <tr><td><code>model_path.json</code> em <code>raw.githubusercontent.com</code></td><td>na inicialização da CLI, se o <code>.ckpt</code> estiver ausente</td><td><code>requests.get</code> e depois <code>urlretrieve</code></td></tr>
+            <tr><td>pacote pip <code>shapeaxi</code></td><td>o tempo todo</td><td><code>saxi_nets_lightning</code>, <code>saxi_dataset</code>, <code>saxi_transforms</code>, <code>saxi_gradcam</code>, <code>post_process</code>, <code>utils</code></td></tr>
+            <tr><td><span class="badge cli">DOCShapeAXI_utils.install_pytorch</span></td><td>se o pytorch3d estiver ausente</td><td><code>conda run -n shapeaxi python -m DOCShapeAXI_utils.install_pytorch &lt;pip&gt;</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O ambiente <code>shapeaxi</code> é <strong>compartilhado</strong> com <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../ALI/ALI.html">ALI</a>, AREG e <a href="../ASO/ASO.html">ASO</a>:
+      qualquer mudança de versão repercute em todos eles.</p>
+
+      <p>O json dos modelos é lido <strong>da branch <code>main</code> no GitHub</strong>, e não da
+      cópia local (<code>DOCShapeAXI_CLI.py:118</code>): uma versão instalada pode baixar
+      pesos publicados depois dela.</p>
+
+      <h2 id="fichiers">2. Arquivos envolvidos</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Arquivo</th><th>Papel</th><th>Onde roda</th></tr></thead>
+          <tbody>
+            <tr><td><code>DOCShapeAXI/DOCShapeAXI.py</code></td><td>widget: conda, escolha do modelo, barra de progresso, ~180 linhas de estilo para tema escuro</td><td>Python do Slicer</td></tr>
+            <tr><td><code>DOCShapeAXI_CLI.py</code></td><td><strong>predição + explicabilidade</strong>, 307 linhas</td><td>ambiente conda <code>shapeaxi</code>, GPU se disponível</td></tr>
+            <tr><td><code>model_path.json</code></td><td>5 checkpoints e suas URLs</td><td>—</td></tr>
+            <tr><td><code>install_pytorch.py</code></td><td>escolhe a wheel do pytorch3d conforme o torch instalado, depois <code>shapeaxi&gt;=2.0.2</code></td><td>ambiente conda</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>A maior parte do trabalho real está no pacote pip <code>shapeaxi</code>, fora do
+      repositório. Os detalhes de arquitetura abaixo foram lidos da instalação
+      real (<code>shapeaxi/saxi_nets_lightning.py</code>, <code>saxi_layers.py</code>, <code>saxi_nets.py</code>,
+      <code>saxi_dataset.py</code>, <code>saxi_transforms.py</code>, <code>saxi_gradcam.py</code>) e conferidos com os
+      hiperparâmetros armazenados no próprio checkpoint <code>condyles_4_class.ckpt</code>.</p>
+
+      <h2 id="entrees">3. Entradas e pré-processamento</h2>
+
+      <h3>3.1 O CSV</h3>
+
+      <p>A CLI lista sem recursão <code>args.input_dir</code>, mantém os arquivos <code>.vtk</code> e escreve
+      <code>&lt;output_dir&gt;/files_&lt;data_type&gt;.csv</code> com o cabeçalho <code>surf</code> e <strong>um nome de arquivo
+      por linha</strong> (<code>csv_edit</code>, <code>DOCShapeAXI_CLI.py:102</code>).
+      Os caminhos são relativos; <code>SaxiDataset</code> os junta com <code>mount_point = input_dir</code>.</p>
+
+      <p><code>data_type</code> contém espaços ("Mandibular Condyle"), então o csv se chama
+      <code>files_Mandibular Condyle.csv</code>. O csv é <strong>regenerado apenas se ainda não
+      existir</strong> (<code>DOCShapeAXI_CLI.py:282</code>): acrescentar
+      malhas à pasta de entrada sem esvaziar a pasta de saída não fará com que sejam
+      processadas.</p>
+
+      <h3 id="normalisation">3.2 Normalização geométrica</h3>
+
+      <p><code>EvalTransform</code> → <code>UnitSurfTransform</code> → <code>utils.GetUnitSurf</code> → <code>ScaleSurf</code>:</p>
+
+      <ol>
+        <li>centro = ponto médio da <strong>caixa delimitadora</strong> (não o centroide);</li>
+        <li>translação dos pontos para esse centro;</li>
+        <li>fator de escala <code>1 / ||bounds_max - center||</code>, aplicado uniformemente.</li>
+      </ol>
+
+      <p>A malha cabe assim na esfera unitária, independentemente do seu tamanho real.
+      <strong>Toda informação de escala absoluta se perde</strong> — um côndilo pequeno e um
+      côndilo grande de mesma forma são idênticos para a rede.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado (pacote shapeaxi)</div>
+        <p>Vale saber: <code>saxi_predict</code> lê <code>model.hparams.scale_factor</code> (0,0507 no
+        checkpoint dos côndilos) e o passa para <code>EvalTransform(scale_factor)</code>
+        (<code>DOCShapeAXI_CLI.py:206</code>), mas
+        <code>UnitSurfTransform.__call__</code> chama <code>utils.GetUnitSurf(surf)</code> <strong>sem
+        repassá-lo</strong> quando a entrada é um <code>vtkPolyData</code>. O fator de escala aprendido no
+        treinamento é, portanto, <strong>ignorado silenciosamente na inferência</strong>, substituído por uma
+        normalização por sujeito. É um bug do pacote <code>shapeaxi</code>, não do
+        repositório, mas ele muda o pré-processamento efetivo. <code>saxi_gradcam</code>, aliás,
+        constrói seu dataset
+        com <code>EvalTransform()</code> sem argumento: as duas passadas acabam coerentes
+        entre si.</p>
+      </div>
+
+      <h3>3.3 O que o DataLoader retorna</h3>
+
+      <p><code>SaxiDataset(..., CN=True, class_column=None, scalar_column=None)</code> →
+      <code>(V, F, CN)</code> por sujeito:</p>
+
+      <ul>
+        <li><code>V</code>: vértices <code>(1, Nv, 3)</code> após a normalização;</li>
+        <li><code>F</code>: triângulos <code>(1, Nf, 3)</code>;</li>
+        <li><code>CN</code>: <strong>normais codificadas como cor</strong>, <code>utils.ComputeNormals</code> e depois
+        <code>GetColorArray(surf,"Normals")</code> dividido por 255 → <code>(1, Nv, 3)</code> em [0,1].</li>
+      </ul>
+
+      <p>Nenhum escalar da malha é lido (<code>surf_property=None</code>): <strong>só entram a
+      geometria e as normais</strong>. <code>batch_size=1</code>, sem padding, então malhas
+      de tamanhos diferentes passam sem problema.</p>
+
+      <h2 id="modeles">4. Os modelos</h2>
+
+      <h3>4.1 A tabela de decisão</h3>
+
+      <p><code>find_model_name()</code> / <code>find_nn_type()</code>
+      (<code>DOCShapeAXI.py:1012</code>) — a palavra-chave testada é
+      um <strong>token</strong> do rótulo do combo (<code>self.data_type.split(' ')</code>):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tipo de dado (combo)</th><th>Token</th><th>Tarefa</th><th>model</th><th>nn</th><th>num_classes</th></tr></thead>
+          <tbody>
+            <tr><td>Mandibular Condyle</td><td><code>Condyle</code></td><td>gravidade</td><td><code>condyles_4_class</code></td><td><code>SaxiMHAFBClassification</code></td><td>4</td></tr>
+            <tr><td>Nasopharynx Airway Obstruction</td><td><code>Airway</code></td><td>binária</td><td><code>airways_2_class</code></td><td><code>SaxiMHAFBClassification</code></td><td>2</td></tr>
+            <tr><td>Nasopharynx Airway Obstruction</td><td><code>Airway</code></td><td>gravidade</td><td><code>airways_4_class</code></td><td><code>SaxiMHAFBClassification</code></td><td>4</td></tr>
+            <tr><td>Nasopharynx Airway Obstruction</td><td><code>Airway</code></td><td>regressão</td><td><code>airways_4_regress</code></td><td><code>SaxiMHAFBRegression</code></td><td>1</td></tr>
+            <tr><td>Alveolar Bone Defect in Cleft</td><td><code>Cleft</code></td><td>gravidade</td><td><code>clefts_4_class</code></td><td><code>SaxiMHAFBClassification</code></td><td>4</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Só o caso <em>Airway</em> encadeia <strong>três execuções completas da CLI</strong>
+      (binária, gravidade, regressão); os outros dois fazem apenas uma, em <code>severity</code>
+      (<code>DOCShapeAXI.py:627</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>URLs, todas na release <code>shapeaxi-ckpt-v1</code>:
+        <code>.../releases/download/shapeaxi-ckpt-v1/{airways_2_class, airways_4_class,
+        airways_4_regress, cleft_4_class, condyles_4_class}.ckpt</code>. Note a assimetria:
+        a chave do json é <code>clefts_4_class</code>, mas o arquivo remoto se chama
+        <code>cleft_4_class.ckpt</code>. O checkpoint é copiado <strong>para a pasta de saída</strong>
+        (<code>&lt;output_dir&gt;/&lt;model&gt;.ckpt</code>), não para um cache: cada nova pasta
+        de saída baixa de novo 72 MB.</p>
+      </div>
+
+      <h3 id="architecture">4.2 A arquitetura realmente usada</h3>
+
+      <p>Isto <strong>não</strong> é um PointNet, nem a fly-by-CNN ResNet-18 do artigo original
+      do ShapeAXI. <code>SaxiMHAFBClassification</code> (<em>MHA Fly-By</em>) tem <strong>dois
+      ramos com fusão tardia</strong>.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verificado</div>
+        <p>Os valores abaixo (K=128, 256 cabeças, 42 vistas, image_size=224…) são
+        confirmados pelos <code>hyper_parameters</code> e pelo buffer <code>ico_verts</code> do próprio
+        checkpoint <code>condyles_4_class.ckpt</code>, não apenas pela leitura do código-fonte.</p>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 900 200" role="img" aria-label="Arquitetura de dois ramos: ramo A, uma nuvem de 4096 pontos com MHAEncoder e atenção; ramo B, 42 vistas renderizadas, depois EfficientNet-B0 e atenção; fusão por concatenação e depois uma camada linear até a classe ou razão.">
+          <rect class="d-box" x="10" y="75" width="130" height="50" rx="6"/>
+          <text class="d-label" x="75" y="96" text-anchor="middle">Malha</text>
+          <text class="d-label-s" x="75" y="111" text-anchor="middle">esfera unitária</text>
+
+          <path class="d-arrow" d="M140 100 H165 V35 H190"/>
+          <path class="d-arrow-head" d="M190 35 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M140 100 H165 V165 H190"/>
+          <path class="d-arrow-head" d="M190 165 l-7 -4 v8 z"/>
+
+          <text class="d-label-s" x="365" y="8" text-anchor="middle">Ramo A — nuvem de pontos</text>
+          <rect class="d-box" x="190" y="10" width="140" height="50" rx="6"/>
+          <text class="d-label" x="260" y="31" text-anchor="middle">Amostragem</text>
+          <text class="d-label-s" x="260" y="47" text-anchor="middle">4096 pontos</text>
+
+          <path class="d-arrow" d="M330 35 H360"/>
+          <path class="d-arrow-head" d="M360 35 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="360" y="10" width="150" height="50" rx="6"/>
+          <text class="d-label" x="435" y="31" text-anchor="middle">MHAEncoder</text>
+          <text class="d-label-s" x="435" y="47" text-anchor="middle">atenção KNN, 4 etapas</text>
+
+          <path class="d-arrow" d="M510 35 H540"/>
+          <path class="d-arrow-head" d="M540 35 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="540" y="10" width="140" height="50" rx="6"/>
+          <text class="d-label" x="610" y="31" text-anchor="middle">SelfAttention</text>
+          <text class="d-label-s" x="610" y="47" text-anchor="middle">→ vetor 256</text>
+
+          <text class="d-label-s" x="365" y="200" text-anchor="middle" transform="translate(0,-6)">Ramo B — multivista</text>
+          <rect class="d-box" x="190" y="140" width="140" height="50" rx="6"/>
+          <text class="d-label" x="260" y="161" text-anchor="middle">Render 42 vistas</text>
+          <text class="d-label-s" x="260" y="177" text-anchor="middle">224×224, icosaedro</text>
+
+          <path class="d-arrow" d="M330 165 H360"/>
+          <path class="d-arrow-head" d="M360 165 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="360" y="140" width="150" height="50" rx="6"/>
+          <text class="d-label" x="435" y="161" text-anchor="middle">EfficientNet-B0</text>
+          <text class="d-label-s" x="435" y="177" text-anchor="middle">TimeDistributed</text>
+
+          <path class="d-arrow" d="M510 165 H540"/>
+          <path class="d-arrow-head" d="M540 165 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="540" y="140" width="140" height="50" rx="6"/>
+          <text class="d-label" x="610" y="161" text-anchor="middle">MHA + SelfAtt.</text>
+          <text class="d-label-s" x="610" y="177" text-anchor="middle">→ vetor 256</text>
+
+          <path class="d-arrow" d="M680 35 H705 V100 H730"/>
+          <path class="d-arrow" d="M680 165 H705 V100 H730"/>
+          <path class="d-arrow-head" d="M730 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="730" y="75" width="150" height="50" rx="6"/>
+          <text class="d-label" x="805" y="96" text-anchor="middle">Concat 512</text>
+          <text class="d-label-s" x="805" y="111" text-anchor="middle">→ classe / razão</text>
+        </svg>
+        <figcaption>O diagrama central do módulo: dois ramos aprendidos (nuvem de pontos, multivista) fundidos tardiamente por concatenação seguida de uma camada linear.</figcaption>
+      </figure>
+
+      <p><strong>Ramo A — nuvem de pontos.</strong></p>
+      <ul>
+        <li><code>sample_points_from_meshes(X_mesh, 4096)</code> (pytorch3d): amostragem uniforme
+        de <strong>4096 pontos</strong> na superfície;</li>
+        <li><code>MHAEncoder</code>: <code>Linear(3→256)</code>, depois 4 etapas com <code>sample_levels = [4096, 2048,
+        512, 128]</code>. Em cada etapa, <code>MHA_KNN</code> (atenção multi-head restrita aos
+        <strong>K=128</strong> vizinhos mais próximos, 256 cabeças) e depois um <code>FeedForward</code> residual
+        (oculta 64). Entre as etapas, subamostragem aleatória até o nível
+        seguinte, levando os índices adiante para acumular um <strong>peso por ponto original</strong>
+        (<code>x_w</code>);</li>
+        <li><code>Linear(256→256)</code>, <code>FeedForward</code> e depois <code>SelfAttention</code> (atenção aditiva
+        <code>Linear(256→64) → tanh → Linear(64→1) → sigmoid</code>, normalizada e depois soma
+        ponderada), que <strong>reduz os 128 tokens a um único vetor de 256</strong>.</li>
+      </ul>
+
+      <p><strong>Ramo B — multivista.</strong></p>
+      <ul>
+        <li>câmeras nos vértices de um <strong>icosaedro subdividido</strong> (<code>subdivision_level=2</code>,
+        <code>radius=1.35</code>). O buffer <code>ico_verts</code> do checkpoint tem forma <code>(42, 3)</code>:
+        <strong>42 vistas</strong> por sujeito;</li>
+        <li>renderização pytorch3d: <code>FoVPerspectiveCameras</code>, <code>look_at_rotation</code> em direção à origem,
+        <code>AmbientLights</code> (sem sombreamento direcional), <code>HardPhongShader</code>,
+        <code>RasterizationSettings(image_size=224, blur_radius=0, faces_per_pixel=1,
+        max_faces_per_bin=200000)</code>;</li>
+        <li>cada vista é um tensor de <strong>4 canais</strong>: RGB (as normais codificadas como cor, definidas como
+        <code>TexturesVertex</code>) <strong>mais o z-buffer</strong>. Daí <code>in_channels=4</code>;</li>
+        <li><code>TimeDistributed(EfficientNetBN('efficientnet-b0', spatial_dims=2,
+        in_channels=4, num_classes=256))</code> do <a class="gterm" href="../glossary.html#g-monai" title="Ver glossário">MONAI</a>: as 42 vistas são achatadas na
+        dimensão do batch, passam pela mesma CNN e depois são remodeladas para <code>(1, 42, 256)</code>;</li>
+        <li><code>FeedForward</code>, <code>nn.MultiheadAttention(256, 256 heads, batch_first=True)</code> como
+        autoatenção sobre as 42 vistas, depois <code>SelfAttention</code> → um vetor de 256.</li>
+      </ul>
+
+      <p><strong>Fusão.</strong> <code>torch.cat([x_points, x_views], dim=1)</code> → 512, depois
+      <code>fc = Linear(512, num_classes)</code>. Para a regressão, <code>Linear(512, 1)</code> e perda MSE.</p>
+
+      <p>A renderização é refeita a cada passada: não há cache de imagens.</p>
+
+      <h3>4.3 O que a rede produz literalmente, e como se deriva uma classe disso</h3>
+
+      <pre><code>x = model(X_pc, X_views)                       # (1, num_classes) — raw logits
+if args.nn == 'SaxiMHAFBClassification':
+    x = softmax(x).detach()
+    x = torch.argmax(x, dim=1, keepdim=True)   # the class integer
+predictions.append(x)</code></pre>
+
+      <p><code>(DOCShapeAXI_CLI.py:227)</code></p>
+
+      <ul>
+        <li>classificação: <strong>só o <code>argmax</code> é mantido</strong>. As probabilidades do softmax
+        são calculadas e depois descartadas; nenhuma medida de confiança sai do módulo;</li>
+        <li>regressão: o valor bruto de <code>Linear(512,1)</code> é escrito tal como está (razão de
+        obstrução, numa escala de 0–100 no treinamento);</li>
+        <li>o <code>softmax</code> não tem, de todo modo, efeito algum sobre o <code>argmax</code>.</li>
+      </ul>
+
+      <p>Um detalhe de treinamento visível no código upstream: na classificação, o alvo
+      não é um one-hot, mas <strong>probabilidades de classe suaves</strong>
+      (<code>soft_class_probabilities</code>: gaussianas centradas em <code>[12.5, 37.5, 62.5, 87.5]</code>
+      com <code>widths = 12.5</code>). As 4 classes de gravidade são, portanto, na realidade
+      <strong>quartis de uma grandeza contínua</strong> numa escala de 0–100, o que explica por que
+      existe um modelo de regressão sobre o mesmo dataset de vias aéreas.</p>
+
+      <h2 id="explicabilite">5. O mecanismo de explicabilidade</h2>
+
+      <div class="callout">
+        <div class="callout-title">Nota</div>
+        <p>Esta é a parte mais característica do módulo, e ela roda <strong>sistematicamente</strong>
+        após a predição — não é uma opção nem uma caixa de seleção
+        (<code>saxi_gradcam</code>, <code>DOCShapeAXI_CLI.py:126</code>).</p>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 620 180" role="img" aria-label="Pipeline do Grad-CAM: logits por classe, LayerGradCam no último bloco MBConv, um mapa 7x7 para as 42 vistas, redimensionamento e corte, reprojeção face-vértice por máximo entre vistas, filtro mediano, escalar gravado.">
+          <rect class="d-box-n" x="10" y="10" width="150" height="50" rx="6"/>
+          <text class="d-label" x="85" y="31" text-anchor="middle">Logits preditos</text>
+          <text class="d-label-s" x="85" y="47" text-anchor="middle">por classe</text>
+
+          <path class="d-arrow" d="M160 35 H190"/>
+          <path class="d-arrow-head" d="M190 35 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="190" y="10" width="170" height="50" rx="6"/>
+          <text class="d-label" x="275" y="31" text-anchor="middle">LayerGradCam</text>
+          <text class="d-label-s" x="275" y="47" text-anchor="middle">último bloco MBConv</text>
+
+          <path class="d-arrow" d="M360 35 H390"/>
+          <path class="d-arrow-head" d="M390 35 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="390" y="10" width="150" height="50" rx="6"/>
+          <text class="d-label" x="465" y="31" text-anchor="middle">Mapa por vista</text>
+          <text class="d-label-s" x="465" y="47" text-anchor="middle">7×7, 42 vistas</text>
+
+          <path class="d-arrow" d="M540 60 V85 H105 V110"/>
+          <path class="d-arrow-head" d="M105 110 l-4 -7 h8 z"/>
+
+          <rect class="d-box" x="10" y="110" width="190" height="50" rx="6"/>
+          <text class="d-label" x="105" y="131" text-anchor="middle">Resize 224×224</text>
+          <text class="d-label-s" x="105" y="147" text-anchor="middle">corte pct 1–99 → [-1,1]</text>
+
+          <path class="d-arrow" d="M200 135 H230"/>
+          <path class="d-arrow-head" d="M230 135 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="230" y="110" width="170" height="50" rx="6"/>
+          <text class="d-label" x="315" y="131" text-anchor="middle">Reprojeção</text>
+          <text class="d-label-s" x="315" y="147" text-anchor="middle">face → vértice, max</text>
+
+          <path class="d-arrow" d="M400 135 H430"/>
+          <path class="d-arrow-head" d="M430 135 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="430" y="110" width="170" height="50" rx="6"/>
+          <text class="d-label" x="515" y="131" text-anchor="middle">Filtro mediano</text>
+          <text class="d-label-s" x="515" y="147" text-anchor="middle">+ escalar gravado</text>
+        </svg>
+        <figcaption>Do logit ao escalar por ponto: a saliência é calculada sobre as vistas renderizadas e depois reprojetada sobre a malha.</figcaption>
+      </figure>
+
+      <p><strong>a) A camada visada.</strong></p>
+
+      <pre><code>target_layer = getattr(model.convnet.module, '_blocks')
+mv_cam = LayerGradCam(model, target_layer[-1], device_ids=[0])</code></pre>
+
+      <p><code>model.convnet.module</code> é a EfficientNet-B0; <code>_blocks[-1]</code> é o seu <strong>último
+      bloco MBConv</strong>.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>Consequência importante: <strong>a saliência descreve apenas o
+        ramo multivista</strong>. O ramo da nuvem de pontos, que contribui com metade do
+        vetor fundido, não aparece em lugar nenhum do mapa. O <code>x_w</code> (peso por ponto) que
+        o encoder é capaz de produzir não é recuperado nem gravado.</p>
+      </div>
+
+      <p><strong>b) Um mapa por classe.</strong> Um laço <code>for class_idx in range(num_classes)</code> com
+      <code>mv_cam.attribute(inputs=(X_pc, X_views), target=class_idx,
+      attr_dim_summation=False)</code>: o Captum retropropaga o logit da classe <code>class_idx</code>
+      até as ativações do bloco, multiplica pelos gradientes médios e retorna um
+      tensor na resolução do mapa de ativação (7×7 para a EfficientNet-B0 em
+      224×224), <strong>para as 42 vistas de uma vez</strong>. <code>attr_dim_summation=False</code> mantém a
+      dimensão de canais, que é colapsada logo em seguida por <code>mv_att.sum(dim=1)</code>.</p>
+
+      <p><strong>c) Reescalonamento</strong> (<code>scale_cam_image</code>,
+      <code>DOCShapeAXI_CLI.py:43</code>, adaptado do
+      pytorch-grad-cam): <code>cv2.resize</code> para <strong>224×224</strong>, corte nos <strong>percentis 1
+      e 99</strong>, depois um remapeamento afim para <strong>[-1, 1]</strong>. O corte por percentis impede
+      que um pixel aberrante esmague toda a faixa dinâmica; a saída é, portanto,
+      com sinal, e não uma probabilidade.</p>
+
+      <p><strong>d) Reprojeção sobre a malha</strong> (<code>gradcam_process</code>, no <code>shapeaxi</code>) — o
+      núcleo do mecanismo:</p>
+
+      <pre><code>P_faces = torch.zeros(1, F.shape[1])
+V_gcam  = -1 * torch.ones(V.shape[1])
+for pf, gc in zip(PF.squeeze(), GCAM):          # one view at a time
+    P_faces[:, pf] = torch.maximum(P_faces[:, pf], gc)
+faces_pid0 = F[0, :, 0].to(torch.int64)
+V_gcam[faces_pid0] = P_faces
+V_gcam[V_gcam &lt; 0] = 0</code></pre>
+
+      <ul>
+        <li><code>PF</code> é o <code>pix_to_face</code> do rasterizador: para cada pixel de cada vista,
+        o índice do triângulo visível. O valor do pixel é assim levado de volta para
+        a <strong>face</strong>;</li>
+        <li>a agregação entre vistas é um <strong>máximo</strong>, não uma média: uma região vista uma
+        única vez e julgada saliente mantém seu valor;</li>
+        <li>a passagem face-vértice é grosseira: o valor de cada face é escrito no
+        <strong>seu primeiro vértice</strong> (<code>F[0,:,0]</code>). Os vértices nunca usados como primeiro
+        ponto de um triângulo ficam em -1 e depois são <strong>zerados</strong>. O mapa fica, portanto,
+        salpicado de zeros estruturais;</li>
+        <li>as faces nunca rasterizadas (interiores, oclusões permanentes) ficam em 0.</li>
+      </ul>
+
+      <p><strong>e) Suavização e escrita.</strong></p>
+
+      <pre><code>surf.GetPointData().AddArray(mv_att_upscaled)
+psp.MedianFilter(surf, mv_att_upscaled)
+utils.WriteSurf(surf, out_surf_path)</code></pre>
+
+      <p><code>MedianFilter</code> substitui cada valor pela mediana dos seus vizinhos
+      topológicos (1 passada, no lugar): é isso que recupera em parte os buracos deixados pelo
+      transporte para o "primeiro vértice". Ele modifica o <code>vtkDataArray</code> <strong>já adicionado</strong> à
+      malha, então é de fato a versão filtrada que é gravada.</p>
+
+      <p>O nome do array é fixado dentro de <code>gradcam_process</code>:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Caso</th><th>Nome do escalar</th></tr></thead>
+          <tbody>
+            <tr><td><code>num_classes &gt; 1</code></td><td><code>grad_cam_target_class_0</code>, <code>_1</code>, …</td></tr>
+            <tr><td>regressão (<code>num_classes == 1</code>)</td><td><code>grad_cam_max</code> (<code>target_class</code> continua <code>None</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O arquivo é <strong>reescrito a cada iteração de classe</strong>, acumulando os
+      arrays: o <code>.vtk</code> final carrega os N mapas. É isso que o README manda
+      selecionar no módulo <em>Models</em> → <em>Scalars</em> → <em>Active Scalar</em>, com a
+      tabela <code>ColdToHotRainbow</code>.</p>
+
+      <h2 id="sorties">6. Pós-processamento e saídas</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Arquivo</th><th>Conteúdo</th></tr></thead>
+          <tbody>
+            <tr><td><code>&lt;output&gt;/&lt;model&gt;.ckpt</code></td><td>o checkpoint baixado, deixado no lugar</td></tr>
+            <tr><td><code>&lt;output&gt;/files_&lt;data_type&gt;.csv</code></td><td>a lista de arquivos <code>.vtk</code></td></tr>
+            <tr><td><code>&lt;output&gt;/files_&lt;data_type&gt;_prediction.csv</code></td><td>o csv de entrada mais uma coluna <code>&lt;task&gt;_prediction</code> por tarefa</td></tr>
+            <tr><td><code>&lt;output&gt;/explainability/&lt;task&gt;/&lt;name&gt;.vtk</code></td><td>uma cópia da malha mais N arrays <code>grad_cam_*</code></td></tr>
+            <tr><td><code>&lt;log_path&gt;</code></td><td><code>"&lt;task&gt;,&lt;predict|explainability&gt;,&lt;index&gt;,&lt;num_classes&gt;"</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O acúmulo de colunas é intencional
+      (<code>DOCShapeAXI_CLI.py:240</code>): se o csv de predições já existe, ele é
+      <strong>relido</strong> e usado como base, e é por isso que um dataset de vias aéreas termina com
+      <code>binary_prediction</code>, <code>severity_prediction</code> e
+      <code>regression_prediction</code> lado a lado. Corolário: rodar de novo sobre a mesma pasta
+      de saída sobrescreve as colunas no lugar e nunca apaga as antigas.</p>
+
+      <p>O log é um <strong>arquivo de uma única linha reescrito a cada vez</strong> (<code>'w+'</code> para cada sujeito);
+      o widget monitora seu <code>mtime</code> e zera a barra de progresso quando o campo
+      <code>predict</code>/<code>explainability</code> muda (<code>DOCShapeAXI.py:694</code>).</p>
+
+      <h2 id="predit-calcule">7. O que é predito e o que é calculado</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bloco</th><th>Natureza</th><th>Onde</th></tr></thead>
+          <tbody>
+            <tr><td>Normalização na esfera unitária</td><td><span class="badge calcule">calculado</span> geométrico (bbox + escala)</td><td><code>shapeaxi</code></td></tr>
+            <tr><td>Normais codificadas como cor</td><td><span class="badge calcule">calculado</span> geométrico (VTK)</td><td><code>shapeaxi</code></td></tr>
+            <tr><td>Amostragem de 4096 pontos</td><td><span class="badge calcule">calculado</span> estocástico (pytorch3d)</td><td>GPU</td></tr>
+            <tr><td>Render de 42 vistas 224×224 RGB+z</td><td><span class="badge calcule">calculado</span> rasterização pytorch3d</td><td>GPU</td></tr>
+            <tr><td>Classe / razão</td><td><span class="badge predit">predito</span> MHAEncoder + EfficientNet-B0 + atenção</td><td>GPU</td></tr>
+            <tr><td>Mapa Grad-CAM</td><td><span class="badge predit">predito</span> derivado da rede (Captum, só o ramo multivista)</td><td>GPU</td></tr>
+            <tr><td>Reprojeção face → vértice, máximo entre vistas</td><td><span class="badge calcule">calculado</span> geométrico</td><td>GPU/CPU</td></tr>
+            <tr><td>Filtro mediano sobre a malha</td><td><span class="badge calcule">calculado</span> geométrico, vizinhança topológica</td><td>CPU</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>Duas fontes de aleatoriedade na inferência: a amostragem dos 4096 pontos
+        (<code>torch.randint</code> em <code>MHAEncoder.sample_points</code> <strong>e</strong> em
+        <code>sample_points_from_meshes</code>) não tem semente fixa. Duas execuções podem produzir
+        dois mapas de saliência ligeiramente diferentes e, em casos limítrofes, duas
+        classes diferentes.</p>
+      </div>
+
+      <h2 id="environnement">8. Ambiente</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>Valor</th><th>Fonte</th></tr></thead>
+          <tbody>
+            <tr><td>Ambiente conda</td><td><code>shapeaxi</code>, <strong>compartilhado</strong> com <a href="../ALI/ALI.html">ALI</a>/AREG/ASO/FlexReg</td><td><code>DOCShapeAXI.py:801</code></td></tr>
+            <tr><td>Python</td><td><strong>3.12</strong></td><td><code>DOCShapeAXI.py:842</code></td></tr>
+            <tr><td>Criação do ambiente</td><td><code>torch&gt;=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td>idem</td></tr>
+            <tr><td>pytorch3d</td><td>wheel escolhida a partir de <code>torch.__version__</code> + CUDA, em <code>https://ImageMindAnalytics.github.io/pytorch3d-wheels/simple/</code></td><td><code>install_pytorch.py:24</code></td></tr>
+            <tr><td>shapeaxi</td><td><code>shapeaxi&gt;=2.0.2</code>, instalado <strong>depois</strong> do pytorch3d</td><td><code>install_pytorch.py:186</code></td></tr>
+            <tr><td>Patch</td><td><code>patch_dentalmodelseg()</code> reescreve <code>saxi_nets.DentalModelSeg</code> → <code>saxi_nets_lightning.DentalModelSeg</code> no pacote instalado</td><td><code>install_pytorch.py:210</code></td></tr>
+            <tr><td>GPU</td><td>não obrigatória (<code>torch.device('cuda' if …)</code>), mas <code>LayerGradCam(..., device_ids=[0])</code> pressupõe a GPU 0</td><td><code>DOCShapeAXI_CLI.py:148</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>A ordem de instalação é restrita: <code>shapeaxi</code> declara <code>pytorch3d</code>, que não está
+      no PyPI, então o pip falha se ele for pedido num ambiente vazio — daí criar o ambiente
+      só com <code>torch</code>, depois <code>install_pytorch</code> ler a versão do torch para escolher
+      a wheel, e depois <code>shapeaxi</code>. <code>verify_gpu()</code> chega a executar um <code>knn_points</code> real
+      na GPU: uma wheel que importa mas não contém os kernels para a
+      arquitetura detectada é pega ali mesmo, e não no meio do pipeline.</p>
+
+      <p><code>check_if_pytorch3d()</code> (<code>DOCShapeAXI.py:844</code>)
+      testa <code>import pytorch3d.renderer</code> <strong>e</strong> o acesso a
+      <code>shapeaxi.dental_model_seg.saxi_nets_lightning.DentalModelSeg</code>: a verificação
+      cobre, portanto, também o patch acima.</p>
+
+      <h2 id="pieges">9. Armadilhas e pontos frágeis</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong>A CLI foi escrita para a API do shapeaxi 1.0.x, o ambiente instala a 2.0.2.</strong>
+        É a primeira coisa a verificar se o módulo parar de funcionar:</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>shapeaxi 1.0.10</th><th>shapeaxi 2.0.2</th></tr></thead>
+            <tbody>
+              <tr><td>assinatura</td><td><code>forward(self, X_pc, X_views)</code></td><td><code>forward(self, X_mesh)</code></td></tr>
+              <tr><td>valor de retorno</td><td><code>x</code></td><td><code>x, x_w, X</code></td></tr>
+              <tr><td>hparam do número de classes</td><td><code>out_classes</code></td><td><code>num_classes</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>A CLI chama <code>model(X_pc, X_views)</code> e usa o valor de retorno como tensor
+        (<code>DOCShapeAXI_CLI.py:227</code>): na 2.0.2
+        isso é um <code>TypeError</code> (3 argumentos posicionais). E os checkpoints publicados
+        carregam <code>out_classes</code>, que o <code>__init__</code> da 2.0.2 não lê mais — a
+        chamada <code>load_from_checkpoint</code> falharia antes mesmo do forward. Em outras palavras:
+        <strong>este módulo espera uma versão fixada <code>shapeaxi&lt;2</code> que o script de
+        instalação não instala</strong>. Ou se fixa essa versão, ou se porta a CLI para a
+        nova API (passar <code>X_mesh</code>, desempacotar o trio) e se regeneram os
+        checkpoints.</p>
+      </div>
+
+      <ul>
+        <li><strong><code>strict=False</code></strong> em <code>load_from_checkpoint</code>
+        (<code>DOCShapeAXI_CLI.py:198</code>): pesos ausentes ou
+        excedentes passam em silêncio. Um modelo parcialmente carregado prediz
+        mesmo assim.</li>
+        <li><strong>O download do modelo depende de a pasta de saída já
+        existir</strong> (<code>if os.path.exists(args.output_dir): if not os.path.exists(...)</code>,
+        <code>DOCShapeAXI_CLI.py:277</code>). Se a pasta
+        não existe, o download é <strong>pulado</strong> e o erro aparece mais tarde, no
+        carregamento do checkpoint. A CLI nunca cria <code>output_dir</code>.</li>
+        <li><strong><code>process.log</code> é escrito dentro da própria árvore do módulo</strong>
+        (<code>os.path.dirname(__file__)</code>, <code>DOCShapeAXI.py:811</code>),
+        e o arquivo vazio <code>DOCShapeAXI/process.log</code> está
+        versionado no repositório. Numa instalação somente leitura (<code>/opt</code>,
+        <code>Program Files</code>), criar o <code>DOCShapeAXILogic</code> levanta uma exceção.</li>
+      </ul>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong><code>gradcam_save()</code></strong> (<code>DOCShapeAXI_CLI.py:62</code>)
+        chama <code>shutil.copy</code>, mas <code>shutil</code> <strong>nunca é importado</strong> no arquivo.
+        Inofensivo: a função nunca é chamada. O mesmo vale para as classes
+        <code>MultiHead</code> e <code>SelfAttention</code> definidas no início da CLI
+        (<code>:84</code>, <code>:93</code>),
+        nunca instanciadas, e para o import de <code>subprocess</code>.</p>
+      </div>
+
+      <ul>
+        <li><strong>O fator de escala aprendido é ignorado</strong> (ver <a href="#normalisation">§3.2</a>). Se um dia
+        <code>UnitSurfTransform</code> passar a repassar seu <code>scale_factor</code>, o pré-processamento
+        mudará sem que nada se mova neste repositório.</li>
+        <li><strong>Nenhuma confiança é informada</strong>: só sai a classe do <code>argmax</code>. Para uma
+        ferramenta cujo nome contém "explainability", esse é o ponto cego — o
+        mapa de saliência diz <em>onde</em> a rede olhou, nunca <em>quão insegura ela
+        estava</em>.</li>
+        <li><strong>A saliência cobre só um dos dois ramos</strong> (ver <a href="#explicabilite">§5a</a>). Uma decisão
+        guiada principalmente pela geometria da nuvem de pontos produzirá um mapa
+        multivista pouco informativo, sem nada que o sinalize.</li>
+        <li><strong><code>num_workers=4</code></strong> no DataLoader da explicabilidade
+        (<code>DOCShapeAXI_CLI.py:144</code>), enquanto
+        a predição não usa nenhum: quatro processos leem os arquivos <code>.vtk</code> em paralelo
+        enquanto a GPU renderiza 42 vistas.</li>
+        <li><strong>A escolha do modelo passa pelas palavras do rótulo do combo.</strong> Renomear
+        "Mandibular Condyle" para "Condyles" no <code>.ui</code> quebra <code>find_model_name</code>,
+        que retornaria <code>(None, None)</code> e, na chamada seguinte, um <code>TypeError</code> em
+        <code>os.path.join(output_dir, None + '.ckpt')</code>.</li>
+        <li><code>check_input_parameters</code> (<code>DOCShapeAXI.py:469</code>)
+        testa a mesma condição duas vezes; o ramo <code>else</code> ("Unknown error") é
+        inalcançável.</li>
+        <li><code>count_num_subjects</code> só conta os arquivos <code>.vtk</code> do nível superior — coerente com
+        <code>csv_edit</code>, mas nenhum dos dois é recursivo.</li>
+        <li><code>DOCShapeAXI/__pycache__/DOCShapeAXI.cpython-312.pyc</code> está versionado.</li>
+      </ul>
+
+      <h2 id="litterature">10. Literatura</h2>
+
+      <p>Três referências, que não devem ser confundidas entre si:</p>
+
+      <p><strong>1. O framework.</strong> <em>ShapeAXI: Shape Analysis Explainability and Interpretability</em>,
+      Prieto, Miranda, Gurgel, Anchling, Hutin, Barone, Al Turkestani, Aliaga, Yatabe,
+      Bianchi, Cevidanes — <strong>Proc. SPIE Medical Imaging, abril de 2024</strong>,
+      DOI <a href="https://doi.org/10.1117/12.3007053">10.1117/12.3007053</a>. Relata 79,78%
+      nos côndilos e 81,58% na gravidade das fissuras — justamente dois dos
+      três datasets suportados aqui.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Divergência código / artigo</div>
+        <p><strong>O código diverge do artigo.</strong> O artigo descreve uma renderização
+        multivista sobre uma subdivisão de icosaedro processada por uma <strong>ResNet-18</strong> mais
+        atenção aditiva, com os côndilos tratados como classificação <strong>binária</strong>. Os
+        checkpoints distribuídos aqui são modelos <code>SaxiMHAFB*</code>: <strong>EfficientNet-B0</strong> sobre 42 vistas
+        <strong>mais um segundo ramo de nuvem de pontos</strong> com atenção KNN, ausente do artigo,
+        com um checkpoint <code>condyles_4_class</code> de <strong>4</strong> classes de gravidade. Não apresente
+        os números do artigo do SPIE como sendo os dos modelos baixados.</p>
+      </div>
+
+      <p><strong>2. O dataset de vias aéreas.</strong> <em>Explainable Artificial Intelligence to Quantify Adenoid
+      Hypertrophy-related Upper Airway Obstruction using 3D Shape Analysis</em>, Mattos et
+      al., <strong>J Dent 2025</strong>. Este descreve exatamente a arquitetura do código:
+      um ramo multivista EfficientNet-B0 pré-treinado no ImageNet + atenção
+      multi-head, um ramo de nuvem de 4096 pontos com atenção KNN, e
+      explicabilidade via "SurfGradCAM" — o mecanismo do <a href="#explicabilite">§5</a>. As três tarefas
+      (4 classes, binária, regressão da razão de obstrução) correspondem aos três
+      checkpoints <code>airways_*</code>. AUC 0,77–0,94, R = 0,854 para a razão.</p>
+
+      <p><strong>3. A origem do módulo Slicer</strong>: <a href="https://github.com/lucieDLE/DOC-ShapeAXI">lucieDLE/DOC-ShapeAXI</a>,
+      citado pelo README.md do repositório.</p>
+
+      <p>Nada foi publicado sobre o dataset <em>Alveolar Bone Defect in Cleft</em> além
+      do experimento "cleft severity" do artigo do SPIE.</p>
+
+      <ul>
+        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11085013/">ShapeAXI (SPIE 2024, texto completo)</a></li>
+        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12089392/">Explainable AI to Quantify Adenoid Hypertrophy-related Upper Airway Obstruction (J Dent 2025)</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/ShapeAXI">ShapeAXI (repositório)</a></li>
+        <li><a href="https://github.com/lucieDLE/DOC-ShapeAXI">DOC-ShapeAXI (repositório original)</a></li>
+        <li><a href="https://arxiv.org/abs/1610.02391">Grad-CAM (Selvaraju et al., 2016)</a></li>
+        <li><a href="https://captum.ai/api/layer.html#gradcam">Captum — LayerGradCam</a></li>
+      </ul>
+
+      <p>Bibliografia completa, arquivos recuperados e links das editoras: <a href="SOURCES.html">SOURCES.html</a>.
+      Ela corrige um ponto acima: o dataset <em>Alveolar Bone Defect in Cleft</em> tem
+      sim uma publicação própria (Miranda et al., Sci Rep 2023).</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Todas as páginas</a> ·
+        <a href="SOURCES.html">Bibliografia desta ferramenta</a> ·
+        Fonte: <code>DOCShapeAXI.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

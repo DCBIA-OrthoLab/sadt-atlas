@@ -1,0 +1,1066 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MRI2CBCT — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="recalage">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/MRI2CBCT/MRI2CBCT.html" hreflang="en" title="English">EN</a><a href="../../fr/MRI2CBCT/MRI2CBCT.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/MRI2CBCT/MRI2CBCT.html" hreflang="ko" title="한국어">KO</a><a href="../../th/MRI2CBCT/MRI2CBCT.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/MRI2CBCT.html"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../MRI2CBCT/MRI2CBCT.html" aria-current="true"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html" aria-current="page">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/MRI2CBCT/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Registro</div>
+        <h1>MRI2CBCT</h1>
+        <p class="lede">Registro rígido multimodal RM → CBCT da ATM por <a class="gterm" href="../glossary.html#g-elastix" title="Ver glossário">elastix</a> (informação mútua de Mattes), ao fim de cinco etapas de preparação independentes; a única rede segmenta o côndilo na CBCT para fornecer um ponto de ancoragem — ela não registra nada por si só.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1007/978-3-031-73083-2_7" target="_blank" rel="noopener" title="Novel CBCT-MRI Registration Approach for TMJ Degenerative Joint Disease.">Leroux 2024 · CLIP, LNCS 15196</a>
+          <span class="badge cli">6 CLIs MRI2CBCT_*</span>
+          <span class="badge neutral">Python do Slicer, sem conda</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliografia</a>
+        </div>
+      </header>
+
+      <p>Registro rígido multimodal RM → CBCT da ATM. Seis etapas independentes, cada uma
+      com seu próprio botão e sua CLI, terminando em um registro rígido elastix por informação
+      mútua. A única rede do módulo é uma <a class="gterm" href="../glossary.html#g-nnunet" title="Ver glossário">nnU-Net</a> que segmenta o côndilo
+      <strong>na CBCT</strong>: ela não participa do registro em si, fornece um
+      ponto de ancoragem e uma caixa de recorte.</p>
+
+      <h2 id="situation">1. Onde se situa no pipeline</h2>
+
+      <p>Nada no repositório chama o MRI2CBCT, e o MRI2CBCT não chama nenhum outro módulo
+      da extensão. Ele se declara dependente do <strong>SlicerNNUNet</strong>
+      (<code>MRI2CBCT.py:150</code>), mas nunca o importa: é
+      o executável <code>nnUNetv2_predict</code> que é lançado como subprocesso.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Chamado</th><th>Como</th><th>Quando</th></tr></thead>
+          <tbody>
+            <tr><td>6 CLIs <code>MRI2CBCT_*</code> do repositório</td><td><code>slicer.cli.run</code></td><td>uma por botão</td></tr>
+            <tr><td><code>nnUNetv2_predict</code></td><td><code>subprocess.run</code> a partir da CLI</td><td>Approximate e <a class="gterm" href="../glossary.html#g-tmj" title="Ver glossário">TMJ</a> Crop</td></tr>
+            <tr><td><code>slicer.modules.fiducialregistration</code></td><td><code>slicer.cli.runSync</code></td><td>fim da aproximação automática</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O comentário no topo de <code>MRI2CBCT_CLI_utils/__init__.py</code>
+      afirma que <code>resample_images</code> é consumido por <a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a> e <a href="../VFACE/VFACE.html">VFACE</a>: um grep em
+      todo o repositório não encontra <strong>nenhum</strong> chamador fora de MRI2CBCT_CLI. O import preguiçoso
+      continua útil (evita carregar <code>torchreg</code> para uma simples reamostragem), mas a
+      justificativa declarada não vale mais.</p>
+
+      <h2 id="fichiers">2. Arquivos envolvidos</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Arquivo</th><th>Papel</th></tr></thead>
+          <tbody>
+            <tr><td><code>MRI2CBCT/MRI2CBCT.py</code></td><td>widget, 2400 linhas: UI, tabelas de orientação / normalização / reamostragem, encadeamento das CLIs</td></tr>
+            <tr><td><code>MRI2CBCT_utils/</code></td><td>uma classe <code>Method</code> por botão: validação dos caminhos, montagem do dict de parâmetros</td></tr>
+            <tr><td><code>ManualApprox_MRI2CBCT.py</code></td><td>aproximação manual (portada do <a href="../GreedyReg/GreedyReg.html">GreedyReg</a>), <strong>inteiramente do lado do widget</strong></td></tr>
+            <tr><td><code>MRI2CBCT_CLI_utils/</code></td><td>o código real: orientação, reamostragem, inversão, normalização, mascaramento, segmentação, elastix</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Tudo roda no Python do Slicer</strong>, sem <code>conda run</code> em lugar algum, ao contrário de
+      <a href="../FlexReg/FlexReg.html">FlexReg</a>/AREG_IOS. <code>install_function()</code>
+      (<code>MRI2CBCT.py:78</code>) faz um <code>pip_install</code> dentro do próprio
+      Slicer e é chamada de novo no início de cada ação. CUDA é opcional:
+      <code>nnunet_predict</code> testa <code>torch.cuda.is_available()</code> e recorre a <code>-device cpu</code>
+      (<code>condyle_segmentation.py:55</code>).</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>CLI</th><th>Chamada por</th><th>Papel</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge cli">MRI2CBCT_ORIENT_CENTER_MRI</span></td><td><code>orientCenterMRI</code></td><td>reescreve direção / espaçamento Z / origem do cabeçalho</td></tr>
+            <tr><td><span class="badge cli">MRI2CBCT_LR_CROP</span></td><td><code>lrCropMRI2CBCT</code></td><td>divide o volume em metades esquerda/direita</td></tr>
+            <tr><td><span class="badge cli">MRI2CBCT_RESAMPLE_CBCT_MRI</span></td><td><code>resampleMRICBCT</code></td><td>reamostra RM, CBCT e Seg T1/T2</td></tr>
+            <tr><td><span class="badge cli">MRI2CBCT_APPROX</span></td><td><code>approximateMRI</code></td><td>segmenta o côndilo, grava dois pontos + uma rotação em JSON</td></tr>
+            <tr><td><span class="badge cli">MRI2CBCT_TMJ_CROP</span></td><td><code>tmjCropMRI2CBCT</code></td><td>caixa de 400³ em torno do côndilo, recorta CBCT/RM/Seg</td></tr>
+            <tr><td><span class="badge cli">MRI2CBCT_REG</span></td><td><code>registration_MR2CBCT</code></td><td>inversão, normalização, mascaramento, elastix</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Os parâmetros passam por <code>slicer.cli.run</code>, que serializa uma lista ou tupla como
+      <code>str(value)</code> sem os colchetes (<code>slicer/cli.py:setNodeParameters</code>) — daí os
+      <code>split(',')</code> e <code>re.findall(r'\d+')</code> do lado da CLI.</p>
+
+      <h2 id="pipeline">3. Ordem do pipeline, e o que é realmente obrigatório</h2>
+
+      <pre class="ascii"><code>[MRI orientation/centering] → [L/R crop] → resample → approximation → [TMJ crop] → registration</code></pre>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1200 300" role="img" aria-label="Encadeamento das seis CLIs do MRI2CBCT, da RM e CBCT brutas ao volume registrado">
+          <rect class="d-box-a" x="10" y="40" width="120" height="50" rx="6"/>
+          <text class="d-label" x="70" y="62" text-anchor="middle">RM + CBCT</text>
+          <text class="d-label-s" x="70" y="76" text-anchor="middle">brutas</text>
+
+          <path class="d-arrow" d="M130 65 H150"/>
+          <path class="d-arrow-head" d="M150 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="150" y="40" width="150" height="50" rx="6"/>
+          <text class="d-label" x="225" y="60" text-anchor="middle">orient_center_mri</text>
+          <text class="d-label-s" x="225" y="74" text-anchor="middle">cabeçalho reescrito</text>
+
+          <path class="d-arrow" d="M300 65 H320"/>
+          <path class="d-arrow-head" d="M320 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="320" y="40" width="120" height="50" rx="6"/>
+          <text class="d-label" x="380" y="60" text-anchor="middle">lr_crop</text>
+          <text class="d-label-s" x="380" y="74" text-anchor="middle">opcional</text>
+
+          <path class="d-arrow" d="M440 65 H460"/>
+          <path class="d-arrow-head" d="M460 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="460" y="40" width="160" height="50" rx="6"/>
+          <text class="d-label" x="540" y="60" text-anchor="middle">resample_cbct_mri</text>
+          <text class="d-label-s" x="540" y="74" text-anchor="middle">espaçam. comum</text>
+
+          <path class="d-arrow" d="M620 65 H640"/>
+          <path class="d-arrow-head" d="M640 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="640" y="40" width="160" height="50" rx="6"/>
+          <text class="d-label" x="720" y="60" text-anchor="middle">mri2cbct_approx</text>
+          <text class="d-label-s" x="720" y="74" text-anchor="middle">pré-alinhamento</text>
+
+          <path class="d-arrow" d="M800 65 H820"/>
+          <path class="d-arrow-head" d="M820 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="820" y="40" width="130" height="50" rx="6"/>
+          <text class="d-label" x="885" y="60" text-anchor="middle">tmj_crop</text>
+          <text class="d-label-s" x="885" y="74" text-anchor="middle">opcional, 400³</text>
+
+          <path class="d-arrow" d="M950 65 H970"/>
+          <path class="d-arrow-head" d="M970 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="970" y="40" width="100" height="50" rx="6"/>
+          <text class="d-label" x="1020" y="60" text-anchor="middle">reg</text>
+          <text class="d-label-s" x="1020" y="74" text-anchor="middle">elastix</text>
+
+          <path class="d-arrow" d="M1070 65 H1090"/>
+          <path class="d-arrow-head" d="M1090 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="1090" y="40" width="100" height="50" rx="6"/>
+          <text class="d-label" x="1140" y="60" text-anchor="middle">saídas</text>
+          <text class="d-label-s" x="1140" y="74" text-anchor="middle">.nii.gz + .tfm</text>
+
+          <path class="d-arrow" d="M720 170 V90"/>
+          <path class="d-arrow-head" d="M720 90 l-4 7 h8 z"/>
+          <path class="d-arrow" d="M885 170 V90"/>
+          <path class="d-arrow-head" d="M885 90 l-4 7 h8 z"/>
+
+          <rect class="d-box-n" x="640" y="170" width="310" height="60" rx="6"/>
+          <text class="d-label" x="795" y="196" text-anchor="middle">nnU-Net v2 segmenta o côndilo</text>
+          <text class="d-label-s" x="795" y="212" text-anchor="middle">em meia CBCT</text>
+          <text class="d-mono" x="795" y="226" text-anchor="middle">nnUNetv2_predict --disable_tta -f 0</text>
+        </svg>
+        <figcaption>As seis CLIs do MRI2CBCT, na ordem em que o pipeline as encadeia. A única
+        rede (nnU-Net) é chamada como subprocesso em duas etapas (approx e tmj_crop)
+        para segmentar o côndilo na CBCT; ela própria não registra nada.</figcaption>
+      </figure>
+
+      <p>Seis botões independentes: nada no código controla a ordem nem a procedência
+      dos arquivos. A única restrição rígida é a do registro.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Etapa</th><th>Status</th><th>Por quê</th></tr></thead>
+          <tbody>
+            <tr><td>Orientação / centralização da RM</td><td><strong>obrigatória de fato</strong></td><td>o elastix parte sem transformação inicial e em uma única resolução</td></tr>
+            <tr><td>Recorte E/D</td><td>opcional</td><td>aquisições bilaterais; produz os sufixos <code>left</code>/<code>right</code> que a reamostragem relê</td></tr>
+            <tr><td>Reamostragem</td><td><strong>obrigatória na prática</strong></td><td>RM e CBCT precisam compartilhar um espaçamento comparável; é também aqui que ocorre a centralização</td></tr>
+            <tr><td>Aproximação (auto ou manual)</td><td><strong>obrigatória de fato</strong></td><td>fornece o alinhamento grosseiro que o elastix não encontra sozinho</td></tr>
+            <tr><td>Recorte da ATM</td><td>opcional</td><td>reduz o campo de visão</td></tr>
+            <tr><td>Registro</td><td>o objetivo</td><td>exige CBCT + RM + <strong>uma segmentação da CBCT</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O "obrigatória de fato" se vê no código: <code>ElastixReg</code> é chamado com
+      <code>initial_transform=None</code> e <code>NumberOfResolutions = 1</code>
+      (<code>AREG_MRI.py:61</code>), e a mensagem de erro de <code>process_images</code>
+      diz <em>"PLEASE MAKE SURE THE IMAGES ARE OF SIMILAR SIZE,
+      ORIENTATION, AND APPROXIMATED"</em>. As entradas do registro também seguem uma
+      convenção de nomes estrita, verificada por <code>get_corresponding_file</code>
+      (<code>AREG_MRI.py:98</code>):
+      <code>&lt;ID&gt;_CBCT*.nii.gz</code>, <code>&lt;ID&gt;_MR*.nii.gz</code> ou <code>&lt;ID&gt;_MRI*.nii.gz</code>, máscara
+      <code>&lt;ID&gt;_CBCT*.nii.gz</code>. Só <code>.nii.gz</code> é aceito, nunca <code>.nii</code>.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>Nada impede lançar o registro sem ter passado antes pela
+        orientação, reamostragem e aproximação: a CLI aceitará os arquivos, e o
+        elastix divergirá silenciosamente por falta de convergência, sem nenhuma mensagem
+        que distinga isso de uma falha "normal".</p>
+      </div>
+
+      <h2 id="orientation">4. Orientação e centralização da RM</h2>
+
+      <p><code>MRI2CBCT_ORIENT_CENTER_MRI.py</code>,
+      <code>modify_image_properties</code>. <strong>Nenhuma reamostragem: uma reescrita de cabeçalho.</strong> O array de
+      voxels não é tocado, só <code>Direction</code>, <code>Spacing[2]</code> e <code>Origin</code> mudam.</p>
+
+      <ol>
+        <li><code>SetDirection(new_direction)</code> — uma matriz 3×3 construída a partir da tabela
+        de caixas de seleção, achatada linha por linha por <code>getCheckboxValuesOrient</code>
+        (<code>MRI2CBCT.py:847</code>); padrão <code>(0,0,-1, 1,0,0, 0,-1,0)</code>
+        (<code>MRI2CBCT.py:866</code>), o valor comentado
+        "USE THIS DIRECTION FOR MRI" no fim da CLI. A tabela impõe um único
+        ±1 por linha e por coluna: só as 48 matrizes de permutação com sinal são
+        alcançáveis.</li>
+        <li><code>Spacing[2]</code> é substituído por <code>acquisition_z_spacing</code> se <strong>Bilateral MRI</strong> estiver
+        marcado (padrão 3,0 mm, lido se necessário da tag DICOM <code>0018,0088</code> e depois <code>0018,0050</code>
+        do nó escolhido, <code>MRI2CBCT.py:733</code>); caso contrário, a string
+        <code>"None"</code> é passada e o espaçamento original se mantém. É o contorno para
+        aquisições bilaterais cujo espaçamento entre cortes se perde na conversão
+        para NIfTI.</li>
+        <li>Nova origem: <code>[(size[i]*spacing[i])/2]</code> permutada em <code>[o[2], -o[0], o[1]]</code>,
+        comentada "FOR MRI". Essa permutação está <strong>acoplada à matriz padrão</strong>:
+        mudar a direção sem mudá-la também descentraliza o volume.</li>
+      </ol>
+
+      <p>Saída: <code>&lt;id&gt;_OR.nii</code> ou <code>&lt;id&gt;_OR.nii.gz</code>, conforme a extensão de entrada.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>A permutação da origem do passo 3 só é coerente com a matriz de direção
+        padrão. Escolher outra combinação de caixas de seleção sem
+        revisar essa permutação descentraliza o volume.</p>
+      </div>
+
+      <h2 id="cropping">5. Recorte</h2>
+
+      <h3 id="cropping-lr">5.1 Recorte E/D — <code>LR_crop.py</code></h3>
+
+      <p>Puramente geométrico, <code>sitk.RegionOfInterest</code>, metade e metade.</p>
+
+      <ul>
+        <li><strong>RM</strong>: corte ao longo do eixo <strong>Z</strong> (<code>size[2]//2</code>); metade inferior → <code>_cropLeft</code>,
+        metade superior → <code>_cropRight</code>.</li>
+        <li><strong>CBCT e Seg</strong>: corte ao longo do eixo <strong>X</strong>, com as duas metades trocadas se
+        <code>direction[0,0] &lt; 0</code>; depois os nomes são <strong>deliberadamente cruzados</strong> (a
+        metade <code>left</code> é gravada em <code>_cropRight</code> e vice-versa) sob um
+        <code># TODO: Check why left is right and why right is left</code>
+        (<code>LR_crop.py:64</code>).</li>
+      </ul>
+
+      <p>Saídas em <code>&lt;output&gt;/CBCT</code>, <code>/MRI</code>, <code>/Seg</code>. Os sufixos <code>left</code>/<code>right</code> são
+      depois relidos pela reamostragem, com um simples <code>in input_path.lower()</code>.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>Esquerda e direita são deliberadamente trocadas em <code>crop_cbct</code>, sem razão
+        esclarecida (o <code>TODO</code> o confirma no próprio código); toda a cadeia
+        a jusante (espelhamento na reamostragem, detecção do lado) passa então a depender desses nomes
+        cruzados.</p>
+      </div>
+
+      <h3 id="cropping-tmj">5.2 Recorte da ATM — <code>MRI2CBCT_TMJ_CROP.py</code></h3>
+
+      <ol>
+        <li><code>GetPatients</code> pareia CBCT / RM / Seg por identificador
+        (<code>TMJ_crop.py:24</code>: uma longa cadeia de
+        chamadas <code>split</code> em <code>_Scan</code>, <code>_T1</code>, <code>_CBCT</code>, <code>_crop</code>…). Uma segmentação nunca cria
+        um paciente sozinha; um paciente ao qual falte qualquer um dos três é pulado.</li>
+        <li><code>segment_condyle</code> (§6) → máscara binária no referencial da meia CBCT.</li>
+        <li>Caixa delimitadora: <code>MARGIN = 3</code> voxels, <strong>mas</strong> <code>FIXED_BBOX_VOXELS = [400,400,400]</code>
+        está ativo, então a margem é código morto — a caixa é um cubo de 400 voxels centrado no
+        <strong>centroide</strong> da máscara, limitado ao volume.</li>
+        <li>Os 8 cantos são levados ao espaço mundo via <code>cbct_half.affine</code>; a CBCT completa e
+        a RM são recortadas por essa caixa no espaço mundo, cada uma em sua própria grade
+        (<code>crop_by_world_corners</code> volta pela afim inversa de cada imagem).</li>
+        <li>A CBCT e a segmentação são <strong>reamostradas na grade da RM
+        recortada</strong> (<code>nibabel.processing.resample_from_to</code>, <code>order=1</code> para a CBCT,
+        <code>order=0</code> para os rótulos).</li>
+      </ol>
+
+      <p>Saídas: <code>MRI/&lt;id&gt;_MRI_TMJ_crop&lt;side&gt;.nii.gz</code>, <code>CBCT/&lt;id&gt;_CBCT_TMJ_crop&lt;side&gt;.nii.gz</code>,
+      <code>CBCT seg/&lt;id&gt;_Seg_TMJ_crop&lt;side&gt;.nii.gz</code>, <code>CBCT seg/&lt;id&gt;_Mask_TMJ_crop&lt;side&gt;.nii.gz</code>,
+      <code>Mask/&lt;id&gt;_Mask_TMJ_&lt;side&gt;.nii.gz</code> (máscara bruta, para inspeção). <code>&lt;id&gt;</code> é o <strong>primeiro
+      token</strong> do nome do arquivo CBCT (<code>stem.split(".")[0].split("_")[0]</code>). Um paciente é
+      pulado se <code>MRI/&lt;id&gt;_MRI_TMJ_crop*.nii.gz</code> já existir.</p>
+
+      <h2 id="segmentation">6. A rede: segmentação do côndilo</h2>
+
+      <p><code>condyle_segmentation.py</code>,
+      compartilhado palavra por palavra entre TMJ crop e Approximate. <strong>A única rede do
+      módulo. Não há nenhuma segmentação da RM.</strong></p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Elemento</th><th>Valor</th></tr></thead>
+          <tbody>
+            <tr><td>Arquitetura</td><td><span class="badge predit">predito</span> nnU-Net v2, plano <code>nnUNetResEncUNetXLPlans</code>, config <code>3d_fullres</code>, fold 0</td></tr>
+            <tr><td>Conjunto de dados</td><td><code>Dataset001_myseg</code></td></tr>
+            <tr><td>Pesos</td><td><code>checkpoint_final.pth</code>, mais <code>dataset.json</code> e <code>plans.json</code></td></tr>
+            <tr><td>URL</td><td><code>github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/TMJ_CROP_MODEL/…</code> (<code>MRI2CBCT.py:1249</code>)</td></tr>
+            <tr><td>Local</td><td><code>&lt;Documents&gt;/SlicerDownloads/MRI2CBCT/MRI2CBCT_CBCT/ML/Dataset001_myseg/nnUNetTrainer__nnUNetResEncUNetXLPlans__3d_fullres/fold_0/</code></td></tr>
+            <tr><td>Execução</td><td><code>subprocess.run(["nnUNetv2_predict", …, "--disable_tta", "--save_probabilities", "-f", "0"])</code></td></tr>
+            <tr><td>Entrada / saída</td><td>uma meia CBCT <code>&lt;name&gt;_0000.nii.gz</code> → um mapa de rótulos <code>&lt;name&gt;.nii.gz</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>A arquitetura exata e o pré-processamento do nnU-Net (normalização de intensidade,
+      espaçamento-alvo, tamanho de patch) estão no <code>plans.json</code> / <code>dataset.json</code> baixados:
+      <strong>não determináveis a partir do repositório</strong>. O código não faz nenhum pré-processamento
+      próprio, delega tudo ao nnU-Net. <code>os.environ['nnUNet_results']</code> é
+      derivado subindo dois níveis a partir da pasta do trainer.</p>
+
+      <p><strong>Pré-processamento próprio do módulo</strong>, <code>detect_side_and_half</code>
+      (<code>condyle_segmentation.py:84</code>):
+      o centro de massa dos voxels não nulos da RM é comparado <strong>em coordenadas mundo</strong>
+      ao centro da CBCT (<code>cog_w[0] &gt; cbct_mid_w[0]</code> → lado <code>Right</code>). A CBCT é dividida
+      em duas ao longo do eixo de índice 0, e a metade mantida é escolhida pelo sinal de
+      <code>affine[:3,0][0]</code> — portanto independentemente da direção de armazenamento dos voxels. Objetivo:
+      apresentar à rede o mesmo campo de visão que no treinamento.</p>
+
+      <p><strong>Pós-processamento</strong>: <span class="badge calcule">calculado</span></p>
+
+      <pre><code>mask = pred if pred.max() &gt; 1 else (pred &gt; PROBA_THR)   # PROBA_THR = 0.02
+mask = biggest_cc(mask)                                  # scipy.ndimage.label</code></pre>
+
+      <p><code>nnUNetv2_predict</code> grava um mapa de rótulos (as probabilidades vão para um
+      <code>.npz</code> que nunca é relido), então <code>pred.max()</code> vale 1 e o ramo realmente
+      tomado é o limiar de 0,02, isto é, "rótulo ≠ 0"; <code>PROBA_THR</code> só teria
+      efeito sobre um mapa de probabilidades. A maior componente conexa é mantida: o
+      resultado é um <strong>côndilo único e binário</strong>.</p>
+
+      <h2 id="resampling">7. Reamostragem</h2>
+
+      <p><code>MRI2CBCT_RESAMPLE_CBCT_MRI.py</code>
+      + <code>resample.py</code>. Seis pastas de entrada:
+      MRI/CBCT/Seg × T1/T2. <code>create_csv</code> inventaria recursivamente <code>.nii</code>, <code>.nii.gz</code>,
+      <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code> e registra o tamanho e o espaçamento de cada um.</p>
+
+      <p>Valores padrão da tabela (<code>MRI2CBCT.py:543</code>): <strong>443 × 443 × 119</strong>
+      cortes, espaçamento <strong>0,3 × 0,3 × 0,3 mm</strong>; cada linha pode ser desativada via "Keep the
+      same size / spacing as the input scan" (a string <code>"None"</code> é então passada à
+      CLI).</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Entrada</th><th><code>resample_size</code></th><th>Interpolação</th><th>Nota</th></tr></thead>
+          <tbody>
+            <tr><td>RM</td><td>o valor da tabela</td><td>linear</td><td><code>iso_spacing=True</code> na verdade serve de flag <strong><code>isMRI</code></strong></td></tr>
+            <tr><td>CBCT</td><td>forçado a <code>"None"</code></td><td>linear</td><td>só o espaçamento muda, o tamanho próprio é mantido</td></tr>
+            <tr><td>Seg</td><td>forçado a <code>"None"</code></td><td><strong>vizinho mais próximo</strong> (<code>linear=False</code>)</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O forçamento é comentado na linha 163: impor o tamanho da RM à CBCT
+      recortaria todo o crânio às dimensões do pequeno volume de RM.</p>
+
+      <p>Em <code>resample_fn</code>:</p>
+
+      <ul>
+        <li><code>fit_spacing=True</code> (um tamanho-alvo é dado) → <code>output_spacing = sp·si/o_si</code>, a
+        extensão física é preservada; sobrescrito depois se um espaçamento explícito for
+        fornecido.</li>
+        <li><code>center</code> → <code>output_origin -= (output_physical_size − input_physical_size)/2</code>,
+        sendo o deslocamento antes multiplicado pela matriz de direção no caso da RM.</li>
+        <li><strong>Espelhamento</strong>: se RM <strong>e</strong> o nome contém <code>right</code> <strong>e</strong> <code>center</code> é
+        falso, o volume é invertido ao longo de Z (<code>sitk.Flip [False,False,True]</code>) antes da
+        reamostragem e desinvertido depois. O lado vem do nome de arquivo
+        produzido pelo recorte E/D.</li>
+        <li><code>DefaultPixelValue</code> = <strong>o mínimo do volume de entrada</strong>, não 0: o preenchimento reutiliza
+        o fundo real.</li>
+        <li>O ramo <code>iso_spacing == "True"</code> compara um booleano a uma string: código morto.</li>
+      </ul>
+
+      <p>Saídas em <code>&lt;output&gt;/MRI</code>, <code>/CBCT</code>, <code>/Seg</code>, <strong>nomes inalterados</strong>. O caminho de saída
+      é <code>file_path.replace(dirname(file_path), output)</code>: qualquer árvore de diretórios de entrada é
+      achatada, e dois arquivos de mesmo nome vindos de subpastas diferentes se sobrescrevem
+      silenciosamente.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>O achatamento das subpastas na reamostragem sobrescreve silenciosamente dois arquivos de mesmo nome
+        vindos de subpastas diferentes. O tratador de erro que deveria sinalizar o problema está
+        ele próprio quebrado (§12).</p>
+      </div>
+
+      <h2 id="approximation">8. Aproximação</h2>
+
+      <p>Dois caminhos coexistem na mesma seção da UI, gravando na <strong>mesma</strong>
+      pasta <code>&lt;output&gt;/first_approximation/</code> sob os <strong>mesmos</strong> nomes de arquivo.</p>
+
+      <h3 id="approx-auto">8.1 Caminho automático</h3>
+
+      <p>A CLI <code>MRI2CBCT_APPROX</code> <strong>não registra
+      nada</strong>: ela produz um par de pontos e uma rotação, e o widget termina o
+      trabalho (a CLI não tem acesso aos módulos do Slicer). <code>approximation()</code>
+      (<code>approximate.py:77</code>), por par
+      CBCT/RM (pastas, ou um único arquivo se as duas entradas forem arquivos — modo "Scene Volume"):</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1300 300" role="img" aria-label="Caminho de aproximação automática: da CBCT e da RM brutas ao volume de RM pré-posicionado">
+          <rect class="d-box" x="10" y="30" width="120" height="44" rx="6"/>
+          <text class="d-label" x="70" y="56" text-anchor="middle">CBCT (metade)</text>
+
+          <path class="d-arrow" d="M130 52 H160"/>
+          <path class="d-arrow-head" d="M160 52 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="160" y="30" width="220" height="44" rx="6"/>
+          <text class="d-label" x="270" y="48" text-anchor="middle">nnU-Net segmenta</text>
+          <text class="d-label-s" x="270" y="62" text-anchor="middle">o côndilo</text>
+
+          <path class="d-arrow" d="M380 52 H410"/>
+          <path class="d-arrow-head" d="M410 52 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="410" y="30" width="170" height="44" rx="6"/>
+          <text class="d-label" x="495" y="48" text-anchor="middle">ponto CBCT</text>
+          <text class="d-label-s" x="495" y="62" text-anchor="middle">centroide da máscara</text>
+
+          <rect class="d-box" x="10" y="190" width="120" height="44" rx="6"/>
+          <text class="d-label" x="70" y="216" text-anchor="middle">RM (inteira)</text>
+
+          <path class="d-arrow" d="M130 212 H160"/>
+          <path class="d-arrow-head" d="M160 212 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="160" y="190" width="190" height="44" rx="6"/>
+          <text class="d-label" x="255" y="208" text-anchor="middle">ponto RM</text>
+          <text class="d-label-s" x="255" y="222" text-anchor="middle">centro de massa</text>
+
+          <path class="d-arrow" d="M350 212 H380"/>
+          <path class="d-arrow-head" d="M380 212 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="380" y="190" width="220" height="44" rx="6"/>
+          <text class="d-label" x="490" y="208" text-anchor="middle">rotação = SVD(afins)</text>
+          <text class="d-label-s" x="490" y="222" text-anchor="middle">R_cbct · R_mriᵀ</text>
+
+          <path class="d-arrow" d="M600 212 H630"/>
+          <path class="d-arrow-head" d="M630 212 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="630" y="190" width="170" height="44" rx="6"/>
+          <text class="d-label" x="715" y="208" text-anchor="middle">ponto RM girado</text>
+          <text class="d-label-s" x="715" y="222" text-anchor="middle">R · ponto RM</text>
+
+          <path class="d-arrow" d="M580 60 L850 130"/>
+          <path class="d-arrow-head" d="M850 130 l-9 -2 l3 -8 z"/>
+          <path class="d-arrow" d="M800 205 L850 155"/>
+          <path class="d-arrow-head" d="M850 155 l-9 2 l1 -8 z"/>
+
+          <rect class="d-box-a" x="850" y="105" width="200" height="60" rx="6"/>
+          <text class="d-label" x="950" y="128" text-anchor="middle">fiducialregistration</text>
+          <text class="d-label-s" x="950" y="142" text-anchor="middle">Slicer, translação, 1 ponto</text>
+          <text class="d-mono" x="950" y="156" text-anchor="middle">fixed = CBCT, moving = MRI</text>
+
+          <path class="d-arrow" d="M1050 135 H1080"/>
+          <path class="d-arrow-head" d="M1080 135 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="1080" y="105" width="200" height="60" rx="6"/>
+          <text class="d-label" x="1180" y="128" text-anchor="middle">RM aproximada</text>
+          <text class="d-label-s" x="1180" y="142" text-anchor="middle">volume movido + .tfm</text>
+          <text class="d-mono" x="1180" y="156" text-anchor="middle">hardenTransform</text>
+        </svg>
+        <figcaption>Rotação derivada dos cabeçalhos (<a class="gterm" href="../glossary.html#g-svd" title="Ver glossário">SVD</a> das afins), translação derivada
+        do pareamento do centroide do côndilo com o centro de massa da RM. A rede só
+        serve para fornecer o ponto CBCT.</figcaption>
+      </figure>
+
+      <ol>
+        <li><code>segment_condyle</code> → máscara <span class="badge predit">predito</span> do côndilo na metade correta da CBCT;</li>
+        <li><strong>ponto CBCT</strong> = centroide <span class="badge calcule">calculado</span> dos voxels da máscara, levado ao espaço mundo <a class="gterm" href="../glossary.html#g-ras" title="Ver glossário">RAS</a>
+        por <code>cbct_half.affine</code>;</li>
+        <li><strong>ponto RM</strong> = <code>world_center_of_mass</code>, centro de massa dos voxels não nulos
+        da RM inteira, em RAS;</li>
+        <li><strong>rotação</strong> = <code>compute_rotation_correction</code>
+        (<code>approx_utils.py:38</code>): as duas imagens passam por
+        <code>nib.as_closest_canonical</code>, a parte 3×3 de cada afim é ortogonalizada por SVD
+        (<code>U @ Vt</code>), retornando <code>R_cbct @ R_mri.T</code>. Após a recanonicalização os referenciais
+        já estão próximos de RAS: essa rotação só captura o resíduo não
+        alinhado aos eixos;</li>
+        <li><code>mri_point_rotated = R @ mri_point</code>;</li>
+        <li>gravação de <code>first_approximation/points/&lt;id&gt;_approx_points.json</code>: <code>patient_id</code>,
+        <code>side</code>, <code>cbct_point_ras</code>, <code>mri_point_rotated_ras</code>, <code>rotation_ras</code>, <code>mri_path</code>,
+        <code>cbct_path</code>.</li>
+      </ol>
+
+      <p>Depois <code>finalizeApproximation()</code>
+      (<code>Approx_MRI2CBCT.py:119</code>),
+      disparada a partir de <code>onProcessUpdate</code> em <code>module_name == "MRI2CBCT approximation"</code>
+      (<code>MRI2CBCT.py:2166</code>): dois fiduciais de ponto único
+      (fixo = ponto CBCT, móvel = ponto RM girado) são passados ao módulo
+      <code>fiducialregistration</code> do Slicer com <code>transformType = "Translation"</code>; a matriz 4×4
+      RAS é montada (bloco 3×3 = rotação do JSON, coluna 3 =
+      translação); o volume de RM é carregado, colocado sob essa transformação,
+      <code>hardenTransform</code>, gravado.</p>
+
+      <p>Em outras palavras: <strong>rotação derivada dos cabeçalhos, translação derivada do
+      pareamento do centroide do côndilo com o centro de massa da RM.</strong> A rede só
+      serve para fornecer o ponto CBCT.</p>
+
+      <h3 id="approx-manuelle">8.2 Caminho manual</h3>
+
+      <p><code>ManualApprox_MRI2CBCT.py</code>, injetado
+      na seção Approximate por <code>injectUI</code>. Uma portagem do <a href="../GreedyReg/GreedyReg.html">GreedyReg</a>, inteiramente no widget.</p>
+
+      <ul>
+        <li>6 controles deslizantes: rotações X/Y/Z (−180…180°), translações X/Y/Z (−200…200 mm).
+        <code>onManualTransformChanged</code> constrói um <code>vtkTransform</code>: <code>Translate</code> e depois
+        <code>RotateX/Y/Z</code>. Como <code>vtkTransform</code> trabalha em <strong>PreMultiply</strong>, a matriz final é
+        <code>T·Rx·Ry·Rz</code>: a rotação ocorre <strong>em torno da origem do referencial RAS</strong>, não
+        em torno do centro do volume — daí a importância das etapas de centralização
+        a montante.</li>
+        <li>"Center MRI on CBCT" soma à translação a diferença entre os centros dos
+        <code>GetRASBounds</code>.</li>
+        <li>"Enable Interactive Tool" ativa as alças nativas do Slicer, translação e
+        rotação permitidas, <strong>escala desativada</strong> (<code>SetEditorScalingEnabled(False)</code>), e
+        mostra o <code>qMRMLTransformDisplayNodeWidget</code> do módulo Transforms.</li>
+        <li>"Confirm &amp; Save Alignment" clona a RM, consolida a transformação, grava o
+        volume e depois grava o <code>.tfm</code> <strong>à mão</strong>.</li>
+      </ul>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p>"Confirm &amp; Save" trava se o volume vier da cena: <code>onConfirm</code> faz
+        <code>os.path.basename(self._mri_path)</code> enquanto <code>_mri_path</code> é redefinido para <code>None</code> assim que
+        o volume é escolhido via <code>qMRMLNodeComboBox</code>
+        (<code>ManualApprox_MRI2CBCT.py:247</code>). Só "Load from Folders Above" funciona.</p>
+      </div>
+
+      <h3 id="approx-donne">8.3 O que a aproximação entrega ao registro</h3>
+
+      <p>Nada formal: nenhum parâmetro é passado ao elastix. Ela produz um
+      <strong>volume de RM</strong> já deslocado, e é esse volume que o operador deve indicar como pasta de
+      RM do registro. O <code>.tfm</code> nunca é relido pelo módulo.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Caminho</th><th>Volume</th><th>Transformação</th><th>Convenção do <code>.tfm</code></th></tr></thead>
+          <tbody>
+            <tr><td>auto</td><td><code>&lt;mri_basename&gt;_approximate.nii.gz</code></td><td><code>&lt;patient_id&gt;_MRI_approximate.tfm</code></td><td><code>slicer.util.saveNode</code> (o Slicer trata RAS→<a class="gterm" href="../glossary.html#g-lps" title="Ver glossário">LPS</a>)</td></tr>
+            <tr><td>manual</td><td><code>&lt;mri_basename&gt;_approximate.nii.gz</code></td><td><code>&lt;mri_basename&gt;_approximate.tfm</code></td><td><code>flip @ M @ flip</code>, <code>flip = diag(-1,-1,1,1)</code>, <strong>sem inversão</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Nem a mesma convenção, nem a mesma regra de nomes (ver §12).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>Os dois caminhos gravam na mesma pasta sob nomes de volume idênticos, mas
+        nomes de <code>.tfm</code> diferentes, com convenções RAS/LPS diferentes — ver o detalhe
+        no §12.</p>
+      </div>
+
+      <h2 id="normalisation">9. Normalização</h2>
+
+      <p>Uma tabela de 4 colunas × 2 linhas (RM, CBCT): <code>Normalization Min/Max</code>,
+      <code>Percentile Min/Max</code>. Dois conjuntos de valores padrão, <code>DefaultNorm</code>
+      (<code>MRI2CBCT.py:1157</code>):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Predefinição</th><th>RM <code>[min, max, p_low, p_high]</code></th><th>CBCT <code>[min, max, p_low, p_high]</code></th></tr></thead>
+          <tbody>
+            <tr><td><strong>Default 1</strong> (aplicado na abertura)</td><td><code>[0, 100, 0, 100]</code></td><td><code>[0, 75, 10, 95]</code></td></tr>
+            <tr><td><strong>Default 2</strong></td><td><code>[0, 100, 10, 95]</code></td><td><code>[0, 100, 10, 95]</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Os dois papéis são distintos
+      (<code>normalize_percentile.py</code>):</p>
+
+      <ul>
+        <li><strong>os percentis definem a janela de intensidade</strong>. <code>np.percentile</code> é calculado
+        sobre <strong>o array inteiro, fundo incluído</strong> — não sobre os voxels não nulos. Numa
+        CBCT composta sobretudo de ar, <code>p10</code> cai no fundo e <code>p95</code> corta as
+        estruturas mais densas.</li>
+        <li><strong><code>min_norm</code> / <code>max_norm</code> definem a faixa de saída</strong>:</li>
+      </ul>
+
+      <pre><code>normalized = np.clip((array - lo) / (hi - lo), 0, 1)
+scaled     = normalized * (max_norm - min_norm) + min_norm</code></pre>
+
+      <p>Com <strong>Default 1</strong>, a RM é janelada nos percentis <code>[0, 100]</code> — portanto uma
+      normalização min–max pura, sem corte, reescalada para <code>[0, 100]</code> —, enquanto a CBCT é
+      janelada entre seu p10 e seu p95 e depois reescalada para <code>[0, 75]</code>, deliberadamente
+      abaixo da RM. Com <strong>Default 2</strong> as duas modalidades recebem o mesmo
+      tratamento.</p>
+
+      <p>Há <strong>um único método de normalização</strong> no código: nenhuma escolha de algoritmo,
+      apenas esses quatro números por modalidade. <code>CheckNormalization</code>
+      (<code>Reg_MRI2CBCT.py:54</code>) só verifica
+      <code>max &gt; min</code> nos dois pares. <code>normalize()</code> só trata arquivos <code>.nii.gz</code> (um <code>.nii</code>
+      é pulado silenciosamente) e grava <code>&lt;name&gt;_percentile=[lo,hi]_norm=[min,max].nii.gz</code>:
+      os nomes de arquivo crescem a cada etapa, colchetes e vírgulas incluídos.</p>
+
+      <h2 id="recalage">10. Registro</h2>
+
+      <p><code>MRI2CBCT_REG.py</code> encadeia 6 etapas,
+      cada uma em sua própria subpasta de <code>folder_general</code>:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Etapa</th><th>Saída</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>inversão de intensidade da RM</td><td><code>a01_MRI_inv/</code></td></tr>
+            <tr><td>2</td><td>normalização da RM</td><td><code>a2_MRI_inv_norm/percentile=[…]_norm=[…]/</code></td></tr>
+            <tr><td>3</td><td>mascaramento da RM com a <strong>segmentação da CBCT</strong></td><td><code>a3_MRI_inv_norm_mask/…</code></td></tr>
+            <tr><td>4</td><td>normalização da CBCT</td><td><code>b2_CBCT_norm/…</code></td></tr>
+            <tr><td>5</td><td>mascaramento da CBCT com a mesma segmentação</td><td><code>b3_CBCT_norm_mask_l2/…</code></td></tr>
+            <tr><td>6</td><td>elastix</td><td><code>mri=inv+norm[…]+p[…]_cbct=norm[…]+p[…]+mask/</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1000 300" role="img" aria-label="As seis etapas do registro: dois ramos RM e CBCT mascarados pela mesma segmentação, convergindo no elastix">
+          <rect class="d-box" x="10" y="20" width="110" height="44" rx="6"/>
+          <text class="d-label" x="65" y="46" text-anchor="middle">RM original</text>
+
+          <path class="d-arrow" d="M120 42 H150"/>
+          <path class="d-arrow-head" d="M150 42 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="150" y="20" width="120" height="44" rx="6"/>
+          <text class="d-label" x="210" y="38" text-anchor="middle">inversão</text>
+          <text class="d-mono" x="210" y="52" text-anchor="middle">a01_MRI_inv</text>
+
+          <path class="d-arrow" d="M270 42 H300"/>
+          <path class="d-arrow-head" d="M300 42 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="300" y="20" width="140" height="44" rx="6"/>
+          <text class="d-label" x="370" y="38" text-anchor="middle">normalização</text>
+          <text class="d-mono" x="370" y="52" text-anchor="middle">a2_..._norm</text>
+
+          <path class="d-arrow" d="M440 42 H470"/>
+          <path class="d-arrow-head" d="M470 42 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="470" y="20" width="150" height="44" rx="6"/>
+          <text class="d-label" x="545" y="38" text-anchor="middle">máscara (móvel)</text>
+          <text class="d-mono" x="545" y="52" text-anchor="middle">a3_..._mask</text>
+
+          <rect class="d-box" x="10" y="185" width="110" height="44" rx="6"/>
+          <text class="d-label" x="65" y="211" text-anchor="middle">CBCT</text>
+
+          <path class="d-arrow" d="M120 207 H150"/>
+          <path class="d-arrow-head" d="M150 207 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="150" y="185" width="140" height="44" rx="6"/>
+          <text class="d-label" x="220" y="203" text-anchor="middle">normalização</text>
+          <text class="d-mono" x="220" y="217" text-anchor="middle">b2_CBCT_norm</text>
+
+          <path class="d-arrow" d="M290 207 H470"/>
+          <path class="d-arrow-head" d="M470 207 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="470" y="185" width="150" height="44" rx="6"/>
+          <text class="d-label" x="545" y="203" text-anchor="middle">máscara (fixa)</text>
+          <text class="d-mono" x="545" y="217" text-anchor="middle">b3_..._mask_l2</text>
+
+          <rect class="d-box-n" x="470" y="105" width="150" height="40" rx="6"/>
+          <text class="d-label" x="545" y="127" text-anchor="middle">segmentação CBCT</text>
+          <text class="d-label-s" x="545" y="140" text-anchor="middle">usada duas vezes</text>
+
+          <path class="d-arrow" d="M545 105 V64"/>
+          <path class="d-arrow-head" d="M545 64 l-4 7 h8 z"/>
+          <path class="d-arrow" d="M545 145 V185"/>
+          <path class="d-arrow-head" d="M545 185 l-4 -7 h8 z"/>
+
+          <path class="d-arrow" d="M620 42 L660 115"/>
+          <path class="d-arrow-head" d="M660 115 l-8 -3 l5 -7 z"/>
+          <path class="d-arrow" d="M620 207 L660 165"/>
+          <path class="d-arrow-head" d="M660 165 l-8 3 l1 -8 z"/>
+          <rect class="d-box-a" x="660" y="95" width="150" height="90" rx="6"/>
+          <text class="d-label" x="735" y="128" text-anchor="middle">elastix</text>
+          <text class="d-label-s" x="735" y="142" text-anchor="middle">rígido, MI Mattes</text>
+          <text class="d-label-s" x="735" y="156" text-anchor="middle">fixa = CBCT</text>
+          <text class="d-label-s" x="735" y="170" text-anchor="middle">móvel = RM</text>
+
+          <path class="d-arrow" d="M810 140 H840"/>
+          <path class="d-arrow-head" d="M840 140 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="840" y="115" width="150" height="50" rx="6"/>
+          <text class="d-label" x="915" y="135" text-anchor="middle">saídas</text>
+          <text class="d-label-s" x="915" y="150" text-anchor="middle">_reg.nii.gz + .tfm</text>
+        </svg>
+        <figcaption>A segmentação da CBCT do §6 serve de máscara duas vezes, tanto para a RM invertida
+        e normalizada (móvel) quanto para a CBCT normalizada (fixa). A CBCT bruta
+        nunca é lida pelo elastix: a variável <code>cbct_folder</code> só serve para enumerar os
+        pacientes.</figcaption>
+      </figure>
+
+      <p><strong>Inversão</strong> (<code>mri_inverse.py:19</code>):
+      <code>inverted = max_intensity − array</code>, e depois os voxels que valiam 0 voltam a 0.
+      O osso, escuro na RM, fica claro como na CBCT: a relação de intensidade entre
+      as duas modalidades se torna aproximadamente monotônica. Sufixo <code>_inv</code>, <code>os.listdir</code>, portanto
+      não recursivo.</p>
+
+      <p><strong>Mascaramento</strong> (<code>apply_mask.py</code>): as
+      <strong>duas</strong> modalidades são mascaradas pelo <strong>mesmo</strong> arquivo, a segmentação da CBCT
+      (<code>cbct_label2</code>), com <code>seg_label = 1</code>. Se o valor 1 estiver presente, a segmentação
+      é binarizada como <code>array == 1</code>; caso contrário, a máscara é usada como está. Uma máscara de
+      tamanho diferente é reamostrada na grade da imagem por vizinho mais próximo. Um
+      arquivo cujo nome não contém nem <code>_CBCT</code> nem <code>_MR</code> é pulado. <strong>O resultado é
+      convertido para <code>sitk.sitkInt16</code></strong>: os valores normalizados em ponto flutuante são truncados para
+      inteiros — restam apenas 76 níveis distintos para uma CBCT normalizada em <code>[0, 75]</code>.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado (corrigido desde então, ver §14)</div>
+        <p>Uma incompatibilidade de tamanho entre máscara e imagem em <code>apply_mask.py</code> causava um
+        travamento antes da adição da reamostragem automática — ver o relatório NA-MIC PW45, que
+        lista "fixed a mask size mismatch crash in apply_mask.py" entre as correções feitas
+        desde a descrição acima.</p>
+      </div>
+
+      <p><strong>Elastix</strong>, <code>ElastixReg</code>
+      (<code>AREG_MRI.py:49</code>):</p>
+
+      <pre><code>elastix_object = itk.ElastixRegistrationMethod.New(fixed_image, moving_image)
+parameter_object.AddParameterMap(parameter_object.GetDefaultParameterMap("rigid"))
+parameter_object.SetParameter("ErodeMask", "true")
+parameter_object.SetParameter("WriteResultImage", "false")
+parameter_object.SetParameter("MaximumNumberOfIterations", "10000")
+parameter_object.SetParameter("NumberOfResolutions", "1")
+parameter_object.SetParameter("NumberOfSpatialSamples", "10000")</code></pre>
+
+      <p><strong>Fixa = a CBCT normalizada e mascarada. Móvel = a RM invertida, normalizada e
+      mascarada.</strong> A CBCT bruta nunca é lida: <code>cbct_folder</code> só serve para enumerar os pacientes.</p>
+
+      <p>Todo o resto vem do parameter map <code>rigid</code> padrão do ITKElastix, que
+      é preciso ler em outro lugar para conhecer o algoritmo real. Valores efetivos:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parâmetro</th><th>Valor</th><th>Origem</th></tr></thead>
+          <tbody>
+            <tr><td><code>Transform</code></td><td><code>EulerTransform</code> (rígido, 6 GDL)</td><td>padrão</td></tr>
+            <tr><td><code>Metric</code></td><td><strong><code>AdvancedMattesMutualInformation</code></strong></td><td>padrão</td></tr>
+            <tr><td><code>NumberOfHistogramBins</code></td><td>32 (padrão do elastix, ausente do map)</td><td>padrão</td></tr>
+            <tr><td><code>Optimizer</code></td><td><code>AdaptiveStochasticGradientDescent</code></td><td>padrão</td></tr>
+            <tr><td><code>ImageSampler</code></td><td><code>RandomCoordinate</code>, <code>NewSamplesEveryIteration = true</code></td><td>padrão</td></tr>
+            <tr><td><code>Registration</code></td><td><code>MultiResolutionRegistration</code>, pirâmides <code>*SmoothingImagePyramid</code></td><td>padrão</td></tr>
+            <tr><td><code>NumberOfResolutions</code></td><td><strong>1</strong> (padrão 4)</td><td>sobrescrito</td></tr>
+            <tr><td><code>MaximumNumberOfIterations</code></td><td><strong>10000</strong> (padrão 256)</td><td>sobrescrito</td></tr>
+            <tr><td><code>NumberOfSpatialSamples</code></td><td><strong>10000</strong> (padrão 2048)</td><td>sobrescrito</td></tr>
+            <tr><td><code>Interpolator</code> / <code>ResampleInterpolator</code></td><td><code>LinearInterpolator</code> / <code>FinalBSplineInterpolator</code> ordem 3</td><td>padrão</td></tr>
+            <tr><td><code>AutomaticParameterEstimation</code>, <code>AutomaticScalesEstimation</code></td><td><code>true</code></td><td>padrão</td></tr>
+            <tr><td><code>MaximumNumberOfSamplingAttempts</code></td><td>8</td><td>padrão</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout ok">
+        <div class="callout-title">Verificado</div>
+        <p>O registro final é de fato um elastix rígido com informação mútua de Mattes,
+        uma única resolução, 10.000 iterações, 10.000 amostras sorteadas aleatoriamente
+        e renovadas a cada iteração, sem transformação inicial — coerente
+        com o que o artigo de método afirma.</p>
+      </div>
+
+      <p>Portanto: <strong>informação mútua de Mattes</strong>, como esperado num contexto multimodal,
+      uma única resolução, 10.000 iterações, 10.000 amostras sorteadas aleatoriamente e renovadas a
+      cada iteração, sem transformação inicial. <code>ErodeMask = "true"</code> é inerte:
+      <code>SetFixedMask</code> / <code>SetMovingMask</code> nunca são chamados, já que o mascaramento foi feito
+      a montante zerando voxels.</p>
+
+      <p><code>MatrixRetrieval</code> reconstrói um <code>sitk.Euler3DTransform</code> a partir dos 6
+      <code>TransformParameters</code> (3 ângulos, 3 translações); <code>ComputeFinalMatrix</code> recompõe uma
+      lista que aqui tem um único elemento, portanto sem efeito.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><code>MatrixRetrieval</code> lê <code>TransformParameters</code>, mas ignora o
+        <code>CenterOfRotationPoint</code> que o parameter map de saída do elastix no entanto contém;
+        o <code>sitk.Euler3DTransform</code> reconstruído gira, portanto, em torno da origem.
+        A transformação gravada e aplicada só coincide com a realmente estimada
+        pelo elastix se esse centro de rotação estiver na origem — o que não é
+        garantido. Código copiado literalmente de
+        <code>AREG_CBCT/AREG_CBCT_utils/utils.py:830</code>: o problema
+        é compartilhado com o AREG_CBCT.</p>
+      </div>
+
+      <p><strong>Aplicação</strong> (<code>AREG_MRI.py:231</code>):</p>
+
+      <pre><code>transformed_mri = sitk.Resample(original_mri_sitk, original_mri_sitk,
+                                transform, sitk.sitkLinear, 0.0, ...)</code></pre>
+
+      <p>A transformação é aplicada à <strong>RM original</strong>, não à RM mascarada, e a
+      geometria de referência é <strong>a da RM</strong>, não a da CBCT: o volume de saída permanece na
+      grade da RM, e tudo o que cai fora do campo de visão original após o
+      deslocamento é perdido.</p>
+
+      <p>Saídas na pasta <code>mri=…_cbct=…</code>: <code>&lt;original_MRI_name&gt;_reg.nii.gz</code> e
+      <code>&lt;original_MRI_name&gt;_reg_transform.tfm</code> (transformação ITK, LPS, legível diretamente
+      pelo SimpleITK). Se "Keep the temporary folder" estiver desmarcado, as 5
+      pastas intermediárias e suas pastas-pai são apagadas ao fim da CLI.</p>
+
+      <h2 id="predit-calcule">11. O que é predito e o que é calculado</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bloco</th><th>Natureza</th><th>Onde</th></tr></thead>
+          <tbody>
+            <tr><td>Orientação / centralização da RM</td><td><span class="badge calcule">calculado</span> reescrita de cabeçalho, matriz escolhida à mão</td><td>CLI</td></tr>
+            <tr><td>Recorte E/D, reamostragem</td><td><span class="badge calcule">calculado</span> índice mediano, <code>sitk.ResampleImageFilter</code></td><td>CLI</td></tr>
+            <tr><td>Detecção do lado, divisão em metades</td><td><span class="badge calcule">calculado</span> comparação de centros de massa no espaço mundo</td><td>CLI</td></tr>
+            <tr><td>Segmentação do côndilo</td><td><span class="badge predit">predito</span> rede nnU-Net v2 <code>3d_fullres</code> ResEnc XL</td><td>subprocesso <code>nnUNetv2_predict</code></td></tr>
+            <tr><td>Ponto CBCT, caixa ATM de 400³</td><td><span class="badge calcule">calculado</span> centroide da máscara predita</td><td>CLI</td></tr>
+            <tr><td>Ponto RM, rotação</td><td><span class="badge calcule">calculado</span> centro de massa + SVD das afins</td><td>CLI</td></tr>
+            <tr><td>Translação da aproximação</td><td><span class="badge calcule">calculado</span> <code>fiducialregistration</code> do Slicer, 1 ponto</td><td>widget</td></tr>
+            <tr><td>Aproximação manual</td><td><span class="badge neutral">operador</span> controles deslizantes / alças</td><td>widget</td></tr>
+            <tr><td>Inversão, normalização, mascaramento</td><td><span class="badge calcule">calculado</span> numpy / SimpleITK</td><td>CLI</td></tr>
+            <tr><td>Registro</td><td><span class="badge calcule">calculado</span> elastix rígido, MI de Mattes</td><td>CLI</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Nenhum aprendizado ocorre na execução: a única rede é pré-treinada e serve de
+      detector de ponto de referência anatômico.</p>
+
+      <h2 id="pieges">12. Armadilhas e pontos frágeis</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong><code>install_function()</code> sempre falha.</strong> A lista de dependências
+        (<code>MRI2CBCT.py:96</code>) contém <code>('nnunet_version', "==2.8.0")</code>;
+        esse pacote não existe no PyPI (o <a href="../AMASSS/AMASSS.html">AMASSS</a> declara corretamente <code>('nnunetv2','2.8.0')</code>).
+        <code>check_lib_installed</code> retorna portanto sempre <code>False</code>: um diálogo de instalação a
+        cada ação, um <code>pip_install</code> que lança exceção, <code>errorDisplay</code> e um retorno <code>False</code> —
+        <strong>valor que todos os chamadores ignoram</strong>, então a ação prossegue mesmo assim.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong>O centro de rotação do elastix se perde.</strong> <code>MatrixRetrieval</code> lê
+        <code>TransformParameters</code>, mas não o <code>CenterOfRotationPoint</code> que o parameter map
+        de saída também contém; o <code>sitk.Euler3DTransform</code> reconstruído
+        gira, portanto, em torno da origem. A transformação gravada e aplicada só coincide com
+        a estimada pelo elastix se esse centro estiver na origem. Código copiado
+        literalmente de
+        <code>AREG_CBCT/AREG_CBCT_utils/utils.py:830</code>:
+        o problema é compartilhado.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>Duas convenções de <code>.tfm</code> para a mesma etapa.</strong> A aproximação manual grava
+        <code>flip @ M @ flip</code> sem inversão
+        (<code>ManualApprox_MRI2CBCT.py:472</code>),
+        enquanto o <a href="../FlexReg/FlexReg.html">FlexReg</a> grava <code>inv(flip @ M @ flip)</code> para a mesma conversão — sendo a convenção
+        ITK fixa → móvel. O caminho automático passa por
+        <code>slicer.util.saveNode</code>, que aplica a convenção correta.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong>"Confirm &amp; Save" trava se o volume vier da cena</strong>: <code>onConfirm</code> faz
+        <code>os.path.basename(self._mri_path)</code> enquanto <code>_mri_path</code> é redefinido para <code>None</code> assim que
+        o volume é escolhido via <code>qMRMLNodeComboBox</code>
+        (<code>ManualApprox_MRI2CBCT.py:247</code>).
+        Só "Load from Folders Above" funciona.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong>O tratador de erro da reamostragem também trava</strong>:
+        <code>logger.warning(e, file=sys.stderr)</code>
+        (<code>resample.py:240</code>) —
+        <code>Logger.warning</code> não aceita <code>file=</code>, então a exceção capturada vira um
+        <code>TypeError</code> não capturado.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong>T2 sem T1 quebra a reamostragem</strong>: <code>mri_output_folder</code> / <code>cbct_output_folder</code> só são
+        definidos no ramo T1
+        (<code>MRI2CBCT_RESAMPLE_CBCT_MRI.py:157</code>) → <code>NameError</code>.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>Sufixos <code>_T1</code>/<code>_T2</code> fixos no código</strong> em <code>extract_patient_id</code>
+        (<code>TMJ_crop.py:24</code>) e <code>GetPatients</code>
+        (<code>utils_CBCT.py:41</code>): um <code>_T3</code> quebra o
+        pareamento. Observação compartilhada com o AREG_CBCT.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>Esquerda e direita deliberadamente trocadas</strong> em <code>crop_cbct</code>, sem razão
+        esclarecida (<code>TODO</code>); toda a cadeia a jusante (espelhamento na reamostragem, detecção
+        do lado) depende desses nomes.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>A permutação da origem na orientação foi escrita para a matriz
+        padrão</strong>: outra direção na tabela descentraliza o volume.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>Achatamento das subpastas na reamostragem</strong>: arquivos de mesmo nome sobrescritos sem
+        mensagem.</p>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Nota</div>
+        <p><strong>A barra de progresso</strong> é declarada não funcional para o recorte da ATM
+        (<code>labelBarNotWorking</code>).</p>
+      </div>
+
+      <h3 id="pieges-mort">Código morto</h3>
+
+      <ul>
+        <li><code>run_script_get_transformation</code> e <code>run_script_crop_volumes</code>
+        (<code>MRI2CBCT_APPROX.py:63</code>) nunca são
+        chamadas; <code>main()</code> só executa a primeira etapa, e os parâmetros XML
+        <code>mean_folder</code> / <code>ROI_file</code> estão comentados. O import
+        <code>from MRI2CBCT_CLI_utils import approximation, get_transformation, crop_volume</code>
+        permanece e força o carregamento de <code>crop_approximation</code>, logo de <code>torch</code>, <code>sklearn</code>
+        e <code>torchreg</code> — exatamente o que o import preguiçoso do <code>__init__</code> deveria
+        evitar.</li>
+        <li><code>crop_approximation.py</code>
+        (359 linhas) e <code>nmi.py</code> (155 linhas) são
+        a <strong>antiga</strong> aproximação: um <code>torchreg.AffineRegistration</code> rígido (escalas
+        <code>(4,2)</code>, iterações <code>(100,30)</code>, Adam) guiado por uma NMI gaussiana diferenciável
+        (<code>nbins=64</code>), com uma busca de hiperparâmetros <code>ParameterSampler</code> em 40 sorteios
+        (<code>learning_rate ∈ logspace(-5,-3,10)</code>, <code>sigma ∈ logspace(-2,-1,4)</code>). Substituída pelo
+        caminho côndilo + fiducial no commit <code>2e79862</code>. Nenhum chamador restante.</li>
+        <li><code>utils_CBCT.py</code> inteiro: alcançável
+        apenas via <code>NumberScan()</code>, nunca chamada. O mesmo vale para <code>getGPUUsage()</code>, <code>getModelUrl()</code>
+        (retorna <code>{"MeanCBCT": "xxx", "ROI": "xxx"}</code>), <code>TestScanDCM</code>, <code>getTestFileListDCM</code>.</li>
+        <li><code>MRI2CBCTLogic.process()</code> e <code>MRI2CBCTTest</code>: boilerplate de limiarização do
+        template do Slicer, sem relação com o módulo.</li>
+        <li><code>predict_entry_point</code> importado no topo de
+        <code>MRI2CBCT_TMJ_CROP.py:5</code> e
+        nunca usado — mas exige que <code>nnunetv2</code> seja importável dentro do Slicer, embora
+        a predição passe por um subprocesso.</li>
+        <li><code>run_resample</code> existe duas vezes:
+        <code>resample.py:243</code> e uma cópia em
+        <code>MRI2CBCT_RESAMPLE_CBCT_MRI.py:32</code>;
+        é a cópia local que é realmente usada.</li>
+        <li><code>downloadModel()</code> afirma em sua docstring usar <code>getModelUrl</code>; ela baixa
+        um <code>TestFile.zip</code> fixo no código, para os quatro botões "Test File".</li>
+      </ul>
+
+      <h2 id="environnement">13. Ambiente</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Elemento</th><th>Valor</th></tr></thead>
+          <tbody>
+            <tr><td>Interpretador</td><td>Python do Slicer, em toda parte (<code>slicer.cli.run</code>, <code>#!/usr/bin/env python-real</code>)</td></tr>
+            <tr><td>Conda</td><td>nenhum</td></tr>
+            <tr><td>GPU</td><td>opcional, recurso automático à CPU no nnU-Net (<code>condyle_segmentation.py:55</code>)</td></tr>
+            <tr><td>torch</td><td><code>2.2.0</code>, índice <code>download.pytorch.org/whl/cu118</code> (<code>MRI2CBCT.py:117</code>)</td></tr>
+            <tr><td>numpy</td><td>fixado em <strong>1.26.4</strong>; <code>numexpr==2.9.0</code></td></tr>
+            <tr><td>pydicom</td><td>fixado em <strong>3.0.2</strong> — rebaixá-lo quebra <code>dicomweb-client</code>, <code>highdicom</code> e todos os módulos DICOM do Slicer (<code>MRI2CBCT.py:83</code>)</td></tr>
+            <tr><td>dicom2nifti</td><td><code>2.6.2</code></td></tr>
+            <tr><td>Registro</td><td><code>itk-elastix</code> (0.19.2 no Slicer 5.12)</td></tr>
+            <tr><td>Outros</td><td><code>einops</code>, <code>nibabel</code>, <code>pandas</code>, <code>scikit-learn</code>, <code>torchreg</code>, <code>SimpleITK</code>, <code>psutil</code></td></tr>
+            <tr><td>nnU-Net</td><td>esperado via a extensão <strong>SlicerNNUNet</strong>; a entrada pip está errada (§12)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>As CLIs em subpastas são registradas por meio de uma pasta plana de links simbólicos,
+      daí o <code>os.path.realpath(__file__)</code> antes do <code>sys.path.append("..")</code> no
+      topo de cada uma: sem ele, <code>MRI2CBCT_CLI_utils</code> não é encontrado em
+      desenvolvimento.</p>
+
+      <h2 id="litterature">14. Literatura</h2>
+
+      <p>O artigo correspondente é <strong>Novel CBCT-MRI Registration Approach for Enhanced
+      Analysis of Temporomandibular Degenerative Joint Disease</strong>, Leroux G. <em>et al.</em>,
+      <em>Clinical Image-Based Procedures</em> (CLIP 2024), LNCS vol. 15196, Springer. Seu
+      resumo descreve a sequência implementada aqui: orientação automática,
+      reamostragem, inversão da RM, normalização e depois registro rígido por informação
+      mútua.</p>
+
+      <p>Duas divergências entre o artigo e o estado atual do código: a
+      aproximação do repositório na época era o caminho <code>torchreg</code> + NMI de
+      <code>crop_approximation.py</code>, substituído
+      desde então por côndilo nnU-Net + <code>fiducialregistration</code>; e nem a segmentação
+      do côndilo nem o recorte da ATM aparecem no resumo publicado. O README do
+      repositório, aliás, ainda afirma <em>"Currently, cropping is done using the
+      AutoCrop method. In the future, this step will be replaced by a trained model"</em> —
+      o que já foi feito desde então.</p>
+
+      <ul>
+        <li><a href="https://link.springer.com/chapter/10.1007/978-3-031-73083-2_7">Novel CBCT-MRI Registration Approach… (CLIP 2024, LNCS 15196)</a></li>
+        <li><a href="https://journalotohns.biomedcentral.com/articles/10.1186/s40463-016-0144-4">MRI and CBCT image registration of TMJ: a systematic review</a></li>
+        <li><a href="https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0169555">Three-Dimensional Assessment of TMJ Using MRI-CBCT Image Registration (PLOS ONE)</a></li>
+        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12360114/">Aligning MRI and CBCT for Advanced TMJ Diagnostics (PMC)</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p><strong>Bibliografia completa: <a href="SOURCES.html">SOURCES.html</a></strong> — referências verificadas,
+      arquivos recuperados nesta pasta (incluindo o texto completo de Caleme <em>et al.</em> 2025
+      e dois relatórios da NA-MIC Project Week) e o que resta verificar online. Ela também
+      traz a única avaliação numérica publicada do pipeline (precisão
+      submilimétrica, taxa de sucesso de 98,75%, Gaydamour <em>et al.</em>, CLIP 2025).</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Todas as páginas de ferramentas</a> ·
+        <a href="SOURCES.html">Bibliografia desta ferramenta</a> ·
+        Fonte: <code>MRI2CBCT.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

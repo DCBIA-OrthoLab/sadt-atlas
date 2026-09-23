@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLIC — Guia — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="analyse">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/CLIC.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/CLIC.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/guide/CLIC.html" hreflang="ko" title="한국어">KO</a><a href="../../th/guide/CLIC.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/CLIC.html" aria-current="true"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../CLIC/CLIC.html"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html" aria-current="page">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/CLIC/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">Guia</a> › Análise</div>
+        <h1>CLIC — encontrar e classificar caninos impactados em uma CBCT</h1>
+        <p class="lede">O CLIC percorre uma CBCT corte a corte e sinaliza os caninos
+        impactados, indicando para cada um onde ele se situa em relação ao osso:
+        <strong>vestibular</strong>, <strong>bicortical</strong> ou
+        <strong>palatino</strong>. Você parte do volume bruto — sem necessidade de
+        segmentação ou de landmarks prévios.</p>
+      </header>
+
+      <div class="callout bug">
+        <div class="callout-title">A barra de progresso não se mexe — isso é esperado</div>
+        <p>Enquanto a ferramenta roda, a barra de progresso fica em zero e nada aparece na
+        cena do Slicer, mesmo depois que o processamento terminou. Não é um travamento: o
+        arquivo de resultado é gravado em disco na pasta de saída de qualquer forma. Você
+        precisa <strong>ir buscá-lo e carregá-lo você mesmo</strong> — veja abaixo onde ele
+        fica.</p>
+      </div>
+
+      <h2 id="quand">Quando usar</h2>
+      <p>Quando você tem uma CBCT com um ou mais caninos impactados e quer saber, sem
+      inspecionar cada um a olho, de que lado da cortical óssea ele se situa. O CLIC não
+      depende de outros módulos — você não precisa ter rodado AMASSS, ASO ou ALI antes.</p>
+
+      <h2 id="besoin">O que você precisa, o que você obtém</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>A fornecer</h4>
+          <ul>
+            <li>Uma pasta de exames CBCT em <code>.nii</code> ou <code>.nii.gz</code></li>
+            <li>O modelo treinado, baixado uma única vez</li>
+            <li>Uma pasta de saída, escolhida explicitamente</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>Você obtém</h4>
+          <ul>
+            <li>Uma subpasta por exame, contendo um mapa de rótulos <code>.nii.gz</code></li>
+            <li>Três valores de voxel possíveis: vestibular, bicortical, palatino</li>
+            <li>Sobreponível diretamente ao exame de origem, sem necessidade de registro</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Formatos aceitos que na verdade não funcionam</div>
+        <p>O seletor de arquivos também lista <code>.nrrd</code>, <code>.mha</code> e
+        <code>.mhd</code>. Não os use: o processamento só consegue ler
+        <code>.nii</code>/<code>.nii.gz</code> e falha nos outros formatos, seja lá o que o
+        seletor tenha permitido.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Somente Linux</div>
+        <p>O módulo não tem nenhum caminho funcional no Windows, diga o que disser o README.
+        Rode-o em uma instalação do Slicer no Linux.</p>
+      </div>
+
+      <h2 id="marche">Passo a passo</h2>
+      <ol class="steps">
+        <li><strong>Baixe o modelo.</strong> O botão dedicado busca a rede treinada. Faça
+        isso uma única vez.</li>
+        <li><strong>Indique a pasta de entrada.</strong> Uma pasta plana de arquivos
+        <code>.nii.gz</code> — não uma pasta de subpastas.</li>
+        <li><strong>Escolha uma pasta de saída.</strong> Esta etapa é obrigatória: sem ela, o
+        processamento falha antes mesmo de começar.</li>
+        <li><strong>Execute.</strong> A primeira execução também configura o ambiente de
+        cálculo, por isso demora mais do que as seguintes.</li>
+        <li><strong>Aguarde até o fim</strong>, mesmo que nada se mexa na tela. O
+        processamento segue exame por exame, sem retorno visual entre eles.</li>
+      </ol>
+
+      <h2 id="resultat">Onde encontrar o resultado</h2>
+      <p>Quando o processamento terminar, abra a pasta de saída que você escolheu: ela
+      contém uma subpasta por exame processado e, dentro de cada uma, um arquivo
+      <code>.nii.gz</code> com o sufixo mostrado na interface (<code>seg</code> por padrão).
+      Carregue você mesmo esse arquivo no Slicer como volume de segmentação — ele já está
+      alinhado ao exame de origem, sem necessidade de registro. Os valores 1, 2 e 3
+      correspondem respectivamente a vestibular, bicortical e palatino.</p>
+
+      <h2 id="coince">Se algo der errado</h2>
+      <div class="callout warn">
+        <div class="callout-title">Cancel não faz nada</div>
+        <p>Não interrompe nem o cálculo em andamento nem o processo subjacente. Se você
+        realmente precisar parar, feche o Slicer.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">A primeira execução precisa de acesso à internet</div>
+        <p>A construção da rede baixa pesos genéricos pré-treinados antes de aplicar por
+        cima o modelo treinado. Sem conexão na primeira tentativa, o processamento
+        falha.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Dois arquivos de modelo na pasta</div>
+        <p>Com mais de um arquivo de modelo na pasta de modelos, é usado aquele cujo nome
+        vem primeiro em ordem alfabética, sem nenhum aviso. Mantenha um único arquivo
+        <code>.pth</code> nessa pasta para evitar qualquer ambiguidade.</p>
+      </div>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">Para saber mais</h2>
+      <p>O módulo ainda não tem publicação: sua única descrição pública é uma página de projeto NA-MIC.</p>
+      <h3 id="sur-outil">Sobre o próprio CLIC</h3>
+      <ul>
+        <li><strong>NA-MIC Project Week 43, Montréal 2025</strong> — <a href="https://projectweek.na-mic.org/PW43_2025_Montreal/Projects/InterpretableDeepLearningForTheDetectionAndClassificationOfImpactedCaninesAndSeverityOfRootResorption/"><em>Interpretable Deep Learning for the Detection and Classification of Impacted Canines and severity of root resorption</em></a>. O relatório do projeto: o objetivo, os dados e em que ponto estava o trabalho naquele momento.</li>
+      </ul>
+      <h3 id="autour">Em torno do método</h3>
+      <ul>
+        <li><strong>He et al., ICCV 2017</strong> — <a href="https://arxiv.org/abs/1703.06870"><em>Mask R-CNN</em></a>. A arquitetura que o módulo executa: detectar objetos e produzir suas máscaras ao mesmo tempo.</li>
+        <li><strong>Swaity et al., Scientific Reports 2023</strong> — <a href="https://doi.org/10.1038/s41598-023-49613-0"><em>Deep learning driven segmentation of maxillary impacted canine on cone beam computed tomography images</em></a>. O mesmo problema abordado por outra equipe, com o erro medido em uma série independente.</li>
+        <li><strong>Pirayesh et al., BMC Oral Health 2024</strong> — <a href="https://doi.org/10.1186/s12903-024-04718-4"><em>A hierarchical deep learning approach for diagnosing impacted canine-induced root resorption</em></a>. Do lado da reabsorção radicular: como a gravidade é graduada e como isso se compara a um observador humano.</li>
+      </ul>
+      <p>A bibliografia completa da ferramenta — o que foi encontrado, e o que foi procurado sem sucesso — está em <a href="../CLIC/SOURCES.html">suas fontes</a>.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../CLIC/CLIC.html">
+        <b>Como funciona de verdade →</b>
+        <span>A página do Atlas: a rede única por trás da classificação e da localização,
+        a limiarização que produz o mapa de rótulos e as falhas encontradas no
+        código.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Todos os guias</a> ·
+        <a href="../CLIC/CLIC.html">Página do Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

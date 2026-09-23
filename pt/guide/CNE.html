@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNE — Guia — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="texte">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/CNE.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/CNE.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/guide/CNE.html" hreflang="ko" title="한국어">KO</a><a href="../../th/guide/CNE.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/CNE.html" aria-current="true"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../CNE/CNE.html"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../guide/CNE.html" aria-current="page">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/CNE/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">Guia</a> › Texto e linguagem</div>
+        <h1>CNE — extrair informações de notas clínicas</h1>
+        <p class="lede">O nome não deixa claro: o CNE não mexe em <strong>nenhuma imagem</strong>,
+        volume ou malha. É uma ferramenta de leitura — recebe notas clínicas em texto livre e extrai
+        delas informações estruturadas, na forma de pares chave/valor, usando um modelo de linguagem
+        (LLM) que roda localmente dentro do Slicer.</p>
+      </header>
+
+      <!-- video:start -->
+      <div class="video-box">
+        <span class="vb-label">Em vídeo</span>
+        <ul>
+          <li><a href="https://www.youtube.com/watch?v=4I84dCcgRGw" target="_blank" rel="noopener">CNE (Clinical notes extraction) to summarize your notes and extract common data elements</a> <span class="vb-meta">34 s (apresentação) · canal DCBIA Videos</span></li>
+        </ul>
+      </div>
+      <!-- video:end -->
+      <h2 id="quand">Quando usar</h2>
+      <p>Sempre que você tiver um lote de notas em texto livre — consultas de ATM ou de Ortodontia — e quiser
+      extrair rapidamente os fatos principais (sintomas, diagnósticos) em vez de ler cada uma
+      à mão. O CNE processa uma pasta inteira de notas de uma só vez, usando um modelo diferente
+      conforme as notas sejam de ATM (TMJ) ou de Ortodontia (Ortho).</p>
+
+      <div class="callout">
+        <div class="callout-title">Nada sai da sua máquina</div>
+        <p>O modelo roda dentro do próprio Python do Slicer, no seu computador. As notas não são enviadas
+        a nenhum serviço online durante a extração — a única etapa que usa a rede
+        é o download do modelo, feito uma única vez.</p>
+      </div>
+
+      <h2 id="besoin">O que você precisa, o que você obtém</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>O que fornecer</h4>
+          <ul>
+            <li>Uma pasta de notas, colocadas <strong>diretamente dentro dela</strong> (sem
+            subpastas) — <code>.txt</code>, <code>.pdf</code> ou <code>.docx</code></li>
+            <li>O tipo de nota: <strong>TMJ</strong> ou <strong>Ortho</strong>, cada um com
+            seu próprio modelo</li>
+            <li>O modelo correspondente, baixado uma vez (alguns GB)</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>O que sai</h4>
+          <ul>
+            <li>Um arquivo de texto por nota, <code>Extraction_&lt;note name&gt;.txt</code>, na
+            pasta de saída</li>
+            <li>Linhas <code>key : value</code> que resumem a nota</li>
+            <li>Nenhuma tabela-resumo, nenhum CSV: um arquivo por nota, a ser conferido um de
+            cada vez</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Passo a passo</h2>
+      <ol class="steps">
+        <li><strong>Escolha o tipo de nota.</strong> TMJ ou Ortho: isso decide qual modelo
+        é usado e o tamanho de nota que ele consegue ler de uma vez.</li>
+        <li><strong>Baixe o modelo correspondente.</strong> No primeiro clique em "Apply" (Aplicar),
+        o módulo instala o que falta (após sua confirmação) e depois busca o
+        modelo no Hugging Face. Só é necessário uma vez por tipo de nota.</li>
+        <li><strong>Indique a pasta de notas.</strong> Os arquivos devem ficar diretamente na
+        raiz da pasta escolhida, e não organizados em subpastas por paciente.</li>
+        <li><strong>Defina uma pasta de saída.</strong></li>
+        <li><strong>Execute e aguarde.</strong> As notas são processadas uma após a outra;
+        espere várias dezenas de segundos por nota.</li>
+      </ol>
+
+      <h2 id="temps">Quanto tempo leva, quanta memória</h2>
+      <p>Embora o módulo mencione o uso de placa de vídeo, a instalação só configura
+      pacotes de CPU: na prática, a extração <strong>sempre roda na CPU</strong>. Espere
+      cerca de um minuto por nota, dependendo do tamanho; em um lote de várias dezenas de
+      notas, é melhor iniciar a execução e voltar depois. O modelo carregado precisa de
+      cerca de <strong>5 a 6 GB de RAM</strong> além do que o Slicer já usa, e seu
+      download tem vários gigabytes, feito uma vez por tipo de nota.</p>
+
+      <h2 id="relire">Confira o resultado</h2>
+      <p>Todo o conteúdo clínico do arquivo de saída vem do modelo: não há regra,
+      nem dicionário de termos, nem verificação de esquema por trás. O módulo espera uma resposta JSON, mas
+      não a impõe tecnicamente — apenas procura a primeira chave de abertura e a
+      última chave de fechamento na resposta. Se a saída do modelo não estiver bem formada, seu texto
+      bruto vai para o arquivo tal como está, <strong>sem nenhuma indicação</strong> de que a formatação
+      falhou. Confira cada arquivo produzido antes de confiar nele.</p>
+
+      <h2 id="coince">Se algo der errado</h2>
+      <div class="callout warn">
+        <div class="callout-title">O modelo Ortho não baixa</div>
+        <p>O arquivo que o módulo solicita para o modelo Ortho não existe no endereço
+        indicado no Hugging Face: o download falha com "Download failed or was
+        cancelled", sem mais explicações. O modo TMJ baixa normalmente. Se você escolher
+        Ortho hoje, espere essa falha — o problema não está do seu lado.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Notas organizadas em subpastas por paciente</div>
+        <p>O CNE só olha os arquivos que estão diretamente na pasta escolhida, nada do que
+        está dentro de subpastas. Uma pasta organizada com uma subpasta por paciente
+        não produzirá saída nenhuma, sem mensagem de erro.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">PDF digitalizado</div>
+        <p>A extração de texto de PDF não faz OCR: se o seu PDF for na verdade uma imagem digitalizada,
+        o texto extraído fica vazio e a nota não pode produzir nada.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Tabelas dentro de um .docx</div>
+        <p>Só o texto dos parágrafos de um documento Word é lido; o conteúdo das tabelas é ignorado. Se
+        suas informações principais estiverem em uma tabela, elas nunca chegam ao modelo.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Nota longa demais</div>
+        <p>Não há divisão em partes: uma nota maior do que o modelo consegue ler de uma vez falha
+        por inteiro em vez de ser processada em pedaços. A margem é especialmente apertada no
+        modo Ortho.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Sem anonimização</div>
+        <p>As notas são lidas tal como estão, sem remoção de dados pessoais. Se seus arquivos contêm
+        informações identificadoras, passe-os antes pelo MedicalDataAnonymizer, se necessário.</p>
+      </div>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">Para saber mais</h2>
+      <p>O módulo não tem publicação, e os modelos que ele executa são fine-tunes do laboratório publicados sem model card: nenhum conjunto de treinamento descrito, nenhuma avaliação. As leituras abaixo reúnem o que se sabe, em geral, sobre a confiabilidade desse tipo de extração.</p>
+      <h3 id="autour">Em torno do método</h3>
+      <ul>
+        <li><strong>Wiest et al., npj Digital Medicine 2024</strong> — <a href="https://doi.org/10.1038/s41746-024-01233-2"><em>Privacy-preserving large language models for structured medical information retrieval</em></a>. Exatamente o uso pretendido — extrair campos estruturados de um relatório com um modelo executado localmente — e o que isso de fato alcança.</li>
+        <li><strong>Panchal et al., BMJ Health &amp; Care Informatics 2026</strong> — <a href="https://doi.org/10.1136/bmjhci-2025-101894"><em>Benchmarking large language models for de-identification of electronic health record notes</em></a>. Uma comparação quantitativa de vários modelos em notas clínicas: onde eles erram e em quais tipos de campo.</li>
+        <li><strong>Dorémus et al., JMIR 2025</strong> — <a href="https://doi.org/10.2196/57828"><em>Harnessing Moderate-Sized Language Models for Reliable Patient Data Deidentification in Emergency Department Records</em></a>. O que esperar de um modelo do tamanho dos usados aqui, em vez de um modelo remoto muito grande.</li>
+      </ul>
+      <p>A bibliografia completa da ferramenta — o que foi encontrado, e o que foi procurado sem sucesso — está em <a href="../CNE/SOURCES.html">suas fontes</a>.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../CNE/CNE.html">
+        <b>Como funciona de verdade →</b>
+        <span>A página do Atlas: o modelo usado, como o texto é extraído e limpo, e
+        os pontos fracos encontrados no código.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Todos os guias</a> ·
+        <a href="../CNE/CNE.html">Página do Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AREG_CBCT — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="recalage">
+<div class="layout">
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/AREG_CBCT/AREG_CBCT.html" hreflang="en" title="English">EN</a><a href="../../fr/AREG_CBCT/AREG_CBCT.html" hreflang="fr" title="Français">FR</a><a href="../../pt/AREG_CBCT/AREG_CBCT.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/AREG_CBCT/AREG_CBCT.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/AREG_CBCT.html"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../AREG_CBCT/AREG_CBCT.html" aria-current="true"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html" aria-current="page">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/AREG_CBCT/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › 정합</div>
+        <h1>AREG_CBCT</h1>
+        <p class="lede">기준 골 부위(두개저, 하악골, 상악골)에 대한 CBCT의 T1/T2 강체 정합(rigid registration): 순수한 <a class="gterm" href="../glossary.html#g-elastix" title="용어집 보기">elastix</a>, 상호정보량(mutual information), 신경망 없음 — 학습된 요소는 모두 앞 단계, 즉 마스크와 랜드마크에 있다.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1007/978-3-031-45249-9_5" target="_blank" rel="noopener" title="논문은 SimpleElastix 2단계를 설명하지만 코드는 itk-elastix로 1단계만 실행한다.">Anchling 2023 · LNCS 14242</a>
+          <span class="badge cli">areg_cbct</span>
+          <span class="badge neutral">Slicer의 Python — conda 없음, CPU 전용</span>
+          <a class="badge neutral" href="SOURCES.html">참고문헌</a>
+        </div>
+      </header>
+
+      <h2 id="situation">1. 파이프라인에서의 위치</h2>
+
+      <p><code>AREG/AREG.py</code>는 세 가지 모달리티를 구동하는 단일 위젯이다.
+      CBCT(<code>AREG/AREG_Method/CBCT.py</code>), IOS(<code>AREG/AREG_Method/IOS.py</code>),
+      IOS-on-CBCT(<code>AREG/AREG_Method/IOSCBCT.py</code>). 위젯 자체는 아무것도 계산하지 않는다.
+      각 <code>Method.Process()</code>가 <strong>단계 딕셔너리의 리스트</strong>를 반환하고,
+      위젯이 이를 차례로 실행한다.</p>
+
+      <p>단계는 항상 다음 형태를 갖는다.</p>
+
+      <pre><code>{"Process": slicer.modules.areg_cbct,   # Slicer CLI module
+ "Parameter": {...},                    # dict passed as-is to slicer.cli.run
+ "Module": "AREG_CBCT for Mandible",    # label shown in the UI
+ "ReviewId": "cbct_registration",       # optional review pause
+ "ReviewFolder": ".../Mandible",
+ "ReviewReferenceFolder": "&lt;T1 folder&gt;",
+ "Display": DisplayAREGCBCT(nb_scan)}   # progress translation -&gt; progress bar</code></pre>
+
+      <p>CBCT 모드가 외부로 호출하는 모듈, 실행 순서대로:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>호출되는 모듈</th><th>모드</th><th>역할</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge cli">pre_aso_cbct</span><br><code>ASO_CBCT/PRE_ASO_CBCT/PRE_ASO_CBCT.py</code></td><td>3개 모두</td><td>T2 중앙 맞춤(Orientation 모드에서는 T1도)</td></tr>
+            <tr><td><span class="badge cli">ali_cbct</span><br><code>ALI_CBCT/ALI_CBCT.py</code></td><td>Orientation 전용</td><td>T1에 랜드마크 6개 또는 7개 배치 <span class="badge predit">예측</span></td></tr>
+            <tr><td><span class="badge cli">semi_aso_cbct</span><br><code>ASO_CBCT/SEMI_ASO_CBCT/SEMI_ASO_CBCT.py</code></td><td>Orientation 전용</td><td>T1을 골드 스탠더드에 방향 정렬(랜드마크 <a class="gterm" href="../glossary.html#g-icp" title="용어집 보기">ICP</a>) <span class="badge calcule">계산</span></td></tr>
+            <tr><td><span class="badge cli">amasss_cli</span><br><code>AMASSS_CLI/AMASSS_CLI.py</code></td><td>Fully-Auto, Orientation</td><td>T1에서 기준 부위의 <strong>마스크</strong> 생성 <span class="badge predit">예측</span></td></tr>
+            <tr><td><span class="badge cli">areg_cbct</span><br><code>AREG_CBCT/AREG_CBCT.py</code></td><td>3개 모두</td><td><strong>정합 그 자체</strong>, 체크한 부위마다 한 번 <span class="badge calcule">계산</span></td></tr>
+            <tr><td><span class="badge cli">amasss_cli</span></td><td>3개 모두 (선택)</td><td>T1과 정합된 T2의 최종 분할 <span class="badge predit">예측</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>저장소 안에서 AREG를 호출하는 곳은 없다. 말단 도구다. 다만 AREG의 <code>.tfm</code> 파일은
+      <a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a>와 분석 모듈이 다시 사용한다.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1520 260" role="img" aria-label="AREG CBCT 모드의 호출 순서와 선택적 방향 정렬 분기">
+          <rect x="150" y="14" width="500" height="96" fill="none" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="4 4" rx="8"/>
+          <text class="d-label-s" x="400" y="28" text-anchor="middle">Orientation &amp; Registration 모드만</text>
+
+          <rect class="d-box-n" x="170" y="38" width="200" height="52" rx="6"/>
+          <text class="d-label" x="270" y="60" text-anchor="middle">ALI_CBCT</text>
+          <text class="d-label-s" x="270" y="76" text-anchor="middle">랜드마크 6-7개, 신경망</text>
+
+          <path class="d-arrow" d="M370 64 H430"/>
+          <text class="d-label-s" x="400" y="28" text-anchor="middle">랜드마크</text>
+          <path class="d-arrow-head" d="M430 64 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="430" y="38" width="200" height="52" rx="6"/>
+          <text class="d-label" x="530" y="60" text-anchor="middle">SEMI_ASO_CBCT</text>
+          <text class="d-label-s" x="530" y="76" text-anchor="middle">랜드마크 강체 ICP</text>
+
+          <path class="d-arrow" d="M530 90 V150"/>
+          <text class="d-label-s" x="540" y="122" text-anchor="start">방향 정렬</text>
+          <path class="d-arrow-head" d="M530 150 l-5 -8 h10 z"/>
+
+          <rect class="d-box" x="10" y="150" width="150" height="56" rx="6"/>
+          <text class="d-label" x="85" y="172" text-anchor="middle">입력</text>
+          <text class="d-label-s" x="85" y="188" text-anchor="middle">T1 + T2 (nii/nrrd/gipl)</text>
+
+          <path class="d-arrow" d="M160 178 H210"/>
+          <text class="d-label-s" x="185" y="225" text-anchor="middle">원본 T1 / T2</text>
+          <path class="d-arrow-head" d="M210 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="210" y="150" width="180" height="56" rx="6"/>
+          <text class="d-label" x="300" y="172" text-anchor="middle">PRE_ASO_CBCT</text>
+          <text class="d-label-s" x="300" y="188" text-anchor="middle">T2 중앙 맞춤(평행이동)</text>
+
+          <path class="d-arrow" d="M390 178 H440"/>
+          <text class="d-label-s" x="415" y="225" text-anchor="middle">사전 정렬됨</text>
+          <path class="d-arrow-head" d="M440 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="440" y="150" width="180" height="56" rx="6"/>
+          <text class="d-label" x="530" y="172" text-anchor="middle">AMASSS</text>
+          <text class="d-label-s" x="530" y="188" text-anchor="middle">CB/MAND/MAX 마스크, 신경망</text>
+
+          <path class="d-arrow" d="M620 178 H680"/>
+          <text class="d-label-s" x="650" y="225" text-anchor="middle">정렬 + 마스크</text>
+          <path class="d-arrow-head" d="M680 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box-a" x="680" y="150" width="200" height="56" rx="6"/>
+          <text class="d-label" x="780" y="172" text-anchor="middle">AREG_CBCT</text>
+          <text class="d-label-s" x="780" y="188" text-anchor="middle">elastix 강체, 1회</text>
+
+          <path class="d-arrow" d="M880 178 H940"/>
+          <text class="d-label-s" x="910" y="225" text-anchor="middle">.tfm + 정합 볼륨</text>
+          <path class="d-arrow-head" d="M940 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="940" y="150" width="220" height="56" rx="6"/>
+          <text class="d-label" x="1050" y="172" text-anchor="middle">출력</text>
+          <text class="d-label-s" x="1050" y="188" text-anchor="middle">정합된 T2 (int16) + .tfm</text>
+
+          <path class="d-arrow" d="M1160 178 H1220" stroke-dasharray="4 4"/>
+          <text class="d-label-s" x="1190" y="225" text-anchor="middle">정합 볼륨 — 선택 단계</text>
+          <path class="d-arrow-head" d="M1220 178 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="1220" y="150" width="290" height="56" rx="6"/>
+          <text class="d-label" x="1365" y="172" text-anchor="middle">AMASSS (선택)</text>
+          <text class="d-label-s" x="1365" y="188" text-anchor="middle">T1 + 정합 T2 최종 분할, 신경망</text>
+        </svg>
+        <figcaption>CBCT 모드의 실제 실행 순서. 위쪽 분기(ALI_CBCT → SEMI_ASO_CBCT)는 "Orientation &amp; Registration" 모드에만 있으며, 이때 AMASSS는 방향 정렬된 T1에서 실행된다. 중앙 블록에서 예측이 아닌 단계는 정합 자체(AREG_CBCT, 강조된 상자)뿐이다.</figcaption>
+      </figure>
+
+      <h2 id="fichiers">2. 관련 파일</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>역할</th><th>실행 위치</th></tr></thead>
+          <tbody>
+            <tr><td><code>AREG/AREG.py</code></td><td>위젯, 3336줄: UI, 단계 연결, 검토 일시정지, 라이브러리 설치</td><td>Slicer의 Python</td></tr>
+            <tr><td><code>AREG/AREG_Method/CBCT.py</code></td><td>CBCT 3개 모드, 단계 리스트 구성, T1/T2 짝짓기</td><td>동일</td></tr>
+            <tr><td><code>AREG/AREG_Method/Review.py</code></td><td>검토 일시정지: 환자 대기열, 로드, 보정 기록, 되돌리기</td><td>동일</td></tr>
+            <tr><td><code>AREG/AREG_Method/Progress.py</code></td><td><code>&lt;filter-progress&gt;</code>를 진행 표시줄로 변환</td><td>동일</td></tr>
+            <tr><td><code>AREG_CBCT/AREG_CBCT.py</code></td><td>CLI: 환자 루프, 출력 기록</td><td><strong>별도 프로세스</strong>, Slicer의 <code>python-real</code></td></tr>
+            <tr><td><code>AREG_CBCT/AREG_CBCT_utils/utils.py</code></td><td>짝짓기, 마스킹, elastix, 행렬</td><td>동일</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>IOS 경로와 달리 <strong>CBCT 쪽은 conda를 전혀 거치지 않는다</strong>. <code>AREGLogic</code>과
+      그 <code>shapeaxi</code> 환경(<code>AREG.py:3087</code>)은 IOS에서만 쓰인다.
+      CBCT는 <code>slicer.cli.run</code>(<code>AREG.py:1552</code>,
+      <code>AREG.py:1804</code>)으로 실행되며, 패키지는 Slicer 자체에
+      <code>pip_install</code>로 설치된다.</p>
+
+      <div class="callout">
+        <div class="callout-title">참고</div>
+        <p>AREG_CBCT는 GPU가 필요 없다(반면 <a href="../AMASSS/AMASSS.html">AMASSS</a>는 GPU를 원한다).</p>
+      </div>
+
+      <p><code>import slicer</code>(<code>AREG_CBCT.py:6</code>)는 전혀
+      쓰이지 않는다. <code>LoadOnlyLandmarks</code>, <code>applyTransformLandmarks</code>, <code>WriteJson</code>은
+      import되지만 호출되지 않는다. <code>reg_lm</code> 파라미터의 잔재로, 이 파라미터는
+      <code>AREG_CBCT.xml</code>에서 주석 처리되어 있다.</p>
+
+      <h2 id="modes">3. 세 가지 모드와 정확한 호출 순서</h2>
+
+      <p>모드는 <code>CbModeType</code>으로 선택되며, <code>SwitchType()</code>
+      (<code>AREG.py:930</code>)이 해당 클래스를 인스턴스화한다. 세 모드는
+      뒷부분 — T2 중앙 맞춤, 부위별 AREG 실행, 최종 <a href="../AMASSS/AMASSS.html">AMASSS</a> — 을 공유하고,
+      앞 단계만 다르다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>모드</th><th>클래스</th><th>앞 단계</th><th>T1 마스크</th></tr></thead>
+          <tbody>
+            <tr><td>Semi-Automated</td><td><code>Semi_CBCT</code> (<code>CBCT.py:266</code>)</td><td>없음</td><td><strong>사용자가 제공</strong>("T1 Masks" 필드)</td></tr>
+            <tr><td>Fully-Automated</td><td><code>Auto_CBCT</code> (<code>CBCT.py:446</code>)</td><td>없음</td><td>AMASSS <code>CBMASK</code>/<code>MANDMASK</code>/<code>MAXMASK</code>, <strong>입력 T1 폴더에</strong> 기록 <span class="badge predit">예측</span></td></tr>
+            <tr><td>Orientation &amp; Registration</td><td><code>Or_Auto_CBCT</code> (<code>CBCT.py:731</code>)</td><td>T1에 PRE_ASO → <a href="../ALI/ALI.html">ALI_CBCT</a> → SEMI_ASO, 결과는 <code>&lt;T1 folder&gt;Or</code>에</td><td><code>&lt;T1 folder&gt;Or</code>에 대한 AMASSS <span class="badge predit">예측</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>기준 부위는 추론되는 것이 아니라 <strong>사용자의 선택</strong>이다.
+      "Regions of Reference for Registration" 체크박스 — Cranial Base,
+      Mandible, Maxilla(<code>CBCT.py:198</code>) — 는
+      <code>CB</code> / <code>MAND</code> / <code>MAX</code>로 변환된다(<code>TranslateModels</code>). 두 부위를 체크하면
+      <strong>독립된 정합 두 번</strong>이 실행되고, 각각 별도의 출력 폴더를 갖는다.</p>
+
+      <h2 id="entrees">4. 입력, 짝짓기, 전처리</h2>
+
+      <p><strong>형식.</strong> <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>.
+      DICOM 입력의 경우 <code>convertdicom2nifti</code>(<code>utils.py:720</code>)가
+      환자별 하위 폴더를 <code>sitk.ImageSeriesReader</code>로 변환하고, 실패하면
+      <code>dicom2nifti</code>로 대체하여 <code>&lt;folder&gt;/NIFTI/&lt;patient&gt;.nii.gz</code>에 기록한다.</p>
+
+      <p><strong>T1/T2 짝짓기</strong> — <code>GetPatients</code>
+      (<code>utils.py:91</code>). 환자 식별자는
+      <code>split()</code>을 고정된 표지 목록(<code>_Scan</code>, <code>_Or</code>, <code>_MAND</code>, <code>_CB</code>, <code>_lm</code>, <code>_T2</code>, <code>_T1</code>, <code>_Cl</code> 등)에 대해
+      연달아 호출한 뒤 파일 이름에 남는 부분이다.
+      그다음:</p>
+
+      <ul>
+        <li>이름에 <code>mask</code>, <code>seg</code>, <code>pred</code>가 들어 있는 영상 파일 → 분할;</li>
+        <li>그 외 → <code>scanT1</code> / <code>scanT2</code>;</li>
+        <li><code>segmentationType</code>이 주어지면 두 번째 탐색이
+        <code>mask_folder_t1</code>(기본값은 T1 폴더)에서 부위에 따라 이름에
+        <code>cb</code>, <code>mand</code>/<code>md</code>, 또는 <code>max</code>/<code>mx</code>가 들어 있는 파일을 찾고, <strong>처음 찾은 파일이
+        채택된다</strong>. 이 탐색은 그 파일이 실제로 마스크인지 전혀 확인하지 않는다.
+        <code>P1_T1_MAX.nii.gz</code>라는 이름의 스캔이 분할로 간주될 수 있다.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>키워드 기반 마스크 탐색(<code>cb</code>, <code>mand</code>/<code>md</code>, <code>max</code>/<code>mx</code>)은
+        찾은 파일이 실제 분할인지 전혀 확인하지 않는다.
+        <code>P1_T1_MAX.nii.gz</code>라는 이름의 스캔이 조용히 분할로 간주될 수 있다.</p>
+      </div>
+
+      <p>T2는 <code>segmentationType=None</code>으로 읽힌다. <strong>마스킹되는 것은 고정 영상뿐이고</strong>,
+      이동 영상은 결코 마스킹되지 않는다.</p>
+
+      <p><strong>T2 중앙 맞춤</strong> — <code>pre_aso_cbct</code>. 이름과,
+      <code>model_folder</code> 파라미터가 <code>Models/Orientation/PreASO</code>를 가리킨다는 점에도 불구하고 이 CLI는 <strong>신경망을
+      전혀 쓰지 않는다</strong>. <code>T = -physical_center_of_the_image</code>를 계산하고
+      (<code>PRE_ASO_CBCT.py:163</code>), 역변환으로 리샘플링한 뒤
+      <code>TranslationTransform</code>을 <code>.tfm</code>으로 옆에 기록한다. 예전에는
+      <code>DenseNet</code>으로 방향을 예측하는 코드가 주석 처리된 채 있었으나 삭제되었다
+      (커밋 <code>4296774</code>). <code>model_folder</code>와 <code>SmallFOV</code> 인자는 <strong>사용되지 않는 코드</strong>지만,
+      PreASO 가중치는 여전히 내려받는다.</p>
+
+      <p><strong>고정 영상 마스킹</strong> — <code>MaskedImage</code>
+      (<code>utils.py:584</code>):</p>
+
+      <pre><code>fixed_seg_sitk.SetOrigin(fixed_image_sitk.GetOrigin())   # origin forced
+fixed_image_masked = applyMask(fixed_image_sitk, fixed_seg_sitk, label=SegLabel)
+sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
+                os.path.join(temp_folder, "fixed_image_masked.nii.gz"))</code></pre>
+
+      <p><code>applyMask</code>는 레이블이 지정되면 이진화하고, 아니면 마스크를 그대로
+      <code>sitk.Mask</code>에 넘긴다(0이 아닌 복셀은 모두 유지). 임시 파일은
+      <strong>항상 같은 이름</strong>이다. 임시 폴더는 일괄 처리 전체에 하나뿐이므로
+      (<code>CBCT.py:306</code>) 각 환자가 이전 환자의 파일을
+      덮어쓴다. 순차 실행에서는 무해하지만 CLI를 병렬화하면 치명적이다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>마스킹용 임시 폴더는 일괄 처리 전체에 하나뿐이고 파일 이름은
+        항상 <code>fixed_image_masked.nii.gz</code>다. 각 환자가 이전 환자의 파일을
+        덮어쓴다. 순차 실행에서는 무해하지만 CLI를 병렬화하면 치명적이다.</p>
+      </div>
+
+      <p><code>SegLabel</code>은 실제로는 항상 <code>None</code>이다. <code>LabelSelectcomboBox</code> 콤보 박스가
+      코드에서 강제로 숨겨져 있고(<code>AREG.py:548</code>) <code>SegmentationLabels</code>는
+      <code>[0]</code>으로 남는데, CLI가 이를 다시 <code>None</code>으로 변환한다. 마스크에 있는 레이블을 읽던
+      <code>GetSegmentationLabel</code>(<code>CBCT.py:177</code>)은
+      어디에서도 호출되지 않는다. <strong>사용되지 않는 코드</strong>다.</p>
+
+      <h2 id="recalage">5. 알고리즘의 핵심 — 정합</h2>
+
+      <p>모든 일은 <code>VoxelBasedRegistration</code>
+      (<code>utils.py:598</code>)에서 일어난다.</p>
+
+      <ol>
+        <li>이동 영상 T2를 <code>itk.F</code>로 읽는다;</li>
+        <li>고정 영상 T1을 마스킹하고(위 참고) <code>itk.F</code>로 다시 읽는다;</li>
+        <li><strong>단 한 번의</strong> <code>ElastixReg(fixed_image_masked, moving_image, initial_transform=None)</code>;</li>
+        <li><code>MatrixRetrieval</code> → SimpleITK 변환;</li>
+        <li><code>ComputeFinalMatrix([t])</code> → <code>Euler3DTransform</code>;</li>
+        <li>T2 리샘플링.</li>
+      </ol>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1520 150" role="img" aria-label="VoxelBasedRegistration의 내부 6단계">
+          <rect class="d-box" x="10" y="35" width="190" height="56" rx="6"/>
+          <text class="d-label" x="105" y="58" text-anchor="middle">① 이동 T2 읽기</text>
+          <text class="d-label-s" x="105" y="74" text-anchor="middle">itk.F</text>
+
+          <path class="d-arrow" d="M200 63 H240"/>
+          <path class="d-arrow-head" d="M240 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="240" y="35" width="200" height="56" rx="6"/>
+          <text class="d-label" x="340" y="58" text-anchor="middle">② 고정 T1 마스킹</text>
+          <text class="d-label-s" x="340" y="74" text-anchor="middle">MaskedImage, sitk.Mask</text>
+
+          <path class="d-arrow" d="M440 63 H480"/>
+          <path class="d-arrow-head" d="M480 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box-a" x="480" y="35" width="230" height="56" rx="6"/>
+          <text class="d-label" x="595" y="58" text-anchor="middle">③ ElastixReg</text>
+          <text class="d-label-s" x="595" y="74" text-anchor="middle">itk-elastix, 1회, 1500 반복</text>
+
+          <path class="d-arrow" d="M710 63 H750"/>
+          <path class="d-arrow-head" d="M750 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="750" y="35" width="230" height="56" rx="6"/>
+          <text class="d-label" x="865" y="58" text-anchor="middle">④ MatrixRetrieval</text>
+          <text class="d-label-s" x="865" y="74" text-anchor="middle">TransformParameters만</text>
+
+          <path class="d-arrow" d="M980 63 H1020"/>
+          <path class="d-arrow-head" d="M1020 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="1020" y="35" width="230" height="56" rx="6"/>
+          <text class="d-label" x="1135" y="58" text-anchor="middle">⑤ ComputeFinalMatrix</text>
+          <text class="d-label-s" x="1135" y="74" text-anchor="middle">원소 1개 = 그대로 복사</text>
+
+          <path class="d-arrow" d="M1250 63 H1290"/>
+          <path class="d-arrow-head" d="M1290 63 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="1290" y="35" width="220" height="56" rx="6"/>
+          <text class="d-label" x="1400" y="58" text-anchor="middle">⑥ ResampleImage</text>
+          <text class="d-label-s" x="1400" y="74" text-anchor="middle">이동 T2 격자, int16</text>
+        </svg>
+        <figcaption><code>VoxelBasedRegistration</code>의 6단계. elastix는 한 번만 실행된다(③, 강조된 상자). 마스크 정합 앞에 거친 단계는 더 이상 없다.</figcaption>
+      </figure>
+
+      <p>라이브러리는 SimpleITK나 ANTs가 아니라 <strong>itk-elastix</strong>(<code>itk.ElastixRegistrationMethod</code>)다.
+      파라미터는 모두
+      <code>make_rigid_param_map_deterministic</code>(<code>utils.py:527</code>)에 명시되어 있으며,
+      elastix 기본 <code>"rigid"</code> 맵 위에 덧씌워진다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파라미터</th><th>값</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>Transform</td><td><code>EulerTransform</code> (<code>rigid</code> 맵의 기본값)</td><td>6 자유도, 스케일링 없음</td></tr>
+            <tr><td><code>Metric</code></td><td><code>AdvancedMattesMutualInformation</code>, 64 bins</td><td>상호정보량</td></tr>
+            <tr><td><code>Optimizer</code></td><td><code>ConjugateGradient</code></td><td>확률적 경사하강 아님</td></tr>
+            <tr><td><code>MaximumNumberOfIterations</code></td><td><strong>1500</strong></td><td>레벨당</td></tr>
+            <tr><td><code>MaximumStepLength</code> / <code>MinimumStepLength</code></td><td>2.0 / 0.001</td><td></td></tr>
+            <tr><td><code>ValueTolerance</code> / <code>GradientTolerance</code></td><td>1e-6 / 1e-6</td><td></td></tr>
+            <tr><td><code>NumberOfResolutions</code></td><td><strong>3</strong></td><td>고정·이동 영상의 평활화 피라미드</td></tr>
+            <tr><td><code>ImagePyramidSchedule</code></td><td><code>8 8 / 4 4 / 2 2</code></td><td><strong>3D 볼륨인데 레벨당 값이 2개뿐</strong></td></tr>
+            <tr><td><code>ImageSampler</code></td><td><code>Grid</code></td><td>결정론적 샘플링</td></tr>
+            <tr><td><code>NewSamplesEveryIteration</code></td><td><code>false</code></td><td></td></tr>
+            <tr><td><code>NumberOfSpatialSamples</code></td><td>30000</td><td><code>Grid</code> 샘플러는 무시함(코드 자체 주석에 따름)</td></tr>
+            <tr><td><code>NumberOfThreads</code></td><td>1</td><td>속도를 희생한 결정론</td></tr>
+            <tr><td><code>AutomaticTransformInitialization</code></td><td><code>true</code></td><td>중심 사전 정렬</td></tr>
+            <tr><td><code>AutomaticScalesEstimation</code></td><td><code>true</code></td><td></td></tr>
+            <tr><td><code>ErodeMask</code></td><td><code>true</code></td><td></td></tr>
+            <tr><td><code>Interpolator</code></td><td><code>LinearInterpolator</code></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>거친 단계는 더 이상 없다.</strong> "Include Approximation Step" 체크박스 뒤의
+      <code>ApproxReg</code> 파라미터는 <code>VoxelBasedRegistration(approx=...)</code>까지 전달되지만
+      그곳에서 <strong>전혀 읽히지 않는다</strong>. <code>ElastixApprox</code>와 <code>make_rigid_param_map_stochastic</code>
+      (<code>RandomCoordinate</code> 샘플러, 샘플 10000개, <code>AdaptiveStochasticGradientDescent</code>,
+      2레벨, <strong>마스킹하지 않은</strong> 영상 대상)은 2025-09-23 커밋
+      <code>350a8de</code>로 삭제되었고, 이때 <code>initial_transform</code>의 사용도
+      <code>ElastixReg</code>(<code>utils.py:573</code>)에서 함께 사라졌다. 이 함수는 모든 곳에서
+      <code>None</code>으로 호출된다. 남은 "coarse to fine"은 3레벨
+      피라미드뿐이며, 거친 사전 정렬은 이제 PRE_ASO의 T2 중앙 맞춤과
+      <code>AutomaticTransformInitialization</code>이 담당한다.</p>
+
+      <p><strong>행렬 추출</strong> — <code>MatrixRetrieval</code>
+      (<code>utils.py:830</code>)이
+      <code>TransformParameters</code>를 읽는다. 각도 3개와 평행이동 3개를 순서를 바꿔
+      <code>sitk.Euler3DTransform</code>으로 만든다. <code>ComputeFinalMatrix</code>
+      (<code>utils.py:851</code>)는 리스트를 합성한다
+      (회전은 곱하고 평행이동은 <strong>더한다</strong>). 원소가 하나인 리스트에서는
+      그대로 복사할 뿐이다. 따라서 합성 코드는 한 번도
+      실행되지 않으며, 어차피 평행이동을 더하는 방식은 중간 회전이 항등일 때만
+      유효하다.</p>
+
+      <p><strong>리샘플링</strong> — <code>ResampleImage</code>
+      (<code>utils.py:472</code>): 선형
+      보간, <code>DefaultPixelValue = 0</code>, 그리고 <code>SetReferenceImage(image)</code>에서 <code>image</code>는
+      <strong>이동 영상 자신</strong>이다. 따라서 정합된 볼륨은 T1이 아니라 T2의 격자(크기,
+      간격, 원점)를 유지한다. 출력은 <code>int16</code>으로 변환된다.</p>
+
+      <h2 id="amont">6. 앞 단계에서 실행되는 것: 정확한 인자</h2>
+
+      <p><strong><a href="../AMASSS/AMASSS.html">AMASSS</a> — 정합용 마스크</strong> (<code>CBCT.py:456</code>):</p>
+
+      <pre><code>{"inputVolume": &lt;T1 folder&gt;,                  # or &lt;T1 folder&gt;Or
+ "modelDirectory": &lt;model_folder_1&gt;/AMASSS_Models,
+ "skullStructure": "CBMASK,MANDMASK,MAXMASK",  # depending on checked boxes
+ "merge": "SEPARATE", "genVtk": False, "save_in_folder": False,
+ "output_folder": &lt;T1 folder&gt;,                # next to the scans
+ "vtk_smooth": 5, "prediction_ID": "seg",
+ "temp_fold": &lt;Documents&gt;/Slicer_temp_AMASSS,
+ "SegmentInput": False, "DCMInput": False}</code></pre>
+
+      <p>기록되는 이름은 <code>&lt;base&gt;_seg_&lt;STRUCT&gt;.&lt;ext&gt;</code>
+      (<code>AMASSS_CLI.py:600</code>)이다. 예를 들어 <code>P1_T1_seg_MANDMASK.nii.gz</code>이며,
+      <code>GetPatients</code>의 두 번째 탐색이 <code>mand</code> 키워드로 이를 찾는다. AMASSS는
+      현재 subprocess로 호출되는 <strong><a class="gterm" href="../glossary.html#g-nnunet" title="용어집 보기">nnU-Net</a> v2</strong>이며
+      (<code>AMASSS_CLI.py:54</code>), 그룹마다 별도의 모델을 쓴다
+      (<code>FF</code>, <code>SKIN</code>, <code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code>) <span class="badge predit">예측</span>.</p>
+
+      <p><strong>AMASSS — 최종 분할.</strong> 두 단계로, <code>inputVolume = &lt;T1 folder&gt;</code>
+      다음 <code>inputVolume = &lt;output folder&gt;</code>, <code>genVtk=True</code>, <code>merge</code>는
+      "Merge Segmentations" 체크박스에 따르고, <code>save_in_folder=True</code>는 Semi 모드에서, 그 외에는 <code>False</code>.
+      두 번째 단계는 <code>&lt;Region&gt;/&lt;patient&gt;_OutReg/</code> 트리를 재귀적으로 탐색하며
+      <code>_seg_</code> 접미사 덕분에 자신의 출력을 건너뛴다.</p>
+
+      <p><strong><a href="../ALI/ALI.html">ALI_CBCT</a></strong> (Orientation 모드 전용, <code>CBCT.py:756</code>):</p>
+
+      <pre><code>{"input": &lt;temp&gt;, "dir_models": &lt;model_folder_3&gt;,
+ "lm_type": "'N', 'S', 'Ba', 'RPo', 'LPo', 'LOr', 'ROr'",
+ "output_dir": &lt;temp&gt;, "temp_fold": &lt;Documents&gt;/Slicer_temp_ALI,
+ "DCMInput": False, "spacing": "[1,0.3]", "speed_per_scale": "[1,1]",
+ "agent_FOV": "[64,64,64]", "spawn_radius": "10"}</code></pre>
+
+      <p>다중 스케일 강화학습 에이전트(1 mm, 이어서 0.3 mm), <a class="gterm" href="../glossary.html#g-fov" title="용어집 보기">FOV</a> 64³ 복셀,
+      <code>DNet</code> 신경망 = 3D <code>DenseNet</code> <a class="gterm" href="../glossary.html#g-monai" title="용어집 보기">MONAI</a>(<code>growth_rate=34</code>, 블록 <code>(6,12,24,16)</code>)
+      뒤에 출력 6개짜리 MLP = 이동 방향 6개
+      (<code>brain.py:48</code>) <span class="badge predit">예측</span>. 랜드마크 목록은
+      기준 평면에 따라 다르다. <code>IF ANS PNS UR1O UR6O UL6O</code>(<a class="gterm" href="../glossary.html#g-occlusal" title="용어집 보기">교합</a>) 또는 <code>N S Ba RPo LPo LOr ROr</code>
+      (Frankfort).</p>
+
+      <p><strong>SEMI_ASO_CBCT</strong>: <code>gold_folder</code> = <code>&lt;model_folder_2&gt;/&lt;reference&gt;</code>,
+      <code>output_folder</code> = <code>&lt;T1 folder&gt;Or</code>, <code>add_inname</code> = <code>"Or"</code>. 정렬은
+      <code>vtkIterativeClosestPointTransform</code>으로, 랜드마크에 대한 강체 정렬(반복 1000회,
+      <code>StartByMatchingCentroidsOn</code>)이며, 이상치 랜드마크를 제외한 뒤 수행된다 <span class="badge calcule">계산</span>.</p>
+
+      <h2 id="sorties">7. 출력</h2>
+
+      <p><code>AREG_CBCT.py:152</code>가 기록한다.</p>
+
+      <pre><code>&lt;output&gt;/&lt;Cranial Base|Mandible|Maxilla&gt;/&lt;patient&gt;_OutReg/
+    &lt;patient&gt;_&lt;CB|MAND|MAX&gt;Scan&lt;add_name&gt;.nii.gz    # registered T2, int16
+    &lt;patient&gt;_&lt;CB|MAND|MAX&gt;&lt;add_name&gt;_matrix.tfm    # the transform</code></pre>
+
+      <p>하위 폴더 이름은 <code>translate()</code>
+      (<code>utils.py:714</code>)에서 온다: <code>CB</code> → <code>Cranial Base</code>.
+      <code>add_name</code>은 <strong>구분자 없이</strong> 이어 붙는다.</p>
+
+      <p><code>.tfm</code>의 규약: <code>sitk.WriteTransform</code>으로 <code>Euler3DTransform</code>을 쓴 것이므로
+      <strong><a class="gterm" href="../glossary.html#g-lps" title="용어집 보기">LPS</a></strong>이고 ITK 규약(변환이 출력 공간을 입력 공간으로
+      매핑)을 따른다. CLI 어디에도 축 반전이 필요 없다. 모두 SimpleITK/elastix이기 때문이다.
+      CBCT 체인에서 <code>diag(-1,-1,1,1)</code>로 켤레 변환하는 곳은 수동 보정
+      하나뿐이며, 이는 <a class="gterm" href="../glossary.html#g-ras" title="용어집 보기">RAS</a>의 Slicer 행렬에서 출발하기 때문이다
+      (<code>Review.py:489</code>).</p>
+
+      <p>PRE_ASO가 중앙 맞춤된 T2 옆에 기록하는 중앙 맞춤 <code>.tfm</code>은 AREG의 것과 <strong>합성되지 않는다</strong>.
+      원본 T2를 T1 위로 되돌리려면 두 파일을 손으로
+      이어 적용해야 한다.</p>
+
+      <h2 id="revue">8. 검토 일시정지와 일괄 탐색</h2>
+
+      <p>커밋 <code>2609bc4</code>("Pause <a href="../VFACE/VFACE.html">VFACE</a> at chosen steps"… 그보다 앞서 AREG)에서
+      추가되었다. "Review and manual adjustment"에서 사용자가 실행을 멈출 단계를
+      체크하며, 선택 내용은 <code>QSettings</code>의
+      <code>AREG/ReviewSteps</code>(<code>AREG.py:1922</code>)에 저장된다.</p>
+
+      <p><strong>CBCT에서 쓸 수 있는 중단점</strong>(<code>getReviewSteps</code>, <code>CBCT.py:258</code>)과
+      각각 허용하는 작업(<code>CATALOGUE</code>, <code>Review.py:568</code>):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Id</th><th>직전 단계</th><th>성격</th></tr></thead>
+          <tbody>
+            <tr><td><code>cbct_landmarks_orientation</code></td><td><a href="../ALI/ALI.html">ALI_CBCT</a> (Orientation 모드)</td><td><strong>편집 가능</strong>: 점을 옮길 수 있고 다시 기록된다</td></tr>
+            <tr><td><code>cbct_oriented</code></td><td>SEMI_ASO</td><td>보기 전용</td></tr>
+            <tr><td><code>cbct_masks</code></td><td><a href="../AMASSS/AMASSS.html">AMASSS</a> 마스크</td><td>보기 전용</td></tr>
+            <tr><td><code>cbct_centered_t2</code></td><td>PRE_ASO T2</td><td>보기 전용</td></tr>
+            <tr><td><code>cbct_registration</code></td><td><strong>AREG_CBCT</strong></td><td><strong>조정 가능</strong>: 정합된 스캔을 옮길 수 있다</td></tr>
+            <tr><td><code>cbct_segmentation</code></td><td>T2에 대한 최종 AMASSS</td><td>보기 전용</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>일시정지의 동작 방식.</strong> <code>markProcessesForReview</code>
+      (<code>AREG.py:1936</code>)가
+      <code>ReviewPause=True</code>를 설정한다. 대상은 <code>ReviewId</code>가 체크된 단계다. CLI 실행이 끝나면 <code>enterReviewPause</code>
+      (<code>AREG.py:1949</code>)가 <code>True</code>를 반환하고 <code>beginReview</code>를
+      <code>QTimer.singleShot(0, ...)</code>로 미룬다. 이는 필수다. 이 시점은 VTK 옵저버
+      콜백 안이어서 Qt 이벤트 루프가 돌지 않고, 여기서 볼륨을 로드하면
+      Slicer가 더 이상 비우지 않는 stdout 파이프가 가득 차 버린다.</p>
+
+      <p><code>ReviewSession.build</code>(<code>Review.py:118</code>)가
+      대기열을 만든다. <code>ReviewFolder</code>에서 찾은 환자마다 항목 하나이며,
+      <strong>이번</strong> 실행의 환자로 한정된다(<code>runPatientIds()</code>가 입력 T1 폴더를 읽는다 — 재사용된 출력
+      폴더에는 몇 달치 작업 결과가 들어 있을 수 있다). AREG의 경우 <code>ReviewFolder</code>는
+      <code>&lt;output&gt;/&lt;Region&gt;</code>으로 범위가 좁혀진다. 그렇지 않으면 하악골 일시정지에서 두개저도
+      함께 보이고, 사용자의 조정이 먼저 나온 아무
+      행렬에나 반영된다.</p>
+
+      <p><code>cbct_registration</code>에서는 정합된 스캔이 T1 위에 로드되고
+      (<code>foregroundOpacity=0.5</code>) 상호작용 핸들과 함께 <code>vtkMRMLLinearTransformNode</code>에
+      연결된다(<code>Review.py:366</code>). 종료할 때
+      <code>_saveAdjustment</code>(<code>Review.py:457</code>)가
+      RAS 이동량을 LPS로 변환하고(<code>flip @ ras @ flip</code>), 역변환한 뒤,
+      <code>sitk.CompositeTransform([original, nudge.GetInverse()])</code>를 <strong>기존
+      .tfm에</strong> 기록한다. 하류에서 이를 쓰는 쪽은 환자당 행렬 하나만 적용하며 여러 행렬을
+      이어 적용할 수 없기 때문이다. 이어서 스캔을 확정(harden)하여 제자리에 다시 기록한다
+      (<code>Review.py:510</code>). 행렬이 1e-9 이내에서
+      항등이면 아무것도 기록하지 않는다.</p>
+
+      <p><strong>일괄 탐색</strong>:</p>
+
+      <ul>
+        <li><em>Previous / Next patient</em>(<code>AREG.py:2117</code>): 실행을
+        진행시키지 않고 대기열을 오간다. 이동할 때마다 <code>saveEdits()</code>가
+        호출되므로 보정 내용이 유지된다.</li>
+        <li><em>Flag</em>(<code>AREG.py:2131</code>): 환자를 "다시 할 것"으로 표시한다.
+        이 버튼은 더 앞에 보정 가능한 단계가 있을 때만 나타난다.</li>
+        <li><em>Go back</em>(<code>AREG.py:2138</code>): <code>previousCorrectableStep()</code>
+        (<code>AREG.py:2052</code>)이 <code>executed_steps</code>를 거슬러
+        <code>LANDMARKS</code> 또는 <code>REGISTRATION</code> 유형의 마지막 단계까지 간다. 읽기 전용 단계는
+        건너뛴다. 중간 단계는 <strong>표시된
+        환자에 대해서만 다시 실행된다</strong>. <code>restrictStepToPatients</code>(<code>Review.py:727</code>)가
+        이 환자들만 담은 임시 폴더를 <strong>심볼릭
+        링크</strong>로(CBCT 하나가 200 MB) 트리 구조를 유지한 채 만들고, 해당
+        단계의 입력 키(<code>t1_folder</code>, <code>t2_folder</code>, <code>input</code>, <code>inputVolume</code> 등:
+        <code>INPUT_KEYS</code>, <code>Review.py:717</code>)를 다시 쓴다. 범위가 좁혀진
+        단계는 <code>list_Processes_Parameters</code>의 맨 앞에 삽입된다. 링크는
+        실행이 끝날 때 <code>clearReviewTempFolders</code>가 지운다.</li>
+        <li><em>Next step</em>(<code>AREG.py:2181</code>): 현재
+        환자를 저장하고, 열어 보지 않고 수락된 환자 수를 로그에 남긴 뒤,
+        실행을 재개한다.</li>
+      </ul>
+
+      <p><code>ReviewMatrixFolder</code>와 <code>ReviewKind</code>는 <code>Review.build</code>가 읽지만 <strong>어디에서도
+      설정되지 않는다</strong>. 쓰이지 않는 확장 지점이다(따라서 행렬은 항상
+      <code>ReviewFolder</code> 안에서 찾는다).</p>
+
+      <h2 id="predit-calcule">9. 예측되는 것과 계산되는 것</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>블록</th><th>성격</th><th>실행 위치</th></tr></thead>
+          <tbody>
+            <tr><td>T1/T2 중앙 맞춤 (PRE_ASO)</td><td><span class="badge calcule">계산</span> 기하, 중심의 평행이동</td><td>Slicer CLI</td></tr>
+            <tr><td>방향 정렬용 랜드마크 (<a href="../ALI/ALI.html">ALI_CBCT</a>)</td><td><span class="badge predit">예측</span> 3D DenseNet 신경망, 다중 스케일 RL 에이전트</td><td>Slicer CLI, 가능하면 CUDA</td></tr>
+            <tr><td>방향 정렬 (SEMI_ASO)</td><td><span class="badge calcule">계산</span> 랜드마크에 대한 VTK 강체 ICP</td><td>Slicer CLI</td></tr>
+            <tr><td>기준 부위 마스크 (<a href="../AMASSS/AMASSS.html">AMASSS</a>)</td><td><span class="badge predit">예측</span> nnU-Net v2 3d_fullres 신경망</td><td>Slicer CLI, GPU</td></tr>
+            <tr><td><strong>T1/T2 정합 (AREG_CBCT)</strong></td><td><span class="badge calcule">계산</span> elastix 강체, 상호정보량</td><td>Slicer CLI, CPU</td></tr>
+            <tr><td>최종 분할 (AMASSS)</td><td><span class="badge predit">예측</span> nnU-Net v2 신경망</td><td>Slicer CLI, GPU</td></tr>
+            <tr><td>수동 보정</td><td><span class="badge calcule">계산</span> Slicer 변환을 .tfm에 합성</td><td>위젯</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1560 190" role="img" aria-label="성격별로 색을 칠한 전체 체인: 계산, 신경망 예측, 모듈 핵심">
+          <rect class="d-box" x="10" y="20" width="190" height="56" rx="6"/>
+          <text class="d-label" x="105" y="43" text-anchor="middle">T1/T2 중앙 맞춤</text>
+          <text class="d-label-s" x="105" y="59" text-anchor="middle">PRE_ASO, 기하</text>
+
+          <path class="d-arrow" d="M200 48 H240"/>
+          <path class="d-arrow-head" d="M240 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="240" y="20" width="200" height="56" rx="6"/>
+          <text class="d-label" x="340" y="43" text-anchor="middle">랜드마크 (ALI_CBCT)</text>
+          <text class="d-label-s" x="340" y="59" text-anchor="middle">3D DenseNet, RL 에이전트</text>
+
+          <path class="d-arrow" d="M440 48 H480"/>
+          <path class="d-arrow-head" d="M480 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="480" y="20" width="180" height="56" rx="6"/>
+          <text class="d-label" x="570" y="43" text-anchor="middle">방향 정렬 (SEMI_ASO)</text>
+          <text class="d-label-s" x="570" y="59" text-anchor="middle">VTK 강체 ICP</text>
+
+          <path class="d-arrow" d="M660 48 H700"/>
+          <path class="d-arrow-head" d="M700 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="700" y="20" width="210" height="56" rx="6"/>
+          <text class="d-label" x="805" y="43" text-anchor="middle">마스크 (AMASSS)</text>
+          <text class="d-label-s" x="805" y="59" text-anchor="middle">nnU-Net v2 3d_fullres</text>
+
+          <path class="d-arrow" d="M910 48 H950"/>
+          <path class="d-arrow-head" d="M950 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box-a" x="950" y="20" width="220" height="56" rx="6"/>
+          <text class="d-label" x="1060" y="43" text-anchor="middle">정합 (AREG_CBCT)</text>
+          <text class="d-label-s" x="1060" y="59" text-anchor="middle">elastix 강체, 상호정보량</text>
+
+          <path class="d-arrow" d="M1170 48 H1210"/>
+          <path class="d-arrow-head" d="M1210 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box-n" x="1210" y="20" width="180" height="56" rx="6"/>
+          <text class="d-label" x="1300" y="43" text-anchor="middle">최종 분할</text>
+          <text class="d-label-s" x="1300" y="59" text-anchor="middle">AMASSS, nnU-Net v2</text>
+
+          <path class="d-arrow" d="M1390 48 H1430"/>
+          <path class="d-arrow-head" d="M1430 48 l-8 -5 v10 z"/>
+
+          <rect class="d-box" x="1430" y="20" width="120" height="56" rx="6"/>
+          <text class="d-label" x="1490" y="43" text-anchor="middle">보정</text>
+          <text class="d-label-s" x="1490" y="59" text-anchor="middle">수동</text>
+
+          <rect class="d-box" x="10" y="130" width="26" height="18" rx="3"/>
+          <text class="d-label-s" x="44" y="144">계산</text>
+          <rect class="d-box-n" x="150" y="130" width="26" height="18" rx="3"/>
+          <text class="d-label-s" x="184" y="144">신경망 예측</text>
+          <rect class="d-box-a" x="380" y="130" width="26" height="18" rx="3"/>
+          <text class="d-label-s" x="414" y="144">모듈 핵심 (계산)</text>
+        </svg>
+        <figcaption>AREG_CBCT 체인의 블록 7개 중 3개가 신경망으로 예측된다(랜드마크, 마스크/분할 두 세트). 강조된 상자인 정합 자체는 전적으로 elastix가 계산한다.</figcaption>
+      </figure>
+
+      <div class="callout ok">
+        <div class="callout-title">확인됨</div>
+        <p>AREG_CBCT에는 신경망이 전혀 없다. <code>torch</code>도,
+        <code>monai</code>도, <code>.pth</code>도 없다. 체인에서 학습이 쓰이는 곳은 기준 부위를 구분하는
+        마스크 생성과, Orientation 모드에서의 랜드마크뿐이다.</p>
+      </div>
+
+      <h2 id="environnement">10. 실행 환경</h2>
+
+      <p>모든 패키지는 실행 버튼을 누르면 확인 대화 상자를 거친 뒤
+      <code>install_function</code>(<code>AREG.py:86</code>)이 Slicer의 Python에
+      설치한다.</p>
+
+      <p><code>itk==5.4.0</code>, <strong><code>itk-elastix==0.19.2</code></strong>(정합 엔진),
+      <code>dicom2nifti==2.6.2</code>, <code>torch==2.2.0</code>(Windows에서는 <code>cu118</code> 휠),
+      <code>monai==1.3.2</code>, <code>nnunetv2&gt;=2.8.0</code>과 <code>torchvision</code>(<strong>Linux/macOS 전용</strong>),
+      numpy ≥ 2가 감지되면 이후 다시 강제하는 <code>numpy&lt;2.0.0</code>, 그리고
+      <code>connected-components-3d</code>, <code>einops</code>, <code>nibabel</code>, <code>pandas</code>. <code>pydicom</code>은
+      Slicer 자체 버전인 <code>==3.0.2</code>로 고정된다. 이를 다운그레이드하면 <code>dicomweb-client</code>와
+      <code>highdicom</code>이 깨지고, 그 결과 Slicer의 모든 DICOM 모듈이 깨진다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><code>check_lib_installed</code>(<code>AREG.py:68</code>)는 <strong>버전을
+        비교하지 않는다</strong>. 패키지가 설치되어 있기만 하면 버전과 상관없이
+        제약 조건이 무시된다.</p>
+      </div>
+
+      <h2 id="pieges">11. 함정과 취약 지점</h2>
+
+      <p><strong><code>_T1</code> / <code>_T2</code> 접미사.</strong> 커밋 <code>05d1fec</code>에서 해당하는 모든 위치에
+      <code>TIMEPOINT-SUFFIX</code> 키워드를 달았다. 기준 메모는 <code>GetPatients</code> 위에 있다
+      (<code>utils.py:68</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>문제: 환자 ID는 고정된 표지 목록으로 이름을 쪼갠 뒤 남는 부분인데,
+        그 목록에 있는 시점은 <code>_T1</code>과 <code>_T2</code>뿐이다.
+        <code>P001_T3.nii.gz</code>는 ID <code>P001_T3</code>을 유지하고, 아무것과도 짝지어지지 않으며, 그 쌍은
+        <strong>조용히 제외된다</strong>. 예외도 발생하지 않는다. 실제 시점은 이름이 아니라
+        <code>time_point</code> 인자, 즉 폴더에서 온다. 문제는
+        ID 추출에만 있다.</p>
+      </div>
+
+      <p>AREG 범위 내의 해당 위치:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>줄</th><th>형태</th></tr></thead>
+          <tbody>
+            <tr><td><code>AREG_CBCT/AREG_CBCT_utils/utils.py</code></td><td>101</td><td><code>split()</code> 연쇄, 스캔과 랜드마크</td></tr>
+            <tr><td><code>AREG_CBCT/AREG_CBCT_utils/utils.py</code></td><td>144</td><td>같은 코드를 마스크 탐색용으로 복사</td></tr>
+            <tr><td><code>AREG/AREG_Method/CBCT.py</code></td><td>1014</td><td>위젯 쪽 복사본(개수 세기, <code>TestScan</code>)</td></tr>
+            <tr><td><code>AREG/AREG_Method/Review.py</code></td><td>39</td><td><code>patientIdFromFileName</code>, 확장된 목록(<code>_Center</code>, <code>_Pred</code>, <code>_U</code>, <code>_L</code> 등)</td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS.py</code></td><td>318</td><td>T2 스캔 이름이 <code>_T2</code>라고 가정</td></tr>
+            <tr><td><code>AREG_IOSCBCT/AREG_IOSCBCT.py</code></td><td>376</td><td>정규식 <code>[Tt][0-2]</code>: <code>_T3</code>은 일치하지 않아 환자가 건너뛰어진다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>AREG 밖에서도 같은 연쇄가 <code>ASO/ASO_Method/CBCT.py</code>(42행),
+      <code>MRI2CBCT/MRI2CBCT_utils/utils_CBCT.py</code>(41행),
+      <code>MRI2CBCT_CLI/MRI2CBCT_CLI_utils/TMJ_crop.py</code>(21행),
+      그리고 <code>VFACE/VFACE_utils/createlistprocess.py</code>(2099행)에 두 번 있다.
+      메모에서 제안한 수정은 모든 곳에 <code>re.sub(r"_[Tt]\d+$", "", ...)</code>를 적용하되
+      <strong>split 순서를 유지하는 것</strong>이다(긴 표지는 그 안에서 일치할 짧은 표지보다
+      먼저 잘라야 한다). 이 수정은 의도적으로 하지
+      않았다. 현재 지원되는 해법은 입력 파일 이름을 바꾸는 것이다.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p><strong>elastix의 회전 중심이 사라진다.</strong> <code>MatrixRetrieval</code>은
+        <code>TransformParameters</code>만 읽고 <strong><code>CenterOfRotationPoint</code>는 전혀 읽지 않는다</strong>. elastix
+        <code>EulerTransform</code>은 <code>R·(x − c) + t + c</code>이지만, 재구성된
+        <code>sitk.Euler3DTransform</code>은 중심이 원점이어서 <code>R·x + t</code>이다. 둘이
+        일치하는 것은 <code>c</code>가 원점이거나 <code>R = I</code>일 때뿐이다. <code>AutomaticTransformInitialization</code>이
+        활성화되어 있고 회전 중심은 <strong>고정</strong>
+        영상(T1, Orientation 모드에서만 중앙 맞춤됨)에서 유도되므로, 차이 <code>(I − R)·c</code>는
+        일반적으로 0이 아니다. 그리고 이 차이는 <code>.tfm</code>에만 국한되지 않는다. 출력
+        볼륨은 <strong>elastix 자체의 결과 영상이 아니라</strong>, 같은 행렬로
+        <code>ResampleImage(sitk.ReadImage(moving_image_path), transform)</code>
+        (<code>utils.py:686</code>)가 다시
+        만든 것이다. 따라서 <code>.tfm</code>과 정합된 볼륨은 서로
+        일치하지만, 둘 다 elastix가 실제로 최적화한 결과에서 벗어난다.</p>
+        <p><code>CenterOfRotationPoint</code>는 <strong>저장소 어디에도 나오지 않으며</strong>(grep으로 확인),
+        <code>MatrixRetrieval</code>은 <strong>똑같이 복제되어</strong>
+        <code>MRI2CBCT_CLI/MRI2CBCT_CLI_utils/AREG_MRI.py:78</code>에도 있다.
+        MRI↔CBCT 정합에도 같은 차이가 적용된다.</p>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">참고</div>
+        <p>믿기보다는 검증해야 할 가설: 모듈이 실제로 여전히
+        올바른 결과를 낸다면, 볼륨이 이미
+        원점 가까이에 도착하기 때문일 가능성이 높다. PRE_ASO가 T2를 다시 중앙에 맞추고 <a href="../ASO/ASO.html">ASO</a>가 T1의 방향을 정렬하므로
+        <code>c ≈ 0</code>이고 <code>(I − R)·c</code>가 작게 유지된다. 이는 결과가
+        어디에서도 보장되지 않는 사전 중앙 맞춤에 의존하게 만든다. 결론을 내리기 전에 실제 증례에서
+        차이를 측정하라.</p>
+      </div>
+
+      <p><strong>기타 사항:</strong></p>
+
+      <ul>
+        <li><code>ApproxReg</code> / "Include Approximation Step"은 2025년 9월 이후 <strong>아무 효과가 없다</strong>.
+        UI에서 체크박스는 여전히 기본으로 체크되어 있다.</li>
+        <li><code>&lt;T2 folder&gt;_Center</code> 폴더는 <strong>사용자 입력
+        폴더 옆에</strong> 생성된다. <code>&lt;T1 folder&gt;Or</code>도 마찬가지다. PRE_ASO는 이미
+        있는 파일을 건너뛴다. 입력을 바꿔 다시 실행하면 이전 파일을 재사용한다.</li>
+        <li>Fully-Auto 모드에서는 <a href="../AMASSS/AMASSS.html">AMASSS</a>가 마스크를 <strong>입력 T1 폴더에</strong> 기록한다.
+        <code>cbct_registration</code> 일시정지에서 <code>ReviewReferenceFolder</code>가 바로 그 폴더이므로,
+        해당 환자의 모든 마스크가 스캔과 함께 장면에 로드된다.</li>
+        <li><code>fixed_image_masked.nii.gz</code> 파일은 같은 임시 폴더에서
+        환자마다 다시 쓰인다.</li>
+        <li><code>SwitchType</code>(<code>AREG.py:1030</code>)은
+        <code>SwitchModeCBCT</code>가 숨긴 NIFTI/DCM 선택기를 다시 표시한다. 최종 결과는
+        <strong>DICOM 입력이 Orientation 모드에서만 제공된다</strong>는 것으로,
+        <code>SwitchModeCBCT</code>가 의도한 것으로 보이는 바와 정반대다. 게다가 그 모드에서 <code>DCMInput</code>은
+        폴더에 이미 NIfTI가 들어 있는 AREG 단계로 전달된다.</li>
+        <li>첫 번째 CBCT 단계에 대해 <code>startStep</code>이 두 번 호출된다
+        (<code>AREG.py:1542</code>, 이어서 <code>AREG.py:1557</code>).
+        <code>executed_steps</code>에 중복 항목이 생기는데, <code>previousCorrectableStep</code>은
+        <strong>마지막</strong> 항목을 찾으므로 문제가 흡수된다.</li>
+        <li>수동으로 보정한 <code>.tfm</code>은
+        <code>CompositeTransform</code>이 되며, <code>Euler3DTransform</code>이 아니다. 단순 변환을 가정하는 하류 소비자는
+        이를 다시 읽지 못할 수 있다.</li>
+        <li>발견된 사용되지 않는 코드: <code>TestReference</code>(<code>CBCT.py:61</code>,
+        인자 하나로 <code>NumberScan</code>을 호출하여 <code>TypeError</code>를 일으킬 것),
+        <code>GetSegmentationLabel</code>, <code>getGPUUsage</code>, <code>GetMatrixPatients</code>, <code>ModifiedDictPatients</code>
+        (<code>matrix_folder</code>나 <code>todo_str</code>를 넘기는 호출자가 없음), <code>ElastixReg(initial_transform=...)</code>,
+        그리고 <code>DisplayAREGIOSCBCT</code>. 마지막 것은
+        <code>Progress.py</code>(135행)에 두 번 정의되어 있다.</li>
+      </ul>
+
+      <h2 id="litterature">12. 문헌</h2>
+
+      <p>기준 논문은 <strong>Anchling, Hutin, Huang, Barone, Roberts, Miranda,
+      Gurgel, Al Turkestani, Tinawi, Bianchi, Yatabe, Ruellas, Prieto, Cevidanes,
+      "Automated Orientation and Registration of Cone-Beam Computed Tomography
+      Scans," LNCS 14242, 2023, p. 43-58</strong>이다 —
+      <a href="https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5">Springer</a>,
+      <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11104011/">PMC11104011</a>.
+      보고된 정확도: 전문가 대비 &lt; 3°, &lt; 2 mm, 증례당 5분 미만.</p>
+
+      <p><strong>코드는 확인된 세 가지 점에서 논문과 다르다.</strong></p>
+
+      <ol>
+        <li>논문은 2단계 정합 — "VBR between the full images,
+        then with the masked image as a refinement step", 마스크 단계에서 반복 10,000회 — 을
+        설명한다. 코드는 이제 마스크 단계 한 번만 1500회 반복으로 실행한다;</li>
+        <li>논문은 <strong>SimpleElastix</strong>를 언급하지만, 코드는 <code>itk-elastix</code>
+        (<code>itk.ElastixRegistrationMethod</code>)를 쓴다;</li>
+        <li>논문은 마스크를 <strong><a href="../AMASSS/AMASSS.html">AMASSS</a> / <a class="gterm" href="../glossary.html#g-unetr" title="용어집 보기">UNETR</a> MONAI</strong>로 얻지만, AMASSS는
+        현재 <strong>nnU-Net v2</strong>다.</li>
+      </ol>
+
+      <p>근본적인 질문 — 두개저 기준 복셀 기반 중첩 — 에 관한
+      연구실의 역사적 기준 문헌은 Cevidanes et al., <em>Superimposition of 3D
+      cone-beam CT models of orthognathic surgery patients</em>(2005,
+      <a href="https://pubmed.ncbi.nlm.nih.gov/16227481/">PubMed 16227481</a>)이다.</p>
+
+      <p>다음 논문과 혼동하지 말 것:
+      <a href="https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0016520">Accuracy and Reproducibility of Voxel Based Superimposition…, PLOS One 2011</a>.
+      이 논문은 연구실의 것이 <strong>아니다</strong>. 저자는 Nada, Maal, Kuijpers-Jagtman et al.
+      (Radboud UMC, 네이메헌)이다. 방법에 대한 독립적인 검증이므로 오히려
+      더 무게가 있지만, 이 연구 그룹의 것으로 돌리는 것은
+      잘못이다.</p>
+
+      <p>저장소: <a href="https://github.com/lucanchling/AREG">lucanchling/AREG</a>,
+      <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">DCBIA-OrthoLab/SlicerAutomatedDentalTools</a>.
+      검토 일시정지와 일괄 탐색은 어떤
+      발표 문헌에도 설명되어 있지 않다. 내부 개발 사항이다.</p>
+
+      <p>전체 참고문헌, 받아 둔 PDF, 확인할 만한 링크: <a href="SOURCES.html">SOURCES.html</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← 모든 도구 페이지</a> ·
+        <a href="SOURCES.html">이 도구의 참고문헌</a> ·
+        출처: <code>AREG_CBCT.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

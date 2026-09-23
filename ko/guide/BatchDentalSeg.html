@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BatchDentalSeg — 가이드 — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="segmentation">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/BatchDentalSeg.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/BatchDentalSeg.html" hreflang="fr" title="Français">FR</a><a href="../../pt/guide/BatchDentalSeg.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/guide/BatchDentalSeg.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/BatchDentalSeg.html" aria-current="true"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../BatchDentalSeg/BatchDentalSeg.html"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html" aria-current="page">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/BatchDentalSeg/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">가이드</a> › 분할</div>
+        <h1>BatchDentalSeg — CT/CBCT 스캔 일괄 분할</h1>
+        <p class="lede">BatchDentalSeg는 치아·악안면 CT 및 CBCT 볼륨을 조립 라인처럼
+        분할합니다. 폴더를 지정하면 모든 스캔에 같은 레이블 세트를 하나씩 차례로 적용합니다.
+        여기서 중요한 선택은 신경망 설정이 아니라 <strong>모델</strong>입니다. 모델마다 분할하는
+        구조가 다릅니다.</p>
+      </header>
+
+      <h2 id="quand">언제 쓰는가</h2>
+      <p>여러 CT 또는 CBCT 스캔에서 같은 해부학적 구조(두개골, 하악골, 치아, 하악관, 또는 치아별
+      구분)를 분할해야 할 때 씁니다. BatchDentalSeg는 독립 도구입니다. 저장소의 다른 어떤 모듈도
+      이를 호출하지 않고, 이 도구가 후속 모듈을 위해 무언가를 준비하지도 않습니다. 파이프라인의 한
+      단계가 아니라 종착점입니다.</p>
+
+      <div class="callout">
+        <div class="callout-title">먼저 설치할 확장이 하나 있습니다</div>
+        <p>BatchDentalSeg는 계산을 외부 Slicer 확장 <strong>NNUnet</strong>에 의존합니다. 이 확장은
+        자동으로 설치되지 않습니다. Extensions Manager(확장 관리자)에서 설치한 뒤 Slicer를
+        재시작하십시오. 없으면 모듈이 메시지를 표시하고 시작을 거부합니다.</p>
+      </div>
+
+      <h2 id="modele">모델 선택</h2>
+      <p>드롭다운 메뉴에 모델 네 개가 있습니다. 같은 엔진과 같은 창을 쓰지만, 분할하는 대상은
+      서로 다릅니다:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>모델</th><th>분할하는 것</th><th>용도</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>DentalSegmentator</td>
+              <td>구조 5개: 두개골 상부(상악골 포함), 하악골, 상악 치아,
+              하악 치아, 하악관</td>
+              <td>영구치열(성인)</td>
+            </tr>
+            <tr>
+              <td>PediatricDentalsegmentator</td>
+              <td>같은 구조 5개, 같은 구분</td>
+              <td>혼합치열(소아) — 학습 데이터만 다름</td>
+            </tr>
+            <tr>
+              <td>NasoMaxillaDentSeg</td>
+              <td>구조 6개: 상악골을 두개골에서 분리해 별도
+              구조로 출력</td>
+              <td>상악골을 나머지 안면부와 분리해야 할 때</td>
+            </tr>
+            <tr>
+              <td>UniversalLabDentalsegmentator</td>
+              <td>구조 55개: 영구치 32개 모두 개별 번호, 유치
+              20개, 하악골, 상악골, 하악관</td>
+              <td>치아별 분할, 혼합치열 또는 영구치열</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>동료 심사를 거친 출판물이 뒷받침하는 것은 DentalSegmentator뿐입니다(<em>Journal of
+      Dentistry</em>, 2024, 7개 기관의 CT 스캔 453건). 나머지 세 모델은 독립적인 검증 논문 없이
+      연구팀이 공개한 것이므로, 공개된 학습 수치는 내부 주장으로 받아들이십시오.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">NasoMaxillaDentSeg: 표시되는 이름이나 색을
+        믿지 마십시오</div>
+        <p>이 모델에서는 여섯 세그먼트 중 네 개에 대해 화면에 표시되는 레이블과 색이 실제 구조와
+        맞지 않습니다. 예를 들어 "Upper Teeth"(상악 치아)로 표시되는 것은 실제로는 상악골입니다.
+        단순한 표시 오류가 아닙니다. 내보낸 파일에 기록되는 값도 잘못된 이름을 따르며, 일치하는 항목이
+        없으면 하악관 세그먼트가 <strong>내보내기에서 아예 빠질</strong> 수 있습니다. 이 모델을
+        쓴다면, 이름을 믿기 전에 각 세그먼트를 하나씩 확인하십시오.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">UniversalLabDentalsegmentator는 두개골을 분할하지
+        않습니다</div>
+        <p>인터페이스의 설명과 원 모델의 문서는 두개골이 포함된다고 암시합니다. 그렇지
+        않습니다. 55개 구조는 치아, 하악골, 상악골, 하악관이며, "두개골" 구조는 전혀 없습니다.
+        두개 분할을 기대하고 이 모델을 고르지 마십시오.</p>
+      </div>
+
+      <h2 id="besoin">필요한 것, 얻는 것</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>준비할 것</h4>
+          <ul>
+            <li><code>.nii</code>, <code>.nii.gz</code>,
+            <code>.gipl</code>, <code>.gipl.gz</code> 형식의 스캔 폴더 — NRRD는 안 되며, 하위 폴더는
+            탐색하지 않습니다</li>
+            <li>메뉴에서 고른 원하는 모델</li>
+            <li>출력 폴더</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>얻는 것</h4>
+          <ul>
+            <li>항상: <code>&lt;name&gt;_Segmentation.nii.gz</code>, 원본 스캔의 기하 정보를 따르는
+            레이블 맵</li>
+            <li>선택 사항: STL/OBJ 메시, 구조별 또는 병합된 VTK, 구조별 이진 NIfTI,
+            glTF</li>
+            <li>원본 스캔은 건드리지 않습니다</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">사용 절차</h2>
+      <ol class="steps">
+        <li>아직 설치하지 않았다면 <strong>NNUnet 확장을 설치하고</strong>, Slicer를
+        재시작합니다.</li>
+        <li>필요한 구조에 따라(위 표 참조) 드롭다운에서 <strong>모델을 고릅니다</strong>.
+        어떤 모델을 처음 쓸 때 그 가중치가 자동으로 다운로드됩니다.</li>
+        <li><strong>입력 폴더를 지정합니다.</strong> BatchDentalSeg는 폴더 전체를 한 번에
+        처리합니다. 이미 분할 결과가 있는 스캔은 자동으로 건너뛸 수 있습니다(기본으로
+        체크되어 있음).</li>
+        <li>항상 기록되는 레이블 맵 외에 필요한 <strong>출력 형식을 체크합니다</strong>.</li>
+        <li><strong>출력 폴더와 장치를 지정하고</strong>(GPU 또는 CPU), 실행합니다. 대기열이
+        진행 막대와 함께 스캔을 하나씩 처리합니다. 대기열 상태는 계속 저장되므로, Slicer를 닫았다가
+        나중에 중단한 곳부터 이어서 할 수 있습니다.</li>
+      </ol>
+
+      <h2 id="memoire">메모리와 시간</h2>
+      <p>전악 CBCT는 추론 중에 많은 RAM을 요구할 수 있습니다. 모듈 자체의 메모에는 한 스캔이
+      컴퓨터의 125 GB 중 114 GB를 채우고 시스템에 의해 강제 종료된 실제 사례가 적혀 있습니다.
+      세 겹의 방어 장치가 있습니다:</p>
+      <ul>
+        <li>시작 전: 예상 메모리 요구량이 예산(기본값은 여유 RAM의 85%)을 넘는 스캔은
+        <strong>시작조차 하지 않고</strong> 실패로 표시됩니다.</li>
+        <li>실행 중: 두 번 연속 확인된 초과가 있으면, 시스템이 멈추게 두는 대신 해당 스캔을 깔끔하게
+        중단합니다.</li>
+        <li><em>Free memory</em>(메모리 해제) 버튼으로, 갑작스러운 중단 후 남은 프로세스가 있으면
+        메모리를 직접 회수할 수 있습니다.</li>
+      </ul>
+      <p>이 이유로 스캔이 실패하면 <em>Retry failed</em>(실패 항목 재시도)가 다시 시도하기 전에 조직
+      주변을 자동으로 잘라 내는 옵션(여백 15 mm)을 제공합니다. 출력은 이후 원본 스캔의 격자에
+      다시 배치됩니다. 긴 일괄 작업에서는 분할 다섯 번마다 정리를 위한 일시 정지가 있습니다.</p>
+      <p>그래픽 카드 없이도 계산은 되지만, 몇 분이 아니라 스캔당 대략 <strong>1시간</strong>이
+      걸린다고 생각하십시오. 선택한 장치를 쓸 수 없으면, CPU로 전환할지 묻는 질문은 대기열
+      전체에 대해 한 번만 나옵니다.</p>
+
+      <h2 id="coince">문제가 생기면</h2>
+      <div class="callout warn">
+        <div class="callout-title">나중에 모델을 바꾸면 다른 모델의 가중치가 지워질 수 있습니다</div>
+        <p>DentalSegmentator의 가중치를 다시 다운로드하거나 업데이트하면 모델 폴더 전체가
+        지워지며, PediatricDentalsegmentator, NasoMaxillaDentSeg, UniversalLabDentalsegmentator용으로 이미
+        받아 둔 것도 포함됩니다. 모델을 오가며 쓴다면 다시 다운로드해야 한다고 생각하십시오.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">파일이 인식되지 않습니다</div>
+        <p><code>.nii</code>, <code>.nii.gz</code>, <code>.gipl</code>,
+        <code>.gipl.gz</code>만, 그리고 선택한 폴더의 최상위에 있는 것만 인식됩니다. NRRD 스캔이나
+        하위 폴더에 있는 스캔은 조용히 무시됩니다. 서로 다른 두 폴더에 기본 이름이 같은 스캔이 있으면
+        같은 출력을 덮어씁니다. 파일 이름을 고유하게 지으십시오.</p>
+      </div>
+
+      <h2 id="resultat">그다음</h2>
+      <p>다른 형식을 무엇을 체크했든 레이블 맵은 항상 기록됩니다. 측정이나 내보내기에 쓰기 전에
+      Slicer에서 열어 분할을 확인하십시오. UniversalLabDentalsegmentator에서는 신경망이 가끔 좌우를
+      혼동합니다. 전용 버튼이 원래 결과를 건드리지 않고 중절치를 기준으로 좌우를 바로잡습니다.
+      메시 내보내기가 실패해도 스캔은 완료로 표시됩니다. 중요한 것은 레이블 맵입니다.</p>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">더 읽을거리</h2>
+      <p>원래 모델은 논문으로 발표되어 문서화되어 있습니다. 나중에 추가된 세 가지 변형(소아용, <em>universal labelling</em>, 비상악)은 그렇지 않습니다. 학습 데이터셋도, 평가도 없습니다.</p>
+      <h3 id="sur-outil">BatchDentalSeg 자체에 관한 문헌</h3>
+      <ul>
+        <li><strong>Dot et al., Journal of Dentistry 2024</strong> — <a href="https://doi.org/10.1016/j.jdent.2024.105130"><em>DentalSegmentator: Robust open source deep learning-based CT and CBCT image segmentation</em></a>. 이 모듈이 실행하는 모델입니다. 분할하는 다섯 구조물, 학습 데이터, 측정된 정확도를 다룹니다. 무료로 읽을 수 있습니다.</li>
+      </ul>
+      <h3 id="autour">방법론 관련 문헌</h3>
+      <ul>
+        <li><strong>Isensee et al., Nature Methods 2021</strong> — <a href="https://doi.org/10.1038/s41592-020-01008-z"><em>nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation</em></a>. 이 모듈의 모든 모델이 기반으로 하는 프레임워크입니다.</li>
+        <li><strong>Sinard et al., Orthod Craniofac Res 2025</strong> — <a href="https://doi.org/10.1111/ocr.12890"><em>Automated Cone Beam Computed Tomography Segmentation of Multiple Impacted Teeth With or Without Association to Rare Diseases: Evaluation of Four Deep Learning-Based Methods</em></a>. 어려운 증례(다수의 매복치)에 대한 독립적인 평가입니다. 모델이 어디서 버티고 어디서 무너지는지 보여 줍니다.</li>
+      </ul>
+      <p>이 도구의 전체 참고문헌 — 찾아낸 것과 찾아봤지만 없었던 것 — 은 <a href="../BatchDentalSeg/SOURCES.html">출처 페이지</a>에 있습니다.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../BatchDentalSeg/BatchDentalSeg.html">
+        <b>실제 동작 방식 →</b>
+        <span>아틀라스 페이지: 네 모델과 그 가중치, 대기열과 메모리 보호 장치, 기하 정보 복원,
+        내보내기, 그리고 코드에서 발견된
+        함정.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← 모든 가이드</a> ·
+        <a href="../BatchDentalSeg/BatchDentalSeg.html">아틀라스 페이지</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

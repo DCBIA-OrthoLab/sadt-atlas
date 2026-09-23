@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASO — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="landmarks">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/ASO/ASO.html" hreflang="en" title="English">EN</a><a href="../../fr/ASO/ASO.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/ASO/ASO.html" hreflang="ko" title="한국어">KO</a><a href="../../th/ASO/ASO.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/ASO.html"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../ASO/ASO.html" aria-current="true"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html" aria-current="page">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/ASO/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Landmarks e orientação</div>
+        <h1>ASO</h1>
+        <p class="lede">Busca uma rotação rígida que leve uma CBCT ou um escaneamento intraoral ao referencial de um caso de referência (o "gold"), por meio de uma inicialização em 3 pontos seguida de <a class="gterm" href="../glossary.html#g-icp" title="Ver glossário">ICP</a> — nunca um registro ótimo por mínimos quadrados.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1007/978-3-031-45249-9_5" target="_blank" rel="noopener" title="Automated Orientation and Registration of CBCT Scans.">Anchling 2023 · LNCS 14242</a>
+          <span class="badge cli">PRE_ASO_CBCT</span>
+          <span class="badge cli">SEMI_ASO_CBCT</span>
+          <span class="badge cli">PRE_ASO_IOS</span>
+          <span class="badge cli">SEMI_ASO_IOS</span>
+          <span class="badge neutral">ambiente conda: shapeaxi (só IOS auto)</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliografia</a>
+        </div>
+      </header>
+
+      <h2 id="situation">1. Onde se situa no pipeline</h2>
+
+      <p>Nada no repositório chama o ASO. O ASO, por sua vez, chama três ferramentas, e o
+      <strong><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> consome diretamente a sua saída</strong>: <code>AREG_IOS.py:324</code>
+      procura <code>&lt;patient&gt;_SegOr.tfm</code> nas pastas T1 e T2 — exatamente o nome
+      escrito por <code>PRE_ASO_IOS.py:422</code> — e
+      compõe <code>inv(areg_matrix @ inv(matrix_aso))</code> para produzir uma única matriz do
+      exame bruto até o registrado.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Chamado</th><th>Quando</th><th>Como</th></tr></thead>
+          <tbody>
+            <tr><td><code>slicer.modules.pre_aso_cbct</code></td><td>CBCT, somente modo Fully-Automated</td><td><code>slicer.cli.run</code></td></tr>
+            <tr><td><code>slicer.modules.ali_cbct</code></td><td>CBCT, somente modo Fully-Automated</td><td><code>slicer.cli.run</code></td></tr>
+            <tr><td><code>slicer.modules.semi_aso_cbct</code></td><td>CBCT, <strong>ambos</strong> os modos</td><td><code>slicer.cli.run</code></td></tr>
+            <tr><td><code>CrownSegmentationcli</code> (ShapeAXI / <a href="../ALI/ALI.html">DentalModelSeg</a>)</td><td>IOS, modo Fully-Automated</td><td><code>conda run -n shapeaxi</code></td></tr>
+            <tr><td><code>slicer.modules.pre_aso_ios</code></td><td>IOS, modo Fully-Automated</td><td><code>slicer.cli.run</code></td></tr>
+            <tr><td><code>slicer.modules.semi_aso_ios</code></td><td>IOS, modo Semi-Automated</td><td><code>slicer.cli.run</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 640 320" role="img" aria-label="Visão geral das chamadas do ASO: um ramo CBCT e um ramo IOS, cada um em modo automático ou semiautomático, convergindo para uma saída orientada consumida pelo AREG_IOS">
+          <rect class="d-box-a" x="235" y="8" width="170" height="42" rx="6"/>
+          <text class="d-label" x="320" y="34" text-anchor="middle">ASO (widget Slicer)</text>
+
+          <path class="d-arrow" d="M300 50 C260 75, 200 80, 165 100"/>
+          <text class="d-label-s" x="150" y="76" text-anchor="end">via CBCT</text>
+          <path class="d-arrow-head" d="M165 100 l9 -2 l-3 -8 z"/>
+          <path class="d-arrow" d="M340 50 C390 75, 450 80, 480 100"/>
+          <text class="d-label-s" x="496" y="76" text-anchor="start">via IOS</text>
+          <path class="d-arrow-head" d="M480 100 l-9 -2 l3 -8 z"/>
+
+          <rect class="d-box" x="70" y="102" width="190" height="34" rx="6"/>
+          <text class="d-label" x="165" y="123" text-anchor="middle">CBCT</text>
+          <rect class="d-box" x="385" y="102" width="190" height="34" rx="6"/>
+          <text class="d-label" x="480" y="123" text-anchor="middle">IOS</text>
+
+          <path class="d-arrow" d="M165 136 V158"/>
+          <text class="d-label-s" x="172" y="152" text-anchor="start">modo</text>
+          <path class="d-arrow-head" d="M165 158 l-5 -8 h10 z"/>
+          <path class="d-arrow" d="M480 136 V158"/>
+          <text class="d-label-s" x="487" y="152" text-anchor="start">modo</text>
+          <path class="d-arrow-head" d="M480 158 l-5 -8 h10 z"/>
+
+          <rect class="d-box" x="20" y="160" width="290" height="46" rx="6"/>
+          <text class="d-mono" x="165" y="177" text-anchor="middle">PRE_ASO_CBCT → ALI_CBCT → SEMI_ASO_CBCT</text>
+          <text class="d-label-s" x="165" y="192" text-anchor="middle">Fully-Automated</text>
+
+          <rect class="d-box" x="335" y="160" width="290" height="46" rx="6"/>
+          <text class="d-mono" x="480" y="177" text-anchor="middle">CrownSegmentationcli → PRE_ASO_IOS</text>
+          <text class="d-label-s" x="480" y="192" text-anchor="middle">Fully-Automated</text>
+
+          <text class="d-label-s" x="165" y="222" text-anchor="middle">(Semi-Automated: só SEMI_ASO_CBCT, em fiducials fornecidos)</text>
+          <text class="d-label-s" x="480" y="222" text-anchor="middle">(Semi-Automated: só SEMI_ASO_IOS, em landmarks fornecidos)</text>
+
+          <path class="d-arrow" d="M165 232 C165 250, 300 255, 300 265"/>
+          <text class="d-label-s" x="150" y="250" text-anchor="end">exame orientado</text>
+          <path class="d-arrow" d="M480 232 C480 250, 340 255, 340 265"/>
+          <text class="d-label-s" x="496" y="250" text-anchor="start">exame orientado</text>
+          <path class="d-arrow-head" d="M320 266 l9 2 l-2 -9 z"/>
+
+          <rect class="d-box-a" x="200" y="268" width="240" height="42" rx="6"/>
+          <text class="d-label" x="320" y="286" text-anchor="middle">exame / malha orientados</text>
+          <text class="d-label-s" x="320" y="300" text-anchor="middle">+ transformação (.tfm ou .npy)</text>
+        </svg>
+        <figcaption>Os dois backends do ASO, em modo automático ou semiautomático. A saída orientada é depois lida por outro módulo (o nome de arquivo <code>_SegOr.tfm</code> é o que o AREG_IOS espera, mostrado aqui como texto simples).</figcaption>
+      </figure>
+
+      <p><strong>O <a href="../ALI/ALI.html">ALI_IOS</a> nunca é chamado.</strong> <code>Auto_IOS.getALIModelList()</code>
+      (<code>IOS.py:161</code>) existe e aponta para uma release de pesos,
+      mas <code>SearchModelALI</code> está condicionado por <code>if self.type == "CBCT"</code>
+      (<code>ASO.py:961</code>, <code>ASO.py:1030</code>), e <code>SwitchMode</code>
+      esconde o campo nos dois modos IOS. Em IOS, os pontos de ancoragem não são
+      landmarks preditos, mas <strong>centroides dos dentes</strong>.</p>
+
+      <p><code>CrownSegmentationcli</code> não está neste repositório: vem do SlicerDentalModelSeg.
+      <code>slicer.modules.crownsegmentationcli</code> é avaliado em <code>Auto_IOS.Process</code>
+      (<code>IOS.py:304</code>), então a extensão precisa estar instalada
+      mesmo que, no fim, o módulo não seja lançado via <code>slicer.cli.run</code> (ver §5.1).</p>
+
+      <h2 id="fichiers">2. Arquivos envolvidos</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Arquivo</th><th>Papel</th><th>Onde roda</th></tr></thead>
+          <tbody>
+            <tr><td><code>ASO/ASO.py</code></td><td>widget, 2590 linhas: UI, downloads, encadeamento das CLIs, conda</td><td>Python do Slicer</td></tr>
+            <tr><td><code>ASO_Method/CBCT.py</code></td><td><code>Semi_CBCT</code> / <code>Auto_CBCT</code>: listas de landmarks, parâmetros das CLIs</td><td>idem</td></tr>
+            <tr><td><code>ASO_Method/IOS.py</code></td><td><code>Semi_IOS</code> / <code>Auto_IOS</code>: desvio da segmentação, parâmetros</td><td>idem</td></tr>
+            <tr><td><code>PRE_ASO_CBCT.py</code></td><td>recentralização do volume</td><td>CLI, Python do Slicer</td></tr>
+            <tr><td><code>SEMI_ASO_CBCT.py</code></td><td>a orientação CBCT propriamente dita</td><td>idem</td></tr>
+            <tr><td><code>ASO_CBCT_utils/utils.py</code></td><td>1045 linhas: fusão de json, ordenação de landmarks, InitICP, ICP, reamostragem</td><td>idem</td></tr>
+            <tr><td><code>PRE_ASO_IOS.py</code></td><td>orientação IOS por centroides dos dentes</td><td>idem</td></tr>
+            <tr><td><code>SEMI_ASO_IOS.py</code></td><td>orientação IOS por landmarks fornecidos</td><td>idem</td></tr>
+            <tr><td><code>ASO_IOS_utils/</code></td><td><code>PrePreAso</code>, <code>ICP</code>, <code>vtkMeanTeeth</code>, leitura/escrita de malhas</td><td>idem</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Nenhuma dessas CLIs roda no ambiente conda: todas passam por
+      <code>slicer.cli.run</code>, portanto no Python do Slicer. Só <code>dentalmodelseg</code> passa por
+      <code>conda run -n shapeaxi</code> (<code>ASO.py:1417</code>).</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verificado</div>
+        <p>Nenhuma das CLIs do ASO exige CUDA — é tudo VTK e SimpleITK.</p>
+      </div>
+
+      <h2 id="principe">3. O princípio geométrico comum</h2>
+
+      <p>O alvo não é um referencial analítico ("plano <a class="gterm" href="../glossary.html#g-occlusal" title="Ver glossário">oclusal</a> = z=0"), mas <strong>um caso de
+      paciente de referência</strong>, baixado de uma release: exame + fiducials para a
+      CBCT, duas malhas + dois jsons para o IOS. A escolha do referencial é assim transferida
+      para os dados: <code>Occlusal and Midsagittal Plane</code> ou
+      <code>Frankfurt Horizontal and Midsagittal Plane</code>
+      (<code>CBCT.py:68</code>) são dois golds diferentes, e o mesmo código
+      produz duas orientações diferentes.</p>
+
+      <p>Nos dois backends, a estimativa segue o mesmo esquema em duas etapas:</p>
+
+      <ol>
+        <li><strong>Uma inicialização em 3 pontos</strong> — uma translação seguida de duas rotações
+        em torno de eixos construídos à mão, nunca um <a class="gterm" href="../glossary.html#g-procrustes" title="Ver glossário">Procrustes</a>/<a class="gterm" href="../glossary.html#g-kabsch" title="Ver glossário">Kabsch</a> por mínimos quadrados;</li>
+        <li>um <code>vtkIterativeClosestPointTransform</code> em modo <code>RigidBody</code> sobre as nuvens de
+        pontos de ancoragem, para refinar.</li>
+      </ol>
+
+      <p>Este é o ponto a guardar: a matriz <strong>não</strong> é uma solução ótima no sentido
+      dos mínimos quadrados sobre N correspondências. Ela é construída por rotações
+      sucessivas sobre um trio escolhido e depois polida por um ICP que, por sua vez,
+      reemparelha os pontos <strong>por vizinho mais próximo</strong>, e não pelo rótulo.</p>
+
+      <h2 id="aso-cbct">4. ASO_CBCT</h2>
+
+      <h3 id="modes-cbct">4.1 Os dois modos</h3>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Semi-Automated</th><th>Fully-Automated</th></tr></thead>
+          <tbody>
+            <tr><td>Entrada</td><td>exames <strong>+</strong> fiducials <code>.mrk.json</code></td><td>só os exames (ou DICOM)</td></tr>
+            <tr><td>Etapas</td><td><code>SEMI_ASO_CBCT</code></td><td><code>PRE_ASO_CBCT</code> → <code>ALI_CBCT</code> → <code>SEMI_ASO_CBCT</code></td></tr>
+            <tr><td>Pasta de trabalho</td><td><strong>a pasta do usuário</strong></td><td>dois <code>slicer.util.tempDirectory()</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O modo automático é, portanto, apenas o modo semi precedido da geração dos
+      landmarks que faltam (<code>CBCT.py:489</code>).</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 760 210" role="img" aria-label="Comparação dos dois modos do ASO_CBCT: Fully-Automated encadeia recentralização, predição de landmarks por rede e depois orientação; Semi-Automated vai direto à orientação sobre fiducials fornecidos">
+          <text class="d-label-s" x="10" y="18">Fully-Automated</text>
+          <rect class="d-box" x="10" y="24" width="150" height="48" rx="6"/>
+          <text class="d-label" x="85" y="45" text-anchor="middle">PRE_ASO_CBCT</text>
+          <text class="d-label-s" x="85" y="60" text-anchor="middle">recentraliza (translação)</text>
+
+          <path class="d-arrow" d="M160 48 H190"/>
+          <path class="d-arrow-head" d="M190 48 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="195" y="24" width="150" height="48" rx="6"/>
+          <text class="d-label" x="270" y="45" text-anchor="middle">ALI_CBCT</text>
+          <text class="d-label-s" x="270" y="60" text-anchor="middle">landmarks, rede</text>
+
+          <path class="d-arrow" d="M345 48 H375"/>
+          <path class="d-arrow-head" d="M375 48 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="380" y="24" width="180" height="48" rx="6"/>
+          <text class="d-label" x="470" y="45" text-anchor="middle">SEMI_ASO_CBCT</text>
+          <text class="d-label-s" x="470" y="60" text-anchor="middle">trio + rotações + ICP</text>
+
+          <path class="d-arrow" d="M560 48 H590"/>
+          <path class="d-arrow-head" d="M590 48 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="595" y="24" width="155" height="48" rx="6"/>
+          <text class="d-label" x="672" y="45" text-anchor="middle">saída</text>
+          <text class="d-mono" x="672" y="60" text-anchor="middle">.nii.gz + .tfm</text>
+
+          <text class="d-label-s" x="10" y="118">Semi-Automated</text>
+          <text class="d-mono" x="10" y="150">pasta usuário</text>
+          <text class="d-label-s" x="10" y="163">(exames + .mrk.json)</text>
+
+          <path class="d-arrow" d="M130 150 H375"/>
+          <path class="d-arrow-head" d="M375 150 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="380" y="126" width="180" height="48" rx="6"/>
+          <text class="d-label" x="470" y="147" text-anchor="middle">SEMI_ASO_CBCT</text>
+          <text class="d-label-s" x="470" y="162" text-anchor="middle">trio + rotações + ICP</text>
+
+          <path class="d-arrow" d="M560 150 H590"/>
+          <path class="d-arrow-head" d="M590 150 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="595" y="126" width="155" height="48" rx="6"/>
+          <text class="d-label" x="672" y="147" text-anchor="middle">saída</text>
+          <text class="d-mono" x="672" y="162" text-anchor="middle">.nii.gz + .tfm</text>
+        </svg>
+        <figcaption>ASO_CBCT: o modo Fully-Automated apenas acrescenta a recentralização e a predição de landmarks pelo ALI_CBCT (<span class="badge predit">rede</span>) antes de uma orientação idêntica (<span class="badge calcule">geométrico</span>).</figcaption>
+      </figure>
+
+      <h3 id="pre-aso-cbct">4.2 PRE_ASO_CBCT — recentralização, sem rede alguma <span class="badge calcule">calculado</span></h3>
+
+      <p>Apesar do nome e dos seus seis argumentos, esta CLI hoje faz uma única coisa
+      (<code>PRE_ASO_CBCT.py:163</code>):</p>
+
+      <pre><code>T = -np.array(img.TransformContinuousIndexToPhysicalPoint(np.array(img.GetSize()) / 2.0))
+translation = sitk.TranslationTransform(3); translation.SetOffset(T.tolist())
+img_trans = ResampleImage(img, translation.GetInverse())</code></pre>
+
+      <p><code>ResampleImage</code> mantém o tamanho (<code>ratio = 1</code>), o espaçamento e a direção, e
+      define <code>new_origin = orig_origin - orig_center</code>. Como a transformação aplicada cancela
+      exatamente esse deslocamento, <strong>não há interpolação real</strong>: só a origem física
+      se move, e o volume termina centrado na origem do mundo. Esse é o
+      pré-requisito do §4.4, em que a rotação é aplicada em torno da origem.</p>
+
+      <p>Os argumentos <code>model_folder</code>, <code>SmallFOV</code> e <code>temp_folder</code> são lidos e nunca
+      usados. <code>PreASOResample</code>
+      (<code>ResamplePreASO.py:199</code>, uma reamostragem isotrópica
+      128³) é importado mas nunca chamado, e <code>DenseNet</code>
+      (<code>Net.py:39</code>, um <code>DenseNet169</code> 3D do monai
+      que regride um vetor unitário de direção via perda cosseno) está comentado em
+      <code>__init__.py</code>. <strong>Não existe mais nenhuma
+      rede de pré-orientação no ASO_CBCT</strong>: o código de treinamento continua lá, os
+      pesos <code>PreASOModels.zip</code> continuam sendo baixados e validados
+      (<code>CBCT.py:133</code>, <code>TestModel</code> exige um <code>.ckpt</code>), para
+      nada.</p>
+
+      <p>Saída: o volume recentralizado com seu nome original, e
+      <code>&lt;name without extension&gt;.tfm</code> contendo a translação <code>T</code> — <strong>não invertida</strong>,
+      embora tenha sido <code>translation.GetInverse()</code> o que se aplicou ao volume.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><code>convertdicom2nifti</code> (<code>utils.py:504</code>) tenta
+        <code>sitk.ImageSeriesReader</code> e depois recorre a <code>dicom2nifti</code>. Esse recurso está quebrado:
+        ele chama <code>search(output_folder, "nii.gz")</code>, mas <code>search</code>
+        (<code>utils.py:189</code>) é declarada como
+        <code>def search(self, path, *args)</code> — o primeiro argumento é absorvido por <code>self</code>,
+        <code>args</code> fica vazio, o dict retornado fica vazio e o acesso <code>["nii.gz"]</code> levanta um
+        <code>KeyError</code>.</p>
+      </div>
+
+      <h3 id="ali-cbct">4.3 <a href="../ALI/ALI.html">ALI_CBCT</a> — o fornecedor de landmarks <span class="badge predit">predito</span></h3>
+
+      <p>Chamado sobre a pasta temporária, tanto para a entrada quanto para a saída, com constantes
+      fixas no código (<code>CBCT.py:515</code>): <code>spacing="[1,0.3]"</code>,
+      <code>speed_per_scale="[1,1]"</code>, <code>agent_FOV="[64,64,64]"</code>, <code>spawn_radius="10"</code>, e
+      <code>lm_type</code> reformatado em uma lista Python literal por <code>format_lm_string</code>
+      (<code>CBCT.py:481</code>). O ALI_CBCT é um sistema de <strong>agentes
+      de busca</strong> em duas escalas (1 mm e depois 0,3 mm, um <a class="gterm" href="../glossary.html#g-fov" title="Ver glossário">FOV</a> de 64³ voxels em torno
+      do agente); ele escreve <strong>um json por grupo anatômico</strong>,
+      <code>&lt;id&gt;_lm_Pred_&lt;group&gt;.mrk.json</code>
+      (<code>environment.py:138</code>), em <strong><a class="gterm" href="../glossary.html#g-lps" title="Ver glossário">LPS</a></strong>.
+      Os pesos são arquivos <code>&lt;Landmark&gt;_Net*.pth</code> baixados um por landmark de
+      <code>ALI_CBCT/releases/download/models_v01/&lt;LM&gt;.zip</code>.</p>
+
+      <p>Essa é toda a razão de ser de <code>MergeJson</code>
+      (<code>utils.py:65</code>), a primeira chamada feita pelo
+      SEMI_ASO_CBCT: colar os jsons por grupo de volta em um único <code>&lt;patient&gt;_lm_MERGED.mrk.json</code>
+      — <strong>e apagar os arquivos de origem</strong> (<code>os.remove</code>).</p>
+
+      <h3 id="semi-aso-cbct">4.4 SEMI_ASO_CBCT — a orientação <span class="badge calcule">calculado</span></h3>
+
+      <p><strong>a) Poda dos landmarks aberrantes.</strong> <code>GetLandmarkToRemove</code>
+      (<code>utils.py:413</code>) compara a <strong>matriz completa
+      de distâncias</strong> e a <strong>matriz de direções</strong> entre todos os
+      landmarks do exame e os do gold. Constantes efetivas: diferença de distância
+      &gt; 15 mm, diferença angular &gt; 0,4 rad (e <code>-1</code> se &lt; 0,1 rad, ou seja, um
+      par muito coerente compensa um duvidoso). Um landmark é descartado se sua contagem
+      total exceder o número de landmarks, ou se só a sua contagem angular
+      exceder a metade dele. A análise abrange <strong>todos</strong> os landmarks do json, não
+      apenas os marcados.</p>
+
+      <p><strong>b) O trio ótimo.</strong> <code>FindOptimalLandmarks</code>
+      (<code>utils.py:161</code>) sorteia
+      trios <code>(A, B, C)</code>, executa a inicialização para cada um e fica com aquele que
+      minimiza a distância média final. Limites: <code>n(n-1)(n-2)</code> trios distintos ou
+      <strong>2500 sorteios</strong>, o que vier primeiro.</p>
+
+      <p><strong>c) A inicialização</strong>, <code>InitICP</code>
+      (<code>utils.py:649</code>):</p>
+
+      <ol>
+        <li>translação que leva <code>A_source</code> sobre <code>A_target</code>;</li>
+        <li>rotação em torno do eixo <code>cross(v2, v1)</code> pelo ângulo <code>arccos</code> do produto
+        escalar, onde <code>v1 = abs(B - A)</code> do lado da origem e
+        <code>v2 = abs(B - A)</code> do lado do alvo — <strong>valores absolutos componente
+        a componente</strong>, o que dobra os dois vetores para o octante positivo e não é o
+        ângulo entre os vetores reais;</li>
+        <li>uma terceira rotação cujo <strong>eixo é o próprio <code>abs(B - A)</code></strong>, e não um produto
+        vetorial: é um rolamento em torno do eixo recém-alinhado, com o
+        ângulo calculado a partir de <code>C</code>.</li>
+      </ol>
+
+      <p><code>RotationMatrix</code> (<code>utils.py:921</code>) é a
+      fórmula de Rodrigues baseada em quatérnios, idêntica à do <a href="../FlexReg/FlexReg.html">FlexReg</a> e do ASO_IOS.
+      Um ponto crucial: <code>TransformMatrix = RotationTransformMatrix  # @ TranslationTransformMatrix</code>
+      — a translação da etapa 1 é <strong>deliberadamente excluída</strong> da matriz
+      retornada. Ela serve para calcular as rotações, não para mover o volume.</p>
+
+      <p><strong>d) O ICP.</strong> <code>ICP_Transform</code> (<code>utils.py:620</code>)
+      converte os dois dicionários em <code>vtkPolyData</code> de vértices e executa um
+      <code>vtkIterativeClosestPointTransform</code>: <code>SetModeToRigidBody()</code>,
+      <code>SetMaximumNumberOfIterations(1000)</code>, <code>StartByMatchingCentroidsOn()</code>. Sua
+      translação é então zerada: <code>TransformMatrixBis[:3, 3] = [0, 0, 0]</code>.</p>
+
+      <p><strong>e) Composição.</strong> <code>TransformList</code> acumula <code>[translation, R2, R3, R_icp]</code>, depois
+      (<code>utils.py:803</code>):</p>
+
+      <pre><code>for i in range(len(TransformList) - 1, 0, -1):   # stops at 1: the translation is discarded
+    TransformSITK.AddTransform(TransformList[i])
+TransformSITKFinal = sitk.CompositeTransform(TransformSITK)
+TransformSITKFinal.AddTransform(input_transform)   # the PRE_ASO .tfm
+TransformSITKFinal = TransformSITKFinal.GetInverse()
+TransformSITK = TransformSITK.GetInverse()</code></pre>
+
+      <p><strong>O resultado final é, portanto, uma rotação pura em torno da origem do mundo.</strong>
+      Isso é coerente porque o PRE_ASO_CBCT centralizou o volume nessa origem — e
+      é justamente o que falta ao modo semi.</p>
+
+      <p><code>ResampleImage</code> (<code>utils.py:835</code>) chama
+      <code>SetReferenceImage(image)</code>: <strong>mesma grade, mesmo tamanho, mesmo espaçamento</strong>,
+      interpolação linear, <code>DefaultPixelValue = 0</code>. O volume gira dentro da sua
+      caixa existente, nada é reamostrado para outra resolução, e o que cai
+      fora do FOV se perde.</p>
+
+      <p><strong>f) Saídas</strong>, em <code>output_folder</code>, com a mesma estrutura relativa de pastas
+      da entrada:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Arquivo</th><th>Conteúdo</th></tr></thead>
+          <tbody>
+            <tr><td><code>&lt;patient&gt;_&lt;suffix&gt;.nii.gz</code></td><td>volume reorientado, <strong>sempre <code>.nii.gz</code></strong>, qualquer que seja o formato de entrada</td></tr>
+            <tr><td><code>&lt;patient&gt;_lm_&lt;suffix&gt;.mrk.json</code></td><td>landmarks girados, escritos por <code>WriteJson</code> em <strong>LPS</strong></td></tr>
+            <tr><td><code>&lt;patient&gt;_&lt;suffix&gt;_transform.tfm</code></td><td><code>TransformSITKFinal</code>, convenção ITK (fixed → moving)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>As três escritas são protegidas por <code>if not os.path.exists(...)</code>: <strong>rodar de novo
+      sobre uma pasta de saída não vazia não reescreve nada</strong> e ainda assim termina em sucesso.</p>
+
+      <h2 id="aso-ios">5. ASO_IOS</h2>
+
+      <h3 id="mode-auto-ios">5.1 Modo automático — centroides das coroas</h3>
+
+      <p><strong>a) Desvio da segmentação.</strong> <code>__BypassCrownseg__</code>
+      (<code>IOS.py:196</code>) abre cada malha e procura um array
+      <code>PredictedID</code>, <code>UniversalID</code> ou <code>Universal_ID</code>. As malhas já segmentadas são
+      copiadas diretamente para a pasta de <strong>saída</strong> da segmentação com o
+      sufixo <code>_Seg</code>; as outras vão para a pasta de entrada para serem segmentadas, com os
+      formatos exóticos convertidos para <code>.vtk</code> no caminho.</p>
+
+      <p><strong>b) <a href="../ALI/ALI.html">DentalModelSeg</a></strong> <span class="badge predit">predito</span>, via conda (<code>IOS.py:275</code>):</p>
+
+      <pre><code>conda run -n shapeaxi python -m CrownSegmentationcli \
+  None &lt;csv&gt; &lt;out&gt; 0 latest 0 Universal_ID 0 Seg &lt;vtk_folder&gt; &lt;dentalmodelseg_path&gt;</code></pre>
+
+      <p>Ordem dos argumentos: <code>surf</code>, <code>input_csv</code>, <code>out</code>, <code>overwrite</code>, <code>model</code>,
+      <code>crown_segmentation</code>, <code>array_name</code>, <code>fdi</code>, <code>suffix</code>, <code>vtk_folder</code>,
+      <code>dentalmodelseg_path</code>. <strong><code>overwrite = "0"</code> e <code>suffix = "Seg"</code></strong>: ao contrário do
+      <a href="../FlexReg/FlexReg.html">FlexReg</a>, o ASO não sobrescreve o arquivo de entrada, ele produz um <code>&lt;name&gt;_Seg.vtk</code> em
+      uma pasta temporária. A rede é a mesma (Fly-by-CNN multivista,
+      numeração universal 1–32 em <code>Universal_ID</code>), empacotada no pacote pip <code>shapeaxi</code>:
+      a arquitetura e os pesos <code>latest</code> não podem ser determinados a partir deste repositório.</p>
+
+      <p>O <code>dentalmodelseg_path</code> calculado em <code>Process</code> é morto: <code>run_conda_tool</code>
+      (<code>ASO.py:1417</code>) o substitui pelo resultado de um
+      <code>which dentalmodelseg</code> dentro do ambiente. O ramo <code>if os.path.isfile(path_input)</code>
+      (<code>IOS.py:266</code>) também é morto — <code>path_input</code> é
+      sempre uma pasta criada por <code>os.makedirs</code> — e referencia um <code>self.input</code> que
+      não existe. <code>path_preor</code> é criado e nunca usado.</p>
+
+      <p>A execução é <strong>síncrona e bloqueante</strong>: <code>run_conda_tool</code> fica em laço sobre
+      <code>process.is_alive()</code> chamando <code>slicer.app.processEvents()</code>, acompanha o progresso
+      relendo o log e depois retira a etapa da fila antes que <code>onPredictButton</code>
+      lance <code>slicer.cli.run</code> na seguinte.</p>
+
+      <p><strong>c) <code>PrePreAso</code> — a orientação</strong> <span class="badge calcule">calculado</span>, o núcleo
+      (<code>pre_icp.py:103</code>). <code>organizeLandmark</code> (<code>pre_icp.py:43</code>) ordena os
+      3 ou 4 dentes escolhidos em <code>(left, middle(s), right)</code> usando a numeração
+      universal: na arcada superior (1–16) o número cresce da direita
+      para a esquerda, então <code>max → left</code>; na arcada inferior (17–32) é o inverso.</p>
+
+      <p><code>vtkMeanTeeth</code> (<code>icp.py:415</code>) faz a média dos
+      vértices que carregam cada <code>Universal_ID</code>. Com 4 dentes, os dois centroides do meio
+      são promediados entre si → sempre se volta a <strong>três pontos</strong>.</p>
+
+      <p><code>make_vector</code> constrói, para cada trio, uma base local:
+      <code>normal = cross(m→d, m→g)</code> (a normal do plano que passa pelos três pontos), <code>perpen</code>
+      = a direção direita→esquerda, <code>direction = cross(normal, perpen)</code>. Depois:</p>
+
+      <ol>
+        <li>rotação em torno do eixo <code>cross(normal_source, normal_target)</code> pelo ângulo
+        <code>arccos(dot)</code> — o plano dos três centroides do exame é levado sobre o do gold;</li>
+        <li><code>direction_source</code> é girado por essa matriz e, em seguida, uma segunda rotação
+        em torno do eixo <code>cross(direction_source, direction_target)</code> corrige o rolamento dentro
+        desse plano;</li>
+        <li>uma translação que faz coincidir os <strong>centroides</strong> dos dois trios.</li>
+      </ol>
+
+      <p>Sem escala. A matriz 4×4 é retornada junto com a malha
+      transformada.</p>
+
+      <p><strong>d) O refinamento.</strong> <code>ICP([InitIcp(), vtkICP()], option=vtkMeanTeeth(dents))</code>
+      (<code>PRE_ASO_IOS.py:292</code>). A <code>option</code> é
+      aplicada às duas malhas antes de a cadeia rodar: <strong>o ICP só enxerga os 3 ou
+      4 centroides</strong>, nunca a geometria das coroas. <code>InitIcp</code>
+      (<code>icp.py:136</code>) é a versão em classe do
+      <code>InitICP</code> do ASO_CBCT — o mesmo <code>abs()</code>, o mesmo eixo de rolamento, o mesmo
+      <code>FindOptimalLandmarks</code> com 2500 sorteios. <code>vtkICP</code> é o mesmo
+      <code>vtkIterativeClosestPointTransform</code> rígido, mas com <strong>100 iterações</strong> em vez de
+      1000, e sua translação não é zerada.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p>Um detalhe revelador: <code>InitIcp.__call__</code> faz um <code>np.save</code> de <code>source</code> e
+        <code>target</code> em <code>ASO_IOS_utils/cache/</code>, e <code>FindOptimalLandmarks</code> <strong>recarrega os
+        <code>.npy</code> a cada iteração</strong> em vez de copiar o dict em memória — um
+        contorno para uma mutação, ao custo de uma escrita na árvore instalada do
+        módulo (os dois arquivos <code>.npy</code> chegaram a ser commitados e depois removidos, commit
+        <code>a334a10</code>).</p>
+      </div>
+
+      <p>A matriz final é <code>output_icp["matrix"] @ matrix</code>: o ICP depois do PrePreAso.</p>
+
+      <h3 id="mode-semi-ios">5.2 Modo semi — landmarks fornecidos <span class="badge calcule">calculado</span></h3>
+
+      <p><code>SEMI_ASO_IOS.py</code>. Mesma mecânica, a <code>option</code>
+      passa a ser <code>SelectKey(liste_de_landmarks)</code> (<code>icp.py:480</code>):
+      um simples filtro de chaves sobre os dicionários de landmarks. Sem <code>PrePreAso</code>,
+      sem segmentação — <code>InitIcp</code> e depois <code>vtkICP</code> sobre os landmarks nomeados.</p>
+
+      <p>Os nomes dos landmarks são construídos por produto cartesiano na UI:
+      <code>{dent}{repère}</code> com repère ∈ <code>O, MB, DB</code> (oclusais) ou <code>CB, CL, OIP, R, RIP</code>
+      (cervicais), depois <code>listlandmark2diclandmark</code> os separa por arcada com base apenas na
+      inicial <code>U</code>/<code>L</code> (<code>utils.py:272</code>).</p>
+
+      <p>A matriz obtida a partir dos landmarks é então aplicada à malha completa.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 760 200" role="img" aria-label="Comparação dos dois modos do ASO_IOS: Fully-Automated segmenta as coroas por rede e depois orienta pelos centroides dos dentes; Semi-Automated orienta diretamente sobre landmarks fornecidos pelo operador">
+          <text class="d-label-s" x="10" y="18">Fully-Automated</text>
+          <rect class="d-box-n" x="10" y="24" width="170" height="48" rx="6"/>
+          <text class="d-label" x="95" y="45" text-anchor="middle">CrownSegmentationcli</text>
+          <text class="d-label-s" x="95" y="60" text-anchor="middle">segmentação, rede (conda)</text>
+
+          <path class="d-arrow" d="M180 48 H210"/>
+          <path class="d-arrow-head" d="M210 48 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="215" y="24" width="200" height="48" rx="6"/>
+          <text class="d-label" x="315" y="45" text-anchor="middle">PRE_ASO_IOS</text>
+          <text class="d-label-s" x="315" y="60" text-anchor="middle">PrePreAso + ICP (centroides)</text>
+
+          <path class="d-arrow" d="M415 48 H445"/>
+          <path class="d-arrow-head" d="M445 48 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="450" y="24" width="180" height="48" rx="6"/>
+          <text class="d-label" x="540" y="45" text-anchor="middle">saída</text>
+          <text class="d-mono" x="540" y="60" text-anchor="middle">.vtk + _SegOr.tfm</text>
+
+          <text class="d-label-s" x="10" y="118">Semi-Automated</text>
+          <text class="d-mono" x="10" y="150">landmarks nomeados</text>
+          <text class="d-label-s" x="10" y="163">(dados pelo operador)</text>
+
+          <path class="d-arrow" d="M160 150 H210"/>
+          <path class="d-arrow-head" d="M210 150 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="215" y="126" width="200" height="48" rx="6"/>
+          <text class="d-label" x="315" y="147" text-anchor="middle">SEMI_ASO_IOS</text>
+          <text class="d-label-s" x="315" y="162" text-anchor="middle">InitIcp + vtkICP</text>
+
+          <path class="d-arrow" d="M415 150 H445"/>
+          <path class="d-arrow-head" d="M445 150 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="450" y="126" width="180" height="48" rx="6"/>
+          <text class="d-label" x="540" y="147" text-anchor="middle">saída</text>
+          <text class="d-mono" x="540" y="162" text-anchor="middle">.vtk + matrix_&lt;name&gt;.npy</text>
+        </svg>
+        <figcaption>ASO_IOS: a única diferença estrutural entre os dois modos é a presença, a montante, de uma segmentação por rede (<span class="badge predit">rede</span>) que fornece os centroides — a orientação em si é o mesmo ICP sobre 3 pontos.</figcaption>
+      </figure>
+
+      <h3 id="occlusion">5.3 Oclusão</h3>
+
+      <p>Uma caixa de seleção que força uma única arcada
+      (<code>ASO.py:1850</code>): a arcada escolhida conduz a orientação, e
+      <strong>a mesma matriz é aplicada à arcada oposta</strong> (<code>file[jaw.inv()]</code>,
+      <code>PRE_ASO_IOS.py:473</code>) para preservar a
+      relação oclusal. O emparelhamento superior/inferior é feito pelo nome do arquivo, via
+      <code>Files_vtk_link</code> / <code>Files_vtk_json_semilink</code>
+      (<code>data_file.py</code>): os marcadores reconhecidos
+      são <code>Upper</code>/<code>_U_</code> e <code>Lower</code>/<code>_L_</code>.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><code>UpperOrLower</code>
+        (<code>utils.py:180</code>) <strong>assume <code>"Lower"</code> por padrão</strong> quando nenhum marcador é encontrado: um
+        arquivo mal nomeado é tratado silenciosamente como mandibular.</p>
+      </div>
+
+      <h3 id="sorties-ios">5.4 Saídas IOS</h3>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Arquivo</th><th>Escrito por</th><th>Conteúdo</th></tr></thead>
+          <tbody>
+            <tr><td><code>&lt;input_name&gt;&lt;suffix&gt;.vtk</code></td><td><code>WriteSurf</code></td><td>malha orientada, extensão forçada para <code>.vtk</code> se desconhecida</td></tr>
+            <tr><td><code>&lt;patient&gt;_SegOr.tfm</code></td><td><code>saveMatrixAsTfm</code></td><td><strong>só auto</strong>, nome fixo independentemente do sufixo</td></tr>
+            <tr><td><code>matrix_&lt;name&gt;.npy</code></td><td><code>np.save</code></td><td><strong>só semi</strong>, matriz 4×4 bruta</td></tr>
+            <tr><td><code>&lt;name&gt;Error.txt</code></td><td><code>WritefileError</code></td><td>na subpasta <code>Error/</code> da pasta de saída</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Com o sufixo padrão <code>Or</code> e o <code>_Seg</code> acrescentado pela segmentação, um arquivo
+      <code>P01_U.vtk</code> sai como <code>P01_U_SegOr.vtk</code> — o nome que o AREG_IOS espera.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verificado</div>
+        <p><code>saveMatrixAsTfm</code> (<code>utils.py:300</code>) inverte a
+        matriz (convenção ITK fixed → moving) e a escreve como <code>AffineTransform</code>. <strong>Nenhuma
+        conjugação LPS↔<a class="gterm" href="../glossary.html#g-ras" title="Ver glossário">RAS</a></strong>: o ASO_IOS nunca inverte nada, as malhas são lidas e
+        reescritas nas coordenadas do próprio arquivo (LPS para um <code>.vtk</code>), e a matriz é
+        expressa nesse mesmo referencial. Isso é coerente de ponta a ponta com o <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a>, que
+        a relê tal como está.</p>
+      </div>
+
+      <h2 id="flexreg">6. Comparação com a orientação do <a href="../FlexReg/FlexReg.html">FlexReg</a></h2>
+
+      <p><code>FlexReg_Method/orientation.py</code> e
+      <code>ASO_IOS_utils/pre_icp.py</code> são <strong>o mesmo
+      algoritmo, copiado e colado</strong>. <code>make_vector</code> é idêntico caractere por caractere; os
+      corpos de <code>orientation()</code> e <code>PrePreAso()</code> diferem apenas em três pontos:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>ASO_IOS <code>PrePreAso</code></th><th>FlexReg <code>orientation</code></th></tr></thead>
+          <tbody>
+            <tr><td>Alvo</td><td>os <strong>centroides da malha gold</strong>, lidos com o mesmo <code>vtkMeanTeeth</code></td><td>três pontos fixos no código, <code>[[-0.5,-0.5,0], [0,0,0], [0.5,-0.5,0]]</code></td></tr>
+            <tr><td>Dentes</td><td>3 ou 4 escolhidos pelo operador, ordenados por <code>organizeLandmark</code></td><td><strong>3, 5, 12, 14</strong> fixos no código (UR6, UR4, UL4, UL6)</td></tr>
+            <tr><td>Retorno</td><td><code>(mesh, matrix)</code></td><td>só <code>mesh</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>transformation.py</code> também é duplicado entre os dois (mesmos <code>RotationMatrix</code>,
+      <code>TransformSurf</code>, <code>TransformDict</code>, salvo a formatação), e o <code>icp.py</code> do ASO_IOS
+      contém as classes das quais <code>FlexReg_Method/util.py</code> reaproveita <code>vtkTeeth</code>,
+      <code>vtkMeanTeeth</code> e <code>vtkMeshTeeth</code>.</p>
+
+      <p>Consequência prática: o FlexReg produz um referencial <strong>canônico e reprodutível</strong>
+      (plano oclusal ≈ z=0, +y anterior), o que lhe permite depois raciocinar em 2D
+      no plano XY. O ASO_IOS produz uma orientação <strong>relativa a um
+      paciente de referência</strong> — sem garantia de que o plano oclusal caia em z=0, e sem
+      refinamento por ICP no FlexReg, onde o ASO acrescenta um.</p>
+
+      <h2 id="predit-calcule">7. O que é predito e o que é calculado</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bloco</th><th>Natureza</th><th>Onde</th></tr></thead>
+          <tbody>
+            <tr><td>Recentralização CBCT</td><td><span class="badge calcule">geométrico</span> (translação)</td><td><code>PRE_ASO_CBCT</code></td></tr>
+            <tr><td>Landmarks CBCT (modo auto)</td><td><span class="badge predit">rede</span>, agentes de busca multiescala</td><td><code>ALI_CBCT</code></td></tr>
+            <tr><td>Poda dos landmarks aberrantes</td><td><span class="badge calcule">geométrico</span>, distâncias + ângulos</td><td><code>SEMI_ASO_CBCT</code></td></tr>
+            <tr><td>Trio ótimo + rotações</td><td><span class="badge calcule">geométrico</span>, busca aleatória ≤ 2500 sorteios</td><td><code>SEMI_ASO_CBCT</code> / <code>PRE_ASO_IOS</code></td></tr>
+            <tr><td>Refinamento</td><td><span class="badge calcule">geométrico</span>, ICP rígido VTK</td><td>idem</td></tr>
+            <tr><td>Segmentação das coroas IOS</td><td><span class="badge predit">rede</span>, multivista (<a href="../ALI/ALI.html">DentalModelSeg</a>)</td><td><code>conda run -n shapeaxi</code></td></tr>
+            <tr><td>Centroides dos dentes</td><td><span class="badge calcule">geométrico</span>, média de vértices</td><td><code>PRE_ASO_IOS</code></td></tr>
+            <tr><td>Orientação IOS</td><td><span class="badge calcule">geométrico</span>, 2 rotações + translação</td><td><code>PrePreAso</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>As duas redes chamadas são pré-treinadas e servem apenas para <strong>fornecer
+      pontos de ancoragem</strong>. O pré-orientador aprendido do ASO_CBCT (<code>DenseNet169</code>) foi
+      desconectado.</p>
+
+      <h2 id="environnement">8. Ambiente</h2>
+
+      <p>Dois regimes distintos, e isso é fonte de confusão.</p>
+
+      <p><strong>As CLIs</strong> rodam no Python do Slicer. <code>install_function</code>
+      (<code>ASO.py:69</code>) instala por <code>pip_install</code> o que faltar ali: <code>itk</code>,
+      <code>torch==2.2.0</code>, <code>pytorch_lightning</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code> e
+      <code>monai</code> na versão 1.3.2 (Python ≥ 3.10) ou 0.7.0 caso contrário.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><code>torch</code>, <code>pytorch_lightning</code> e <code>monai</code> só são usados por <code>Net.py</code> e pelo <a href="../ALI/ALI.html">ALI_CBCT</a>:
+        no modo semi-CBCT e em IOS, o ASO os instala para nada, com o risco de
+        sobrescrever a versão do torch de outro módulo (o próprio diálogo avisa: "Doing it
+        could break other modules").</p>
+      </div>
+
+      <p><strong>O ambiente conda</strong> só é configurado para o modo IOS automático, por
+      <code>onCheckRequirements</code> (<code>ASO.py:1867</code>):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Elemento</th><th>Valor</th><th>Fonte</th></tr></thead>
+          <tbody>
+            <tr><td>Env</td><td><code>shapeaxi</code>, compartilhado com <a href="../ALI/ALI.html">ALI</a>, AREG, <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td><code>ASO.py:2415</code></td></tr>
+            <tr><td>Python</td><td><strong>3.12</strong></td><td><code>ASO.py:2417</code></td></tr>
+            <tr><td>Criação</td><td><code>torch>=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td><code>install_shapeaxi</code></td></tr>
+            <tr><td>pytorch3d + shapeaxi</td><td>wheels pré-compiladas escolhidas conforme a versão do torch instalada</td><td><code>install_pytorch.py</code></td></tr>
+            <tr><td>Windows</td><td>conda via WSL (<code>CondaSetUpCallWsl</code>) + verificação de <code>libxrender1</code>, <code>libgl1</code>/<code>libgl1-mesa-glx</code>, <code>libglx-mesa0</code></td><td><code>check_lib_wsl</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><code>install_pytorch.py</code> resolve a tag de build (<code>0.7.9+pt2110cu128</code> = torch 2.11.0,
+        CUDA 12.8) a partir do índice PEP 503
+        <code>https://ImageMindAnalytics.github.io/pytorch3d-wheels/simple/</code>: instalar uma
+        wheel cuja tag não corresponde ao torch presente produz um <code>undefined symbol</code>
+        na importação.</p>
+      </div>
+
+      <p>Nenhuma GPU é exigida pelo ASO em si; ela é exigida pelo
+      <code>dentalmodelseg</code>.</p>
+
+      <h2 id="pieges">9. Armadilhas e pontos frágeis</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong>O modo semi-CBCT está quebrado no estado atual.</strong>
+        <code>SEMI_ASO_CBCT.py:113</code> exige
+        <code>data["tfm"]</code>, introduzido pelo commit <code>1bfb51f</code> junto com a saída
+        da matriz. Esse <code>.tfm</code> só existe porque o PRE_ASO_CBCT o escreve — mas o modo semi
+        não roda o PRE_ASO_CBCT e trabalha sobre a pasta bruta do usuário.
+        Resultado: um <code>KeyError</code> para todo paciente cuja pasta ainda não contenha um
+        <code>.tfm</code>, capturado e registrado como "missing required files", com o paciente
+        contado como falha sem interromper os demais. O modo, portanto, só
+        funciona se por acaso houver um <code>.tfm</code> ao lado do exame — tipicamente após uma
+        passada anterior pelo modo Fully, já que
+        <code>PRE_ASO_CBCT.py:217</code> escreve o seu
+        na pasta do exame. Verificado: <code>GetPatients</code>
+        (<code>utils.py:1042</code>) só preenche a chave
+        <code>tfm</code> se houver um arquivo <code>.tfm</code> na árvore de entrada.</p>
+        <p><strong>E, mesmo sem isso, o modo semi não tem recentralização.</strong> Como a
+        orientação é uma rotação pura em torno da origem do mundo (§4.4e), um volume
+        descentralizado acaba fora do seu próprio FOV, <code>DefaultPixelValue = 0</code>.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong><code>MergeJson</code> apaga arquivos na pasta de entrada.</strong> No modo semi,
+        <code>input_dir</code> é a pasta do usuário: todos os seus arquivos <code>.mrk.json</code> sem <code>MERGED</code>
+        no nome são fundidos e depois <strong>apagados</strong>
+        (<code>utils.py:111</code>).</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>O sistema de coordenadas dos jsons nunca é verificado.</strong>
+        <code>LoadJsonLandmarks</code> lê <code>position</code> tal como está; o <a href="../ALI/ALI.html">ALI</a> e o ASO escrevem em LPS, mas um
+        fiducial exportado em RAS pelo Slicer será lido com x e y
+        invertidos, sem nenhum aviso.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>Número mínimo de landmarks incoerente.</strong> A UI exige 3 landmarks marcados
+        (<code>TestCheckbox</code>, <code>CBCT.py:85</code>), mas o <code>ICP</code> desiste
+        assim que <code>len(list_landmark) &lt;= 3</code> (<code>utils.py:754</code>).
+        Na prática são necessários 4, e mais se a poda remover alguns.</p>
+      </div>
+
+      <ul>
+        <li><strong>O ICP reemparelha por vizinho mais próximo.</strong> <code>vtkIterativeClosestPointTransform</code>
+        ignora os rótulos: com landmarks próximos dois a dois (pares
+        esquerda/direita), ele pode fixar um emparelhamento cruzado que a inicialização
+        já tinha errado.</li>
+        <li><strong>As chamadas <code>abs()</code> em <code>InitICP</code>.</strong> Os vetores são dobrados para o octante
+        positivo antes do cálculo do ângulo, nos dois backends. Como o trio
+        retido é aquele que minimiza o erro medido, a busca
+        compensa isso — mas nada deve ser concluído da geometria desta
+        etapa tomada isoladamente.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>Nada é reescrito se o arquivo já existe.</strong> As três saídas CBCT são
+        protegidas por <code>if not os.path.exists</code>. Uma segunda passada após corrigir um parâmetro
+        não produz efeito visível e ainda assim termina em sucesso.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p><strong>Os identificadores de paciente divergem entre ASO e AREG.</strong>
+        <code>PatientNumber</code> (<code>utils.py:295</code>) corta em
+        <code>_U</code>/<code>_L</code>, enquanto o <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> o reconstrói como <code>patient_id.split("_")[0]</code>
+        (<code>AREG_IOS.py:321</code>). Um nome como <code>P01_T1_U.vtk</code>
+        dá <code>P01_T1</code> de um lado e <code>P01</code> do outro: o <code>.tfm</code> do ASO nunca é
+        encontrado, e o AREG se contenta com um <code>logger.warning</code>. De passagem, há
+        <strong>duas funções <code>PatientNumber</code></strong> neste arquivo, sendo a da linha 229 (primeiro
+        grupo de dígitos) sombreada pela da linha 295.</p>
+      </div>
+
+      <ul>
+        <li><strong>Código morto</strong>: <code>Net.py</code> (<code>DenseNet</code>) e <code>PreASOResample</code> do lado CBCT; o
+        <code>search</code> com um <code>self</code> fantasma; <code>DisplayALIIOS</code>; <code>Files_vtk_json_link</code>;
+        <code>vtkMiddleTeeth</code>; <code>npSameNumberPoint</code> (o ramo <code>source.shape[0] &lt; target.shape[0]</code>,
+        que referencia um <code>target_points</code> indefinido); o arquivo órfão
+        <code>LinearTransform_t.tfm</code>, referenciado em lugar nenhum.</li>
+        <li><strong>O <code>.tfm</code> do PRE_ASO_CBCT é escrito sem inversão</strong>, embora tenha sido a sua inversa
+        a aplicada ao volume. Ele é depois composto e invertido em
+        bloco no SEMI_ASO_CBCT; vale verificar antes de reutilizar esse arquivo isoladamente.</li>
+        <li><strong>Sufixos de tempo.</strong> <code>PatientScanLandmark</code>
+        (<code>CBCT.py:36</code>) só corta em <code>_T1</code>/<code>_T2</code>; um
+        <code>_T3</code> quebra o emparelhamento. O comentário já está no código.</li>
+      </ul>
+
+      <h2 id="litterature">10. Literatura</h2>
+
+      <p>O artigo de referência do ASO_CBCT é <strong>Automated Orientation and Registration
+      of Cone-Beam Computed Tomography Scans</strong> (Anchling, Hutin, Cevidanes et al.,
+      Lecture Notes in Computer Science, 2023). Sua descrição corresponde ao código: o <a href="../ALI/ALI.html">ALI_CBCT</a>
+      identifica os landmarks independentemente da orientação de entrada, e depois a
+      orientação é obtida "alinhando primeiro 3 landmarks escolhidos aleatoriamente e depois
+      refinando com ICP". Erros relatados: &lt; 3° e &lt; 2 mm em relação a especialistas.
+      O artigo não menciona o pré-orientador <code>DenseNet</code>, coerente com o
+      fato de ele não estar mais conectado.</p>
+
+      <p>Para o próprio ALI_CBCT: <strong>Automatic landmark identification in cone-beam computed
+      tomography</strong> (Gillot et al., <em>Orthodontics &amp; Craniofacial Research</em>, 2023).</p>
+
+      <p><strong>O ASO_IOS não tem artigo próprio.</strong> O texto publicado mais próximo é
+      <em>AReg IOS: Automatic Registration on IntraOral Scans</em> (Hutin, Anchling, Cevidanes
+      et al., LNCS 2023), que descreve o alinhamento inicial por centroides de dentes
+      comuns — ou seja, exatamente o <code>PrePreAso</code>. O resto (seleção dos dentes pelo
+      operador, refinamento por ICP sobre 3 centroides, modo de oclusão) é
+      desenvolvimento interno não publicado.</p>
+
+      <ul>
+        <li><a href="https://github.com/lucanchling/ASO">ASO (repositório original, Anchling)</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/ASO">ASO (DCBIA-OrthoLab)</a></li>
+        <li><a href="https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5">Automated Orientation and Registration of CBCT Scans, LNCS</a></li>
+        <li><a href="https://pubmed.ncbi.nlm.nih.gov/38770027/">PubMed 38770027</a></li>
+        <li><a href="https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642">Automatic landmark identification in CBCT, Gillot 2023</a></li>
+        <li><a href="https://projectweek.na-mic.org/PW38_2023_GranCanaria/Projects/ASO_CBCT/">Projeto ASO_CBCT, NA-MIC Project Week 38</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>Referências completas, PDFs recuperados e links a conferir: <a href="SOURCES.html">SOURCES.html</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Todas as páginas</a> ·
+        <a href="SOURCES.html">Bibliografia desta ferramenta</a> ·
+        Fonte: <code>ASO.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

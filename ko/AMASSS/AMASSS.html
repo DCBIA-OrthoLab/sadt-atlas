@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMASSS — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="segmentation">
+<div class="layout">
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/AMASSS/AMASSS.html" hreflang="en" title="English">EN</a><a href="../../fr/AMASSS/AMASSS.html" hreflang="fr" title="Français">FR</a><a href="../../pt/AMASSS/AMASSS.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/AMASSS/AMASSS.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/AMASSS.html"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../AMASSS/AMASSS.html" aria-current="true"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html" aria-current="page">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/AMASSS/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › 분할</div>
+        <h1>AMASSS</h1>
+        <p class="lede">두개안면 CBCT의 자동 다중 구조물 분할: 해부학적 구조물마다 이진 <a class="gterm" href="../glossary.html#g-nnunet" title="용어집 보기">nnU-Net</a> v2 신경망 하나를 두고, CLI가 그 결과를 조립하고 병합한다.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1371/journal.pone.0275033" target="_blank" rel="noopener" title="논문은 MONAI UNETR를 설명하지만 코드는 nnU-Net v2를 실행한다.">Gillot 2022 · PLOS ONE</a>
+          <span class="badge cli">AMASSS_CLI</span>
+          <span class="badge neutral">Slicer의 Python, conda 없음</span>
+          <a class="badge neutral" href="SOURCES.html">참고문헌</a>
+        </div>
+      </header>
+
+      <h2 id="situation">1. 파이프라인에서의 위치</h2>
+
+      <p>AMASSS는 말단 모듈(AMASSS 위젯)이면서 동시에 <strong>다른 세 도구가 재사용하는
+      구성 요소</strong>다. 세 도구 모두
+      <code>slicer.modules.amasss_cli</code>를 통해 같은 CLI를 호출한다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>호출자</th><th>파일</th><th>용도</th></tr></thead>
+          <tbody>
+            <tr><td>AMASSS 위젯</td><td><code>AMASSS.py:1638</code></td><td>사용자가 직접 수행하는 분할</td></tr>
+            <tr><td><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a> (semi-auto, fully-auto, oriented)</td><td><code>CBCT.py:341</code>, <code>470</code>, <code>555</code>, <code>840</code>, <code>918</code></td><td>두 가지 별개의 역할: AREG 전에는 정합용 <strong>마스크</strong>(<code>merge=SEPARATE</code>, <code>genVtk=False</code>), 그 후에는 결과물인 <strong>분할</strong></td></tr>
+            <tr><td><a href="../VFACE/VFACE.html">VFACE</a></td><td><code>createlistprocess.py:126</code></td><td>비대칭 분석 체인 안의 분할</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>AMASSS는 다른 것을 호출하지 않는다. conda 하위 프로세스도, 다른 모듈도 없다.
+      유일한 외부 의존성은 pip 패키지 <code>nnunetv2</code>이며, 이를 쓰는 함수 안에서
+      <strong>지연(lazy)</strong> import된다.</p>
+
+      <p>AREG와 관련해 중요한 구분: <code>CBMASK</code> / <code>MANDMASK</code> / <code>MAXMASK</code> 코드는
+      <code>CB</code> / <code>MAND</code> / <code>MAX</code> 분할에 적용하는 후처리 단계가 아니다.
+      다른 데이터로, 다른 해상도에서 <strong>따로 학습된 모델</strong>이다(§4).</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 760 200" role="img" aria-label="입력에서 출력까지 AMASSS 파이프라인 개요">
+          <rect class="d-box" x="10" y="78" width="130" height="44" rx="6"/>
+          <text class="d-label" x="75" y="96" text-anchor="middle">CBCT 스캔</text>
+          <text class="d-label-s" x="75" y="110" text-anchor="middle">파일 또는 폴더</text>
+
+          <path class="d-arrow" d="M145 100 H190"/>
+          <text class="d-label-s" x="167" y="142" text-anchor="middle">.nii.gz 스캔</text>
+          <path class="d-arrow-head" d="M190 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="195" y="78" width="140" height="44" rx="6"/>
+          <text class="d-label" x="265" y="96" text-anchor="middle">nnU-Net 변환</text>
+          <text class="d-label-s" x="265" y="110" text-anchor="middle">p_NNN_0000.nii.gz</text>
+
+          <path class="d-arrow" d="M340 100 H385"/>
+          <text class="d-label-s" x="362" y="142" text-anchor="middle">nnU-Net 형식</text>
+          <path class="d-arrow-head" d="M385 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="390" y="30" width="160" height="140" rx="6"/>
+          <text class="d-label" x="470" y="55" text-anchor="middle">nnU-Net v2</text>
+          <text class="d-label-s" x="470" y="70" text-anchor="middle">PlainConvUNet</text>
+          <text class="d-label-s" x="470" y="88" text-anchor="middle">리샘플링 + CTNormalization</text>
+          <text class="d-label-s" x="470" y="104" text-anchor="middle">구조물당 이진 신경망 1개</text>
+          <text class="d-label-s" x="470" y="120" text-anchor="middle">슬라이딩 윈도, step 0.5</text>
+          <text class="d-label-s" x="470" y="136" text-anchor="middle">gaussian, 미러 TTA 없음</text>
+          <text class="d-label-s" x="470" y="152" text-anchor="middle">출력 리샘플링 (torch/scipy)</text>
+
+          <path class="d-arrow" d="M555 100 H600"/>
+          <text class="d-label-s" x="577" y="142" text-anchor="middle">구조물별 마스크</text>
+          <path class="d-arrow-head" d="M600 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="605" y="78" width="150" height="44" rx="6"/>
+          <text class="d-label" x="680" y="96" text-anchor="middle">조립 + 병합</text>
+          <text class="d-label-s" x="680" y="110" text-anchor="middle">이진화, 레이블, VTK</text>
+        </svg>
+        <figcaption>CBCT 입력 → 변환 → nnU-Net 추론(구조물 하나 = 이진 신경망 하나) → 조립과 출력. 모두 conda 없이 Slicer의 Python에서 실행된다.</figcaption>
+      </figure>
+
+      <h2 id="fichiers">2. 관련 파일</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>역할</th><th>실행 위치</th></tr></thead>
+          <tbody>
+            <tr><td><code>AMASSS/AMASSS.py</code></td><td>Slicer 위젯, 1654줄, 그중 약 450줄이 라이트/다크 스타일시트</td><td>Slicer의 Python</td></tr>
+            <tr><td><code>AMASSS_CLI/AMASSS_CLI.py</code></td><td>모든 로직: 모델 탐색, 추론, 출력 조립</td><td>Slicer의 Python, <code>slicer.cli.run</code> 경유</td></tr>
+            <tr><td><code>AMASSS_CLI/AMASSS_CLI.xml</code></td><td><strong>위치 인자 12개</strong>의 선언</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>CLI는 conda 환경에서 실행되지 <strong>않는다</strong>. <code>slicer.cli.run</code>이
+      Slicer의 Python에서 CLI를 시작하며, 2026년 9월 이식
+      (<code>109e1ed</code>) 이후로 nnU-Net 추론은 <strong>이 같은
+      프로세스 안에서</strong> 실행되며, 더 이상 자식 프로세스 <code>nnUNetv2_predict</code>에서 실행되지 않는다.</p>
+
+      <p>CUDA는 필수가 아니다. <code>ResolveDevice()</code>
+      (<code>AMASSS_CLI.py:81</code>)는 로그를 남기고 CPU로 대체한다. 실제로는
+      일괄 처리에서 CPU를 쓸 수 없다(단일 코어 scipy 리샘플링이
+      지배적이다, §5.1 참고).</p>
+
+      <p><strong>인자는 위치 인자이며 인덱스로 읽힌다</strong>. <code>sys.argv</code>에서 읽으며
+      (<code>AMASSS_CLI.py:922</code>), import는 되어 있지만 <code>argparse</code>는
+      쓰지 않는다. 따라서 XML의 순서가 기준이다. <code>inputVolume</code>(파일 <strong>또는</strong> 폴더),
+      <code>modelDirectory</code>, <code>skullStructure</code>(쉼표로 구분된 코드), <code>merge</code>
+      (<code>MERGE</code> / <code>SEPARATE</code> / 둘 다, <code>[, ]+</code>로 분리), <code>genVtk</code>,
+      <code>save_in_folder</code>, <code>output_folder</code>, <code>vtk_smooth</code>, <code>prediction_ID</code>(기본값 <code>Pred</code>),
+      <code>temp_fold</code>(<strong>시작할 때 비워짐</strong>), <code>SegmentInput</code>, <code>DCMInput</code>(<strong>전혀
+      쓰이지 않음</strong>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>위젯은 <code>param["highDefinition"]</code>도 만든다
+        (<code>AMASSS.py:935</code>). <strong>이 파라미터는
+        XML에 없으므로</strong> 조용히 버려진다. §9 참고.</p>
+      </div>
+
+      <h2 id="entrees">3. 입력과 전처리</h2>
+
+      <h3>3.1 파일 탐색</h3>
+
+      <p><code>main()</code>은 파일이나 폴더를 받으며, 폴더는 <strong>재귀적인 <code>os.walk</code></strong>로 탐색한다
+      (<code>AMASSS_CLI.py:676</code>). AREG가 정합된 스캔을
+      <code>&lt;output&gt;/&lt;Region&gt;/&lt;patient&gt;_OutReg/</code>에 기록하기 때문에 필요하다. 유지되는
+      확장자: <code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>. 필터는 두 가지다. 이름에
+      <code>MASK</code>가 들어 있으면 건너뛰고, <code>isSegmentInput</code>이 거짓이면 이름에
+      <code>_&lt;prediction_ID&gt;_</code>가 들어 있는 것도 건너뛴다. 이전 실행의 출력이며,
+      이를 다시 분할하면 빈 마스크가 나오기 때문이다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>반면 위젯은 <strong>다른</strong> 확장자 목록
+        (<code>.gipl</code> 포함)과 다른 예외 <code>["Seg","seg","Pred"]</code>로 파일을 센다
+        (<code>AMASSS.py:682</code>). "Number of scans to
+        process" 카운터와 CLI가 실제로 처리하는 것이 어긋날 수 있다.</p>
+      </div>
+
+      <h3>3.2 변환</h3>
+
+      <p><code>PrepareScanForNnunet()</code>(<code>AMASSS_CLI.py:557</code>)은
+      각 스캔을 단일 폴더 <code>&lt;temp&gt;/nnunet_input/</code>에
+      <code>p_&lt;NNN&gt;_0000.nii.gz</code>라는 이름으로 복사한다(<code>NNN</code> = 세 자리 인덱스, 탐색 순서).
+      <code>.nii.gz</code>는 그대로 복사하고, <strong>나머지는 모두 SimpleITK로 다시 읽어
+      기록한다</strong>. 이는 겉치레가 아니다. 이전 버전은 NRRD를
+      <code>shutil.copy</code>로 <code>.nii.gz</code> 이름에 복사했는데, nnU-Net의 리더는 확장자로 형식을
+      고르기 때문에 Slicer의 기본 형식인 NRRD가 사실상
+      깨져 있었다. 복셀 타입은 그대로 둔다. nnU-Net이 알아서
+      float32로 변환하기 때문이다.</p>
+
+      <h3>3.3 AMASSS가 더 이상 하지 않는 것</h3>
+
+      <p>강도 정규화도, 윈도잉도, 리샘플링도 <strong>이 저장소에는
+      작성되어 있지 않다</strong>. <code>CorrectHisto()</code>
+      (<code>AMASSS_CLI.py:271</code>)는 여전히 있지만 본문이 비워졌다.
+      영상을 읽어 float32로 변환해 반환할 뿐이다. <code>(min_porcent, max_porcent, i_min, i_max)</code> 시그니처에도 불구하고
+      백분위수도, 클리핑도, 기록도 없다. <strong>어디에서도
+      호출되지 않는다</strong>. 사용되지 않는 코드다.</p>
+
+      <p>실제로 적용되는 전처리는 모두 nnU-Net 자체의 것이며, 각 모델의 <code>plans.json</code>이
+      기술한다(§4.2). 목표 간격으로 리샘플링한 뒤
+      <code>CTNormalization</code>(학습 세트 전경 강도의 0.5% / 99.5% 백분위수로
+      클리핑한 다음, 같은 세트의 평균과 표준편차로 중심화·스케일링)을 적용한다. 모델별 값은 저장소가 아니라 모델 묶음의
+      <code>plans.json</code>에 있다.</p>
+
+      <h2 id="modeles">4. 모델</h2>
+
+      <h3>4.1 모델 묶음과 탐색</h3>
+
+      <p><code>FindModelFolder()</code>(<code>AMASSS_CLI.py:89</code>)는
+      구조물 코드마다 다음을 찾는다.</p>
+
+      <pre class="ascii"><code>&lt;modelDirectory&gt;/&lt;CODE&gt;/**/&lt;Dataset...&gt;__nnUNetPlans__3d_fullres/fold_0/checkpoint_final.pth</code></pre>
+
+      <p>후보는 <code>fold_0</code> 체크포인트가 <strong>실제로
+      있음이 확인되어야</strong> 채택된다. 그렇지 않으면 그 구조물은 사용 불가로 처리되고 실행은
+      나머지 구조물로 계속된다. 탐색은 <strong>실행 전체에 한 번</strong> 이루어진다.</p>
+
+      <p>다운로드: <em>Download latest models</em> 버튼은 단순히
+      브라우저(<code>AMASSS.py:738</code>)로 <code>MODEL_LINK</code>, 즉
+      <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/tag/AMASSS_CBCT">releases/tag/AMASSS_CBCT</a> 페이지를 연다.
+      AMASSS 쪽에는 <strong>자동 다운로드가 없다</strong>. 압축 파일은
+      <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/AMASSS_CBCT/AMASSS_Models.zip">AMASSS_Models.zip</a>이며,
+      AREG(<code>CBCT.py:124</code>,
+      <code>617</code>)와 <a href="../VFACE/VFACE.html">VFACE</a>
+      (<code>VFACE.py:959</code>)는 이를 자동으로 내려받는다. <a href="../ALI/ALI.html">ALI</a>는 여전히
+      개인 저장소 <a href="https://github.com/lucanchling/AMASSS_CBCT/releases/tag/v1.0.2">lucanchling/AMASSS_CBCT v1.0.2</a>를 거친다
+      (<code>AMASSS_Models.zip</code> + <code>Masks_Models.zip</code>,
+      <code>CBCT.py:107</code>). README는 여전히
+      <code>ALL_NEW_MODELS.zip</code>을 가리키고, 주석 처리된 줄은 <code>ALL_MODELS.zip</code>을 가리킨다. monai 시절의
+      유물로, 이 압축 파일들에는 원시 <code>.pth</code> 파일이 들어 있었다.</p>
+
+      <h3>4.2 모델 묶음의 실제 내용</h3>
+
+      <p>압축을 푼 묶음(<code>AMASSS_Models.zip</code>, 저장소 외부)을 조사한 결과: <strong>폴더
+      9개</strong>, 코드마다 하나씩이며, 각각
+      <code>Dataset001_myseg/nnUNetTrainer__nnUNetPlans__3d_fullres/</code>를 포함하고 그 안에 <code>dataset.json</code>,
+      <code>plans.json</code>, <code>fold_0/checkpoint_final.pth</code>가 있다. fold는 하나뿐이다.</p>
+
+      <p><code>plans.json</code>으로 구분되는 두 계열: <strong>전체 FOV</strong>(<code>MAND</code>, <code>MAX</code>,
+      <code>CB</code>, <code>CV</code>, <code>UAW</code>, <code>SKIN</code>)는 0.4 mm 등방성, 패치 128³, <code>numTraining = 76</code>.
+      <strong>마스크</strong>(<code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code>)는 0.3 mm 등방성, 패치
+      112 × 160 × 128, <code>numTraining = 50</code>.</p>
+
+      <p>아키텍처는 두 계열에서 동일하다(<code>architecture</code> 필드, <code>plans.json</code>):</p>
+
+      <pre class="ascii"><code>dynamic_network_architectures.architectures.unet.PlainConvUNet
+n_stages = 6            features_per_stage = [32, 64, 128, 256, 320, 320]
+kernel_sizes = 6 x [3,3,3]          n_conv_per_stage = [2,2,2,2,2,2]
+n_conv_per_stage_decoder = [2,2,2,2,2]
+norm_op = InstanceNorm3d (eps 1e-5, affine)   conv_bias = True</code></pre>
+
+      <div class="callout warn">
+        <div class="callout-title">코드 / 논문 불일치</div>
+        <p>이것은 <strong>결코</strong> <code>monai.networks.nets.UNet</code>이 아니다. <code>channels</code>도, <code>strides</code>도,
+        <code>num_res_units</code>도 어디에도 나오지 않는다. <code>PlainConvUNet</code>은 nnU-Net이
+        스스로 구성하는 합성곱 U-Net으로, 잔차 블록이 없다.
+        <code>strides</code>는 plan에서 온다(전체 FOV는 <code>[1,1,1]</code> 다음 <code>[2,2,2]</code> 다섯 번, 마스크는 패치의 비등방성 때문에 마지막
+        단계가 <code>[1,2,2]</code>).
+        <code>batch_size = 2</code>, <code>use_mask_for_norm = [false]</code>는 모든 모델에서 같다. 2022년 PLOS ONE 논문은
+        128³ 크롭의 <a class="gterm" href="../glossary.html#g-unetr" title="용어집 보기">UNETR</a> <a class="gterm" href="../glossary.html#g-monai" title="용어집 보기">MONAI</a> 모델(트랜스포머 인코더 + 합성곱
+        디코더)을 설명하지만, 현재 실행되는 코드는 순수 합성곱 nnU-Net v2 <code>PlainConvUNet</code>이다.
+        §10 참고.</p>
+      </div>
+
+      <p><strong>모든 모델은 이진 모델이다.</strong> <code>dataset.json</code> 파일은
+      <code>{background: 0, &lt;one structure&gt;: 1}</code>만 선언하며, 전체 FOV 모델 6개에서는
+      복사·붙여넣기 탓에 레이블 이름이 <code>"Skin"</code>으로 남아 있다. <code>MAND</code>나 <code>CB</code>에서도 마찬가지다. 이
+      이름은 전혀 읽히지 않는다. 출력은 <code>(arr &gt; 0)</code>으로 이진화되고
+      (<code>AMASSS_CLI.py:586</code>) 최종 값은 CLI가
+      부여한다.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 720 210" role="img" aria-label="모델 묶음 탐색과 구조물별 추론">
+          <rect class="d-box" x="10" y="20" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="40" text-anchor="middle">modelDirectory</text>
+          <text class="d-label-s" x="100" y="55" text-anchor="middle">코드마다 폴더 1개</text>
+
+          <path class="d-arrow" d="M100 75 V100"/>
+          <path class="d-arrow-head" d="M100 100 l-4 -7 h8 z"/>
+
+          <rect class="d-box" x="10" y="105" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="125" text-anchor="middle">FindModelFolder()</text>
+          <text class="d-label-s" x="100" y="140" text-anchor="middle">fold_0 체크포인트 필수</text>
+
+          <path class="d-arrow" d="M195 130 H240"/>
+          <path class="d-arrow-head" d="M240 130 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="245" y="95" width="170" height="90" rx="6"/>
+          <text class="d-label" x="330" y="118" text-anchor="middle">구조물마다</text>
+          <text class="d-label" x="330" y="134" text-anchor="middle">이진 신경망 1개</text>
+          <text class="d-label-s" x="330" y="152" text-anchor="middle">MAND CB UAW MAX CV SKIN</text>
+          <text class="d-label-s" x="330" y="166" text-anchor="middle">CBMASK MANDMASK MAXMASK</text>
+
+          <path class="d-arrow" d="M420 130 H465"/>
+          <path class="d-arrow-head" d="M465 130 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="470" y="95" width="160" height="90" rx="6"/>
+          <text class="d-label" x="550" y="118" text-anchor="middle">구조물별</text>
+          <text class="d-label" x="550" y="134" text-anchor="middle">루프</text>
+          <text class="d-label-s" x="550" y="152" text-anchor="middle">predict_from_files_sequential</text>
+          <text class="d-label-s" x="550" y="166" text-anchor="middle">체크포인트 S번 로드</text>
+        </svg>
+        <figcaption>모델 탐색은 실행 전체에 한 번 이루어진다. 추론은 스캔마다가 아니라 구조물마다 스캔 폴더 전체에 대해 루프를 돈다.</figcaption>
+      </figure>
+
+      <h3>4.3 구조물과 레이블</h3>
+
+      <p>병합 출력에서는 <code>LABELS["LARGE"]</code>(<code>AMASSS_CLI.py:43</code>)가
+      기준이며, <code>LABEL_COLORS</code>가 표면 색을 정한다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>레이블</th><th>코드</th><th>구조물</th><th>RGB 색</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><code>MAND</code></td><td>하악골</td><td>216, 101, 79</td></tr>
+            <tr><td>2</td><td><code>CB</code></td><td>두개저</td><td>128, 174, 128</td></tr>
+            <tr><td>3</td><td><code>UAW</code></td><td>상기도</td><td>0, 0, 0 (검정)</td></tr>
+            <tr><td>4</td><td><code>MAX</code></td><td>상악골</td><td>230, 220, 70</td></tr>
+            <tr><td>5</td><td><code>CV</code></td><td>경추</td><td>111, 184, 210</td></tr>
+            <tr><td>6</td><td><code>SKIN</code></td><td>피부</td><td>172, 122, 101</td></tr>
+            <tr><td>7, 8, 9</td><td><code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code></td><td>정합용 마스크</td><td>흰색 (<code>LABEL_COLORS</code>는 6에서 끝남)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>묶음에 모델이 없는</strong> 코드: <code>RC</code>(근관), <code>TEETH</code>, <code>MCAN</code>.
+      뒤의 둘은 UI에서 비활성화되어 있지만(<code>UNAVAILABLE_MODELS</code>) <code>RC</code>는 그렇지 않다.
+      심지어 <code>DEFAULT_SELECT</code>(<code>AMASSS.py:256</code>)에 들어 있어 기본으로
+      체크되며, <code>missing_structures</code>로 들어가고 <code>logger.warning</code>이 남는다.</p>
+
+      <p><code>LABELS["SMALL"]</code>(<code>MAND:1, RC:2, MAX:4</code>), <code>MODELS_GROUP</code>
+      (<code>AMASSS_CLI.py:256</code>) — 이전 버전의 다중 클래스 모델을
+      기술하던 것으로, <code>FF</code>가 신경망 하나로 MAND/CB/UAW/MAX/CV를 만들어 냈다 — 그리고 <code>NTRANSLATE</code>는
+      더 이상 어디에서도 읽히지 않는다. <strong>사용되지 않는 코드</strong>다.</p>
+
+      <h3>4.4 추론</h3>
+
+      <p>여기에는 <code>sliding_window_inference</code>가 작성되어 있지 않다. nnU-Net이 plan의
+      <code>patch_size</code>로 슬라이딩 윈도를 직접 처리한다. CLI가 고르는
+      파라미터는 step 크기뿐이다.</p>
+
+      <p><code>BuildPredictor()</code>(<code>AMASSS_CLI.py:114</code>)는
+      <code>tile_step_size = 0.5</code>(50% 겹침, 시그니처에 하드코딩),
+      <code>use_gaussian = True</code>(패치의 가우시안 가중),
+      <code>use_mirroring = False</code>(<code>--disable_tta</code>와 동등: 테스트 시 미러
+      증강 없음), <code>device</code>(<code>ResolveDevice()</code>에서 얻음)를 지정하고, <code>verbose</code> /
+      <code>verbose_preprocessing</code> / <code>allow_tqdm</code>을 <code>False</code>로 설정한다. <code>perform_everything_on_device</code>
+      kwarg(2.x 시리즈 도중 <code>perform_everything_on_gpu</code>에서 이름이
+      바뀜)는 시그니처를 <strong>인트로스펙션하여 선택한다</strong>.</p>
+
+      <p><code>PredictFolder()</code>(<code>AMASSS_CLI.py:206</code>)는
+      체크포인트를 로드한 뒤(<code>initialize_from_trained_model_folder(..., use_folds=(0,),
+      checkpoint_name="checkpoint_final.pth")</code>) 폴더 전체에 대해
+      <strong><code>predict_from_files_sequential</code></strong>을 호출한다. 구조를 결정하는 세 가지 선택이 있으며,
+      모두 코드에 주석으로 설명되어 있다.</p>
+
+      <ol>
+        <li><strong>명시적인 모델 경로</strong>, <code>nnUNet_results</code> 없음. <code>os.environ</code>은
+        프로세스 전역이므로 AMASSS 실행 두 개가 동시에 돌면 서로의 모델 경로를
+        덮어쓰게 된다.</li>
+        <li><strong>스캔마다가 아니라 구조물마다 루프</strong>: 모든 스캔을 입력
+        폴더 하나에 넣고, 구조물마다 폴더 단위 예측을 한 번 한다. 체크포인트는
+        <code>S</code>번 로드된다(<code>N × S</code>번이 아니라).</li>
+        <li><strong>순차 버전</strong>: <code>predict_from_files</code>는 <code>spawn</code>을 쓰는데,
+        Slicer에서는 워커가 이 모듈을 다시 import하면서 torch import 비용을 통째로 다시
+        치러야 한다. GPU 리샘플링을 위해 자체 CUDA 컨텍스트도 필요해진다.</li>
+      </ol>
+
+      <p>작업이 구조물 단위로 묶여 있어도 위젯이 기대하는 척도를 바꾸지 않도록
+      진행률은 여전히 <code>scan × structure</code> 단계로 센다
+      (<code>AMASSS_CLI.py:815</code>). 진행 표시줄은
+      <code>scan_count</code> 크기의 걸음으로 전진한다.</p>
+
+      <p>실패한 구조물은 <code>failed_structures</code>에 기록되고 실행은
+      계속된다. <strong>모든</strong> 구조물이 실패해야만 실행이 실패한다.</p>
+
+      <h2 id="coeur">5. 알고리즘의 핵심 (학습되지 않은 부분)</h2>
+
+      <h3>5.1 GPU 리샘플링</h3>
+
+      <p><code>EnableGpuResampling()</code>(<code>AMASSS_CLI.py:150</code>)은
+      CLI의 주요 최적화다. 코드 주석에 따르면 단일 코어
+      scipy 리샘플링은 신경망보다 <strong>약 일곱 배</strong>의 비용이 든다.</p>
+
+      <p>동작 방식: nnU-Net은 리샘플링 함수를 <strong>이름으로</strong> 찾는다. 설정 딕셔너리에서
+      <code>recursive_find_resampling_fn_by_name</code>을 통해서다.
+      두 이름을 다시 쓰면 monkeypatch 없이 양쪽 끝이 모두 바뀐다.</p>
+
+      <pre><code>configuration["resampling_fn_data"]          = "resample_torch_fornnunet"
+configuration["resampling_fn_probabilities"] = "resample_torch_fornnunet"
+configuration[f"{key}_kwargs"] = {"is_seg": False, "device": torch.device(device), "mode": "linear"}</code></pre>
+
+      <p>안전장치 세 가지: 두 키가 모두 정확히
+      <code>resample_data_or_seg_to_shape</code>일 때만 치환한다(다른 것을 요구하는 plan은
+      그대로 둔다). <code>PlansManager</code>는 <code>deepcopy</code>를 넘겨주므로 딕셔너리를 바꿔도
+      공유 plan이나 동시 실행에 영향이 없다. 두 속성 모두
+      <code>@property @lru_cache</code>이므로 <code>getattr(manager_class, key).fget.cache_clear()</code>를 호출한다.
+      이것이 없으면 전환 전에 읽은 값이 살아남는다. 의도적으로 받아들인 수치
+      차이: 데이터 보간이 3차에서 1차로 바뀐다(torch에는 3D
+      3차 보간이 없다). 확률은 원래 1차였다.</p>
+
+      <p><strong>자동 대체</strong>: <code>torch.cuda.OutOfMemoryError</code>가 나면 <code>empty_cache()</code> 후
+      scipy 리샘플러로 그 구조물을 다시 실행한다
+      (<code>AMASSS_CLI.py:244</code>). 클라우드 버전에는
+      명시적인 <code>gpu_resampling</code> 인자가 있지만, 여기서는 파라미터 목록이 XML과 그 호출자들에 의해
+      고정되어 있어 불가능하다.</p>
+
+      <h3>5.2 조립과 기록</h3>
+
+      <p><code>AssembleScanOutputs()</code>(<code>AMASSS_CLI.py:575</code>)는
+      스캔마다 각 <code>p_&lt;NNN&gt;.nii.gz</code>를 <code>pred_&lt;STRUCT&gt;</code>
+      폴더에서 읽고(없으면 경고 후 해당 구조물 건너뜀), <code>(arr &gt; 0)</code>으로 이진화한 다음</p>
+
+      <ul>
+        <li><strong>SEPARATE</strong>: 요청되었을 때, <em>또는</em> 구조물이 하나뿐일 때(구조물 하나로 된
+        "병합"은 그 구조물 자체일 뿐이다);</li>
+        <li><strong>MERGE</strong>: 요청되었고 구조물이 2개 이상일 때. <code>np.where(mask == 1, label, merged)</code>를
+        <code>merging_order</code> =
+        <code>["SKIN","CV","UAW","CB","MAX","MAND","CAN","RC","CBMASK","MANDMASK","MAXMASK"]</code>의 순서로 적용한다.
+        <strong>이것은 우선순위 순서다</strong>. 마지막에 기록된 구조물이 겹치는 복셀에서
+        앞의 것을 덮어쓴다. <code>"CAN"</code>은 어떤 딕셔너리에도 없는
+        사용되지 않는 항목이다(관 코드는 <code>MCAN</code>). <code>.get(struct, 1)</code>은 알 수 없는 코드를
+        레이블 1로 처리하게 된다.</li>
+      </ul>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 700 190" role="img" aria-label="구조물별 예측의 조립과 우선순위에 따른 병합">
+          <rect class="d-box-n" x="10" y="10" width="150" height="36" rx="6"/>
+          <text class="d-label" x="85" y="33" text-anchor="middle">pred_MAND</text>
+          <rect class="d-box-n" x="10" y="55" width="150" height="36" rx="6"/>
+          <text class="d-label" x="85" y="78" text-anchor="middle">pred_MAX</text>
+          <rect class="d-box-n" x="10" y="100" width="150" height="36" rx="6"/>
+          <text class="d-label" x="85" y="123" text-anchor="middle">pred_CB, pred_UAW…</text>
+          <text class="d-label-s" x="85" y="150" text-anchor="middle">구조물마다 폴더 1개</text>
+
+          <path class="d-arrow" d="M165 28 H220 M165 73 H220 M165 118 H220"/>
+          <path class="d-arrow-head" d="M220 28 l-7 -4 v8 z"/>
+          <path class="d-arrow-head" d="M220 73 l-7 -4 v8 z"/>
+          <path class="d-arrow-head" d="M220 118 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="225" y="45" width="150" height="60" rx="6"/>
+          <text class="d-label" x="300" y="68" text-anchor="middle">이진화</text>
+          <text class="d-label-s" x="300" y="84" text-anchor="middle">(arr &gt; 0)</text>
+
+          <path class="d-arrow" d="M380 75 H420"/>
+          <path class="d-arrow-head" d="M420 75 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="425" y="10" width="120" height="60" rx="6"/>
+          <text class="d-label" x="485" y="33" text-anchor="middle">SEPARATE</text>
+          <text class="d-label-s" x="485" y="49" text-anchor="middle">구조물당 마스크 1개</text>
+          <text class="d-label-s" x="485" y="63" text-anchor="middle">int16</text>
+
+          <rect class="d-box-a" x="425" y="85" width="120" height="80" rx="6"/>
+          <text class="d-label" x="485" y="105" text-anchor="middle">MERGE</text>
+          <text class="d-label-s" x="485" y="120" text-anchor="middle">np.where(label, merged)</text>
+          <text class="d-label-s" x="485" y="134" text-anchor="middle">순서 = 우선순위</text>
+          <text class="d-label-s" x="485" y="148" text-anchor="middle">마지막이 덮어씀</text>
+
+          <path class="d-arrow" d="M550 40 H595 M550 125 H595"/>
+          <path class="d-arrow-head" d="M595 40 l-7 -4 v8 z"/>
+          <path class="d-arrow-head" d="M595 125 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="600" y="60" width="90" height="45" rx="6"/>
+          <text class="d-label" x="645" y="79" text-anchor="middle">VTK</text>
+          <text class="d-label-s" x="645" y="94" text-anchor="middle">genVtk일 때</text>
+        </svg>
+        <figcaption>스캔별 조립: 각 예측 폴더를 이진화한 뒤 따로 기록하거나 <code>merging_order</code>에 따라 병합하고(목록의 마지막 구조물이 겹치는 복셀에서 앞의 것을 덮어씀), 요청하면 VTK 표면으로 만든다.</figcaption>
+      </figure>
+
+      <p><code>SaveSeg()</code>(<code>AMASSS_CLI.py:524</code>)는 int16으로 변환하고,
+      기준 스캔의 간격, 방향, 원점을 <strong>명시적으로</strong> 다시 복사한 뒤,
+      <code>MatchReferenceGeometry()</code>
+      (<code>AMASSS_CLI.py:502</code>)를 거친다. 이 함수는 기하가 다를 때만 리샘플링(최근접
+      이웃)하므로 정상적인 경우에는 아무 일도 하지 않는다. 이전
+      버전은 기하를 강제하려고 임시 볼륨을 기록한 뒤 다시 읽었다.
+      구조물마다 CBCT 전체를 gzip으로 두 번 왕복하는, 쓸모없는 작업이었다.</p>
+
+      <h3>5.3 후처리: 이제 없는 것</h3>
+
+      <p>구멍 메우기도, 연결 성분 선택도,
+      형태학 연산도 적용되지 않는다. 두 함수가 남아 있지만 <strong>어디에서도 호출되지 않는다</strong>.</p>
+
+      <ul>
+        <li><code>CleanArray()</code>(<code>AMASSS_CLI.py:422</code>) — 반경 <code>r</code>의 이진
+        팽창, <code>BinaryFillhole</code>, 반경 <code>r</code>의 침식, 이어서
+        <code>cc3d.connected_components</code>로 가장 큰 성분만 유지;</li>
+        <li><code>CropSkin()</code>(<code>AMASSS_CLI.py:489</code>) — 채우기,
+        두께 <code>thickness</code>의 침식, 둘의 차이로 껍질만
+        남긴 뒤 가장 큰 성분 유지.</li>
+      </ul>
+
+      <p>monai 버전에서는 <code>CleanArray(sep_arr, 2)</code>를 <code>CV</code>와 <code>RC</code>를 제외한
+      모든 구조물에, <code>CropSkin(sep_arr, 5)</code>를 피부에 적용했다.
+      nnU-Net 이식에서 이 호출들이 제거되었다. 이제 정리는 전적으로 nnU-Net의
+      내부 후처리(묶음에 <code>postprocessing.pkl</code>이 있다면)에
+      의존한다. <code>cc3d</code>는 이 두 사용되지 않는 함수를 위해 여전히 import되며,
+      <code>Write()</code>(<code>AMASSS_CLI.py:287</code>)도 마찬가지다.</p>
+
+      <h3>5.4 VTK 표면 생성</h3>
+
+      <p><code>SavePredToVTK()</code>(<code>AMASSS_CLI.py:305</code>)는
+      <code>SaveSeg</code>에서 <code>genVtk</code>가 참일 때 호출된다. 레이블마다: 이진 마스크를 임시 NRRD
+      <code>&lt;temp&gt;/temp.nrrd</code>로 기록하고, <code>vtkNrrdReader</code> →
+      <code>vtkDiscreteMarchingCubes</code>(<code>GenerateValues(1, 1, 1)</code>: 값 1의 등고선
+      하나 — 그래서 레이블 맵이 아니라 이진 마스크를 거친다) →
+      <code>vtkSmoothPolyDataFilter</code>(<code>vtk_smooth</code>회 반복, 저장소 전체에서
+      5) → <code>vtkUnsignedCharArray</code> "Colors", <strong>셀마다 일정한 색 하나</strong>
+      (<code>LABEL_COLORS</code>에서 가져옴).</p>
+
+      <p>파일 이름의 <code>_MERGED</code> 접미사로 두 모드를 고른다. <strong>병합</strong>
+      모드에서는 <code>np.unique(arr)</code>를 돌며 <code>vtkAppendPolyData</code>로 이어 붙여
+      <strong>하나의</strong> <code>.vtk</code>를 만든다. <strong>개별</strong> 모드에서는 <code>struct = base.split('_')[-1]</code>, 즉
+      색을 찾기 위해 구조물 코드를 <strong>파일 이름에서 다시 추출한다</strong>.</p>
+
+      <p>메시는 <strong>영상 좌표계로</strong> 기록되며,
+      <a class="gterm" href="../glossary.html#g-lps" title="용어집 보기">LPS</a>/<a class="gterm" href="../glossary.html#g-ras" title="용어집 보기">RAS</a> 반전이 없다. NRRD의 인덱스에서 바로 얻은 <code>vtkPolyData</code>이기 때문이다.</p>
+
+      <h2 id="sorties">6. 후처리와 출력</h2>
+
+      <p>이름 규칙 — <code>base</code> = 확장자를 뺀 스캔 이름, <code>ext</code> = 원래 확장자:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>모드</th><th>파일</th><th>내용</th></tr></thead>
+          <tbody>
+            <tr><td>SEPARATE</td><td><code>&lt;base&gt;_&lt;prediction_ID&gt;_&lt;STRUCT&gt;&lt;ext&gt;</code></td><td><span class="badge calcule">계산</span> 이진 int16 마스크, 구조물마다 하나</td></tr>
+            <tr><td>MERGE</td><td><code>&lt;base&gt;_&lt;prediction_ID&gt;_MERGED&lt;ext&gt;</code></td><td><span class="badge calcule">계산</span> int16 레이블 맵, 기준은 <code>LABELS["LARGE"]</code></td></tr>
+            <tr><td><code>genVtk</code></td><td><code>&lt;same name&gt;.vtk</code></td><td><span class="badge calcule">계산</span> 색이 입혀진 표면</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>save_in_folder</code>이면 모두
+      <code>&lt;output_folder&gt;/&lt;base&gt;_&lt;prediction_ID&gt;_SegOut/</code>에, 아니면 바로
+      <code>&lt;output_folder&gt;</code>에 들어간다.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p>임시 폴더는 <strong>시작할 때와 끝날 때 모두 지워지고 다시 만들어진다</strong>.
+        <code>nnunet_input</code>은 추론이 끝나는 즉시, 조립 전에 삭제된다.
+        그러지 않으면 일괄 처리가 끝날 때까지 모든 CBCT의 NIfTI 사본을 통째로 들고 있게 된다.
+        스캔의 예측은 조립이 진행되면서 삭제된다. <code>temp_fold</code>는
+        시작할 때 무조건 <code>rmtree</code>된다(<code>AMASSS_CLI.py:648</code>). 그리고 위젯, AREG,
+        <a href="../VFACE/VFACE.html">VFACE</a>가 모두 <code>&lt;Documents&gt;/Slicer_temp_AMASSS</code>를 넘긴다. 동시에 실행되는 두 작업이
+        서로의 작업 폴더를 지운다. 자세한 내용은 §9.</p>
+      </div>
+
+      <p>위젯 쪽에서는 <code>OnEndProcess()</code>(<code>AMASSS.py:1089</code>)가
+      출력 폴더의 <code>.vtk</code> 파일을 장면에 로드한다(피부는 불투명도 0.1, 근관이 있으면
+      하악골/상악골은 0.2). 이 로드는
+      <code>vtk_output_folder</code>가 null이 아닐 때만 일어나므로, "single file" 입력을
+      원래 폴더에 저장하고 표면 체크박스를 체크한 경우에<strong>만</strong> 해당한다
+      (<code>AMASSS.py:944</code>). <code>LOADED_VTK_FILES</code>는
+      <strong>모듈 수준 전역 변수</strong>다. 장면을 닫은 뒤에도 노드가 세션 내내
+      참조된 채로 남는다.</p>
+
+      <h2 id="predit-calcule">7. 예측되는 것과 계산되는 것</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>블록</th><th>성격</th><th>실행 위치</th></tr></thead>
+          <tbody>
+            <tr><td>전처리 (리샘플링, <code>CTNormalization</code>)</td><td><span class="badge calcule">계산</span> 결정론적, <code>plans.json</code>이 결정</td><td>nnU-Net, 같은 프로세스</td></tr>
+            <tr><td>각 구조물의 분할</td><td><span class="badge predit">예측</span> 3D <code>PlainConvUNet</code> 신경망, 구조물마다 하나, 이진</td><td>nnU-Net, 같은 프로세스, 가능하면 GPU</td></tr>
+            <tr><td>슬라이딩 윈도, gaussian, step 0.5</td><td><span class="badge calcule">계산</span> 결정론적</td><td>nnU-Net</td></tr>
+            <tr><td>출력 리샘플링</td><td><span class="badge calcule">계산</span> 결정론적, torch (GPU) 또는 scipy</td><td>nnU-Net, 리샘플러는 AMASSS가 치환</td></tr>
+            <tr><td>이진화 + 레이블 병합</td><td><span class="badge calcule">계산</span> 단순 기하 연산(<code>np.where</code>)</td><td>CLI</td></tr>
+            <tr><td>스캔에 맞춘 기하 정렬</td><td><span class="badge calcule">계산</span> ITK, 최근접 이웃, 실제로는 아무 일도 하지 않음</td><td>CLI</td></tr>
+            <tr><td>VTK 표면</td><td><span class="badge calcule">계산</span> <a class="gterm" href="../glossary.html#g-marching-cubes" title="용어집 보기">marching cubes</a> + 라플라시안 평활화</td><td>CLI</td></tr>
+            <tr><td>형태학적 정리</td><td><strong>파이프라인에서 제거됨</strong> (사용되지 않는 코드)</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="environnement">8. 실행 환경</h2>
+
+      <p>모두 Slicer의 Python에서 실행된다. 설치는 모듈을 열 때가 아니라
+      <em>Predict</em> 버튼(<code>AMASSS.py:851</code>)을 누를 때 시작되며,
+      확인 대화 상자를 거친다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>패키지</th><th>고정 버전</th><th>코드에서 읽히는 이유</th></tr></thead>
+          <tbody>
+            <tr><td><code>torch</code>, <code>torchvision</code>, <code>torchaudio</code></td><td><code>&gt;=2.2.0</code> (CUDA 휠)</td><td>감지된 CUDA 버전에 따라 <code>download.pytorch.org/whl/cu118</code> 또는 <code>cu121</code> 인덱스</td></tr>
+            <tr><td><code>nnunetv2</code></td><td><code>2.8.0</code></td><td>추론 백엔드</td></tr>
+            <tr><td><code>numpy</code></td><td><strong><code>1.26.4</code></strong> (<code>NUMPY_PINNED_VERSION</code>)</td><td>torch 2.2.0은 numpy 1.x 기준으로 빌드됨. numpy ≥ 2는 모든 torch import를 <code>_ARRAY_API not found</code>로 깨뜨린다</td></tr>
+            <tr><td><code>pydicom</code></td><td><code>3.0.2</code></td><td><strong>다운그레이드 금지</strong>: pydicom 2.x는 <code>dicomweb-client</code>와 <code>highdicom</code>을 깨뜨리고, 그 결과 Slicer의 모든 DICOM 모듈이 깨진다</td></tr>
+            <tr><td><code>dicom2nifti</code></td><td><code>2.6.2</code></td><td>pydicom 3과의 호환성</td></tr>
+            <tr><td><code>itk</code>, <code>blosc2</code>, <code>einops</code>, <code>nibabel</code></td><td>고정 안 함</td><td>nnU-Net 의존성</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>fix_numpy_version()</code>(<code>AMASSS.py:55</code>)은 모든 설치가 끝난 <strong>뒤에</strong>
+      다시 호출된다. pip은 설치마다 독립적으로 의존성을 해결하므로,
+      <code>nnunetv2</code>(<code>numpy&gt;=1.24</code> 요구)가 도중에 numpy 2.x를 끌어올 수 있기 때문이다.</p>
+
+      <p>Windows에서는 <code>check_lib_installed()</code>가 torch 패키지 세 개의 <code>cuXXX</code> 접미사를
+      비교하여 일치할 때만 설치를 유효한 것으로 본다. CUDA 버전
+      감지는 <code>cu121</code>이 상한이며, 12.1 미만이면 <code>cu118</code>로 대체한다.</p>
+
+      <p>WSL도 conda도 없다. IOS 모듈(<a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a>,
+      <a href="../ALI/ALI.html">ALI_IOS</a>)과 달리 AMASSS는 외부 환경을 전혀 쓰지 않는다.</p>
+
+      <h2 id="pieges">9. 함정과 취약 지점</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그 — 작은 <a class="gterm" href="../glossary.html#g-fov" title="용어집 보기">FOV</a> 기능 고장</div>
+        <p><strong><code>highDefinition</code> / "small FOV"는 내세우는 기능을 더 이상 하나도 하지 않는다.</strong>
+        <code>smallFOVCheckBox</code>는 제공되는 구조물 목록을
+        <code>GROUPS_HD_SEG</code>(<code>AMASSS.py:747</code>)로 바꾼다 — 하악골,
+        상악골, 치아, 근관, 하악관이며, 그중 셋은
+        모델이 없다. <code>param["highDefinition"]</code> 플래그는 <strong>XML에 선언되어 있지 않아</strong>
+        <code>slicer.cli.run</code>이 버리며, 어차피 CLI에는 더 이상
+        <code>SMALL</code> 코드 경로가 없다(간격 <code>[0.16, 0.16, 0.32]</code>와 <code>MODELS_GROUP["SMALL"]</code>은
+        이식과 함께 사라졌다). 체크박스를 체크해도 체크박스 목록만 바뀐다.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그 — DICOM 입력 무시</div>
+        <p><strong><code>isDCMInput</code>은 읽히지만 무시된다</strong>. <code>dicom2nifti</code>는 파일
+        맨 위에서 import되지만 쓰이지 않으며, CLI 어디에도 DICOM → NIfTI 변환이
+        없다. 그런데도 UI는 입력 유형으로 "DICOM Files"를 제공한다.
+        DICOM 입력으로는 아무것도 나오지 않는다. 인식되는 확장자를 가진 파일이 하나도 없기 때문이다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>모델이 없는데 기본으로 체크된 <code>RC</code></strong>: <code>DEFAULT_SELECT</code>에
+        "Root canal"이 들어 있지만 공개된 묶음에는 <code>RC</code> 폴더가 없다. 조용한 실패다.</p>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그 — 공유 임시 폴더</div>
+        <p><strong>임시 폴더 덮어쓰기.</strong> <code>temp_fold</code>는 시작할 때 무조건 <code>rmtree</code>되며
+        (<code>AMASSS_CLI.py:648</code>), 위젯,
+        AREG, <a href="../VFACE/VFACE.html">VFACE</a>가 모두 <code>&lt;Documents&gt;/Slicer_temp_AMASSS</code>를 넘긴다. <strong>동시에
+        실행되는 두 작업이 서로의 작업 폴더를 지운다</strong>.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>취약한 케이스 인덱스</strong>: <code>p_NNN</code> → 파일 대응은 메모리의
+        <code>scan_records</code>에만 있다. 조립 중에 충돌이 나면 임시 폴더에 누구의 것인지 모를
+        예측이 남는다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong><code>struct = base.split('_')[-1]</code></strong>(<code>SavePredToVTK</code> 안): 구조물 코드 뒤에 밑줄이 들어간 <code>prediction_ID</code>나
+        스캔 이름은 <code>KeyError</code>를 일으킨다
+        (<code>LABELS["LARGE"][struct]</code>에서).</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>개수 불일치</strong>: 위젯(확장자에 <code>.gipl</code> 포함,
+        예외 <code>Seg</code>/<code>seg</code>/<code>Pred</code>)과 CLI(<code>.gipl</code> 인식 안 함, 예외는
+        <code>_&lt;prediction_ID&gt;_</code>와 <code>MASK</code>) 사이.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>위젯의 <code>cleanup()</code></strong>(<code>AMASSS.py:1348</code>)은
+        <code>shutil.rmtree(os.path.join("..", "temp"))</code>를 실행한다. Slicer의 현재
+        작업 디렉터리 기준 상대 경로로, <code>temp_fold</code>와 무관하다. 예외는 삼켜진다.</p>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">참고 — 알아 둘 만한 사용되지 않는 코드</div>
+        <p>CLI: <code>CorrectHisto</code>, <code>CleanArray</code>, <code>CropSkin</code>,
+        <code>Write</code>, <code>MODELS_GROUP</code>, <code>LABELS["SMALL"]</code>, <code>NTRANSLATE</code>. 위젯:
+        <code>GetSegGroup</code>, <code>createProgressDialog</code>, <code>UpdateRunBtn</code>(
+        <code>self.scan_ready</code>를 읽으려 하지만 이는 <strong>정의된 적이 없다</strong> → <code>AttributeError</code>), <code>self.center_all</code>,
+        <code>self.save_adjusted</code>와 그 체크박스 두 개. 체크박스는 화면에 보이지만 전혀
+        읽히지 않는다.</p>
+      </div>
+
+      <h2 id="litterature">10. 문헌</h2>
+
+      <p>AMASSS는 한 번 발표되었다.</p>
+
+      <blockquote>
+        <p>Gillot M., Baquero B., Le C., Deleat-Besson R., Bianchi J., Ruellas A., …,
+        Cevidanes L., Prieto J.C. <em>Automatic multi-anatomical skull structure
+        segmentation of cone-beam computed tomography scans using 3D UNETR.</em>
+        PLOS ONE 17(10):e0275033, 2022.
+        <a href="https://doi.org/10.1371/journal.pone.0275033">doi:10.1371/journal.pone.0275033</a>
+        — PMID 36223330, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9555672/">PMC9555672</a></p>
+      </blockquote>
+
+      <div class="callout warn">
+        <div class="callout-title">코드 / 논문 불일치</div>
+        <p><strong>코드는 논문과 완전히 달라졌다.</strong> 논문은 <strong>UNETR</strong>
+        (트랜스포머 인코더 + 합성곱 디코더, MONAI 라이브러리)을 설명한다. 128³ 패치,
+        <code>feature_size=16</code>, <code>hidden_size=768</code>, <code>mlp_dim=3072</code>, 어텐션 헤드 12개,
+        드롭아웃 5%, 7개 기관의 CBCT 618건으로 <strong>다섯</strong> 구조물에 대해 학습,
+        <strong>0.4 mm</strong> 등방성 리샘플링, 1% / 99% 백분위수에서 누적 히스토그램을 이용한
+        대비 조정. 보고된 Dice 점수: 피부 0.971, 하악골 0.962,
+        상악골 0.853, 두개저 0.788, 경추 0.760.</p>
+      </div>
+
+      <p>CLI의 과거 버전이 한 일이 바로 이것이다. <code>Create_UNETR(...)</code>,
+      <code>sliding_window_inference(input_img, [128,128,128], nbr_GPU_worker, net,
+      overlap=precision/100, sw_device=DEVICE, ...)</code>, <code>CorrectHisto</code> +
+      <code>ScaleIntensityd(0,1)</code> + <code>Spacingd(pixdim=[0.4,0.4,0.4])</code>(고해상도에서는 <code>[0.16,0.16,0.32]</code>),
+      이어서 <code>CleanArray</code>/<code>CropSkin</code> — 커밋 <code>61bbb15</code> "ENH: AMASSS with nnunet."까지
+      저장소에서 읽을 수 있다. 고해상도
+      간격과 UI의 <code>precision</code>은 논문이 아니라 코드의 파라미터였다.
+      <code>Create_SwinUNETR(feature_size=48)</code>가 주석 처리된 채 함께 있었다.</p>
+
+      <p>현재 코드에는 그중 아무것도 남아 있지 않다. <strong>nnU-Net v2, <code>PlainConvUNet</code>, 구조물마다
+      이진 신경망 하나</strong>. 0.4 mm 간격은 살아남았지만 가중치의
+      <code>plans.json</code>에서 온다. 고해상도 경로와 형태학적 후처리는 사라졌다.
+      <strong>AMASSS의 nnU-Net 버전을 설명한 발표 문헌은 없다</strong>. 현재 동작하는 모듈을 설명하려고
+      PLOS ONE 논문을 인용하면 더 이상 실행되지 않는
+      아키텍처를 설명하는 셈이 된다.</p>
+
+      <ul>
+        <li><a href="https://doi.org/10.1038/s41592-020-01008-z">nnU-Net (Nat Methods, 2021)</a></li>
+        <li><a href="https://arxiv.org/abs/2103.10504">UNETR: Transformers for 3D Medical Image Segmentation (WACV 2022)</a></li>
+        <li><a href="https://github.com/Maxlo24/AMASSS_CBCT">Maxlo24/AMASSS_CBCT (원래 저장소)</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>전체 참고문헌, 받아 둔 PDF, 참고할 링크: <a href="SOURCES.html">SOURCES.html</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← 모든 페이지</a> ·
+        <a href="SOURCES.html">이 도구의 참고문헌</a> ·
+        출처: <code>AMASSS.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

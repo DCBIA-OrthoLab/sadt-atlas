@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BatchDentalSeg — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="segmentation">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/BatchDentalSeg/BatchDentalSeg.html" hreflang="en" title="English">EN</a><a href="../../fr/BatchDentalSeg/BatchDentalSeg.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/BatchDentalSeg/BatchDentalSeg.html" hreflang="ko" title="한국어">KO</a><a href="../../th/BatchDentalSeg/BatchDentalSeg.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/BatchDentalSeg.html"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../BatchDentalSeg/BatchDentalSeg.html" aria-current="true"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html" aria-current="page">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/BatchDentalSeg/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Segmentação</div>
+        <h1>BatchDentalSeg</h1>
+        <p class="lede">Fila que conduz o <code>nnUNetv2_predict</code> sobre um lote de exames de TC/CBCT, com quatro pacotes de pesos intercambiáveis — o DentalSegmentator e suas três variantes — além de todo o trabalho de salvaguardas, restauração da geometria e exportação em torno deles.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1016/j.jdent.2024.105130" target="_blank" rel="noopener" title="DentalSegmentator. As variantes do módulo não são publicadas.">Dot 2024 · J Dent</a>
+          <span class="badge cli">BATCHDENTALSEG</span>
+          <span class="badge cli">nnUNetv2_predict</span>
+          <span class="badge neutral">sem conda — Python do Slicer + nnunetv2</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliografia</a>
+        </div>
+      </header>
+
+      <p>Segmentação dentomaxilofacial em lote de exames de TC/CBCT. O módulo não é uma
+      rede: é uma <strong>fila e um orquestrador</strong> em torno do
+      <code>nnUNetv2_predict</code>, com quatro pacotes de pesos intercambiáveis. Todo o
+      aprendizado acontece fora deste repositório; o que está escrito aqui é a escolha do
+      modelo, as salvaguardas de memória, a restauração da geometria e as exportações.</p>
+
+      <h2 id="situation">1. Onde se situa no pipeline</h2>
+
+      <p><strong>Nenhum outro módulo do repositório chama o BatchDentalSeg</strong>, e o BatchDentalSeg
+      não chama nenhum outro módulo do repositório. É uma ferramenta terminal. Ele depende,
+      no entanto, de uma <strong>extensão externa do Slicer</strong>, <code>NNUNet</code>
+      (<a href="https://github.com/KitwareMedical/SlicerNNUnet" target="_blank" rel="noopener">SlicerNNUNetLib</a>), da qual
+      usa três classes.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Chamado</th><th>Origem</th><th>Papel</th></tr></thead>
+          <tbody>
+            <tr><td><code>SlicerNNUNetLib.InstallLogic</code></td><td>extensão NNUNet</td><td><code>setupPythonRequirements()</code>: instala o nnunetv2 no Python do Slicer</td></tr>
+            <tr><td><code>SlicerNNUNetLib.Parameter</code></td><td>extensão NNUNet</td><td>valida a árvore de diretórios do modelo e monta a linha de comando</td></tr>
+            <tr><td><code>SlicerNNUNetLib.SegmentationLogic</code></td><td>extensão NNUNet</td><td>grava o volume como NIfTI em uma pasta temporária, executa <code>nnUNetv2_predict</code> como <code>QProcess</code>, recarrega a segmentação</td></tr>
+            <tr><td><code>OpenAnatomyExport</code></td><td>extensão SlicerOpenAnatomy</td><td>apenas exportação glTF; instalada na hora se ausente</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O módulo é uma <strong>variante em lote do DentalSegmentator</strong> (extensão
+      <a href="https://github.com/gaudot/SlicerDentalSegmentator" target="_blank" rel="noopener">gaudot/SlicerDentalSegmentator</a>),
+      da qual reaproveita o widget, os ícones e o mecanismo de download dos
+      pesos. Os contribuidores declarados em
+      <code>BATCHDENTALSEG.py:30</code> misturam a equipe
+      original (Dot, Gajny, Fenioux, Pelletier) com o acréscimo da UoM (Tulissi).</p>
+
+      <h2 id="fichiers">2. Arquivos envolvidos</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Arquivo</th><th>Papel</th><th>Tamanho</th></tr></thead>
+          <tbody>
+            <tr><td><code>BATCHDENTALSEG.py</code></td><td>envolve <code>ScriptedLoadableModule</code>, apenas instancia o widget</td><td>83 linhas</td></tr>
+            <tr><td><code>SegmentationWidget.py</code></td><td><strong>tudo</strong>: interface, fila, escolha do modelo, proteção de memória, recorte, rótulos, exportações</td><td>2940 linhas</td></tr>
+            <tr><td><code>Queue.py</code></td><td>fila persistente, <code>QueueItem</code> / <code>SegmentationQueue</code></td><td>204 linhas</td></tr>
+            <tr><td><code>PythonDependencyChecker.py</code></td><td>download e verificação de atualização dos pesos do DentalSegmentator</td><td>184 linhas</td></tr>
+            <tr><td><code>Utils.py</code>, <code>Signal.py</code>, <code>IconPath.py</code></td><td>auxiliares Qt</td><td></td></tr>
+            <tr><td><code>Resources/ML/</code></td><td>raiz dos pesos; o repositório traz <code>Dataset111_453CT/.../dataset.json</code> e <code>plans.json</code></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Tudo roda dentro do <strong>Python do Slicer</strong>. <code>nnUNetv2_predict</code> é executado como
+      <strong>processo filho</strong> (<code>QProcess</code>), um exame de cada vez — ao contrário do <a href="../AMASSS/AMASSS.html">AMASSS</a>, que
+      chama a API Python do <a class="gterm" href="../glossary.html#g-nnunet" title="Ver glossário">nnU-Net</a> no mesmo processo.</p>
+
+      <p><code>Resources/ML</code> <strong>não</strong> está listado em <code>MODULE_PYTHON_RESOURCES</code> do
+      <code>CMakeLists.txt</code>: em uma extensão instalada,
+      a pasta é criada inteiramente em tempo de execução. Os arquivos <code>.pth</code> estão no <code>.gitignore</code>.</p>
+
+      <h2 id="entrees">3. Entradas, percurso das pastas, nomes</h2>
+
+      <h3 id="entrees-acceptees">3.1 O que é aceito</h3>
+
+      <p><code>listVolumes()</code> (<code>Queue.py:28</code>)
+      faz uma varredura <strong>não recursiva</strong> com <code>glob</code> sobre quatro padrões: <code>*.nii</code>, <code>*.nii.gz</code>,
+      <code>*.gipl</code>, <code>*.gipl.gz</code>. As subpastas não são visitadas, e o <strong>NRRD não é
+      reconhecido</strong> — formato padrão do Slicer, e um formato que os outros módulos do repositório
+      produzem com frequência.</p>
+
+      <p><code>volumeStem()</code> remove o sufixo composto: <code>case01.nii.gz</code> → <code>case01</code> (um
+      <code>Path.stem</code> deixaria <code>case01.nii</code>).</p>
+
+      <h3 id="entrees-file">3.2 A fila</h3>
+
+      <p>Uma entrada = <strong>um exame</strong>, não uma pasta
+      (<code>QueueItem</code>, <code>Queue.py:52</code>):
+      <code>inputPath</code>, <code>outputDir</code>, <code>model</code>, <code>device</code>, <code>status</code>, <code>error</code>, <code>durationSec</code>,
+      <code>autoCrop</code>. Várias pastas com modelos diferentes podem, portanto, ser
+      empilhadas na mesma sessão.</p>
+
+      <p><code>addFolder()</code> pula um exame se <code>&lt;outputDir&gt;/&lt;stem&gt;_Segmentation.nii.gz</code> já
+      existir (a caixa <em>Skip scans already segmented</em>, marcada por padrão) ou se ele
+      já estiver na fila.</p>
+
+      <p><strong>Persistência</strong>: o estado é regravado após cada exame em
+      <code>&lt;outputDir&gt;/.batchdentalseg_queue.json</code>. Ao recarregar, um exame deixado em
+      <code>running</code> (Slicer encerrado no meio da inferência) é <strong>rebobinado</strong> para <code>pending</code> e
+      o índice volta para ele.</p>
+
+      <p><code>isChunkBoundary()</code>: a cada <code>chunkSize</code> exames (padrão 5), <code>_coolDown()</code> faz
+      uma limpeza profunda — remove nós órfãos, <code>torch.cuda.empty_cache()</code>
+      + <code>ipc_collect()</code>, <code>gc.collect()</code>.</p>
+
+      <h3 id="entrees-reseau">3.3 O que a rede realmente vê</h3>
+
+      <p>O widget não faz nenhum pré-processamento. <code>SegmentationLogic._prepareInferenceDir()</code> faz um
+      <code>slicer.util.exportNode(volumeNode, &lt;tmp&gt;/input/volume_0000.nii.gz)</code>, e <strong>todo
+      o pré-processamento é do nnU-Net</strong>: transposição conforme
+      <code>transpose_forward</code>, reamostragem para o <code>spacing</code> do plano, <code>CTNormalization</code>
+      (corte nos percentis 0,5% / 99,5% do conjunto de treinamento e depois padronização
+      pela sua média e desvio padrão).</p>
+
+      <p>O único pré-processamento escrito neste repositório é o <strong>recorte automático</strong> (§5.2), e
+      ele é opcional, reservado à nova tentativa após uma falha de memória.</p>
+
+      <h2 id="modeles">4. Os quatro modelos</h2>
+
+      <h3 id="modeles-combo">4.1 O que a caixa de seleção escolhe</h3>
+
+      <p><code>onApplyClickedForVolume()</code>
+      (<code>SegmentationWidget.py:1729</code>)
+      é um <code>if/elif</code> com quatro ramos quase idênticos. Cada um monta o mesmo
+      objeto:</p>
+
+      <pre><code>Parameter(folds="0", modelPath=basePath, device=self.deviceComboBox.currentText)</code></pre>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 920 260" role="img" aria-label="Um único ponto de entrada no código, quatro pacotes de pesos na saída">
+          <rect class="d-box-a" x="330" y="14" width="260" height="46" rx="6"/>
+          <text class="d-label" x="460" y="33" text-anchor="middle">onApplyClickedForVolume()</text>
+          <text class="d-label-s" x="460" y="48" text-anchor="middle">if / elif — mesmo Parameter(...)</text>
+
+          <path class="d-arrow" d="M460 60 V80"/>
+          <path class="d-arrow" d="M460 80 H115"/>
+          <path class="d-arrow" d="M460 80 H345"/>
+          <path class="d-arrow" d="M460 80 H575"/>
+          <path class="d-arrow" d="M460 80 H805"/>
+          <path class="d-arrow" d="M115 80 V100"/>
+          <path class="d-arrow" d="M345 80 V100"/>
+          <path class="d-arrow" d="M575 80 V100"/>
+          <path class="d-arrow" d="M805 80 V100"/>
+          <path class="d-arrow-head" d="M115 100 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M345 100 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M575 100 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M805 100 l-4 -7 h8 z"/>
+
+          <rect class="d-box-n" x="10" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="115" y="122" text-anchor="middle">DentalSegmentator</text>
+          <text class="d-mono" x="115" y="140" text-anchor="middle">Dataset111_453CT</text>
+          <text class="d-label-s" x="115" y="157" text-anchor="middle">5 rótulos — dentição permanente</text>
+          <text class="d-label-s" x="115" y="172" text-anchor="middle">Upper Skull, Mandible,</text>
+          <text class="d-label-s" x="115" y="185" text-anchor="middle">Upper/Lower Teeth, canal</text>
+
+          <rect class="d-box-n" x="240" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="345" y="122" text-anchor="middle">PediatricDentalsegmentator</text>
+          <text class="d-mono" x="345" y="140" text-anchor="middle">Dataset001_380CT</text>
+          <text class="d-label-s" x="345" y="157" text-anchor="middle">5 rótulos — mesma tabela</text>
+          <text class="d-label-s" x="345" y="172" text-anchor="middle">do DentalSegmentator,</text>
+          <text class="d-label-s" x="345" y="185" text-anchor="middle">dentição mista</text>
+
+          <rect class="d-box-n" x="470" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="575" y="122" text-anchor="middle">NasoMaxillaDentSeg</text>
+          <text class="d-mono" x="575" y="140" text-anchor="middle">Dataset001_max4</text>
+          <text class="d-label-s" x="575" y="157" text-anchor="middle">6 rótulos — maxila</text>
+          <text class="d-label-s" x="575" y="172" text-anchor="middle">separada do crânio</text>
+          <text class="d-label-s" x="575" y="185" text-anchor="middle">(erro de nomes, §9)</text>
+
+          <rect class="d-box-n" x="700" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="805" y="122" text-anchor="middle">UniversalLabDentalsegmentator</text>
+          <text class="d-mono" x="805" y="140" text-anchor="middle">Dataset002_380CT</text>
+          <text class="d-label-s" x="805" y="157" text-anchor="middle">55 rótulos — dente a</text>
+          <text class="d-label-s" x="805" y="172" text-anchor="middle">dente, sem “Upper</text>
+          <text class="d-label-s" x="805" y="185" text-anchor="middle">Skull” apesar da UI</text>
+
+          <path class="d-arrow" d="M115 192 V212"/>
+          <path class="d-arrow" d="M345 192 V212"/>
+          <path class="d-arrow" d="M575 192 V212"/>
+          <path class="d-arrow" d="M805 192 V212"/>
+          <path class="d-arrow-head" d="M115 212 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M345 212 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M575 212 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M805 212 l-4 -7 h8 z"/>
+          <text class="d-mono" x="115" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="345" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="575" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="805" y="228" text-anchor="middle">nnUNetv2_predict</text>
+        </svg>
+        <figcaption>As quatro opções da caixa de seleção passam todas pelo mesmo código; só mudam a pasta do dataset e a tabela de rótulos.</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome na caixa de seleção</th><th>Pasta em <code>Resources/ML</code></th><th>Origem dos pesos</th></tr></thead>
+          <tbody>
+            <tr><td><code>DentalSegmentator</code></td><td><code>Dataset111_453CT/nnUNetTrainer__nnUNetPlans__3d_fullres</code></td><td>zip do <strong>release mais recente</strong> de <code>gaudot/SlicerDentalSegmentator</code>, resolvido via API do GitHub</td></tr>
+            <tr><td><code>PediatricDentalsegmentator</code></td><td><code>Dataset001_380CT/...</code></td><td>3 arquivos de <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/PEDIATRICDENTALSEG_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/PEDIATRICDENTALSEG_MODEL</a></td></tr>
+            <tr><td><code>NasoMaxillaDentSeg</code></td><td><code>Dataset001_max4/...</code></td><td><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/NASOMAXILLADENTSEG_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/NASOMAXILLADENTSEG_MODEL</a></td></tr>
+            <tr><td><code>UniversalLabDentalsegmentator</code></td><td><code>Dataset002_380CT/...</code></td><td><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/UNIVERSALLAB_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/UNIVERSALLAB_MODEL</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Os três últimos seguem o mesmo padrão: se
+      <code>&lt;basePath&gt;/fold_0/checkpoint_final.pth</code> estiver ausente, três arquivos são baixados
+      (<code>checkpoint_final.pth</code>, <code>dataset.json</code>, <code>plans.json</code>) via
+      <code>slicer.util.downloadFile</code>. Sem checksum, sem versionamento, sem
+      retomada: um download interrompido deixa um checkpoint truncado que o código
+      considerará presente na execução seguinte.</p>
+
+      <p>O DentalSegmentator passa por um caminho separado,
+      <code>PythonDependencyChecker</code>:
+      <code>Github().get_repo("gaudot/SlicerDentalSegmentator")</code>, depois <strong>o primeiro asset do
+      primeiro release</strong> listado, baixado em streaming e descompactado. A URL usada
+      é guardada em <code>Resources/ML/download_info.json</code>, e um release mais
+      recente dispara uma proposta de atualização. O arquivo versionado no
+      repositório aponta para
+      <a href="https://github.com/gaudot/SlicerDentalSegmentator/releases/download/v1.0.0-alpha/Dataset111_453CT_v100.zip" target="_blank" rel="noopener">Dataset111_453CT_v100.zip</a>.</p>
+
+      <h3 id="modeles-nnunet">4.2 nnU-Net, verificado no código</h3>
+
+      <p>Sim, é o nnU-Net v2, e não só no nome. A prova está na cadeia de
+      chamadas: <code>Parameter.asArgList()</code> monta literalmente</p>
+
+      <pre><code>nnUNetv2_predict -i &lt;tmp&gt;/input -o &lt;tmp&gt;/output
+  -d Dataset111_453CT -tr nnUNetTrainer -p nnUNetPlans -c 3d_fullres
+  -f 0 -npp 1 -nps 1 -step_size 0.5 -device cuda -chk checkpoint_final.pth --disable_tta</code></pre>
+
+      <p><code>-d</code>, <code>-tr</code>, <code>-p</code>, <code>-c</code> são <strong>deduzidos dos nomes das pastas</strong>: a pasta pai
+      dá o <code>Dataset…</code>, e o nome da pasta de configuração é separado em <code>__</code>
+      em (trainer, plan, configuration). Daí a exigência
+      <code>Dataset&lt;id&gt;/&lt;trainer&gt;__&lt;plan&gt;__&lt;conf&gt;/fold_&lt;i&gt;/checkpoint_final.pth</code>.</p>
+
+      <p>Parâmetros não expostos ao usuário, valores padrão de
+      <code>SlicerNNUNetLib.Parameter</code>: <code>stepSize = 0.5</code>, <code>disableTta = True</code> (sem
+      aumento por espelhamento no teste), <code>folds = "0"</code> (<strong>um único fold</strong>, nunca
+      um ensemble), <code>nProcessPreprocessing = nProcessSegmentationExport = 1</code>, forçados a
+      <code>0</code> no macOS (o nnU-Net trava na escrita ali por causa do multiprocessing).</p>
+
+      <p>O único ajuste que a interface oferece é o dispositivo: <code>cuda</code> / <code>cpu</code> / <code>mps</code>. Se
+      indisponível, apenas <strong>uma</strong> pergunta é feita para toda a fila
+      (<code>_deviceFallbackAccepted</code>), e no modo <em>Unattended</em> o recurso à CPU é
+      aceito automaticamente.</p>
+
+      <p><code>nnUNet_raw</code>, <code>nnUNet_preprocessed</code> e <code>nnUNet_results</code> apontam todos para a
+      pasta do modelo — três variáveis de ambiente de nível de processo, escritas por
+      <code>SegmentationLogic._startInferenceProcess</code>. Como <code>os.environ</code> é global, duas
+      inferências simultâneas na mesma sessão do Slicer interfeririam uma na outra;
+      aqui a fila é estritamente sequencial, então a questão não se coloca.</p>
+
+      <h3 id="modeles-architecture">4.3 Arquitetura e plano — o que é verificável</h3>
+
+      <p>Só o <code>Dataset111_453CT</code> (DentalSegmentator) tem seus arquivos JSON no repositório. Resumo do
+      <code>plans.json</code>:</p>
+
+      <pre><code>UNet_class_name = PlainConvUNet     base/max features = 32 / 320
+n_conv_per_stage encoder [2,2,2,2,2,2]  decoder [2,2,2,2,2]
+pool_op_kernel_sizes = [1,1,1], 4 x [2,2,2], [2,2,1]   conv_kernel 6 x [3,3,3]
+patch_size = [128, 160, 112]    spacing = [0.4492, 0.3120, 0.4492] mm
+transpose_forward = transpose_backward = [1, 0, 2]     batch_size = 2, batch_dice
+normalization_schemes = CTNormalization
+foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</code></pre>
+
+      <p>Este <code>plans.json</code> está no <strong>formato do nnU-Net anterior à 2.4</strong> (campos planos
+      <code>UNet_class_name</code> / <code>pool_op_kernel_sizes</code>, sem bloco <code>architecture</code>),
+      enquanto os pacotes do <a href="../AMASSS/AMASSS.html">AMASSS</a> usam o formato mais novo. Ambos continuam legíveis
+      pelo nnunetv2 atual.</p>
+
+      <p>Os planos dos outros três modelos <strong>não podem ser determinados a partir do
+      repositório</strong>: eles chegam com o download. Tudo o que se sabe sobre eles vem
+      dos dicionários fixados no código do widget (§4.4) e do README.</p>
+
+      <h3 id="modeles-labels">4.4 Os rótulos produzidos, por modelo</h3>
+
+      <p><code>_get_active_label_map()</code>
+      (<code>SegmentationWidget.py:1847</code>)
+      é <strong>a</strong> tabela de referência: ela decide os valores gravados no
+      NIfTI de saída.</p>
+
+      <p><strong>DentalSegmentator e PediatricDentalsegmentator</strong> — <span class="badge predit">5 rótulos</span> idênticos,
+      confirmados pelo <code>dataset.json</code> do pacote 111: 1 Upper Skull (maxila
+      incluída), 2 Mandible, 3 Upper Teeth, 4 Lower Teeth, 5 Mandibular canal. O que
+      os distingue, portanto, <strong>não é a saída, mas os dados de treinamento</strong>: dentição
+      permanente (<code>453CT</code>, 7 instituições) versus dentição mista (<code>380CT</code>). O código
+      os trata de forma rigorosamente idêntica — mesma tabela de rótulos, mesmas cores,
+      mesmo pós-processamento; só <code>_modelBasePath</code> difere.</p>
+
+      <p><strong>NasoMaxillaDentSeg</strong> — <span class="badge predit">6 rótulos</span>, a maxila <strong>separada</strong> do crânio:
+      1 Upper Skull, 2 Mandible, <strong>3 Maxilla</strong>, 4 Upper Teeth, 5 Lower Teeth,
+      6 Mandibular canal.</p>
+
+      <p><strong>UniversalLabDentalsegmentator</strong> — <span class="badge predit">55 rótulos</span>: os 32 dentes permanentes
+      numerados um a um (1 = 3<sup>o</sup> molar superior direito → 32 = 3<sup>o</sup> molar
+      inferior direito, percorrendo a arcada superior e depois a inferior), depois
+      20 dentes decíduos (33 → 52), depois <code>Mandible</code> = 53, <code>Maxilla</code> = 54,
+      <code>Mandibular canal</code> = 55. Nenhum "Upper Skull": este modelo não segmenta a
+      calota craniana, ao contrário do que mostra sua descrição na interface e do que
+      diz o README.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>A descrição exibida na interface para <code>UniversalLabDentalsegmentator</code> e o README do repositório anunciam uma segmentação da calota craniana. O modelo real não tem rótulo "Upper Skull": ele apenas numera os dentes, mais mandíbula/maxila/canal.</p>
+      </div>
+
+      <p>Os valores são definidos em cada segmento por uma tag <code>LabelValue</code>
+      (<code>_segmentLabelValue</code>), que <strong>tem prioridade sobre o nome</strong> quando presente.</p>
+
+      <h2 id="coeur">5. O núcleo não aprendido</h2>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 980 230" role="img" aria-label="Pipeline completo, do volume de entrada aos arquivos de saída">
+          <rect class="d-box" x="10" y="70" width="150" height="60" rx="6"/>
+          <text class="d-label" x="85" y="96" text-anchor="middle">Volume de entrada</text>
+          <text class="d-label-s" x="85" y="112" text-anchor="middle">.nii / .nii.gz / .gipl</text>
+
+          <path class="d-arrow" d="M160 100 H205"/>
+          <path class="d-arrow-head" d="M205 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="210" y="60" width="185" height="80" rx="6"/>
+          <text class="d-label" x="302" y="82" text-anchor="middle">Pré-proc. nnU-Net</text>
+          <text class="d-label-s" x="302" y="98" text-anchor="middle">transpor, reamostrar,</text>
+          <text class="d-label-s" x="302" y="112" text-anchor="middle">CTNormalization</text>
+          <text class="d-label-s" x="302" y="127" text-anchor="middle">(guiado por plans.json)</text>
+
+          <path class="d-arrow" d="M395 100 H440"/>
+          <path class="d-arrow-head" d="M440 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="445" y="60" width="180" height="80" rx="6"/>
+          <text class="d-label" x="535" y="85" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-label-s" x="535" y="101" text-anchor="middle">PlainConvUNet 3D</text>
+          <text class="d-label-s" x="535" y="115" text-anchor="middle">1 fold, sem TTA</text>
+          <text class="d-label-s" x="535" y="129" text-anchor="middle">a rede prediz</text>
+
+          <path class="d-arrow" d="M625 100 H670"/>
+          <path class="d-arrow-head" d="M670 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="675" y="60" width="150" height="80" rx="6"/>
+          <text class="d-label" x="750" y="85" text-anchor="middle">Mapa de rótulos</text>
+          <text class="d-label-s" x="750" y="101" text-anchor="middle">export. única</text>
+          <text class="d-label-s" x="750" y="115" text-anchor="middle">+ LUT numpy</text>
+          <text class="d-label-s" x="750" y="129" text-anchor="middle">(restaurado na grade</text>
+
+          <path class="d-arrow" d="M825 100 H870"/>
+          <path class="d-arrow-head" d="M870 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="875" y="55" width="95" height="90" rx="6"/>
+          <text class="d-label" x="922" y="80" text-anchor="middle">Saídas</text>
+          <text class="d-label-s" x="922" y="96" text-anchor="middle">NIfTI</text>
+          <text class="d-label-s" x="922" y="110" text-anchor="middle">STL/OBJ</text>
+          <text class="d-label-s" x="922" y="124" text-anchor="middle">VTK, glTF</text>
+
+          <path class="d-arrow" d="M535 140 V170 H302 V140"/>
+          <path class="d-arrow-head" d="M302 140 l-7 4 v-8 z"/>
+          <text class="d-label-s" x="418" y="185" text-anchor="middle">falha de memória ⇒ recorte auto (§5.2) ⇒ nova tentativa</text>
+        </svg>
+        <figcaption>O único aprendizado acontece em uma única etapa; todo o resto — pré-processamento, reconstrução, ciclo de nova tentativa — é calculado.</figcaption>
+      </figure>
+
+      <h3 id="coeur-labelmap">5.1 Reconstrução do mapa de rótulos e restauração da geometria</h3>
+
+      <p><code>_buildLabelArray()</code>
+      (<code>SegmentationWidget.py:1912</code>):</p>
+
+      <p>um único <code>ExportSegmentsToLabelmapNode</code>, com a lista explícita de <code>segmentId</code>
+      (o que fixa a correspondência "valor exportado <em>i</em>+1 ↔ <code>segIds[i]</code>"), depois
+      uma LUT numpy que remapeia para os valores oficiais em uma passagem
+      (<code>lut[exported]</code>). A versão anterior rasterizava a extensão completa do volume
+      uma vez por segmento: 55 rasterizações de uma CBCT de arcada completa para o
+      UniversalLab.</p>
+
+      <h3 id="coeur-crop">5.2 Recorte automático (nova tentativa após falha de memória)</h3>
+
+      <p>Opcional, disparado por <em>Retry failed</em> após confirmação explícita.
+      <code>_applyAutoCrop()</code>
+      (<code>SegmentationWidget.py:1017</code>):</p>
+
+      <ul>
+        <li><strong>limiar ar/tecido</strong> tolerante à escala: se <code>array.min() &lt; −800</code>, estamos em
+          unidades Hounsfield e o limiar é <code>−500</code>; caso contrário <code>min + 0.15 × (p99.5 − min)</code>;</li>
+        <li>caixa delimitadora dos voxels acima do limiar, ampliada de
+          <code>_CROP_MARGIN_MM = 15.0</code> mm convertidos em voxels por eixo;</li>
+        <li>se mais de <code>_CROP_MIN_GAIN = 0.85</code> dos voxels forem mantidos, <strong>o recorte é
+          abandonado</strong>: ganhar menos de 15% não vale o risco;</li>
+        <li>o subvolume mantém seu espaçamento e seus eixos, <strong>só a origem se desloca</strong>
+          (<code>ijkToRas.MultiplyPoint([i0,j0,k0,1])</code>). Nada é interpolado.</li>
+      </ul>
+
+      <p><code>_restoreCropToOriginalGrid()</code> recoloca o mapa de rótulos em um array do
+      tamanho original por um simples deslocamento de índices: a saída está, portanto, sempre na
+      grade do exame tal como adquirido.</p>
+
+      <h3 id="coeur-memoire">5.3 Proteção de memória — três linhas de defesa</h3>
+
+      <p>O comentário do código dá o caso real: um exame ocupou 114 GB em uma
+      máquina de 125 GB, foi encerrado pelo OOM killer e deixou seus workers de
+      multiprocessing vivos, segurando a memória.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 900 170" role="img" aria-label="Três linhas de defesa de memória: antes, durante, depois">
+          <rect class="d-box" x="10" y="20" width="260" height="100" rx="6"/>
+          <text class="d-label" x="140" y="42" text-anchor="middle">a) Antes: estimativa a priori</text>
+          <text class="d-label-s" x="140" y="60" text-anchor="middle">_estimatePeakRamGb()</text>
+          <text class="d-label-s" x="140" y="76" text-anchor="middle">FOV, espaçamento, nº de rótulos</text>
+          <text class="d-label-s" x="140" y="92" text-anchor="middle">orçamento = RAM livre × 85%</text>
+          <text class="d-label-s" x="140" y="108" text-anchor="middle">excedido ⇒ falha sem executar</text>
+
+          <path class="d-arrow" d="M270 70 H315"/>
+          <path class="d-arrow-head" d="M315 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="320" y="20" width="260" height="100" rx="6"/>
+          <text class="d-label" x="450" y="42" text-anchor="middle">b) Durante: monitoramento</text>
+          <text class="d-label-s" x="450" y="60" text-anchor="middle">_onMemCheck, a cada 3000 ms</text>
+          <text class="d-label-s" x="450" y="76" text-anchor="middle">2 excessos consecutivos</text>
+          <text class="d-label-s" x="450" y="92" text-anchor="middle">(não um pico passageiro)</text>
+          <text class="d-label-s" x="450" y="108" text-anchor="middle">⇒ ordem de encerrar</text>
+
+          <path class="d-arrow" d="M580 70 H625"/>
+          <path class="d-arrow-head" d="M625 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="630" y="20" width="260" height="100" rx="6"/>
+          <text class="d-label" x="760" y="42" text-anchor="middle">c) Depois: recuperação</text>
+          <text class="d-label-s" x="760" y="60" text-anchor="middle">_killInferenceTree(): árvore inteira</text>
+          <text class="d-label-s" x="760" y="76" text-anchor="middle">_reclaimStrayProcesses(): órfãos</text>
+          <text class="d-label-s" x="760" y="92" text-anchor="middle">nnunetv2_predict / nnunetv2.inference</text>
+          <text class="d-label-s" x="760" y="108" text-anchor="middle">botão "Free memory"</text>
+        </svg>
+        <figcaption>As três linhas de defesa da proteção de memória — cada uma cobre um momento diferente do ciclo de vida do processo nnU-Net.</figcaption>
+      </figure>
+
+      <p><strong>a) Estimativa a priori</strong>, <code>_estimatePeakRamGb()</code>
+      (<code>SegmentationWidget.py:1161</code>).
+      Como o volume físico do campo de visão independe do espaçamento, o número de
+      voxels reamostrados é igual a <code>fovMm3 / targetVoxelMm3</code>. O pico é atingido em
+      <code>convert_predicted_logits_to_segmentation_with_correct_shape</code>, onde, por classe,
+      coexistem: o acumulador da janela deslizante (<code>torch.half</code> na
+      grade reamostrada, 2 bytes), sua cópia float64 (<code>data = data.astype(float)</code> sobre
+      o array 4D inteiro de uma vez, 8 bytes) e <code>reshaped_final</code> (<code>torch.half</code> na
+      grade original, 2 bytes). Daí
+      <code>logitsGb = (10 × C × Vresampled + 2 × C × Voriginal) / 2³⁰</code>, mais
+      <code>8 × (Voriginal + Vresampled)</code> para os transientes float64 de <code>skimage.resize</code>,
+      mais <code>_RAM_FIXED_OVERHEAD_GB = 4.0</code> (torch, pesos, workers). O <code>spacing</code> e o
+      número de rótulos são lidos da <strong>mesma</strong> pasta de configuração, para não
+      cruzar o espaçamento de um modelo com o número de rótulos de outro.</p>
+
+      <p>Orçamento = <code>free RAM × ramLimitSpinBox</code> (padrão <strong>85%</strong>). Acima disso, o exame é
+      marcado como <code>failed</code> com o motivo, sem nunca iniciar o nnU-Net.</p>
+
+      <p><strong>b) Monitoramento durante a execução</strong>: <code>_onMemCheck</code> faz uma amostragem a cada
+      <code>_RAM_SAMPLE_MS = 3000</code> ms; são necessários <code>_RAM_CONSECUTIVE_HITS = 2</code> excessos
+      consecutivos para encerrar (um pico passageiro não deve condenar um exame bom).</p>
+
+      <p><strong>c) Recuperação da memória</strong>: <code>_killInferenceTree()</code> encerra a <strong>árvore inteira</strong> —
+      <code>QProcess.kill()</code> só atinge o filho direto, mas o nnU-Net faz
+      multiprocessing. <code>_reclaimStrayProcesses()</code> varre os processos cuja linha de
+      comando contém <code>nnunetv2_predict</code>, <code>nnunetv2/inference</code> ou <code>nnunet</code> e que
+      não pertencem mais a ninguém. O botão <em>Free memory</em> faz isso à mão.</p>
+
+      <h3 id="coeur-fin">5.4 Detecção de término alternativa</h3>
+
+      <p><code>_checkInferenceCompletionFallback()</code>
+      (<code>SegmentationWidget.py:2514</code>):
+      quando a linha "done with volume" aparece na saída do nnU-Net, um temporizador
+      verifica o tamanho do arquivo de saída a cada 1,5 s; <strong>duas leituras
+      iguais consecutivas</strong> ⇒ finalização forçada, mesmo que o <code>QProcess</code> nunca tenha
+      emitido o sinal <code>finished</code>. Desiste após 40 tentativas (60 s).</p>
+
+      <p>Salvaguarda adicional: um watchdog por exame
+      (<code>itemTimeoutSpinBox</code>, padrão <strong>60 min</strong>) marca o exame como falho e passa
+      ao seguinte. <code>_finishCurrentItem</code> é o <strong>único ponto de saída</strong>, protegido por
+      <code>_itemFinalized</code> contra avanço duplo.</p>
+
+      <h3 id="coeur-miroir">5.5 Correção de espelhamento (somente UniversalLab)</h3>
+
+      <p><code>onResolveMirroring()</code>
+      (<code>SegmentationWidget.py:1308</code>),
+      um botão visível apenas para o UniversalLab. A rede confunde regularmente
+      esquerda e direita; a correção é puramente geométrica:</p>
+
+      <ol>
+        <li>reconstrução do mapa de rótulos oficial (§5.1), depois a coordenada <a class="gterm" href="../glossary.html#g-ras" title="Ver glossário">RAS</a> <em>R</em> de
+          cada voxel de primeiro plano <strong>em numpy</strong> (<code>m00·x + m01·y + m02·z + m03</code>) — a
+          versão anterior chamava <code>vtkMatrix4x4.MultiplyPoint</code> uma vez por voxel e
+          por rótulo;</li>
+        <li><strong>plano sagital</strong> = média dos centroides <em>R</em> dos quatro incisivos centrais
+          (rótulos 8, 9, 24, 25); se um estiver ausente, a correção é recusada;</li>
+        <li>para cada rótulo lateralizado, os voxels do lado errado do plano recebem o
+          valor do rótulo simétrico (uma tabela construída substituindo
+          <code>left</code> ↔ <code>right</code> no nome); <code>{53, 54, 55}</code> são <strong>protegidos</strong>.</li>
+      </ol>
+
+      <p>O resultado vai para um novo nó <code>&lt;name&gt;_Mirrored</code>, o original é mantido.</p>
+
+      <h3 id="coeur-postproc">5.6 Pós-processamento ausente</h3>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><code>_postProcessSegments()</code> apenas registra duas linhas no log;
+        <code>_keepLargestIsland()</code> e <code>_removeSmallIsland()</code> (que usaria
+        <code>_minimumIslandSize_mm3 = 60</code>) <strong>nunca são chamados em lugar nenhum</strong> — código morto herdado
+        do DentalSegmentator original. Nenhuma limpeza morfológica é, portanto, aplicada:
+        o que sai é a saída bruta do nnU-Net, com seu próprio pós-processamento
+        interno, se presente no pacote.</p>
+      </div>
+
+      <h2 id="sorties">6. Saídas</h2>
+
+      <p><code>onInferenceFinished</code> grava <strong>sempre</strong>, independentemente dos formatos
+      marcados, <code>&lt;outputFolder&gt;/&lt;stem&gt;_Segmentation.nii.gz</code>: um mapa de rótulos com os valores
+      de <code>_get_active_label_map</code>, na geometria (espaçamento, origem, <code>IJKToRAS</code>) do
+      volume original — sem recorte, se houve recorte. É o arquivo que
+      <code>expectedOutputPath()</code> procura para decidir que um exame já foi processado.</p>
+
+      <p>Formatos adicionais, caixas de seleção, todos gravados na mesma pasta:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Formato</th><th>Função</th><th>Nome</th><th>Detalhes</th></tr></thead>
+          <tbody>
+            <tr><td>STL, OBJ</td><td><code>ExportSegmentsClosedSurfaceRepresentationToFiles</code></td><td>um arquivo por segmento</td><td>suavização 1.0, sem fusão</td></tr>
+            <tr><td>VTK (por rótulo)</td><td><code>_exportVTKPerLabel</code></td><td><code>&lt;segNodeName&gt;_&lt;labelName&gt;.vtk</code></td><td>clean → <code>vtkWindowedSincPolyDataFilter</code> (60 it., <code>passBand</code> 0.05, suavização de bordas/arestas vivas/não-manifold) → normais de célula → <code>vtkQuadricDecimation</code> 40% → <strong>inversão RAS→<a class="gterm" href="../glossary.html#g-lps" title="Ver glossário">LPS</a></strong> (<code>Scale(-1,-1,1)</code>), binário</td></tr>
+            <tr><td>VTK (fundido)</td><td><code>_exportMergedVTK</code></td><td><code>&lt;segNodeName&gt;_merged.vtk</code></td><td><code>vtkDiscreteMarchingCubes</code> <strong>um contorno por rótulo presente</strong>, mesma cadeia de suavização, depois limiarização por rótulo, decimação de 40%, array de células <code>Label</code> constante, concatenação, inversão LPS</td></tr>
+            <tr><td>NIfTI (caixa)</td><td><code>ExportSegmentsBinaryLabelmapRepresentationToFiles</code></td><td>um arquivo <strong>binário</strong> <code>.nii.gz</code> por segmento</td><td>não confundir com o mapa de rótulos acima</td></tr>
+            <tr><td>glTF</td><td><code>OpenAnatomyExport</code></td><td></td><td>fator de decimação ajustável (padrão 0.9); instala o SlicerOpenAnatomy se necessário</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Os nomes dos arquivos de malha derivam do nome do <strong>nó</strong> de segmentação,
+      <code>&lt;stem&gt;_Segmentation</code>, não do nome do exame: os nomes dos segmentos são higienizados
+      por <code>re.sub(r"[^0-9A-Za-z_-]+", "_", ...)</code>.</p>
+
+      <p>Uma falha na exportação de malha <strong>não faz o exame falhar</strong>: o NIfTI já está
+      gravado, o exame é marcado como <code>done</code> com um <code>export warning</code>.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verificado — corrigido no código</div>
+        <p>Um bug que foi corrigido, documentado no código de <code>_exportMergedVTK</code>:
+        <code>vtkDiscreteMarchingCubes.SetValue</code> recebe um <strong>índice</strong> de contorno, não um valor de
+        rótulo. Passar o rótulo como índice deixava o índice 0 com valor de contorno
+        0.0, de modo que o fundo era contornado, suavizado e tinha normais calculadas antes de ser descartado.</p>
+      </div>
+
+      <h2 id="predit">7. O que é predito e o que é calculado</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bloco</th><th>Natureza</th><th>Onde</th></tr></thead>
+          <tbody>
+            <tr><td>Pré-processamento (transposição, reamostragem, <code>CTNormalization</code>)</td><td><span class="badge calcule">calculado</span> determinístico, guiado por <code>plans.json</code></td><td><code>nnUNetv2_predict</code>, processo filho</td></tr>
+            <tr><td>Segmentação</td><td><span class="badge predit">predito</span> rede <code>PlainConvUNet</code> 3D, 1 fold, sem TTA</td><td>idem</td></tr>
+            <tr><td>Recorte automático</td><td><span class="badge calcule">calculado</span> geométrico (limiar de ar + caixa delimitadora)</td><td>widget, numpy</td></tr>
+            <tr><td>Restauração na grade original</td><td><span class="badge calcule">calculado</span> deslocamento de índices, sem interpolação</td><td>widget, numpy</td></tr>
+            <tr><td>Reconstrução do mapa de rótulos</td><td><span class="badge calcule">calculado</span> exportação única + LUT</td><td>widget, VTK/numpy</td></tr>
+            <tr><td>Correção de espelhamento</td><td><span class="badge calcule">calculado</span> geométrico (plano sagital pelos incisivos)</td><td>widget, numpy</td></tr>
+            <tr><td>Malhas</td><td><span class="badge calcule">calculado</span> <a class="gterm" href="../glossary.html#g-marching-cubes" title="Ver glossário">marching cubes</a> + windowed-sinc + decimação quádrica</td><td>widget, VTK</td></tr>
+            <tr><td>Estimativa e proteção de memória</td><td><span class="badge calcule">calculado</span> aritmética sobre o <a class="gterm" href="../glossary.html#g-fov" title="Ver glossário">FOV</a> e os planos</td><td>widget, psutil</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O único aprendizado é o dos quatro checkpoints, fora deste repositório.</p>
+
+      <h2 id="environnement">8. Ambiente</h2>
+
+      <p>Instalado <strong>uma vez por sessão</strong>, no primeiro <em>Apply</em>, por
+      <code>_runSetupThenStartQueue()</code>
+      (<code>SegmentationWidget.py:1651</code>):</p>
+
+      <ol>
+        <li><code>pip install light-the-torch</code>, depois <code>python -m light_the_torch install torch
+          torchvision</code> — o <code>ltt</code> escolhe o wheel CUDA correspondente ao driver detectado,
+          <strong>nenhuma versão é fixada</strong>;</li>
+        <li><code>pip install numexpr&gt;=2.10.2</code>;</li>
+        <li><code>pip install numpy&lt;2.0 numexpr&gt;=2.10.2 psutil</code>, via <code>PipRunner</code>, um <code>QProcess</code>
+          que devolve o controle à interface;</li>
+        <li><code>SlicerNNUNetLib.InstallLogic().setupPythonRequirements()</code>: <code>nnunetv2</code>,
+          fora deste repositório;</li>
+        <li><code>PythonDependencyChecker.downloadWeightsIfNeeded()</code>: pesos do DentalSegmentator
+          apenas.</li>
+      </ol>
+
+      <p><code>numpy&lt;2.0</code> pelo mesmo motivo que no <a href="../AMASSS/AMASSS.html">AMASSS</a>: os wheels atuais de torch são
+      compilados contra numpy 1.x.</p>
+
+      <p>A <strong>extensão NNUNet precisa ser instalada manualmente</strong>: sua ausência é
+      detectada (<code>import SlicerNNUNetLib</code>) e produz uma mensagem pedindo para
+      instalá-la e reiniciar. O <code>SlicerOpenAnatomy</code>, por outro lado, instala-se sozinho
+      na primeira exportação glTF.</p>
+
+      <p>Sem ambiente conda, sem WSL. A GPU é opcional (<code>cpu</code>, <code>mps</code> disponíveis),
+      ao custo de "cerca de uma hora por exame" segundo a mensagem de fallback.</p>
+
+      <h2 id="pieges">9. Armadilhas e pontos frágeis</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado — NasoMaxillaDentSeg</div>
+        <p><strong>Os nomes dos segmentos e a tabela de rótulos divergem para o
+        NasoMaxillaDentSeg.</strong> <code>_get_active_label_map</code> dá <code>Maxilla = 3</code>,
+        <code>Upper Teeth = 4</code>, <code>Lower Teeth = 5</code>, <code>Mandibular canal = 6</code>, enquanto
+        <code>_updateSegmentationDisplay</code>
+        (<code>SegmentationWidget.py:2385</code>)
+        renomeia <code>Segment_1..6</code> com a lista
+        <code>["Upper Skull", "Mandible", "Upper Teeth", "Lower Teeth", "Mandibular canal", "Maxilla "]</code>.</p>
+        <p>O primeiro efeito é <strong>visível na tela</strong>, antes de qualquer questão de exportação: a
+        lista não está na ordem da tabela, então os quatro últimos segmentos
+        recebem o nome errado, a cor errada e a opacidade errada.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Segmento</th><th>Estrutura real</th><th>Nome exibido</th></tr></thead>
+            <tbody>
+              <tr><td><code>Segment_3</code></td><td>Maxila</td><td>"Upper Teeth"</td></tr>
+              <tr><td><code>Segment_4</code></td><td>Dentes superiores</td><td>"Lower Teeth"</td></tr>
+              <tr><td><code>Segment_5</code></td><td>Dentes inferiores</td><td>"Mandibular canal"</td></tr>
+              <tr><td><code>Segment_6</code></td><td>Canal mandibular</td><td>"Maxilla" (com um espaço no final)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>A correção é reordenar a lista — e as listas <code>colors</code> e
+        <code>opacities</code> que a acompanham — para corresponder a <code>_get_active_label_map</code>, em vez de simplesmente
+        remover o espaço.</p>
+        <p>Mas a renomeação acontece <strong>antes</strong> de as tags <code>LabelValue</code> serem definidas, e
+        <code>_segmentLabelValue</code> então recorre ao nome: <code>Segment_3</code>, que na verdade
+        tem o rótulo 3 (maxila), é renomeado "Upper Teeth" e <strong>exportado
+        com o valor 4</strong>. Pior, <code>"Maxilla "</code> tem um <strong>espaço no final</strong>: a busca
+        na tabela falha, <code>Segment_6</code> (o canal mandibular) é registrado como
+        "unexpected segment" e <strong>perdido</strong> do NIfTI. As duas listas,
+        no entanto, correspondem perfeitamente para os outros três modelos.</p>
+      </div>
+
+      <ul>
+        <li><strong>Os quatro ramos de <code>onApplyClickedForVolume</code> são copiados e colados</strong>:
+          o ramo UniversalLab ainda chama sua variável de <code>pediatricCheckpoint</code> e
+          registra "Downloading pediatricdentalseg model…". Cosmético, mas enganoso
+          ao ler os logs.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>Baixar os pesos do DentalSegmentator apaga os outros três modelos</strong>:
+        <code>downloadWeights()</code> faz <code>shutil.rmtree(self.destWeightFolder)</code> em
+        <code>Resources/ML</code>, que também contém <code>Dataset001_380CT</code>, <code>Dataset001_max4</code> e
+        <code>Dataset002_380CT</code>. E <code>areWeightsMissing()</code> testa <code>rglob("dataset.json")</code>
+        <strong>em qualquer lugar</strong> sob <code>Resources/ML</code>: se só o modelo pediátrico estiver
+        presente, o verificador acredita que o DentalSegmentator está instalado.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong>Resolução frágil do release</strong>: <code>assets[0]</code> entre todos os assets de todos
+        os releases, via um cliente GitHub <strong>não autenticado</strong> (60 requisições/h por IP).
+        Um asset adicionado no topo do release mais recente muda o modelo baixado. E
+        <strong>nenhuma verificação de integridade</strong> nos três checkpoints baixados um a um:
+        um arquivo truncado é indistinguível de um completo.</p>
+      </div>
+
+      <ul>
+        <li><strong>O NRRD não é reconhecido</strong> e as subpastas não são percorridas
+          (<code>listVolumes</code>), enquanto os outros módulos do repositório produzem facilmente
+          NRRD e árvores de pastas. <strong>Colisão de nomes</strong> é possível: dois exames de
+          pastas diferentes com o mesmo nome base sobrescrevem o mesmo
+          <code>&lt;stem&gt;_Segmentation.nii.gz</code>.</li>
+        <li><strong>Um único fold, nunca um ensemble</strong> (<code>folds="0"</code>): um pacote que trouxesse
+          <code>fold_1..4</code> os veria ignorados.</li>
+        <li><strong><code>os.environ['nnUNet_results']</code></strong> é reescrito a cada exame por
+          <code>SegmentationLogic</code>: inofensivo aqui (fila sequencial), perigoso se
+          outra inferência nnU-Net rodar na mesma sessão do Slicer.</li>
+        <li><strong>Código morto</strong>: <code>_saveSegmentationAsNifti</code>, <code>_postProcessSegments</code>,
+          <code>_keepLargestIsland</code>, <code>_removeSmallIsland</code>, <code>onExportClicked</code> (o
+          botão correspondente não está ligado ao layout em lote).</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><strong><code>Resources/ML</code> não é instalado pelo CMake</strong>: em uma extensão empacotada, os
+        <code>dataset.json</code> / <code>plans.json</code> do repositório não estão presentes, e a estimativa
+        de memória a priori (§5.3) retorna <code>None</code> enquanto os pesos não forem baixados —
+        ela então deixa o exame passar.</p>
+      </div>
+
+      <h2 id="litterature">10. Literatura</h2>
+
+      <p>O <strong>DentalSegmentator</strong> está publicado:</p>
+
+      <blockquote>
+        <p>Dot G., Chaurasia A., Dubois G., Savoldelli C., Haghighat S., Azimian S.,
+        Rahbar Taramsari A., Sivaramakrishnan G., Issa J., Dubey A., Schouman T.,
+        Gajny L. <em>DentalSegmentator: robust open source deep learning-based CT and CBCT
+        image segmentation.</em> Journal of Dentistry 147:105130, 2024.
+        <a href="https://doi.org/10.1016/j.jdent.2024.105130" target="_blank" rel="noopener">doi:10.1016/j.jdent.2024.105130</a>
+        — PMID 38878813</p>
+      </blockquote>
+
+      <p>nnU-Net v2 (v2.2 segundo a ficha Zenodo dos pesos), <strong>470 exames de TC e CBCT</strong> de
+      7 instituições para o treinamento, 5 estruturas, testado em hold-out com 256 exames
+      (133 internos, 123 externos): DSC 92,2 ± 6,3% interno, 94,2 ± 7,4%
+      externo. O <code>dataset.json</code> fornecido aqui anuncia <code>numTraining = 453</code>, coerente com
+      o corpus descrito.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verificado</div>
+        <p>Neste modelo, código e artigo concordam. Os pesos também estão
+        publicados sob CC-BY-4.0 no <a href="https://zenodo.org/records/10829675" target="_blank" rel="noopener">Zenodo</a>
+        (DOI conceito <a href="https://doi.org/10.5281/zenodo.10829674" target="_blank" rel="noopener">10.5281/zenodo.10829674</a>)
+        — mas este módulo os busca nos releases do GitHub, não no Zenodo.</p>
+      </div>
+
+      <p>A base metodológica:</p>
+
+      <blockquote>
+        <p>Isensee F., Jaeger P.F., Kohl S.A.A., Petersen J., Maier-Hein K.H. <em>nnU-Net: a
+        self-configuring method for deep learning-based biomedical image segmentation.</em>
+        Nature Methods 18(2):203-211, 2021.
+        <a href="https://doi.org/10.1038/s41592-020-01008-z" target="_blank" rel="noopener">doi:10.1038/s41592-020-01008-z</a></p>
+      </blockquote>
+
+      <p><strong>As três variantes não estão ligadas a nenhuma publicação no repositório.</strong>
+      O README do repositório anuncia 513 exames CBCT em dentição mista para o
+      PediatricDentalSegmentator e o UniversalLabDentalSegmentator, e 135 exames para o
+      NasoMaxillaDentalSegmentator, sem referência e sem conjunto de teste. Esses números
+      não podem ser verificados em nenhum lugar do código: os arquivos <code>dataset.json</code>
+      correspondentes só chegam com o download dos pesos. A tratar como afirmações
+      internas até que uma publicação os cubra.</p>
+
+      <ul>
+        <li><a href="https://github.com/gaudot/SlicerDentalSegmentator" target="_blank" rel="noopener">gaudot/SlicerDentalSegmentator</a> — extensão original e fonte dos pesos do DentalSegmentator</li>
+        <li><a href="https://github.com/KitwareMedical/SlicerNNUnet" target="_blank" rel="noopener">KitwareMedical/SlicerNNUnet</a> — a extensão <code>NNUNet</code> exigida</li>
+        <li><a href="https://github.com/MIC-DKFZ/nnUNet" target="_blank" rel="noopener">MIC-DKFZ/nnUNet</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools" target="_blank" rel="noopener">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>Referências completas, PDFs recuperados e links para consulta: <a href="SOURCES.html">SOURCES.md</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Todas as páginas</a> ·
+        <a href="SOURCES.html">Bibliografia desta ferramenta</a> ·
+        Fonte: <code>BatchDentalSeg.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

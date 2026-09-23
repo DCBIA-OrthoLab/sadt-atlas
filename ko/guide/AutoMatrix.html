@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoMatrix — 가이드 — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="utilitaires">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/AutoMatrix.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/AutoMatrix.html" hreflang="fr" title="Français">FR</a><a href="../../pt/guide/AutoMatrix.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/guide/AutoMatrix.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/AutoMatrix.html" aria-current="true"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../AutoMatrix/AutoMatrix.html"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html" aria-current="page">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/AutoMatrix/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">가이드</a> › 유틸리티</div>
+        <h1>AutoMatrix — 파일 묶음 전체에 행렬 적용하기</h1>
+        <p class="lede">AutoMatrix는 ITK 변환 행렬 하나 이상을 볼륨과 랜드마크 파일이 든 폴더
+        전체에 한 번에 적용합니다. 신경망도 GPU도 쓰지 않습니다. 계산 단계가 아니라 일괄 처리
+        도구입니다. 행렬 자체는 다른 곳에서 실행한 정합에서 나옵니다.</p>
+      </header>
+
+      <h2 id="quand">언제 쓰는가</h2>
+      <p>정합 모듈(AREG, ASO, FlexReg 등)을 실행해 변환 행렬(<code>.tfm</code>)을 얻었다고
+      합시다. 이제 같은 행렬을 같은 환자의 다른 파일 — 분할 결과, 두 번째 볼륨, 랜드마크 세트 —
+      에 적용하고 싶은데, Slicer에서 하나하나 손으로 열고 싶지는 않습니다. 또는 환자 여러 명에
+      대해 정합을 실행했고 폴더 전체를 한 번에 처리하고 싶습니다. AutoMatrix는 바로 이런 용도입니다.
+      스스로 정합하지 않고, 이미 계산한 변환을 다시 적용할 뿐입니다.</p>
+
+      <div class="callout">
+        <div class="callout-title">행렬 하나, 움직임 하나</div>
+        <p>행렬을 볼륨에 적용하면 볼륨의 내용이 움직입니다. 랜드마크 파일에 적용하면 점들이
+        정확히 같은 움직임으로 옮겨집니다. 그래서 AutoMatrix를 거친 뒤에도 스캔과 랜드마크가
+        정렬된 상태로 유지됩니다. 단, 둘 다 같은 행렬을 써야 합니다.</p>
+      </div>
+
+      <h2 id="appariement">파일과 행렬이 짝지어지는 방식</h2>
+      <p>AutoMatrix는 어느 행렬이 어느 환자의 것인지 손으로 지정하라고 요구하지 않습니다.
+      파일 이름을 비교해 짝을 추측합니다. 스캔 이름에서 알려진 키워드 목록
+      (<code>_Seg</code>, <code>_Or</code>, <code>_MAND</code>, <code>_CB</code>, 시점 표시인
+      <code>_T1</code>, <code>_T2</code> 등)을 지우고, 행렬 이름에서는 약간 다른 목록을 지워서
+      양쪽에 환자 식별자만 남깁니다. 두 식별자가 같으면 파일과 행렬이 짝지어집니다.</p>
+      <p>함정은 두 키워드 목록이 같지 않다는 점입니다. 확실히 통하는 규칙은 모든 파일 이름을
+      환자 식별자로 시작하고, 이어서 밑줄, 그 뒤에 필요한 나머지를 쓰는 것입니다. 통하는 예:
+      <code>patient1_T1_MA.nii.gz</code>와
+      <code>patient1_left_MA.tfm</code>은 둘 다 <code>patient1</code>이 됩니다. 스캔 쪽에서는
+      <code>_T1</code>이, 행렬 쪽에서는 <code>_left</code>가 지워지기 때문입니다.
+      실패하는 예: 시점 표시가 없는 <code>patient1_MA.nii.gz</code>는 스캔 쪽에서
+      <code>patient1_MA</code>가 되지만 행렬 쪽에서는 <code>patient1</code>이 됩니다.
+      두 식별자가 더 이상 같지 않으므로 그 파일에는 행렬이 전혀 적용되지 않습니다.</p>
+      <p>지름길도 있습니다. 폴더 대신 행렬 파일 하나를 지정하면 입력 폴더의 모든 환자에게 그대로
+      적용됩니다. 이름 비교가 필요 없습니다.</p>
+
+      <h2 id="besoin">필요한 것, 얻는 것</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>준비할 것</h4>
+          <ul>
+            <li><code>.nii</code>, <code>.nii.gz</code>,
+            <code>.nrrd</code> 볼륨 폴더, 그리고/또는 Slicer 랜드마크 파일(<code>.mrk.json</code>)</li>
+            <li>ITK 행렬(<code>.tfm</code>, <code>.h5</code>, <code>.mat</code>) 하나, 또는
+            스캔과 같은 규칙으로 이름 붙인 행렬 폴더</li>
+            <li>볼륨이 분할 결과라면 전용 체크박스를 체크하십시오. 그래야 레이블이 보간으로
+            뭉개지지 않습니다</li>
+            <li>선택 사항: 출력 격자(크기, 방향)를 강제할 기준 파일</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>결과물</h4>
+          <ul>
+            <li>짝지어진 파일마다 변환된 사본 하나. 입력과 같은 폴더 구조로
+            배치됩니다</li>
+            <li>원본 파일은 절대 수정되지 않습니다</li>
+            <li>랜드마크 파일에서는 정의됨(defined)으로 표시된 점만 옮겨집니다</li>
+            <li>새 행렬은 만들어지지 않습니다. AutoMatrix는 변환을 소비할 뿐,
+            기록하지 않습니다</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">사용 절차</h2>
+      <ol class="steps">
+        <li><strong>입력 폴더를 지정합니다.</strong> 변환할 스캔 및/또는 랜드마크 파일. 폴더
+        전체가 한 번에 처리됩니다.</li>
+        <li><strong>행렬 또는 행렬 폴더를 지정합니다.</strong> 이름이 위의 환자 + 접미사
+        규칙을 따르는지 확인하거나, 모두에게 적용할 파일 하나를 바로 지정합니다.</li>
+        <li>볼륨이 레이블맵이라면 <strong>분할 체크박스를 체크합니다</strong>.</li>
+        <li>출력 격자를 강제하려면 <strong>기준 파일을 지정합니다</strong>. 지정하지 않으면
+        각 파일은 자기 입력 볼륨의 격자를 유지하고, 변환으로 촬영 범위 밖으로 밀려난 부분은
+        잃게 됩니다.</li>
+        <li><strong>출력 접미사를 고르고</strong>, 행렬 이름을 덧붙일지 정합니다. 환자 한 명에
+        행렬이 둘 이상이면 반드시 필요합니다(아래
+        참고).</li>
+        <li><strong>출력 폴더를 지정하고</strong> 실행합니다. 진행 표시줄이 처리되는 파일을
+        따라갑니다.</li>
+      </ol>
+
+      <h2 id="miroir">행렬을 찾지 않고 좌우 반전하기</h2>
+      <p>좌우 대칭만 필요하다면 행렬을 직접 만들 필요가 없습니다. Mirror 모드가 미리 만들어진
+      반사 행렬을 내려받아 행렬 입력란에 채워 주며, 전용 출력 접미사(<code>_mir</code>)도
+      붙습니다.</p>
+      <div class="callout warn">
+        <div class="callout-title">대칭면이 환자에 맞춰져 있지 않다</div>
+        <p>반사는 환자 자신의 시상면이 아니라 장면 원점의 시상면을 기준으로 일어납니다. 환자가
+        장면 중앙에 놓여 있지 않다면 결과는 반전되면서 동시에 이동합니다. 어긋남을 바로잡을
+        정합 단계를 뒤에 계획해 두십시오.</p>
+      </div>
+
+      <h2 id="coince">문제가 생기면</h2>
+      <div class="callout warn">
+        <div class="callout-title">안내된 형식 중 일부는 더 이상 동작하지 않는다</div>
+        <p>인터페이스는 여전히 구강 표면용 입력 스캔으로 메시(<code>.vtk</code>, <code>.vtp</code>,
+        <code>.stl</code>, <code>.off</code>, <code>.obj</code>)를, 행렬로
+        <code>.npy</code>를 제공합니다. 둘 다 진행 표시줄에는 집계되지만 어느 쪽도 출력을 만들지
+        않습니다. 그런 파일은 오류 로그에 한 줄을 남기고 그냥 건너뜁니다. <code>.txt</code>
+        행렬은 단순한 4×4 배열이 아니라 실제 ITK 변환 파일일 때만 동작합니다.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">짝짓기에 실패해도 경고가 없다</div>
+        <p>스캔 이름과 행렬 이름이 같은 환자 식별자로 줄어들지 않으면(위 참고) 그 파일은 그냥
+        변환되지 않습니다. 오류 메시지도, 눈에 보이는 경고도 없습니다. 출력에서 환자가 빠졌다면
+        가장 먼저 그 환자의 파일 이름을 확인하십시오.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">출력 하나가 다른 출력을 덮어쓸 수 있다</div>
+        <p>출력 파일에 행렬 이름을 덧붙이는 옵션을 끄고 환자 한 명에 행렬이 둘 이상이면, 모든
+        결과가 같은 파일 이름을 갖습니다. 매번 이전 결과를 덮어쓰고, 마지막으로 처리된 행렬의
+        결과만 남습니다. 환자당 행렬을 둘 이상 적용할 때는 이 옵션을 켜 두십시오.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">랜드마크 파일이 조용히 사라질 수 있다</div>
+        <p>일부 변환(조밀 변형장, B-spline)은 수학적으로 역변환할 수 없습니다. 이 경우 해당
+        랜드마크 파일은 로그에 경고 한 줄만 남기고 건너뛰는데, 볼륨은 그대로 변환됩니다. 그래서
+        화면에 아무 표시 없이 스캔과 랜드마크가 서로 어긋날 수 있습니다.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">행렬은 연쇄 적용되지 않는다</div>
+        <p>환자에게 행렬이 여러 개 있으면 각각 원본 입력 파일에 따로 적용됩니다. 행렬마다 출력
+        파일이 하나씩 나오며, 행렬을 차례로 합성한 결과는 나오지 않습니다.</p>
+      </div>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">더 읽을거리</h2>
+      <p>논문은 없으며, 발표할 내용도 없습니다. 이 모듈은 변환 행렬을 파일에 일괄 적용합니다. 중요한 것은 Slicer에서 행렬이 무엇인지, 그리고 어느 좌표계로 표현되는지 아는 것입니다.</p>
+      <h3 id="autour">방법론 관련 문헌</h3>
+      <ul>
+        <li><strong>Documentation 3D Slicer</strong> — <a href="https://slicer.readthedocs.io/en/latest/user_guide/modules/transforms.html"><em>Transforms</em></a>. Slicer에서 선형 변환이 무엇인지, 어떻게 적용하고 어떻게 역변환하는지 설명합니다.</li>
+        <li><strong>Documentation 3D Slicer</strong> — <a href="https://slicer.readthedocs.io/en/latest/user_guide/coordinate_systems.html"><em>Coordinate systems</em></a>. RAS와 LPS, 그리고 올바른 행렬도 잘못된 좌표계에 적용하면 환자가 뒤집히는 이유를 설명합니다.</li>
+      </ul>
+      <p>이 도구의 전체 참고문헌 — 찾아낸 것과 찾아봤지만 없었던 것 — 은 <a href="../AutoMatrix/SOURCES.html">출처 페이지</a>에 있습니다.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../AutoMatrix/AutoMatrix.html">
+        <b>실제 동작 방식 →</b>
+        <span>아틀라스 페이지: ITK 변환 규약, 파일과 행렬을 짝짓는 로직의 세부, 실제로
+        읽히는 형식, 코드에서 발견된 모든 함정.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← 모든 가이드</a> ·
+        <a href="../AutoMatrix/AutoMatrix.html">아틀라스 페이지</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

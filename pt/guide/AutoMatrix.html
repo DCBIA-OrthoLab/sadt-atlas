@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoMatrix — Guia — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="utilitaires">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/AutoMatrix.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/AutoMatrix.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/guide/AutoMatrix.html" hreflang="ko" title="한국어">KO</a><a href="../../th/guide/AutoMatrix.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/AutoMatrix.html" aria-current="true"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../AutoMatrix/AutoMatrix.html"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html" aria-current="page">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/AutoMatrix/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">Guia</a> › Utilitários</div>
+        <h1>AutoMatrix — aplicar uma matriz a um lote inteiro de arquivos</h1>
+        <p class="lede">O AutoMatrix aplica uma ou mais matrizes de transformação ITK a uma
+        pasta inteira de volumes e arquivos de landmarks de uma só vez. Sem rede neural, sem
+        GPU: é uma ferramenta de processamento em lote, não uma etapa de cálculo — a matriz em
+        si vem de um registro que você executou em outro lugar.</p>
+      </header>
+
+      <h2 id="quand">Quando usar</h2>
+      <p>Você executou um módulo de registro (AREG, ASO, FlexReg…) e obteve dele uma matriz de
+      transformação (<code>.tfm</code>). Agora você quer aplicar essa mesma matriz a outros
+      arquivos do mesmo paciente — uma segmentação, um segundo volume, um conjunto de
+      landmarks (pontos de referência anatômicos) — sem abrir cada um manualmente no Slicer.
+      Ou você executou esse registro em uma série inteira de pacientes e quer processar a
+      pasta toda de uma vez. É para isso que serve o AutoMatrix: ele não registra nada por
+      conta própria, ele reaplica uma transformação que você já calculou.</p>
+
+      <div class="callout">
+        <div class="callout-title">Uma matriz, um movimento</div>
+        <p>Aplicada a um volume, a matriz desloca seu conteúdo. Aplicada a um arquivo de
+        landmarks, ela desloca os pontos exatamente pelo mesmo movimento. É isso que mantém uma
+        tomografia e seus landmarks alinhados depois de passarem pelo AutoMatrix — desde que
+        você use a mesma matriz para ambos.</p>
+      </div>
+
+      <h2 id="appariement">Como arquivos e matrizes são pareados</h2>
+      <p>O AutoMatrix nunca pede que você indique manualmente qual matriz corresponde a qual
+      paciente. Ele deduz o pareamento comparando os nomes dos arquivos: remove uma lista de
+      palavras-chave conhecidas (<code>_Seg</code>, <code>_Or</code>, <code>_MAND</code>,
+      <code>_CB</code>, um marcador temporal como <code>_T1</code>, <code>_T2</code>…) do nome
+      da tomografia, e uma lista ligeiramente diferente do nome da matriz, até restar um
+      identificador de paciente de cada lado. Se os dois identificadores coincidirem, o
+      arquivo e a matriz são pareados.</p>
+      <p>O problema: essas duas listas de palavras-chave não são iguais. A regra que funciona
+      de forma confiável: comece todo nome de arquivo pelo identificador do paciente, depois
+      um sublinhado, depois o que mais você precisar. Exemplo que funciona:
+      <code>patient1_T1_MA.nii.gz</code> e <code>patient1_left_MA.tfm</code> se reduzem ambos
+      a <code>patient1</code>, porque <code>_T1</code> é removido do lado da tomografia e
+      <code>_left</code> do lado da matriz. Exemplo que falha: <code>patient1_MA.nii.gz</code>
+      sem marcador temporal se reduz a <code>patient1_MA</code> do lado da tomografia, mas a
+      <code>patient1</code> do lado da matriz — os dois não coincidem mais, e esse arquivo não
+      recebe matriz nenhuma.</p>
+      <p>Existe um atalho: indique um único arquivo de matriz, em vez de uma pasta, e ele será
+      aplicado como está a todos os pacientes da pasta de entrada — sem necessidade de
+      correspondência de nomes.</p>
+
+      <h2 id="besoin">O que você precisa, o que você obtém</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>O que fornecer</h4>
+          <ul>
+            <li>Uma pasta de volumes em <code>.nii</code>, <code>.nii.gz</code> ou
+            <code>.nrrd</code>, e/ou arquivos de landmarks do Slicer (<code>.mrk.json</code>)</li>
+            <li>Uma matriz ITK (<code>.tfm</code>, <code>.h5</code> ou <code>.mat</code>), ou
+            uma pasta de matrizes nomeadas segundo a mesma regra das tomografias</li>
+            <li>Se seus volumes forem segmentações, marque a caixa específica, para que os
+            rótulos não sejam suavizados pela interpolação</li>
+            <li>Opcional: um arquivo de referência para impor a grade de saída (tamanho,
+            orientação)</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>O que sai</h4>
+          <ul>
+            <li>Uma cópia transformada de cada arquivo pareado, organizada na mesma estrutura de
+            pastas da entrada</li>
+            <li>Seus arquivos originais nunca são modificados</li>
+            <li>Em um arquivo de landmarks, apenas os pontos marcados como definidos são
+            deslocados</li>
+            <li>Nenhuma matriz nova é produzida: o AutoMatrix consome transformações, não as
+            escreve</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Passo a passo</h2>
+      <ol class="steps">
+        <li><strong>Indique a pasta de entrada.</strong> Tomografias e/ou arquivos de landmarks
+        a transformar; a pasta inteira é processada de uma vez.</li>
+        <li><strong>Indique a matriz, ou uma pasta de matrizes.</strong> Verifique se os nomes
+        seguem a regra paciente + sufixo acima, ou aponte diretamente para um único arquivo
+        para aplicá-lo a todos.</li>
+        <li><strong>Marque a caixa de segmentação</strong> se seus volumes forem labelmaps.</li>
+        <li><strong>Forneça um arquivo de referência</strong> se quiser impor a grade de saída;
+        caso contrário, cada arquivo mantém a grade do seu próprio volume de entrada, e tudo o
+        que a transformação empurrar para fora do campo de visão é perdido.</li>
+        <li><strong>Escolha um sufixo de saída</strong> e decida se o nome da matriz deve ser
+        acrescentado a ele — necessário assim que um paciente tiver mais de uma matriz (veja
+        abaixo).</li>
+        <li><strong>Defina uma pasta de saída</strong> e execute. Uma barra de progresso
+        acompanha os arquivos à medida que são processados.</li>
+      </ol>
+
+      <h2 id="miroir">Espelhar esquerda/direita sem procurar uma matriz</h2>
+      <p>Se tudo o que você precisa é um espelhamento esquerda/direita, não é preciso montar
+      sua própria matriz: o modo Mirror baixa uma matriz de reflexão pronta e a preenche no
+      campo de matriz para você, com seu próprio sufixo de saída (<code>_mir</code>).</p>
+      <div class="callout warn">
+        <div class="callout-title">O espelho não é centrado no seu paciente</div>
+        <p>A reflexão ocorre em relação ao plano sagital da origem da cena, e não ao plano
+        sagital do próprio paciente. Se seu paciente ainda não estiver centralizado na cena, o
+        resultado sairá espelhado e deslocado — preveja uma etapa de registro em seguida para
+        corrigir o deslocamento.</p>
+      </div>
+
+      <h2 id="coince">Se algo der errado</h2>
+      <div class="callout warn">
+        <div class="callout-title">Alguns formatos anunciados não funcionam mais</div>
+        <p>A interface ainda oferece malhas (<code>.vtk</code>, <code>.vtp</code>,
+        <code>.stl</code>, <code>.off</code>, <code>.obj</code>) como tomografias de entrada
+        para superfícies intraorais, e matrizes em <code>.npy</code> — ambas são contadas na
+        barra de progresso, mas nenhuma produz saída: cada arquivo desse tipo é simplesmente
+        ignorado, com uma linha no log de erros. Uma matriz <code>.txt</code> só funciona se
+        for um verdadeiro arquivo de transformação ITK, e não uma simples matriz 4×4.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Um pareamento falho não gera aviso</div>
+        <p>Se o nome de uma tomografia e o nome de uma matriz não se reduzirem ao mesmo
+        identificador de paciente (veja acima), esse arquivo simplesmente nunca é transformado
+        — nenhuma mensagem de erro, nenhum aviso visível. Se um paciente estiver faltando na
+        saída, a primeira coisa a verificar são os nomes dos arquivos desse paciente.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Uma saída pode sobrescrever outra</div>
+        <p>Se você desmarcar a opção que acrescenta o nome da matriz ao arquivo de saída, e um
+        paciente tiver mais de uma matriz, todos os resultados recebem o mesmo nome de arquivo:
+        cada um sobrescreve o anterior, e só a última matriz processada sobrevive. Mantenha
+        essa opção marcada sempre que aplicar mais de uma matriz por paciente.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Um arquivo de landmarks pode sumir silenciosamente</div>
+        <p>Algumas transformações (campos de deformação densos, B-splines) não podem ser
+        invertidas matematicamente. Quando isso acontece, o arquivo de landmarks
+        correspondente é ignorado com apenas um aviso no log, enquanto o volume em si continua
+        sendo transformado — assim, uma tomografia e seus landmarks podem ficar dessincronizados
+        sem nada na tela para sinalizar.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">As matrizes não são encadeadas</div>
+        <p>Quando um paciente tem várias matrizes, cada uma é aplicada separadamente ao arquivo
+        de entrada original: você obtém um arquivo de saída por matriz, nunca uma composição de
+        uma após a outra.</p>
+      </div>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">Para saber mais</h2>
+      <p>Não há publicação, e não há o que publicar: o módulo aplica matrizes de transformação a arquivos, em lote. O que importa é saber o que é uma matriz no Slicer e em qual sistema de coordenadas ela está.</p>
+      <h3 id="autour">Em torno do método</h3>
+      <ul>
+        <li><strong>Documentation 3D Slicer</strong> — <a href="https://slicer.readthedocs.io/en/latest/user_guide/modules/transforms.html"><em>Transforms</em></a>. O que é uma transformação linear no Slicer, como ela é aplicada e como é invertida.</li>
+        <li><strong>Documentation 3D Slicer</strong> — <a href="https://slicer.readthedocs.io/en/latest/user_guide/coordinate_systems.html"><em>Coordinate systems</em></a>. RAS, LPS, e por que uma matriz correta aplicada no sistema de coordenadas errado inverte o seu paciente.</li>
+      </ul>
+      <p>A bibliografia completa da ferramenta — o que foi encontrado, e o que foi procurado sem sucesso — está em <a href="../AutoMatrix/SOURCES.html">suas fontes</a>.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../AutoMatrix/AutoMatrix.html">
+        <b>Como funciona de verdade →</b>
+        <span>A página do Atlas: a convenção de transformação ITK, a lógica de pareamento
+        arquivo-matriz em detalhe, os formatos realmente lidos e cada armadilha encontrada no
+        código.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Todos os guias</a> ·
+        <a href="../AutoMatrix/AutoMatrix.html">Página do Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

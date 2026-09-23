@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLIC — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="analyse">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools ทีละเครื่องมือ</small></a>
+    <div class="lang-switch">
+      <a href="../../en/CLIC/CLIC.html" hreflang="en" title="English">EN</a><a href="../../fr/CLIC/CLIC.html" hreflang="fr" title="Français">FR</a><a href="../../pt/CLIC/CLIC.html" hreflang="pt" title="Português">PT</a><a href="../../ko/CLIC/CLIC.html" hreflang="ko" title="한국어">KO</a><span class="cur">TH</span>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/CLIC.html"><b>คู่มือ</b><small>วิธีใช้เครื่องมือ</small></a>
+      <a href="../CLIC/CLIC.html" aria-current="true"><b>แอตลาส</b><small>การทำงานภายในโค้ด</small></a>
+    </div>
+    <div class="nav-group"><h4>การลงทะเบียนภาพ</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>การแบ่งส่วน</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>จุดสังเกตและการจัดแนว</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>การวิเคราะห์</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html" aria-current="page">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>เครื่องมือเสริม</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>ข้อความและภาษา</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>หัวข้อร่วม</h4><ul>
+      <li><a href="../findings.html">ข้อค้นพบ</a></li>
+      <li><a href="../glossary.html">อภิธานศัพท์</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/CLIC/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › การวิเคราะห์</div>
+        <h1>CLIC</h1>
+        <p class="lede">CLIC แบ่งส่วนภาพ CBCT ทีละสไลซ์ด้วย Mask R-CNN และจำแนกแต่ละอินสแตนซ์ที่ตรวจพบว่าเป็นฟันเขี้ยวคุดแบบ buccal, bicortical หรือ palatal — การจำแนกและการระบุตำแหน่งได้มาจากการประมวลผลผ่านโครงข่ายรอบเดียวกัน</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="ยังไม่ตีพิมพ์ — มีเพียงหน้า NA-MIC Project Week 43 ที่อธิบายไว้">ยังไม่ตีพิมพ์</a>
+          <span class="badge cli">clic_runner.py</span>
+          <span class="badge neutral">สภาพแวดล้อม conda: clic_env</span>
+          <span class="badge neutral">Python 3.9</span>
+          <a class="badge neutral" href="SOURCES.html">บรรณานุกรม</a>
+        </div>
+      </header>
+
+      <p><em>Classification and Localization of Impacted Canines.</em> การแบ่งส่วนระดับอินสแตนซ์
+      (instance segmentation) แบบ 2D ทีละสไลซ์บนภาพ CBCT ด้วย <strong>torchvision Mask R-CNN</strong> โดย
+      คลาสที่ทำนายได้เข้ารหัสตำแหน่งในกระดูกของฟันเขี้ยวคุด:
+      <strong>buccal, bicortical, palatal</strong></p>
+
+      <p>ชื่อโมดูลสัญญาว่าทำสองงาน แต่โค้ดมี<strong>โครงข่ายเพียงตัวเดียว</strong> ไม่มี
+      โครงข่ายจำแนกแยกต่างหาก ไม่มีโครงข่ายระบุตำแหน่งแยกต่างหาก และไม่มี
+      head สำหรับถดถอยพิกัด การจำแนกคือป้ายของอินสแตนซ์
+      (<code>pr["labels"]</code>) การระบุตำแหน่งคือมาสก์ (<code>pr["masks"]</code>) ทั้งสองได้มา
+      จากการประมวลผล Mask R-CNN รอบเดียวกัน ทุกอย่างด้านล่างสืบเนื่องจากข้อนี้</p>
+
+      <h2 id="situation">1. ตำแหน่งใน pipeline</h2>
+
+      <p>แยกเป็นอิสระทั้งสองทิศทาง: ไม่มีโมดูลใดในรีโพสิทอรีเรียก CLIC และ
+      CLIC ไม่เรียกโมดูลอื่นในรีโพสิทอรี โมดูลเรียกเพียง
+      runner ของตัวเอง:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>สิ่งที่ถูกเรียก</th><th>เมื่อใด</th><th>อย่างไร</th></tr></thead>
+          <tbody>
+            <tr><td><code>CLIC/runner/clic_runner.py</code></td><td>ครั้งเดียวต่อภาพสแกน</td><td><code>CondaSetUpCall.condaRunFilePython(runner, ["--params_json=…"], "clic_env")</code></td></tr>
+            <tr><td>release <code>CLIC_model/final_model.pth</code></td><td>ปุ่ม <em>Download Model</em></td><td><code>requests.get</code> เขียนลงใน <code>~/Documents/CLIC_Models</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>เริ่มจากภาพ CBCT ดิบ</strong> ไม่ต้องแบ่งส่วนมาก่อน ไม่ต้องมีจุดสังเกตทางกายวิภาค (landmark) ไม่ต้อง
+      จัดแนว: โมดูลอ่าน <code>.nii</code>/<code>.nii.gz</code> แล้วส่งออก label map
+      ไม่พึ่งพา <a href="../AMASSS/AMASSS.html">AMASSS</a>, <a href="../ASO/ASO.html">ASO</a> หรือ <a href="../ALI/ALI.html">ALI</a> ในทางใดเลย</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 700 170" role="img" aria-label="CLIC ทำงานแยกอิสระ: สายการประมวลผลเดียวจาก CBCT ถึง label map ไม่มีการพึ่งพาต้นทางหรือปลายทาง">
+          <rect class="d-box-a" x="20" y="10" width="200" height="46" rx="6"/>
+          <text class="d-label" x="120" y="30" text-anchor="middle">GitHub release</text>
+          <text class="d-label-s" x="120" y="45" text-anchor="middle">final_model.pth</text>
+          <path class="d-arrow" d="M120 56 V78"/>
+          <path class="d-arrow-head" d="M120 78 l-4 -7 h8 z"/>
+
+          <rect class="d-box" x="10" y="90" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="110" text-anchor="middle">CBCT ดิบ</text>
+          <text class="d-label-s" x="100" y="125" text-anchor="middle">.nii / .nii.gz</text>
+          <path class="d-arrow" d="M190 115 H250"/>
+          <path class="d-arrow-head" d="M250 115 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="255" y="90" width="220" height="50" rx="6"/>
+          <text class="d-label" x="365" y="110" text-anchor="middle">clic_runner.py</text>
+          <text class="d-label-s" x="365" y="125" text-anchor="middle">env clic_env, GPU ถ้ามี</text>
+          <path class="d-arrow" d="M475 115 H535"/>
+          <path class="d-arrow-head" d="M535 115 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="540" y="90" width="150" height="50" rx="6"/>
+          <text class="d-label" x="615" y="110" text-anchor="middle">Label map</text>
+          <text class="d-label-s" x="615" y="125" text-anchor="middle">.nii.gz, 0/1/2/3</text>
+
+          <text class="d-label-s" x="365" y="160" text-anchor="middle">ไม่มีโมดูลต้นทางหรือปลายทาง — CLIC ไม่พึ่ง AMASSS, ASO หรือ ALI</text>
+        </svg>
+        <figcaption>CLIC แยกเป็นอิสระทั้งสองทิศทาง: ไม่เรียกและไม่ถูกเรียกโดยโมดูลอื่นใน pipeline</figcaption>
+      </figure>
+
+      <h2 id="fichiers">2. ไฟล์ที่เกี่ยวข้อง</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ไฟล์</th><th>บทบาท</th><th>ทำงานที่ใด</th></tr></thead>
+          <tbody>
+            <tr><td><code>CLIC/CLIC.py</code></td><td>widget 622 บรรทัด ในจำนวนนี้ ~230 บรรทัดเป็น stylesheet ธีมมืด และ ~50 บรรทัดเป็นแพตช์ของ conda</td><td>Slicer Python</td></tr>
+            <tr><td><code>CLIC/runner/clic_runner.py</code></td><td><strong>การประมวลผลทั้งหมด</strong> 110 บรรทัด</td><td>สภาพแวดล้อม conda <code>clic_env</code>, GPU ถ้ามี</td></tr>
+            <tr><td><code>CLIC/Resources/UI/CLIC.ui</code></td><td>อินเทอร์เฟซ</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>ไม่มี Slicer CLI ไม่มี <code>.xml</code> ไม่มีชั้นแบบ <code>MedX_Method</code>: widget เขียน
+      JSON พารามิเตอร์ลงใน <code>slicer.app.temporaryPath</code> แล้วเรียก runner ในฐานะ
+      สคริปต์ Python อิสระภายในสภาพแวดล้อม conda</p>
+
+      <p>widget import <code>CondaSetUp</code> <strong>ที่ระดับโมดูล</strong>
+      (<code>CLIC/CLIC.py:18</code>) โดยไม่ได้ประกาศไว้ใน <code>parent.dependencies</code>:
+      หากไม่ได้ติดตั้ง SlicerConda, CLIC จะไม่โหลดเลย โดยไม่มี
+      ข้อความที่เป็นประโยชน์</p>
+
+      <p>widget สร้าง <code>CondaSetUpCall()</code> เสมอ (<code>CLIC/CLIC.py:62</code>) ไม่เคยใช้
+      <code>CondaSetUpCallWsl</code>: ต่างจาก <a href="../MedX/MedX.html">MedX</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a> และโมดูลอื่น ๆ <strong>CLIC
+      ไม่มีเส้นทาง WSL</strong> บน Windows จะเรียกเส้นทาง Unix ของ SlicerConda และ
+      ลำดับอาร์กิวเมนต์ของ <code>condaRunFilePython</code> ต่างกันระหว่างสองคลาส
+      (<code>(file, args, env)</code> ฝั่ง Unix, <code>(file, env, args)</code> ฝั่ง WSL)
+      รายการ args จะถูกส่งไปเป็นชื่อสภาพแวดล้อม ในทางปฏิบัติโมดูลนี้
+      ใช้ได้บน Linux เท่านั้น แม้ README จะระบุไว้อย่างไรก็ตาม</p>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p>ไม่มีเส้นทาง WSL: <code>CondaSetUpCallWsl</code> ไม่เคยถูกสร้าง บน Windows
+        ลำดับอาร์กิวเมนต์ของ <code>condaRunFilePython</code> ที่เส้นทาง Unix คาดหวัง (ซึ่งถูกใช้
+        โดยผิดพลาด) ไม่ตรงกับของเส้นทาง WSL รายการอาร์กิวเมนต์จะถูกส่งไปเป็น
+        ชื่อสภาพแวดล้อม ในทางปฏิบัติ CLIC ใช้ได้บน Linux เท่านั้น</p>
+      </div>
+
+      <h2 id="entrees">3. อินพุตและการเตรียมข้อมูล</h2>
+
+      <h3 id="collecte">3.1 การรวบรวมภาพสแกน</h3>
+
+      <p><code>_collect_scans()</code> (<code>CLIC/CLIC.py:316</code>) รับ
+      <code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>, <code>.mha</code>, <code>.mhd</code> และใช้กฎสองขั้น:</p>
+
+      <ol>
+        <li>หากมี<strong>โฟลเดอร์ย่อย</strong>ที่มีไฟล์ที่ใช้ได้อย่างน้อยหนึ่งไฟล์
+        จะคืนรายการ<strong>โฟลเดอร์ย่อย</strong>เหล่านั้น</li>
+        <li>มิฉะนั้น คืนรายการไฟล์ที่ใช้ได้ในโฟลเดอร์</li>
+      </ol>
+
+      <p>กรณีที่ 1 ได้ <code>Path</code> ที่เป็นไดเรกทอรี ซึ่งถูกส่งไปตามเดิมเป็น
+      <code>input_path</code> ให้ runner ซึ่งเรียก <code>nib.load(str(inp))</code>: ล้มเหลวทันที
+      กรณีปกติจึงเป็นโฟลเดอร์แบบแบนที่มีไฟล์ <code>.nii.gz</code></p>
+
+      <p>นอกจากนี้ runner ใช้เพียง <strong>nibabel</strong>: <code>.nrrd</code>, <code>.mha</code>, <code>.mhd</code>
+      ผ่านตัวกรองของ widget แต่ runner อ่านไม่ได้</p>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p>ตัวกรองการเลือกของ widget ยอมรับ <code>.nrrd</code>, <code>.mha</code> และ <code>.mhd</code>
+        นอกเหนือจาก <code>.nii</code>/<code>.nii.gz</code> แต่ runner โหลดได้ด้วย
+        <strong>nibabel</strong> เท่านั้น: สามรูปแบบนี้ผ่านตัวกรองแต่โหลดไม่สำเร็จ</p>
+      </div>
+
+      <h3 id="pretraitement">3.2 การเตรียมวอลุ่มที่เกิดขึ้นจริง</h3>
+
+      <p>มีเพียงสามบรรทัด (<code>CLIC/runner/clic_runner.py:88</code>):</p>
+
+      <pre><code>sl = _norm(vol[..., z])                                    # min-max of the slice
+t  = torch.from_numpy(sl).unsqueeze(0).repeat(3, 1, 1).float().to(device)
+pr = model([t])[0]</code></pre>
+
+      <p>กล่าวคือ:</p>
+
+      <ul>
+        <li><strong>ตัดเป็นสไลซ์แนวแกน (axial)</strong> ตามแกน 3<sup>rd</sup> ของอาร์เรย์ nibabel
+        ตามลำดับการจัดเก็บในไฟล์ ไม่ใช่ตามการจัดแนวทางกายวิภาค
+        ที่คำนวณใหม่ ไม่มีการจัดแนวใหม่เป็น <a class="gterm" href="../glossary.html#g-ras" title="ดูอภิธานศัพท์">RAS</a>/<a class="gterm" href="../glossary.html#g-lps" title="ดูอภิธานศัพท์">LPS</a> โค้ดไม่เคยดู
+        <code>nii.affine</code> ยกเว้นตอนเขียนกลับ</li>
+        <li><strong>การทำ normalization แบบ min-max ต่อสไลซ์</strong> (<code>_norm</code>,
+        <code>CLIC/runner/clic_runner.py:53</code>): <code>(x - min) / (max - min)</code>
+        และสไลซ์ที่มีค่าคงที่จะกลายเป็นศูนย์ ไม่มี windowing ตามหน่วย Hounsfield ไม่มีการตัด
+        ตามเปอร์เซ็นไทล์ ไม่มีสถิติระดับวอลุ่ม: <strong>แต่ละสไลซ์มีคอนทราสต์
+        ของตัวเอง</strong> สไลซ์ที่มีแต่อากาศจะถูกยืดให้เต็ม
+        ช่วงไดนามิก</li>
+        <li><strong>ทำซ้ำเป็น 3 ช่องสัญญาณ</strong> ให้ตรงกับอินพุต RGB ของ backbone
+        ImageNet</li>
+        <li><strong>ไม่มีการครอป ไม่มี ROI ไม่มีการ resample อย่างชัดแจ้ง</strong> ไม่มีการปรับสเกลวอกเซล</li>
+      </ul>
+
+      <p>การปรับขนาดเพียงอย่างเดียวมาจาก torchvision เอง:
+      <code>GeneralizedRCNNTransform</code> ที่ฝังอยู่ในโมเดลทำ standardization ด้วย
+      ค่าเฉลี่ยของ ImageNet (<code>[0.485,0.456,0.406]</code> / <code>[0.229,0.224,0.225]</code>) และปรับขนาดให้
+      ด้านสั้นเป็น <strong>800 px</strong> โดยด้านยาวไม่เกิน <strong>1333 px</strong>
+      นี่เป็นค่าเริ่มต้นของ torchvision ไม่ใช่การเลือกในรีโพสิทอรี ภาพ CBCT
+      ขนาด 512×512 จึงถูกขยายเป็น 800×800 ก่อนเข้า backbone</p>
+
+      <h2 id="modele">4. โมเดล</h2>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1400 140" role="img" aria-label="pipeline ต่อสไลซ์ทั้งหมด: การตัดสไลซ์ normalization การทำซ้ำช่องสัญญาณ การปรับขนาดของ torchvision, Mask R-CNN การกำหนดเกณฑ์ และการเขียนลง label map">
+          <rect class="d-box" x="10" y="40" width="150" height="60" rx="6"/>
+          <text class="d-label" x="85" y="65" text-anchor="middle">สไลซ์แกน Z</text>
+          <text class="d-label-s" x="85" y="80" text-anchor="middle">ลำดับในไฟล์</text>
+          <path class="d-arrow" d="M160 70 H190"/>
+          <path class="d-arrow-head" d="M190 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="195" y="40" width="165" height="60" rx="6"/>
+          <text class="d-label" x="277" y="65" text-anchor="middle">Normalization</text>
+          <text class="d-label-s" x="277" y="80" text-anchor="middle">min-max ต่อสไลซ์</text>
+          <path class="d-arrow" d="M360 70 H390"/>
+          <path class="d-arrow-head" d="M390 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="395" y="40" width="145" height="60" rx="6"/>
+          <text class="d-label" x="467" y="65" text-anchor="middle">ทำซ้ำช่อง</text>
+          <text class="d-label-s" x="467" y="80" text-anchor="middle">3 ช่อง RGB</text>
+          <path class="d-arrow" d="M540 70 H570"/>
+          <path class="d-arrow-head" d="M570 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="575" y="40" width="210" height="60" rx="6"/>
+          <text class="d-label" x="680" y="60" text-anchor="middle">Resize 800/1333</text>
+          <text class="d-label-s" x="680" y="76" text-anchor="middle">+ ImageNet norm.</text>
+          <text class="d-label-s" x="680" y="90" text-anchor="middle">(ภายใน torchvision)</text>
+          <path class="d-arrow" d="M785 70 H815"/>
+          <path class="d-arrow-head" d="M815 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="820" y="35" width="230" height="70" rx="6"/>
+          <text class="d-label" x="935" y="60" text-anchor="middle">Mask R-CNN</text>
+          <text class="d-label-s" x="935" y="76" text-anchor="middle">ResNet50-FPN, 4 คลาส</text>
+          <text class="d-label-s" x="935" y="91" text-anchor="middle">โครงข่าย — ทำนาย</text>
+          <path class="d-arrow" d="M1050 70 H1080"/>
+          <path class="d-arrow-head" d="M1080 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="1085" y="40" width="150" height="60" rx="6"/>
+          <text class="d-label" x="1160" y="60" text-anchor="middle">ค่าเกณฑ์</text>
+          <text class="d-label-s" x="1160" y="76" text-anchor="middle">score ≥ 0.7</text>
+          <text class="d-label-s" x="1160" y="90" text-anchor="middle">mask &gt; 0.5</text>
+          <path class="d-arrow" d="M1235 70 H1265"/>
+          <path class="d-arrow-head" d="M1265 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="1270" y="40" width="120" height="60" rx="6"/>
+          <text class="d-label" x="1330" y="65" text-anchor="middle">Label map</text>
+          <text class="d-label-s" x="1330" y="80" text-anchor="middle">เขียนทับ</text>
+        </svg>
+        <figcaption>เส้นทางอัลกอริทึมเพียงเส้นทางเดียวใน CLIC ซึ่งทำซ้ำกับทุกสไลซ์แนวแกน การตัดสินใจทางคลินิกทั้งหมด (buccal / bicortical / palatal) มาจากกล่อง "โครงข่าย" ส่วนที่เหลือเป็นการคำนวณแบบกำหนดแน่นอน</figcaption>
+      </figure>
+
+      <h3 id="architecture">4.1 สถาปัตยกรรม</h3>
+
+      <p><code>_blank_model(nc)</code> (<code>CLIC/runner/clic_runner.py:44</code>) ถูกเรียก
+      ด้วย <code>nc = 4</code>:</p>
+
+      <pre><code>m = maskrcnn_resnet50_fpn(weights=None)
+m.roi_heads.box_predictor  = FastRCNNPredictor(in_f, nc)
+m.roi_heads.mask_predictor = MaskRCNNPredictor(in_fm, 256, nc)</code></pre>
+
+      <ul>
+        <li><strong>backbone</strong>: ResNet-50 + FPN (<code>_resnet_fpn_extractor</code>, 5 ระดับ)</li>
+        <li><strong>RPN</strong> ตามด้วย <strong>ROI heads</strong>: box head (<code>FastRCNNPredictor</code>: <code>cls_score</code>
+        4 คลาส, <code>bbox_pred</code> 16 เอาต์พุต) และ mask head (<code>MaskRCNNPredictor</code>, ชั้นซ่อน
+        256, 4 ช่องเอาต์พุต มาสก์ 28×28 ต่อ ROI)</li>
+        <li><code>weights=None</code> แต่ <code>weights_backbone</code> ยังคงค่าเริ่มต้น
+        <code>ResNet50_Weights.IMAGENET1K_V1</code>: <strong>การสร้างโมเดลจะดาวน์โหลด
+        น้ำหนัก ImageNet ของ ResNet-50</strong> (จากนั้น <code>load_state_dict</code> จึงเขียนทับ) การรัน
+        ครั้งแรกแบบออฟไลน์ = ล้มเหลว ผลข้างเคียงที่มีประโยชน์: เนื่องจาก <code>is_trained</code> เป็น <code>True</code>
+        normalization จึงเป็น <code>FrozenBatchNorm2d</code> แทน <code>BatchNorm2d</code> ซึ่งต้อง
+        ตรงกับโมเดลตอนฝึก เพื่อให้คีย์ของ <code>state_dict</code>
+        ตรงกัน</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p><code>weights_backbone</code> ยังคงค่าเริ่มต้น <code>ResNet50_Weights.IMAGENET1K_V1</code> แม้
+        เมื่อ <code>weights=None</code>: เพียงแค่สร้างโมเดลก็ทำให้เกิดการดาวน์โหลด
+        น้ำหนัก ImageNet ของ ResNet-50 การรันครั้งแรกแบบออฟไลน์ = ล้มเหลว ก่อนจะ
+        ถึง <code>final_model.pth</code> เสียอีก</p>
+      </div>
+
+      <p>4 คลาส = พื้นหลัง + 3 การจับคู่ป้ายกับชื่อมีอยู่ใน
+      widget เท่านั้น ใน <code>_legend()</code> (<code>CLIC/CLIC.py:361</code>):</p>
+
+      <p><span class="badge predit">ทำนาย</span> โครงข่ายส่งออกเพียงจำนวนเต็ม 1/2/3 ชื่อและสีด้านล่างเป็นข้อตกลงของ widget ซึ่งไม่มีใน runner</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ป้าย</th><th>ความหมาย</th><th>สี</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Buccal (ด้านแก้ม)</td><td>เขียว <code>(0,1,0)</code></td></tr>
+            <tr><td>2</td><td>Bicortical (ระหว่างสองคอร์เทกซ์)</td><td>เหลือง <code>(1,1,0)</code></td></tr>
+            <tr><td>3</td><td>Palatal (ด้านเพดานปาก)</td><td>น้ำตาล <code>(.6,.4,.2)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>runner ไม่รู้จักชื่อเหล่านี้: เขียนเพียงจำนวนเต็ม 1, 2, 3</p>
+
+      <h3 id="poids">4.2 น้ำหนัก</h3>
+
+      <p>URL ที่ฝังไว้ในโค้ด (<code>CLIC/CLIC.py:333</code>):</p>
+
+      <pre><code>https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/CLIC_model/final_model.pth</code></pre>
+
+      <p>ปลายทาง <code>~/Documents/CLIC_Models/final_model.pth</code> runner ไม่ได้
+      ค้นหาชื่อนี้: ใช้ <code>sorted(model_dir.glob("*.pth"))[0]</code>
+      (<code>CLIC/runner/clic_runner.py:76</code>) คือ<strong>ไฟล์ <code>.pth</code> แรกตาม
+      ลำดับตัวอักษร</strong> หากมีสองโมเดลในโฟลเดอร์ ชื่อไฟล์เป็นตัวตัดสิน
+      และเกิด <code>IndexError</code> ที่ไม่ถูกจัดการหากโฟลเดอร์ว่าง</p>
+
+      <p>ไฟล์เป็น <code>state_dict</code> เปล่า (<code>model.load_state_dict(torch.load(...))</code>) ไม่ใช่
+      checkpoint ของ Lightning: ไม่มีไฮเปอร์พารามิเตอร์ ไม่มีคลาส ไม่มีเวอร์ชัน ชุด
+      ข้อมูลฝึก จำนวนสไลซ์ที่กำกับข้อมูล และตัวชี้วัด ไม่สามารถ
+      ทราบได้จากรีโพสิทอรี</p>
+
+      <h3 id="sorties-reseau">4.3 สิ่งที่โครงข่ายส่งออกจริง</h3>
+
+      <p><span class="badge predit">โครงข่าย</span> สำหรับแต่ละสไลซ์ <code>model([t])[0]</code> คืน dictionary มาตรฐานของ torchvision:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>คีย์</th><th>รูปร่าง</th><th>เนื้อหา</th></tr></thead>
+          <tbody>
+            <tr><td><code>boxes</code></td><td><code>(N,4)</code></td><td>กล่อง <code>x1,y1,x2,y2</code> ในกรอบที่ปรับขนาดแล้ว ซึ่ง transform แปลงกลับเป็นขนาดเดิม</td></tr>
+            <tr><td><code>labels</code></td><td><code>(N,)</code></td><td>จำนวนเต็ม 1..3</td></tr>
+            <tr><td><code>scores</code></td><td><code>(N,)</code></td><td>คะแนนคลาส เรียงจากมากไปน้อย</td></tr>
+            <tr><td><code>masks</code></td><td><code>(N,1,H,W)</code></td><td><strong>ความน่าจะเป็นต่อพิกเซล</strong> ค่า float ใน [0,1]</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>พร้อมค่าเกณฑ์ต้นทางเริ่มต้นของ torchvision: <code>box_score_thresh=0.05</code>,
+      <code>box_nms_thresh=0.5</code>, <code>box_detections_per_img=100</code></p>
+
+      <h3 id="label-map">4.4 จากเอาต์พุตของโครงข่ายสู่ label map</h3>
+
+      <p>ค่าเกณฑ์สองค่า ทั้งคู่ฝังไว้ในโค้ด
+      (<code>CLIC/runner/clic_runner.py:93</code>):</p>
+
+      <pre><code>keep = pr["scores"] &gt;= 0.7                     # confiance d'instance
+for mk, lb in zip((pr["masks"][keep] &gt; .5).squeeze(1).cpu().numpy(),
+                  pr["labels"][keep].cpu().numpy()):
+    seg[..., z][mk] = int(lb)</code></pre>
+
+      <ul>
+        <li><strong>0.7</strong> กับคะแนนของอินสแตนซ์</li>
+        <li><strong>0.5</strong> กับความน่าจะเป็นของมาสก์ เพื่อแปลงเป็นค่าไบนารี</li>
+        <li>การกำหนดค่าเป็นการ<strong>เขียนทับ</strong> ไม่ใช่การโหวต: หากสองอินสแตนซ์
+        ซ้อนทับกัน อินสแตนซ์ที่ประมวลผล<strong>หลังสุด</strong> (ซึ่งคือคะแนนต่ำสุด
+        เพราะ torchvision เรียงตามคะแนนจากมากไปน้อย) จะได้พิกเซลนั้น ความขัดแย้ง
+        buccal/palatal บนวอกเซลเดียวกันจึงตัดสินด้วยคะแนนต่ำสุด</li>
+        <li>ไม่มีสิ่งใดจำกัดจำนวนอินสแตนซ์ต่อสไลซ์ ไม่ว่าจะเป็นฟันเขี้ยวหนึ่งซี่
+        หรือสองซี่</li>
+      </ul>
+
+      <p><strong>ไม่มีการบังคับความสอดคล้องแบบ 3D</strong> แต่ละสไลซ์ถูกจำแนกอย่างอิสระ
+      ไม่มีการปรับให้เรียบระหว่างสไลซ์ ไม่มีการวิเคราะห์ connected component ไม่มี
+      การโหวตเสียงข้างมากตลอดทั้งชุดสไลซ์ สไลซ์ที่อยู่ติดกันสองสไลซ์อาจมีคลาส
+      ต่างกันสำหรับฟันซี่เดียวกัน ผู้ที่ต้องการ "คลาสของผู้ป่วย"
+      ต้องรวมผลเอง โมดูลไม่ได้สร้างให้</p>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p>การซ้อนทับระหว่างสองอินสแตนซ์ตัดสินด้วยการ<strong>เขียนทับ</strong> ไม่ใช่การโหวต:
+        อินสแตนซ์ที่ประมวลผลหลังสุด ซึ่งคือคะแนนต่ำสุด เพราะ torchvision
+        เรียงตามคะแนนจากมากไปน้อย จะได้พิกเซลนั้น และเนื่องจากไม่มีสิ่งใดบังคับ
+        ความสอดคล้องระหว่างสไลซ์ข้างเคียง สไลซ์ที่ติดกันสองสไลซ์จึงอาจจำแนก
+        ฟันซี่เดียวกันต่างกัน</p>
+      </div>
+
+      <h2 id="coeur">5. แกนหลักของอัลกอริทึม</h2>
+
+      <p>ไม่มีส่วนที่ไม่ได้เรียนรู้ นอกจากการกำหนดค่าเกณฑ์: ไม่มี <a class="gterm" href="../glossary.html#g-icp" title="ดูอภิธานศัพท์">ICP</a> ไม่มี
+      morphology ไม่มีการสกัด component ไม่มีการวัด runner ทั้งหมดคือ:
+      โหลดโมเดล วนตาม Z กำหนดค่าเกณฑ์ เขียน การตัดสินใจทั้งหมดอยู่ภายใน
+      <span class="badge predit">Mask R-CNN</span></p>
+
+      <h2 id="sorties">6. การประมวลผลภายหลังและเอาต์พุต</h2>
+
+      <pre><code>out_dir  = out_root / inp.stem
+out_path = out_dir / f"{inp.stem}_{suffix}.nii.gz"
+nib.save(nib.Nifti1Image(seg.astype(np.int16), nii.affine, nii.header), out_path)</code></pre>
+
+      <ul>
+        <li><strong>โฟลเดอร์ย่อยหนึ่งโฟลเดอร์ต่อภาพสแกน</strong> ตั้งชื่อตามภาพสแกน</li>
+        <li>คำต่อท้ายมาจาก <code>suffixLineEdit</code> ค่าเริ่มต้น <code>"seg"</code></li>
+        <li><code>Path.stem</code> ของ <code>X.nii.gz</code> คือ <strong><code>X.nii</code></strong>: โฟลเดอร์ชื่อ <code>X.nii</code> และ
+        ไฟล์ชื่อ <code>X.nii_seg.nii.gz</code> ไม่สวยงามแต่ไม่มีผลต่อการทำงาน</li>
+        <li><code>affine</code> และ <code>header</code> <strong>นำมาจากวอลุ่มอินพุต</strong>: label map
+        ซ้อนทับได้โดยไม่ต้องลงทะเบียนภาพ (registration) <code>header</code> ต้นฉบับระบุชนิดข้อมูลแบบ
+        ทศนิยม ขณะที่ข้อมูลเป็น <code>int16</code> ทั้งนี้ <code>Nifti1Image</code> จะปรับ
+        <code>dtype</code> ของ header ตอนเขียน</li>
+        <li>ชนิดข้อมูลเป็น <code>int16</code> มีค่า 0/1/2/3</li>
+      </ul>
+
+      <div class="callout">
+        <div class="callout-title">หมายเหตุ</div>
+        <p>การตั้งชื่อ <code>X.nii_seg.nii.gz</code> มาจาก <code>Path.stem</code> ของ <code>X.nii.gz</code> ซึ่ง
+        ตัดนามสกุลออกเพียงชั้นเดียวและคืน <code>X.nii</code> ไม่สวยงามแต่ไม่มีผลต่อ
+        การทำงาน</p>
+      </div>
+
+      <p>ฝั่ง widget การโหลดผลลัพธ์ผ่านคิว <code>ui_q</code>:
+      action <code>"segmentation"</code> เรียก <code>slicer.util.loadSegmentation(path)</code> แล้ว
+      <code>_legend()</code> ซึ่งกำหนดสี segment <strong>ตามลำดับดัชนี</strong> (<code>cols.get(i+1, …)</code>)
+      ไม่ใช่ตามค่าป้าย หากไม่มีคลาสใดในวอลุ่ม สีจะเลื่อน
+      <code>_legend()</code> ยังวาด <code>vtkTextActor</code> สามตัวในมุมมอง Red/Yellow/Green
+      โดยติดแอตทริบิวต์ <code>_leg</code> ไว้เพื่อให้ลบได้ในการรีเฟรชครั้งถัดไป</p>
+
+      <h2 id="predit-calcule">7. อะไรทำนาย อะไรคำนวณ</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ส่วน</th><th>ลักษณะ</th><th>ที่ใด</th></tr></thead>
+          <tbody>
+            <tr><td>Normalization แบบ min-max ต่อสไลซ์</td><td><span class="badge calcule">คำนวณ</span> เลขคณิต 2 บรรทัด</td><td><code>clic_env</code></td></tr>
+            <tr><td>ปรับขนาด 800/1333 + standardization แบบ ImageNet</td><td><span class="badge calcule">คำนวณ</span> กำหนดแน่นอน <strong>ภายใน torchvision</strong></td><td><code>clic_env</code></td></tr>
+            <tr><td>การตรวจจับ การจำแนก มาสก์</td><td><span class="badge predit">ทำนาย</span> <strong>โครงข่าย</strong>: Mask R-CNN ResNet50-FPN, 4 คลาส</td><td><code>clic_env</code>, GPU ถ้ามี</td></tr>
+            <tr><td>ค่าเกณฑ์ 0.7 / 0.5 และการเขียนกลับลงวอลุ่ม</td><td><span class="badge calcule">คำนวณ</span> เลขคณิต</td><td><code>clic_env</code></td></tr>
+            <tr><td>สีและคำอธิบายสัญลักษณ์</td><td><span class="badge neutral">Slicer</span></td><td>widget</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>เนื้อหาทางคลินิกทั้งหมด — <em>นี่เป็นฟันเขี้ยวคุดหรือไม่ และอยู่ด้านใดของ
+      กระดูกคอร์เทกซ์</em> — มาจากโครงข่ายเพียงอย่างเดียว ไม่มีการตรวจสอบ
+      ภายหลัง</p>
+
+      <h2 id="environnement">8. สภาพแวดล้อม</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>รายการ</th><th>ค่า</th><th>แหล่งที่มา</th></tr></thead>
+          <tbody>
+            <tr><td>สภาพแวดล้อม conda</td><td><strong><code>clic_env</code></strong> (เฉพาะ CLIC)</td><td><code>CLIC/CLIC.py:120</code></td></tr>
+            <tr><td>Python</td><td><strong>3.9</strong></td><td><code>CLIC/CLIC.py:167</code></td></tr>
+            <tr><td>การสร้าง</td><td><code>numpy&lt;2.0.0</code>, <code>scipy</code>, <code>nibabel</code>, <code>requests</code></td><td>เช่นเดียวกัน</td></tr>
+            <tr><td>จากนั้น ผ่าน pip</td><td><code>torch==2.2.0</code>, <code>torchvision==0.17.0</code>, <code>torchaudio==2.2.0</code> จากดัชนี <strong>cu118</strong></td><td><code>CLIC/CLIC.py:182</code></td></tr>
+            <tr><td>จากนั้น</td><td><code>pip install 'numpy&lt;2.0'</code> เป็นครั้งที่สอง</td><td><code>CLIC/CLIC.py:204</code></td></tr>
+            <tr><td>GPU</td><td>ไม่บังคับ สลับไปใช้ CPU อัตโนมัติ</td><td><code>CLIC/runner/clic_runner.py:73</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>_ensure_env()</code> (<code>CLIC/CLIC.py:158</code>) ถูกเรียกซ้ำ<strong>ทุกครั้งที่คลิก
+      Predict</strong>: คำสั่ง <code>pip install</code> ทั้งสองรันใหม่ แม้ทุกอย่างจะ
+      พร้อมอยู่แล้ว (pip คืนผลเร็วแต่ยังคงสอบถามเครือข่าย) <code>self._env_ready</code>
+      ถูกตั้งค่าแต่ไม่เคยถูกอ่าน</p>
+
+      <p><code>pip install</code> ครั้งที่สองส่ง <code>"'numpy&lt;2.0'"</code> โดยมีเครื่องหมายคำพูดเดี่ยวรวมอยู่
+      ในสตริง ขึ้นกับวิธีที่ SlicerConda ประกอบคำสั่ง
+      (<code>shell=True</code> กับสตริงฝั่ง Unix) อาร์กิวเมนต์อาจถูกตัดเครื่องหมายคำพูดออก
+      อย่างถูกต้องหรือไม่ก็ได้ ส่วนการตรวจจับความล้มเหลวจะค้นหา
+      <code>"error"</code> หรือ <code>"failed"</code> ในเอาต์พุตที่คืนมา: คำเตือนใด ๆ ของ pip ที่มี
+      คำเหล่านี้จะทำให้ขั้นตอนเตรียมการล้มเหลว</p>
+
+      <h3 id="rustine-conda">แพตช์ของ conda</h3>
+
+      <p><code>CLICWidget.__init__</code> (<code>CLIC/CLIC.py:62</code>–<code>112</code>)
+      แพตช์ <code>getCondaExecutable</code> และ <code>getCondaPath</code> ของ SlicerConda ขณะรันไทม์:</p>
+
+      <ol>
+        <li>แก้ <code>/bin/bin/</code> ที่ซ้ำกันในพาธ</li>
+        <li>มิฉะนั้น ใช้ <code>shutil.which("conda")</code></li>
+        <li>มิฉะนั้น ใช้ <strong><code>/home/luciacev/anaconda3/bin/conda</code> ที่ฝังไว้ในโค้ด</strong></li>
+      </ol>
+
+      <p>และ <code>fixed_getCondaPath</code> คืน <strong><code>/home/luciacev/anaconda3</code> ทันทีที่
+      โฟลเดอร์นี้มีอยู่</strong> ก่อนจะพิจารณาพาธที่ผู้ใช้ตั้งค่าไว้เสียอีก
+      พาธจากเครื่องพัฒนาเครื่องหนึ่งจึงถูกเก็บไว้ในระบบควบคุมเวอร์ชันของ
+      รีโพสิทอรี และมีลำดับความสำคัญเหนือการตั้งค่าของ SlicerConda ควร
+      ถือเป็นหนี้ทางเทคนิค ไม่ใช่พฤติกรรมที่ตั้งใจ</p>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p><code>fixed_getCondaPath</code> คืน <code>/home/luciacev/anaconda3</code> ทันทีที่
+        โฟลเดอร์นี้มีอยู่บนเครื่อง ก่อนจะดูการตั้งค่า SlicerConda ของผู้ใช้
+        เสียอีก พาธของเครื่องพัฒนาถูกเก็บในระบบควบคุมเวอร์ชันและมี
+        ลำดับความสำคัญสูงกว่า</p>
+      </div>
+
+      <h2 id="pieges">9. ข้อควรระวังและจุดเปราะบาง</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">บั๊กที่ยืนยันแล้ว</div>
+        <p>runner ส่งเครื่องหมายผ่าน <code>logger.info</code> ด้วย formatter
+        <code>'%(name)s - %(levelname)s - (%(filename)s:%(lineno)d) - %(message)s'</code>
+        (<code>CLIC/runner/clic_runner.py:39</code>) บรรทัดที่ได้รับจึงมีลักษณะ
+        <code>CLIC_runner - INFO - (clic_runner.py:60) - [SEG] /path</code> การทดสอบ
+        <code>ln.startswith("[PROGRESS]")</code> และ <code>ln.startswith("[SEG]")</code>
+        (<code>CLIC/CLIC.py:268</code>) จึง<strong>ไม่เคยเป็นจริง</strong> ผลคือ แถบความคืบหน้า
+        ค้างที่ศูนย์ และ<strong>ผลการแบ่งส่วนที่ได้ไม่เคยถูกโหลดเข้า
+        Slicer</strong> แม้จะถูกเขียนลงดิสก์อย่างถูกต้อง วิธีแก้ขั้นต่ำ: parse
+        ด้วย <code>"[SEG]" in ln</code> แล้วตัดตั้งแต่เครื่องหมายเป็นต้นไป</p>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 720 230" role="img" aria-label="runner เติมคำนำหน้าบรรทัด log ส่วน widget ทดสอบ startswith กับเครื่องหมาย: การเปรียบเทียบจึงล้มเหลวเสมอ">
+          <rect class="d-box" x="20" y="20" width="310" height="80" rx="6"/>
+          <text class="d-label" x="175" y="42" text-anchor="middle">เอาต์พุตจริงของ runner</text>
+          <text class="d-mono" x="175" y="64" text-anchor="middle">CLIC_runner - INFO -</text>
+          <text class="d-mono" x="175" y="80" text-anchor="middle">(clic_runner.py:60) - [SEG] /path</text>
+
+          <rect class="d-box" x="390" y="20" width="310" height="80" rx="6"/>
+          <text class="d-label" x="545" y="42" text-anchor="middle">การทดสอบของ widget (CLIC.py:268)</text>
+          <text class="d-mono" x="545" y="66" text-anchor="middle">ln.startswith("[SEG]")</text>
+          <text class="d-label-s" x="545" y="84" text-anchor="middle">คาดว่าบรรทัดขึ้นต้นด้วยเครื่องหมาย</text>
+
+          <text class="d-label" x="360" y="65" text-anchor="middle" font-size="22">≠</text>
+
+          <path class="d-arrow" d="M360 105 V150"/>
+          <path class="d-arrow-head" d="M360 150 l-4 -7 h8 z"/>
+
+          <rect class="d-box-a" x="80" y="155" width="560" height="60" rx="6"/>
+          <text class="d-label" x="360" y="178" text-anchor="middle">startswith("[SEG]") ไม่เคยเป็นจริง</text>
+          <text class="d-label-s" x="360" y="196" text-anchor="middle">แถบความคืบหน้าค้างที่ 0% — ผลที่เขียนลงดิสก์ไม่เคยถูกโหลดเข้า Slicer</text>
+        </svg>
+        <figcaption>การเปลี่ยนจาก <code>print</code> เป็น <code>logging</code> ทำให้โปรโตคอลที่ยังอธิบายไว้ในส่วนหัวของ runner ใช้งานไม่ได้</figcaption>
+      </figure>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p>หากไม่ได้เลือกโฟลเดอร์เอาต์พุต widget ยังคงเขียนคีย์
+        <code>"output_dir"</code> ลงใน JSON เป็น <code>None</code> ฝั่ง runner
+        <code>P.get("output_dir", inp.parent)</code> จึงคืน <code>None</code> เพราะคีย์มีอยู่
+        ค่าเริ่มต้นจึงไม่ถูกใช้ และ <code>Path(None)</code> ทำให้เกิด <code>TypeError</code>:
+        runner แครช</p>
+      </div>
+
+      <ul>
+        <li><strong>แถบความคืบหน้าและการโหลดผลลัพธ์อัตโนมัติ
+        ใช้งานไม่ได้</strong> runner ส่งเครื่องหมายผ่าน <code>logger.info</code> ด้วย formatter
+        <code>'%(name)s - %(levelname)s - (%(filename)s:%(lineno)d) - %(message)s'</code>
+        (<code>CLIC/runner/clic_runner.py:39</code>) บรรทัดที่ได้รับ
+        มีลักษณะ <code>CLIC_runner - INFO - (clic_runner.py:60) - [SEG] /path</code> ดังนั้น
+        การทดสอบ <code>ln.startswith("[PROGRESS]")</code> และ <code>ln.startswith("[SEG]")</code>
+        (<code>CLIC/CLIC.py:268</code>) จึง<strong>ไม่เคยเป็นจริง</strong> ผลคือ
+        แถบค้างที่ศูนย์ และผลการแบ่งส่วนที่ได้<strong>ไม่เคยถูกโหลดเข้า
+        Slicer</strong> แม้จะถูกเขียนลงดิสก์อย่างถูกต้อง การเปลี่ยนจาก
+        <code>print</code> เป็น <code>logging</code> ทำให้โปรโตคอลที่ยังอธิบายไว้ใน
+        ส่วนหัวของ runner (<code>CLIC/runner/clic_runner.py:12-16</code>) ใช้งานไม่ได้ วิธีแก้ขั้นต่ำ:
+        parse ด้วย <code>"[SEG]" in ln</code> แล้วตัดตั้งแต่เครื่องหมายเป็นต้นไป</li>
+        <li><strong>อย่างไรก็ตามไม่มีอะไรเป็นแบบค่อยเป็นค่อยไป</strong> <code>condaRunFilePython</code> เรียก
+        <code>subprocess.run(...).stdout</code> และคืน <code>f"Result: {result.stdout}"</code>:
+        เอาต์พุตทั้งหมดมาถึง<strong>ในก้อนเดียว เมื่อจบภาพสแกน</strong> แม้จะแก้
+        เครื่องหมายแล้ว ความคืบหน้าก็จะกระโดดจาก 0 เป็น 100% ต่อภาพสแกน</li>
+        <li><strong>ปุ่ม Cancel ไม่มีผล</strong>: <code>_on_cancel</code> (<code>CLIC/CLIC.py:288</code>)
+        เพียงเขียนบรรทัด log ไม่แตะทั้ง <code>cancel_evt</code> และ
+        subprocess</li>
+        <li><strong>หากไม่ได้เลือกโฟลเดอร์เอาต์พุต runner จะแครช</strong> widget
+        เขียนคีย์ <code>"output_dir"</code> ลงใน JSON เสมอ เป็น <code>None</code> หากผู้ใช้
+        ไม่ได้เลือก
+        <code>P.get("output_dir", inp.parent)</code> จึงคืน <code>None</code> ค่าเริ่มต้นไม่
+        ถูกใช้เพราะคีย์มีอยู่ และ <code>Path(None)</code> ทำให้เกิด <code>TypeError</code>
+        checkbox <em>Save Predictions in Input Folder</em> ใน <code>.ui</code> <strong>ไม่ได้เชื่อมต่อกับ
+        สิ่งใด</strong></li>
+        <li><strong><code>self.output_dir</code> ไม่ถูกแปลงเป็น <code>str</code> สำหรับ JSON</strong>: เป็น
+        สตริงอยู่แล้วฝั่ง <code>_browse</code> เช่นเดียวกับ <code>model_folder</code> ซึ่งสอดคล้องกัน
+        ยกเว้น <code>input_path</code> ที่เป็น <code>Path</code> และถูกแปลงอย่างชัดแจ้ง ควรระวัง
+        หากมีการเขียนใหม่</li>
+        <li><strong>ลูปรอบล็อก Slicer</strong>: <code>_on_predict</code> วนอยู่ใน
+        <code>while not cancel_evt.wait(0.05)</code> พร้อม <code>processEvents()</code> ส่วน worker thread
+        รอ subprocess UI ยังตอบสนอง แต่ปุ่ม <em>Predict</em>
+        เป็นทางออกเพียงทางเดียว</li>
+        <li><strong>Normalization ต่อสไลซ์</strong>: คลาสที่ทำนายบนสไลซ์ขึ้นกับ
+        คอนทราสต์เฉพาะที่ที่คำนวณใหม่ ไม่ใช่หน่วย Hounsfield การถ่ายภาพสองครั้ง
+        ที่มี field of view ต่างกันจะไม่ได้ภาพเดียวกันเมื่อป้อนเข้า
+        โครงข่าย</li>
+        <li><code>.ui</code> ประกาศ <strong><code>QTextEdit</code> สองตัวชื่อ <code>logTextEdit</code></strong>
+        (<code>CLIC/Resources/UI/CLIC.ui:343</code> และ
+        <code>353</code>): <code>childWidgetVariables</code> เก็บไว้เพียง
+        ตัวเดียว อีกตัวว่างเปล่าบนหน้าจอ</li>
+        <li><strong>โค้ดที่ไม่ถูกใช้งาน</strong>: <code>_clean_env()</code> (<code>CLIC/CLIC.py:39</code>),
+        <code>initializeParameterNode</code> (<code>pass</code>), <code>_updateAllLabelsColor</code>,
+        <code>_updateDynamicWidgetsColor</code>, <code>_updateMRMLNodeComboBoxColor</code>, การ import
+        <code>glob</code>, <code>subprocess</code>, <code>urllib.request</code>, <code>Optional</code>,
+        <code>CLIC/testing/test_CanineSegmentation.py</code>
+        (ไฟล์ว่าง) และการ import <code>torch</code> ที่ไม่ได้ใช้ใน
+        <code>MedX_CLI/MedX_Dashboard/MedX_Dashboard.py</code> ซึ่งกล่าวถึงที่นี่
+        เพราะการคัดลอกวางแบบเดียวกันพบในหลายโมดูล</li>
+        <li><code>CLIC/__pycache__/CLIC.cpython-312.pyc</code> ถูก commit ไว้ในรีโพสิทอรี</li>
+      </ul>
+
+      <h2 id="litterature">10. เอกสารอ้างอิง</h2>
+
+      <p><strong>ไม่มีบทความใดครอบคลุม CLIC</strong> งานที่เกี่ยวข้องประกาศไว้ภายใต้
+      ชื่อ <em>Interpretable Deep Learning for the Detection and Classification of
+      Impacted Canines and severity of root resorption</em> (Tulissi, Cevidanes, Prieto)
+      นำเสนอที่ <strong>NA-MIC Project Week 43 (Montreal, 2025)</strong> เป็นโครงการที่กำลัง
+      ดำเนินอยู่ ไม่ใช่งานตีพิมพ์ โค้ดต้นฉบับมาจากรีโพสิทอรีส่วนตัว
+      <code>ashmoy/maskRcnn</code> ซึ่งเป็นที่มาของภาพสแกนทดสอบที่อ้างถึงใน
+      README ด้วย (<code>MN138.nii</code>, <code>UM06.nii</code>)</p>
+
+      <p>อย่าสับสนกับงานที่เกี่ยวข้องด้านล่าง ซึ่งไม่ได้สร้าง
+      โค้ดนี้:</p>
+
+      <ul>
+        <li>การระบุตำแหน่ง buccal/palatal ของฟันเขี้ยวคุดโดยทั่วไปทำ
+        <strong>บนภาพรังสีพาโนรามิก</strong> ด้วย CNN จำแนกภาพ (ไม่ใช่ Mask
+        R-CNN บน CBCT)</li>
+        <li>หลายทีมตีพิมพ์<strong>การแบ่งส่วนแบบ 3D</strong> ของฟันเขี้ยวคุดบน
+        CBCT (U-Net/<a class="gterm" href="../glossary.html#g-nnunet" title="ดูอภิธานศัพท์">nnU-Net</a> แบบวอลุ่ม) โดยไม่จำแนกตำแหน่งเทียบกับ
+        คอร์เทกซ์</li>
+      </ul>
+
+      <p>ลักษณะเฉพาะของ CLIC คือคลาส <em>bicortical</em> ที่เพิ่มจากคู่ buccal/palatal
+      ซึ่งทำนายทีละสไลซ์แบบ 2D บน CBCT ไม่มีการอธิบายไว้ใน
+      บทความเหล่านี้เลย อย่านำตัวเลขของบทความเหล่านั้นมาเสนอว่าเป็นของโมดูลนี้</p>
+
+      <ul>
+        <li><a href="https://projectweek.na-mic.org/PW43_2025_Montreal/">NA-MIC Project Week 43 (2025)</a></li>
+        <li><a href="https://arxiv.org/abs/1703.06870">Mask R-CNN (He et al., 2017)</a></li>
+        <li><a href="https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.maskrcnn_resnet50_fpn.html">torchvision — maskrcnn_resnet50_fpn</a></li>
+        <li><a href="https://link.springer.com/article/10.1186/s12880-025-02143-9">Buccal or palatal? AI-based localization of impacted maxillary canines using panoramic radiographs (BMC Med Imaging, 2025)</a></li>
+        <li><a href="https://link.springer.com/article/10.1186/s12903-025-07117-5">Deep learning-based 3D automatic segmentation of impacted canines in CBCT scans (BMC Oral Health, 2025)</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>บรรณานุกรมโดยละเอียด ไฟล์ที่เก็บไว้ และลิงก์ที่ควรเข้าชม:
+      <a href="SOURCES.html">SOURCES.md</a></p>
+
+      <footer class="footer">
+        <a href="../index.html">← หน้าทั้งหมด</a> ·
+        <a href="SOURCES.html">บรรณานุกรมของเครื่องมือนี้</a> ·
+        แหล่งที่มา: <code>CLIC.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

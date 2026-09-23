@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GreedyReg — Guia — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="recalage">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/GreedyReg.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/GreedyReg.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/guide/GreedyReg.html" hreflang="ko" title="한국어">KO</a><a href="../../th/guide/GreedyReg.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/GreedyReg.html" aria-current="true"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../GreedyReg/GreedyReg.html"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html" aria-current="page">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/GreedyReg/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">Guia</a> › Registro</div>
+        <h1>GreedyReg — registrar duas CBCTs com o motor do ITK-SNAP</h1>
+        <p class="lede">O GreedyReg alinha duas CBCTs do mesmo paciente (um T1 e um T2)
+        pilotando o motor <strong>greedy</strong> do ITK-SNAP. Nenhuma rede neural no
+        cálculo principal, nada a instalar: o resultado vem de uma otimização clássica
+        baseada em intensidades, não de uma predição.</p>
+      </header>
+
+      <h2 id="quand">Quando usar</h2>
+      <p>Para registrar duas CBCTs da mesma modalidade — um acompanhamento antes/depois, por
+      exemplo — quando você quer um controle fino sobre o cálculo: qual métrica, quantos
+      graus de liberdade, eventualmente uma máscara para concentrar a otimização em uma região. É
+      uma ferramenta de fim de cadeia: nada mais no SADT consome o seu resultado. Se você precisa que
+      a transformação resultante seja reutilizada em outro lugar do Slicer, este não é o módulo certo —
+      a sua matriz continua específica do greedy e não é um arquivo de transformação do Slicer.</p>
+
+      <div class="callout">
+        <div class="callout-title">Três modos, um único registro de verdade</div>
+        <p>Só o <strong>Automatic Registration</strong> faz de fato um
+        registro baseado em intensidades. <strong>Manual Alignment</strong> e
+        <strong>Distant Registration</strong> apenas preparam um ponto de partida, a ser refinado
+        depois.</p>
+      </div>
+
+      <h2 id="besoin">O que você precisa, o que você obtém</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>A fornecer</h4>
+          <ul>
+            <li>Duas pastas de CBCTs em <code>.nii.gz</code>: uma para o volume fixo
+            (T1), uma para o volume móvel (T2)</li>
+            <li>Nomes de arquivo que começam com letras seguidas de dígitos, por exemplo
+            <code>A01_T1.nii.gz</code> — é isso que permite ao GreedyReg parear um T1 com o seu T2
+            para o mesmo paciente; qualquer outra nomenclatura nunca é pareada, sem aviso</li>
+            <li>Opcional: uma máscara (segmentação ou labelmap), no espaço do volume
+            fixo</li>
+            <li>Opcional: uma matriz de inicialização, ou um pré-alinhamento manual feito dentro
+            do módulo</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>O que sai</h4>
+          <ul>
+            <li>O T2 reamostrado na grade do T1, em <code>.nii.gz</code>, mais a matriz
+            afim encontrada</li>
+            <li>No modo Distant: apenas uma matriz de partida, nunca um volume registrado</li>
+            <li>A matriz produzida está no formato próprio do greedy, não no formato de transformação
+            do Slicer: ela não carrega como nó de transformação tal como está, e nada mais no SADT
+            a reutiliza</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="modes">Os três modos, e qual escolher</h2>
+      <ul>
+        <li><strong>Manual Alignment.</strong> Você move o volume móvel à mão (sliders,
+        ou o botão "Center T2 on T1" para uma centralização rápida). Útil quando as duas CBCTs
+        já estão próximas e só falta um ajuste grosseiro antes de rodar o
+        cálculo propriamente dito.</li>
+        <li><strong>Automatic Registration.</strong> O único modo que registra de fato:
+        o motor greedy otimiza uma transformação rígida ou afim a partir das intensidades da imagem.
+        É aqui que você escolhe a métrica (NMI por padrão, para intensidades heterogêneas;
+        NCC para uma correlação local; SSD se os dois volumes têm a mesma modalidade) e os
+        graus de liberdade (rígido ou afim completo).</li>
+        <li><strong>Distant Registration (Large Misalignment).</strong> Para dois exames que
+        partem geometricamente distantes um do outro. "Distant" descreve essa distância, não um
+        cálculo remoto: nada sai da sua máquina além do download único do
+        motor e dos pesos de predição, nunca dados de paciente. Este modo prediz
+        alguns landmarks, pontos de referência anatômicos (base do crânio, mandíbula ou maxila — uma região por
+        vez), e deriva deles uma matriz de partida. Ele nunca produz um volume
+        registrado: sempre o faça seguir de um Automatic Registration para refinar.</li>
+      </ul>
+      <p>Na prática: se as suas duas CBCTs já estão mais ou menos sobrepostas, vá direto
+      para Manual e depois Automatic. Se estão distantes, comece com Distant Registration
+      e depois refine com Automatic.</p>
+
+      <h2 id="marche">Passo a passo</h2>
+      <ol class="steps">
+        <li><strong>Separe os seus volumes.</strong> Uma pasta para as CBCTs fixas (T1),
+        uma para as móveis (T2), com o mesmo identificador de paciente em cada nome de
+        arquivo.</li>
+        <li><strong>Adicione uma máscara se necessário.</strong> Ela deve estar no espaço do volume
+        fixo: é ali que a otimização vai buscar o seu gradiente.</li>
+        <li><strong>Pré-alinhe se o desalinhamento for grande.</strong> À mão no modo Manual
+        para uma diferença pequena, via Distant Registration para uma grande.</li>
+        <li><strong>Passe para Automatic Registration.</strong> Escolha a métrica e os
+        graus de liberdade (rígido ou afim) e depois rode.</li>
+        <li><strong>Para uma série</strong>, aponte diretamente para as pastas T1/T2 completas: o processamento
+        em lote encadeia os pares casados pelo identificador.</li>
+        <li><strong>Salve o resultado</strong> antes de fechar o Slicer — veja abaixo por que isso
+        importa.</li>
+      </ol>
+
+      <h2 id="coince">Se algo der errado</h2>
+      <div class="callout warn">
+        <div class="callout-title">"Save Registered Volume" não faz nada no modo Distant</div>
+        <p>Este modo não produz um volume registrado, só uma matriz de partida: o
+        botão sempre responde "No result to save!". Use "Save Transform Matrix" em vez disso, ou
+        vá direto para Automatic Registration para obter um volume que valha a pena salvar.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Caixas de seleção enganosas no modo Distant</div>
+        <p>Marcar várias estruturas (base do crânio, mandíbula, maxila) não as
+        combina. Só uma região é de fato usada, escolhida por uma ordem de prioridade fixa (base
+        do crânio primeiro, depois mandíbula, depois maxila), quaisquer que sejam as caixas que você marcou.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Em lote, uma falha interrompe tudo, nem sempre de forma clara</div>
+        <p>Em uma pasta completa, o primeiro caso que falha interrompe toda a execução: sem retomada, sem
+        lista dos casos restantes. No modo Distant, uma predição de landmarks que falhou nem
+        sempre aparece como um erro evidente: o único sinal visível pode ser um discreto "only 0
+        matched landmarks" no log.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">As pastas temporárias nunca são limpas</div>
+        <p>Seja após um registro automático ou uma sessão manual, o módulo não
+        esvazia as suas pastas de trabalho. Em uma série longa, o uso do disco se acumula; limpe-as
+        você mesmo de tempos em tempos — mas só depois de salvar os seus resultados, já que é também
+        de lá que "Save Registered Volume" tira o seu arquivo no modo Automatic.</p>
+      </div>
+
+      <h2 id="apres">E depois</h2>
+      <p>Sempre confira o resultado a olho, sobrepondo o volume registrado à CBCT fixa
+      no Slicer, antes de usá-lo em uma medida. E lembre-se de que a
+      matriz exportada é um simples arquivo no formato greedy, não uma transformação do Slicer ou do ITK: reutilizá-la
+      fora deste módulo exige uma conversão que o GreedyReg não faz sozinho.</p>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">Para saber mais</h2>
+      <h3 id="sur-outil">Sobre o próprio GreedyReg</h3>
+      <ul>
+        <li><strong>Venet et al., arXiv 2019</strong> — <a href="https://arxiv.org/abs/1904.11929"><em>Accurate and Robust Alignment of Variable-Stained Histologic Images Using a General-Purpose Greedy Diffeomorphic Registration Tool</em></a>. O artigo do <code>greedy</code>, o motor que este módulo apenas controla. É curto, e é a citação que os autores pedem.</li>
+      </ul>
+      <h3 id="autour">Em torno do método</h3>
+      <ul>
+        <li><strong>Yushkevich et al., NeuroImage 2006</strong> — <a href="https://doi.org/10.1016/j.neuroimage.2006.01.015"><em>User-guided 3D active contour segmentation of anatomical structures: Significantly improved efficiency and reliability</em></a>. A referência do ITK-SNAP, do qual o <code>greedy</code> se originou e de cujo vocabulário o módulo se vale.</li>
+        <li><strong>Documentation de greedy</strong> — <a href="https://greedy.readthedocs.io/en/latest/reference.html"><em>greedy — command reference</em></a>. A lista completa de opções do motor, caso você queira saber a que corresponde um ajuste da interface.</li>
+      </ul>
+      <p>A bibliografia completa da ferramenta — o que foi encontrado, e o que foi procurado sem sucesso — está em <a href="../GreedyReg/SOURCES.html">suas fontes</a>.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../GreedyReg/GreedyReg.html">
+        <b>Como funciona de verdade →</b>
+        <span>A página do Atlas: o papel exato do binário greedy e da CLI, o que é
+        predito e o que é calculado em cada modo, o formato da matriz e os limites
+        encontrados no código.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Todos os guias</a> ·
+        <a href="../GreedyReg/GreedyReg.html">Página do Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

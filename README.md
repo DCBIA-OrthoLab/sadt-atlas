@@ -37,7 +37,8 @@ et `index.html` s'ouvre aussi en `file://`, la recherche comprise.
 
 ## Ce qu'il y a dedans
 
-Le site a **deux moitiés** et **deux langues**.
+Le site a **deux moitiés** et **cinq langues** : anglais, français, portugais
+(brésilien), coréen et thaï.
 
 - Le **Guide** s'adresse à qui utilise les outils : à quoi ça sert, quoi fournir,
   quoi vérifier. Aucun détail d'implémentation.
@@ -48,10 +49,10 @@ Le site a **deux moitiés** et **deux langues**.
 index.html              choix de la langue
 assets/                 style, script, index de recherche (partagés)
 <Outil>/                sources : le .md d'origine, les articles récupérés
-fr/  et  en/
+en/  fr/  pt/  ko/  th/
 ├── index.html          accueil de l'Atlas
-├── constats.html       findings.html en anglais
-├── glossaire.html      glossary.html en anglais
+├── findings.html       constats.html en français
+├── glossary.html       glossaire.html en français
 ├── guide/
 │   ├── index.html      accueil du Guide
 │   └── <Outil>.html    un guide par outil
@@ -68,6 +69,8 @@ langue. Seules les pages rendues se dédoublent.
 | [`assets/themes/`](assets/themes/) | surcouches de style interchangeables — voir ci-dessous |
 | [`nav.py`](nav.py) | **définition unique de la navigation**, et la variable `THEME`. La sidebar est identique sur une centaine de pages : ne l'édite jamais dans un `.html`, elle sera écrasée |
 | [`build.py`](build.py) | réécrit les sidebars, génère l'index de recherche, les constats et les index de guides, par langue |
+| [`i18n.py`](i18n.py) | suivi des traductions : quelles pages sont en retard sur l'anglais, et contrôle de structure |
+| [`i18n.json`](i18n.json) | empreinte de la version anglaise sur laquelle chaque page traduite est alignée |
 
 Après avoir modifié une fiche :
 
@@ -107,6 +110,29 @@ Chaque thème gère ses propres variantes claire et sombre.
 **La sidebar ne se modifie que dans `nav.py`.** `build.py` la réécrit ensuite dans
 chaque page. C'est ce qui évite qu'une centaine de copies divergent.
 
+## Langues
+
+**L'anglais est la langue source.** Les modifications se font dans `en/` seulement ;
+`fr/`, `pt/`, `ko/` et `th/` sont des traductions, remises à niveau par lots, pas à chaque
+changement. Entre deux lots elles sont en retard, et c'est voulu.
+
+```bash
+python3 i18n.py stale            # par langue : pages anglaises modifiées depuis la dernière traduction
+python3 i18n.py check pt         # structure identique à l'anglais : balises, ids, liens, code
+python3 i18n.py stamp pt         # après traduction : enregistrer que pt/ est à jour
+```
+
+L'empreinte ignore ce que `build.py` réécrit (sidebar, références, vidéos) : seul un
+changement de contenu rédigé rend une page « en retard ».
+
+Ce qui n'est pas dans les pages se traduit dans le code : libellés de navigation et
+résumés d'outils dans `nav.py`, notes bibliographiques dans `papers.py`, textes des
+pages générées dans `build.py`, libellés d'interface dans `assets/site.js`.
+
+Ajouter une langue : l'ajouter à `LANGS` et `LANG_NAMES` dans `nav.py`, puis compléter
+chaque dictionnaire indexé par langue (`grep -n '"pt"' *.py assets/site.js` les
+liste tous), traduire les pages, et `python3 i18n.py stamp <langue>`.
+
 ## Conventions des fiches
 
 - **Prédit vs calculé** est l'axe central. Les badges le marquent partout, et les
@@ -132,9 +158,9 @@ institutionnels et versions déposées par les auteurs.
 
 Les deux chantiers annoncés sont **en cours**. L'arbitrage est tranché :
 
-- **langues** — deux arborescences `fr/` et `en/`, plutôt qu'une bascule côté client.
-  Les 55 schémas SVG portent du texte : deux arbres permettent de le traduire vraiment,
-  et chaque page garde une URL propre.
+- **langues** — une arborescence par langue, plutôt qu'une bascule côté client.
+  Les 55 schémas SVG portent du texte : un arbre par langue permet de le traduire
+  vraiment, et chaque page garde une URL propre.
 - **couche utilisateur** — des pages séparées, regroupées sous `guide/`, plutôt qu'un
   encart en tête de fiche. Les deux publics n'ont ni le même besoin ni le même ton, et
   le renvoi de l'un vers l'autre suffit à les relier.

@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoMatrix — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="utilitaires">
+<div class="layout">
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/AutoMatrix/AutoMatrix.html" hreflang="en" title="English">EN</a><a href="../../fr/AutoMatrix/AutoMatrix.html" hreflang="fr" title="Français">FR</a><a href="../../pt/AutoMatrix/AutoMatrix.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/AutoMatrix/AutoMatrix.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/AutoMatrix.html"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../AutoMatrix/AutoMatrix.html" aria-current="true"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html" aria-current="page">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/AutoMatrix/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › 유틸리티</div>
+        <h1>AutoMatrix</h1>
+        <p class="lede">다른 곳에서 이미 계산된 ITK 변환 하나 이상을 볼륨과 랜드마크 파일이 든 폴더에 일괄 적용한다 — 신경망도, conda도, GPU도 없다.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="연구실 유틸리티, 미발표.">미발표</a>
+          <span class="badge cli">Automatrix_CLI</span>
+          <span class="badge calcule">계산 — 신경망 없음</span>
+          <span class="badge neutral">conda 없음, GPU 없음</span>
+          <a class="badge neutral" href="SOURCES.html">참고문헌</a>
+        </div>
+      </header>
+
+      <p>볼륨과 랜드마크 파일이 든 폴더에 ITK 변환 하나 이상을 일괄 적용한다.
+      신경망도, conda도, GPU도 없다.
+      <code>sitk.ReadTransform</code> + <code>sitk.ResampleImageFilter</code>, 그리고 이름 쪼개기로 하는
+      파일 ↔ 행렬 짝짓기가 전부다. 이 페이지의 요점은
+      변환 규약, 그리고 UI가 약속하는 것과 CLI가 실제로 하는 것 사이의
+      차이에 있다.</p>
+
+      <h2 id="situation">1. 파이프라인에서의 위치</h2>
+
+      <p>저장소의 다른 모듈 중 AutoMatrix를 호출하는 것은 없다. 다만 AutoMatrix는
+      <strong>소비자</strong>로서 정합 모듈이 생성한 <code>.tfm</code> 파일을 쓴다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>생성자</th><th>생성 파일</th><th>변환 유형</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>AREG_CBCT.py:157</code></td>
+              <td><code>&lt;out&gt;/&lt;Region&gt;/&lt;patient&gt;_OutReg/&lt;patient&gt;_&lt;CB|MAND|MAX&gt;&lt;add_name&gt;_matrix.tfm</code></td>
+              <td>아핀 / 강체</td>
+            </tr>
+            <tr>
+              <td><code>SEMI_ASO_CBCT.py:176</code></td>
+              <td><code>&lt;patient&gt;_&lt;add_name&gt;_transform.tfm</code></td>
+              <td><strong><code>sitk.CompositeTransform</code></strong> (<code>utils.py:802</code>)</td>
+            </tr>
+            <tr>
+              <td><code>AREG_MRI.py:227</code></td>
+              <td><code>&lt;mri&gt;_reg_transform.tfm</code></td>
+              <td>합성</td>
+            </tr>
+            <tr>
+              <td><code>Review.py:499</code>, <code>VFACE.py:2168</code></td>
+              <td>정합 + 수동 미세 조정</td>
+              <td><code>CompositeTransform([areg, nudge.GetInverse()])</code></td>
+            </tr>
+            <tr>
+              <td><code>FlexReg_CLI.py:186</code></td>
+              <td><code>&lt;T2&gt;&lt;suffix&gt;.tfm</code></td>
+              <td>아핀, 이미 <a class="gterm" href="../glossary.html#g-ras" title="용어집 보기">RAS</a>→<a class="gterm" href="../glossary.html#g-lps" title="용어집 보기">LPS</a> 켤레 변환 및 역변환됨</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>UI의 "From AReg" 체크박스는 <a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a>의 이름 규칙을 하드코딩한다
+      (§6). 다른 모듈에 속한 텍스트 필드의 <strong>기본값</strong>까지
+      포함해서다.</p>
+
+      <h2 id="fichiers">2. 관련 파일</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>역할</th><th>실행 위치</th></tr></thead>
+          <tbody>
+            <tr><td><code>AutoMatrix.py</code></td><td>위젯: 선택기, 검증, 미러, 진행 표시줄</td><td>Slicer Python</td></tr>
+            <tr><td><code>applyMatrix.py</code></td><td><code>Automatrix_Method</code>: CLI의 파라미터 딕셔너리 구성</td><td>동일</td></tr>
+            <tr><td><code>General_tools.py</code></td><td><code>search</code>와 <code>GetPatients</code> — CLI 버전의 <strong>복사본</strong>, 개수 세기에만 쓰임</td><td>동일</td></tr>
+            <tr><td><code>Automatrix_CLI.py</code></td><td>실제 작업 전부, 341줄</td><td>Slicer Python, <code>SlicerMacroBuildScriptedCLI</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>AutoMatrixLogic.process()</code>(<code>AutoMatrix.py:1094</code>)는
+      <code>pass</code>일 뿐이다. 로직은 전부 <code>Automatrix_Method</code>에 있다.
+      conda도 CUDA도 없다 — grep으로 확인했으며, AutoMatrix/와 Automatrix_CLI/에 <code>torch</code>, <code>conda</code>,
+      <code>.pth</code>는 한 번도 나오지 않는다.</p>
+
+      <h2 id="formats">3. 읽히는 변환 형식 — 그리고 읽히지 않는 형식</h2>
+
+      <p>UI(<code>AutoMatrix.py:1012</code>)와 README는
+      <code>.npy</code>, <code>.h5</code>, <code>.tfm</code>, <code>.mat</code>, <code>.txt</code>를 내세운다. <code>GetPatients</code>는 이들을 모두 수집한다.
+      그다음 CLI는 구분 없이 다음을 실행한다
+      (<code>Automatrix_CLI.py:285</code>).</p>
+
+      <pre><code>try:
+    tfm = sitk.ReadTransform(matrix)
+except Exception as e:
+    logger.error(f"ERROR reading transform {matrix}: {e}")
+    continue</code></pre>
+
+      <p><code>sitk.ReadTransform</code>은 ITK의 <em>TransformIO</em> 클래스만 안다.
+      Slicer 5.12의 SimpleITK 2.5.5로 시험한 결과:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>확장자</th><th>실제 결과</th></tr></thead>
+          <tbody>
+            <tr><td><code>.tfm</code>, <code>.txt</code></td><td><strong>오직</strong> <em>Insight Transform File V1.0</em>일 때만 OK. 원시 4×4 행렬이 든 텍스트 파일은 거부된다: <code>ITK ERROR: Tags must be delimited</code></td></tr>
+            <tr><td><code>.h5</code>, <code>.hdf5</code></td><td>OK (HDF5TransformIO)</td></tr>
+            <tr><td><code>.mat</code></td><td>OK (MatlabTransformIO)</td></tr>
+            <tr><td><code>.npy</code></td><td><strong>실패</strong>: <code>Could not create Transform IO object for reading file</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p>따라서 <code>.npy</code> 지원은 <strong>고장 나 있다</strong>. 모든 <code>.npy</code> 파일은
+        오류 한 줄을 남기고 건너뛴다. CLI로 옮기면서 생긴 회귀다
+        (커밋 <code>7bc362b</code>). 위젯 버전은 <code>np.load(matrix)</code>로 읽어
+        <code>vtkMRMLTransformNode</code>를 만들었다(<code>extension_mat == ".npy"</code> 분기,
+        <code>git show 7bc362b^:AutoMatrix/AutoMatrix.py</code>로 볼 수 있다).</p>
+        <p>"텍스트 행렬"도 마찬가지다. 이는 행렬 형식이 아니라 ITK의
+        텍스트 형식이다.</p>
+      </div>
+
+      <p>읽기에 성공하면 구체적인 타입이 보존된 <code>sitk.Transform</code>이 반환된다 —
+      <code>isinstance(tfm, sitk.CompositeTransform)</code>가 동작함을 확인했다.</p>
+
+      <h2 id="convention">4. 변환 규약 — 모든 것을 망가뜨리는 지점</h2>
+
+      <h3 id="sens">4.1 변환의 방향</h3>
+
+      <p>ITK는 <strong>fixed → moving</strong>이다. 리샘플러에 넘긴 <code>sitk.Transform</code>은
+      <strong>출력</strong> 물리 좌표점을 샘플링할 <strong>입력</strong> 물리 좌표점으로
+      매핑한다. 따라서 눈에 보이는 내용은 <code>T⁻¹</code>에 따라 움직인다.</p>
+
+      <p>코드는 양쪽에서 이를 활용하며, 일관성이 있다.</p>
+
+      <ul>
+        <li><strong>볼륨</strong>(<code>Automatrix_CLI.py:209</code>):
+        <code>resampler.SetTransform(transform)</code> — 변환을 그대로
+        넘기므로 내용이 <code>T⁻¹</code>만큼 움직인다.</li>
+        <li><strong>랜드마크</strong>(<code>Automatrix_CLI.py:176</code>):
+        <pre><code>tfm_inverted = transform.GetInverse()
+point['position'] = list(tfm_inverted.TransformPoint(point['position']))</code></pre>
+        <code>T⁻¹</code>를 점에 명시적으로 적용하므로 점이 볼륨의
+        내용과 똑같이 움직인다.</li>
+      </ul>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 710 245" role="img" aria-label="볼륨과 그 랜드마크에 변환을 일괄 적용">
+          <rect class="d-box" x="10" y="15" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="35" text-anchor="middle">입력 스캔</text>
+          <text class="d-mono" x="100" y="51" text-anchor="middle">.nii / .nrrd</text>
+
+          <rect class="d-box" x="10" y="85" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="105" text-anchor="middle">행렬</text>
+          <text class="d-mono" x="100" y="121" text-anchor="middle">.tfm (T)</text>
+
+          <path class="d-arrow" d="M190 40 H225 V62 H243"/>
+          <path class="d-arrow-head" d="M250 62 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M190 110 H225 V88 H243"/>
+          <path class="d-arrow-head" d="M250 88 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="250" y="48" width="200" height="54" rx="6"/>
+          <text class="d-label" x="350" y="70" text-anchor="middle">ResampleImageFilter</text>
+          <text class="d-label-s" x="350" y="85" text-anchor="middle">SetTransform(T), 선형/NN</text>
+
+          <path class="d-arrow" d="M450 75 H483"/>
+          <path class="d-arrow-head" d="M490 75 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="490" y="48" width="200" height="54" rx="6"/>
+          <text class="d-label" x="590" y="70" text-anchor="middle">변환된 스캔</text>
+          <text class="d-label-s" x="590" y="85" text-anchor="middle">내용이 T⁻¹만큼 이동</text>
+
+          <rect class="d-box" x="10" y="160" width="180" height="54" rx="6"/>
+          <text class="d-label" x="100" y="182" text-anchor="middle">입력 .mrk.json</text>
+          <text class="d-label-s" x="100" y="197" text-anchor="middle">랜드마크</text>
+
+          <path class="d-arrow" d="M190 187 H223"/>
+          <path class="d-arrow-head" d="M230 187 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="250" y="160" width="200" height="54" rx="6"/>
+          <text class="d-label" x="350" y="182" text-anchor="middle">T⁻¹.TransformPoint</text>
+          <text class="d-label-s" x="350" y="197" text-anchor="middle">점마다 (defined)</text>
+
+          <path class="d-arrow" d="M450 187 H483"/>
+          <path class="d-arrow-head" d="M490 187 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="490" y="160" width="200" height="54" rx="6"/>
+          <text class="d-label" x="590" y="182" text-anchor="middle">변환된 .mrk.json</text>
+          <text class="d-label-s" x="590" y="197" text-anchor="middle">스캔과 같은 움직임</text>
+
+          <text class="d-label-s" x="355" y="232" text-anchor="middle">합성 없음: 각 행렬은 원본 입력 파일에 독립적으로 적용된다.</text>
+        </svg>
+        <figcaption>같은 변환 T를 볼륨의 리샘플러에는 그대로 넘기고(내용은 T⁻¹만큼 이동), 랜드마크에는 명시적으로 역변환하여 적용한다(T⁻¹.TransformPoint). 그래서 스캔과 랜드마크가 동기화된 상태로 유지된다. 신경망 없음: 모두 계산이다.</figcaption>
+      </figure>
+
+      <div class="callout ok">
+        <div class="callout-title">확인됨</div>
+        <p><strong>핵심</strong>: 같은 <code>.tfm</code>을 스캔과 그 랜드마크에 적용하면
+        둘이 같은 움직임으로 옮겨진다. 이 모듈을 쓸 수 있게 해 주는 속성이며,
+        코드에서 역변환이 등장하는 유일한 곳이기도 하다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><code>GetInverse()</code>는 <code>RuntimeError</code>를 일으킬 수 있다(역변환할 수 없는 변환:
+        조밀 변위장, B-spline). 이 경우는 잡혀서 랜드마크 파일이
+        경고와 함께 그냥 건너뛰어지지만, 대응하는 볼륨은 이미
+        변환되어 있을 것이다. 따라서 두 출력이 조용히 어긋날 수 있다.</p>
+      </div>
+
+      <h3 id="ras-lps">4.2 RAS / LPS: 축 반전은 어디서 일어나는가 — 어디에서도</h3>
+
+      <p><strong>AutoMatrix에는 축 반전이 없다.</strong> 이것이 옳으며, 그 이유는 다음과 같다.</p>
+
+      <ul>
+        <li>ITK <code>.tfm</code> 파일은 구조상 <strong>LPS</strong>다.</li>
+        <li><code>sitk.ReadImage</code> / <code>WriteImage</code>는 <strong>LPS</strong>로 동작한다. 양쪽이
+        일치하므로 볼륨에 대해서는 할 일이 없다.</li>
+        <li>저장소의 <code>.mrk.json</code> 파일은 모든 곳에서 <strong>LPS</strong>로 하드코딩되어 있다:
+        <code>ALI_CBCT/io.py:36</code>,
+        <code>ASO_CBCT/utils.py:278</code>,
+        <code>AREG_CBCT/utils.py:373</code>,
+        <code>ALI_IOS/io.py:85</code>,
+        <code>mgl_patch.py:193</code>,
+        <code>VFACE/functionaq3dc.py#L1733</code>. 이는
+        Slicer가 기록할 때의 기본값이기도 하다. 따라서 <code>point['position']</code>은 이미 LPS이며,
+        ITK 변환에 바로 적용하는 것이 옳다.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>취약한 부분은 <strong><code>coordinateSystem</code> 필드를 전혀
+        읽지 않는다는 점</strong>이다. <a href="../FlexReg/FlexReg.html">FlexReg</a>는
+        이를 읽지만(<code>FlexReg.py:2434</code>) AutoMatrix는 읽지 않는다.
+        <code>"coordinateSystem": "RAS"</code>를 선언한 json — 오래된 주석 데이터나 다른
+        도구가 기록하는 형태 — 은 x와 y의 부호가 뒤집힌 채 아무
+        메시지 없이 변환된다. json을 읽어 그대로 다시 쓰기 때문에 출력 파일은 원래의 <code>coordinateSystem: RAS</code>까지
+        그대로 유지한다.</p>
+      </div>
+
+      <p>참고로, 행렬을 <em>생성하는</em> 모듈은 축 반전을 스스로 처리한다.
+      <code>FlexReg_CLI.py:186</code>은
+      <code>flip @ M @ flip</code>을 <code>flip = np.diag([-1,-1,1,1])</code>로 계산한 뒤 역변환하고 나서
+      <code>.tfm</code>을 기록한다. AutoMatrix는 그 결과를 소비하므로
+      다시 할 일이 없다.</p>
+
+      <h3 id="composition">4.3 합성</h3>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>합성은 없다.</strong> 환자에게 행렬이 여러 개 있으면 루프
+        (<code>Automatrix_CLI.py:283</code>)가 각 행렬을
+        <strong>원본 입력 파일에</strong> 독립적으로 적용하여 행렬마다 출력을
+        하나씩 만든다. 연쇄 적용은 없다.</p>
+      </div>
+
+      <p>존재하는 합성은 ITK가 이미 해 둔 것뿐이다. 여러 변환이 든 <code>.tfm</code>은
+      <code>sitk.CompositeTransform</code>으로 읽혀
+      통째로 적용된다.</p>
+
+      <h3 id="harden">4.4 Harden</h3>
+
+      <p>없다. 파이프라인에는 더 이상 <code>vtkMRMLTransformNode</code>가 없다.
+      CLI 이전 버전은 이를 만들고 <code>model.SetAndObserveTransformNodeID(...)</code>,
+      이어서 <code>model.HardenTransform()</code>을 실행한 뒤 <code>slicer.util.exportNode(..., world=True)</code>를 호출했다.
+      그 블록 전체가 사라졌다. 위젯의 <code>saveOutput</code> 메서드
+      (<code>AutoMatrix.py:861</code>)는 <code>exportNode</code>를 호출하던 것으로, 아직 남아 있지만 더 이상 호출되지 않는다. <strong>사용되지 않는 코드</strong>다.</p>
+
+
+      <h2 id="types-donnees">5. 처리하는 데이터 유형</h2>
+
+      <p><code>GetPatients</code>는 <code>.vtk .vtp .stl .off .obj .nii .nii.gz .nrrd .mrk.json</code>을 수집한다
+      (<code>Automatrix_CLI.py:72</code>). 그다음 CLI는 두 경우만
+      구분한다.</p>
+
+      <pre><code>is_landmark = scan.endswith(".mrk.json")
+...
+image = sitk.ReadImage(scan)     # everything else</code></pre>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p><strong>메시는 더 이상 처리되지 않는다.</strong> 시험 결과: <code>sitk.ReadImage</code>로
+        <code>vtkPolyData</code>를 <code>.vtk</code>로 기록한 파일을 읽으면
+        <code>sitk::ERROR: Unable to determine ImageIO reader</code>로 실패한다. <code>.stl</code>, <code>.obj</code>,
+        <code>.off</code>, <code>.vtp</code>도 마찬가지다. 예외는 잡혀서
+        (<code>Automatrix_CLI.py:310</code>)
+        <code>ERROR processing ...</code>로 기록되고 파일은 건너뛰어진다. 그런데도 UI는 여전히 이 형식들을
+        제공하고, <code>CheckGoodEntre</code>는 이를 유효하다고 판정하며, 진행 카운터는 이를 세고,
+        <code>README.md:422</code>는 여전히 IOS 지원을 내세운다.</p>
+        <p>CLI로 옮기면서 생긴 두 번째 회귀다. 위젯 버전은
+        <code>slicer.util.loadModel</code>로 메시를 로드하고 실제로
+        <code>HardenTransform</code>을 실행했다. 반면 <code>.vtk</code> <em>structured points</em> 파일(표면이 아니라
+        영상)은 VTKImageIO를 통해 통과할 것이다.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>유형</th><th>읽기</th><th>변환</th><th>기록</th></tr></thead>
+          <tbody>
+            <tr><td><code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code></td><td><code>sitk.ReadImage</code></td><td><code>ResampleImageFilter</code></td><td><code>sitk.WriteImage</code></td></tr>
+            <tr><td><code>.mrk.json</code></td><td><code>json.load</code>, <code>markups[0]['controlPoints']</code></td><td><code>T⁻¹.TransformPoint</code> 점마다</td><td><code>json.dump(indent=2)</code></td></tr>
+            <tr><td><code>.vtk .vtp .stl .off .obj</code></td><td>—</td><td>—</td><td>— (조용한 실패)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>랜드마크는 <code>markups[0]</code>만 처리되며,
+      <code>positionStatus == 'defined'</code>인 점만 옮겨진다. 나머지는 제자리에,
+      즉 이전 좌표계에 남는다.</p>
+
+      <h2 id="reechantillonnage">6. 리샘플링과 기준 영상</h2>
+
+      <pre><code>resampler.SetInterpolator(sitk.sitkNearestNeighbor if is_seg else sitk.sitkLinear)
+resampler.SetDefaultPixelValue(0)
+resampler.SetReferenceImage(reference)</code></pre>
+
+      <p>보간기는 "Check this box if using segmentations"
+      체크박스(<code>is_seg</code>)에서 정해진다. 레이블맵에는 최근접 이웃, 그 외에는 선형 —
+      올바르며, 이를 선언하는 것은 사용자의 몫이다. 자동 감지는 없다.</p>
+
+      <p>출력 격자는 다음과 같이 우선순위가 높은 것부터 정해진다
+      (<code>Automatrix_CLI.py:191</code>,
+      <code>:301</code>).</p>
+
+      <ol>
+        <li><strong>합성 변환</strong> → 기준 영상을
+        <strong>행렬</strong>의 경로에서 추측한다: <code>matrix.replace("_transform.tfm", ".nii.gz")</code>, 없으면
+        <code>.nii</code>. 버그가 아니다. ASO_CBCT는 <code>&lt;patient&gt;_&lt;add&gt;_transform.tfm</code>과
+        <code>&lt;patient&gt;_&lt;add&gt;.nii.gz</code>를 <strong>같은 폴더에</strong> 기록하므로, 행렬 옆의 방향 정렬된 스캔이
+        바로 올바른 격자다. 파일이 없으면 경고를
+        내고 입력 영상으로 대체한다.</li>
+        <li><strong>행렬 이름에 <code>mirror</code>가 들어 있음</strong>(대소문자 무시) → 기준 영상이
+        입력 영상으로 강제되고, UI의 기준 파일은 무시된다.
+        파일 이름에 따른 분기다.</li>
+        <li><strong>기준 파일 제공됨</strong>(<code>reference_file != "None"</code>, 이 필드의
+        기본값, <code>AutoMatrix.ui:255</code>) → 그 기하가 모든 출력에 적용된다.</li>
+        <li>그 외에는 입력 영상 자체: <strong>크기, 간격, 원점, 방향이
+        그대로</strong>다. 변환으로 내용이 촬영 범위 밖으로 밀려나면
+        사라지고, 그 자리는 <code>DefaultPixelValue = 0</code>으로 채워진다.</li>
+      </ol>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p><code>reference is None</code> 분기(<code>ResampleImage</code> 안,
+        <code>Automatrix_CLI.py:215</code>)는
+        <strong>도달할 수 없다</strong> — 호출자가 항상 기준 영상을 넘긴다. 게다가
+        틀렸다. <code>new_origin = transform.TransformPoint(image.GetOrigin())</code>를 계산하는데,
+        리샘플러의 규약대로라면 <code>T⁻¹</code>를 써야 한다.</p>
+      </div>
+
+      <h2 id="mirror">7. Mirror 모드</h2>
+
+      <p><code>Mirror()</code>(<code>AutoMatrix.py:304</code>)는 개인 GitHub 릴리스에서
+      <code>Mirror.zip</code>을 내려받아
+      (<code>GaelleLeroux/DCBIA_Apply_matrix</code>)
+      <code>&lt;Documents&gt;/SlicerDownloads/Mirror_matrix/</code>에 압축을 풀고, 행렬 필드를
+      <code>Mirror/Matrix_mirror.tfm</code>으로 채운다. 파일의 실제 내용:</p>
+
+      <pre><code>#Insight Transform File V1.0
+Transform: AffineTransform_double_3_3
+Parameters: -1 0 0 0 1 0 0 0 1 0 0 0
+FixedParameters: 0 0 0</code></pre>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>이는 원점을 중심으로 한 LPS의 <code>diag(-1, 1, 1)</code>, 즉
+        <strong>평면 x_LPS = 0에 대한 반사</strong>다. x_LPS는 환자의 왼쪽을 향하므로
+        좌우 반전이 맞다 — 다만 환자 자신의 시상면이 아니라
+        <strong>월드 좌표계 원점</strong>의 시상면에 대한 반전이다. 중앙에 있지 않은
+        환자는 반전과 함께 평행이동까지 되어 나오며, 이는 이후
+        정합에서 보정해야 한다.</p>
+      </div>
+
+      <p>행렬식은 −1이다. 볼륨에서는 <code>ResampleImageFilter</code>가 이를
+      문제없이 처리한다. 메시라면 면의 방향과 법선이 뒤집히겠지만,
+      메시는 더 이상 처리되지 않으므로 여기서는 의미 없는 이야기다.</p>
+
+      <p>이 모드는 <code>ComboBoxMatrix</code>를 "File"로, 접미사를
+      <code>_mir</code>로 강제하고, <code>checkBoxMatrixName</code>의 체크를 해제한다.</p>
+
+      <h2 id="appariement">8. 파일 ↔ 행렬 짝짓기</h2>
+
+      <p><code>GetPatients</code>(<code>Automatrix_CLI.py:60</code>)는
+      <code>{patient_key: {'scan': [...], 'matrix': [...]}}</code>를 만든다. 키는
+      <code>.split()</code> 호출의 연쇄로 얻는데, 이 연쇄는 <strong>양쪽이 같지 않다</strong>.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>제거되는 토큰 (순서대로)</th></tr></thead>
+          <tbody>
+            <tr><td>scan</td><td><code>_Seg _seg _Scan _scan _Or _OR _MAND _MD _MAX _MX _CB _lm _T2 _T1 _Cl _MR</code>, 다음 <code>.split('.')[0]</code>, 다음 <code>_T0</code>…<code>_T49</code></td></tr>
+            <tr><td>matrix</td><td><code>_SegOr _Left _left _Right _right _Or _OR _MAND _MD _MAX _MX _CB _lm _T2 _T1 _Cl _MA _Mir _mir _Mirror _mirror _MR</code>, 다음 <code>.split('.')[0]</code>, 다음 <code>_T0</code>…<code>_T49</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 730 270" role="img" aria-label="환자 이름 키로 스캔 파일과 행렬 파일 짝짓기">
+          <rect class="d-box" x="10" y="20" width="200" height="50" rx="6"/>
+          <text class="d-label" x="110" y="38" text-anchor="middle">스캔</text>
+          <text class="d-mono" x="110" y="54" text-anchor="middle">patient1_T1_MA.nii.gz</text>
+
+          <path class="d-arrow" d="M210 45 H243"/>
+          <path class="d-arrow-head" d="M250 45 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="250" y="20" width="210" height="50" rx="6"/>
+          <text class="d-label" x="355" y="38" text-anchor="middle">split: "scan" 목록</text>
+          <text class="d-label-s" x="355" y="54" text-anchor="middle">_T1, _MA, .split('.')… 제거</text>
+
+          <path class="d-arrow" d="M460 45 H493"/>
+          <path class="d-arrow-head" d="M500 45 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="500" y="20" width="140" height="50" rx="6"/>
+          <text class="d-label" x="570" y="38" text-anchor="middle">키</text>
+          <text class="d-mono" x="570" y="54" text-anchor="middle">patient1</text>
+
+          <rect class="d-box" x="10" y="110" width="200" height="50" rx="6"/>
+          <text class="d-label" x="110" y="128" text-anchor="middle">행렬</text>
+          <text class="d-mono" x="110" y="144" text-anchor="middle">patient1_left_MA.tfm</text>
+
+          <path class="d-arrow" d="M210 135 H243"/>
+          <path class="d-arrow-head" d="M250 135 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="250" y="110" width="210" height="50" rx="6"/>
+          <text class="d-label" x="355" y="128" text-anchor="middle">split: "matrix" 목록</text>
+          <text class="d-label-s" x="355" y="144" text-anchor="middle">_left, _MA… 제거 (다른 목록)</text>
+
+          <path class="d-arrow" d="M460 135 H493"/>
+          <path class="d-arrow-head" d="M500 135 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="500" y="110" width="140" height="50" rx="6"/>
+          <text class="d-label" x="570" y="128" text-anchor="middle">키</text>
+          <text class="d-mono" x="570" y="144" text-anchor="middle">patient1</text>
+
+          <path class="d-arrow" d="M570 160 V183"/>
+          <path class="d-arrow-head" d="M570 190 l-4 -7 h8 z"/>
+          <path class="d-arrow" d="M570 70 H690 V183"/>
+          <path class="d-arrow-head" d="M690 190 l-4 -7 h8 z"/>
+
+          <rect class="d-box" x="490" y="190" width="220" height="60" rx="6"/>
+          <text class="d-label" x="600" y="213" text-anchor="middle">키 일치</text>
+          <text class="d-label-s" x="600" y="230" text-anchor="middle">→ 파일 짝지어짐</text>
+        </svg>
+        <figcaption><code>GetPatients</code>는 환자 키를 얻기 위해 스캔 이름과 행렬 이름에서 서로 다른 토큰을 제거한다. 여기서는 스캔 쪽에서 <code>_T1</code>이, 행렬 쪽에서 <code>_left</code>가 잘려 두 키가 모두 <code>patient1</code>로 수렴한다. 시점 표시가 없으면(<code>patient1_MA.nii.gz</code> ↔ <code>patient1_MA.tfm</code>) 목록 차이가 드러난다. 스캔 쪽 키는 <code>patient1_MA</code>, 행렬 쪽은 <code>patient1</code> — 짝지어지지 않으며 메시지도 없다.</figcaption>
+      </figure>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>두 목록은 다르다. 행렬 쪽은 <code>_MA</code>, <code>_Left</code>/<code>_Right</code>,
+        <code>_Mir</code>와 <code>_SegOr</code> 변형을 제거하고, 스캔 쪽은 <code>_Seg</code>, <code>_Scan</code>, <code>_lm</code>을 제거한다.
+        그래서 README의 요구 사항이 있다: 환자 이름을 먼저, 이어서 밑줄, 그 뒤에
+        나머지. 예시
+        <code>patient1_T1_MA.nii.gz</code> ↔ <code>patient1_left_MA.tfm</code>이 동작하는 것은 스캔 쪽에서 <code>_T1</code>이,
+        행렬 쪽에서 <code>_left</code>가 잘리기 때문이다. 그러나
+        시점 표시가 없는 <code>patient1_MA.nii.gz</code>는 스캔 쪽에서 키 <code>patient1_MA</code>를,
+        행렬 쪽에서는 <code>patient1</code>을 준다.
+        <strong>어떤 행렬도 짝지어지지 않으며</strong>, 메시지도 없다.</p>
+      </div>
+
+      <p>행렬 경로가 폴더가 아니라 <strong>파일</strong>이면, 그 행렬이
+      모든 환자에게 붙는다(<code>Automatrix_CLI.py:167</code>).</p>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p><strong>중복된 코드가 이미 서로 달라졌다.</strong> <code>GetPatients</code>는
+        토큰 하나만 빼고 똑같은 복사본 두 개로 존재한다. CLI 버전은 맨 앞의
+        <code>_SegOr</code>를 제거하지만 <code>General_tools.py:249</code>는 그렇지 않다. 그리고
+        <code>General_tools</code> 복사본이
+        <code>NbScan</code>에 값을 공급하므로, 진행 표시줄의 분모가
+        실제로 처리된 파일 수와 다를 수 있다.</p>
+      </div>
+
+      <h3 id="from-areg">"From AReg" 경로</h3>
+
+      <p><code>suffix_map</code>(<code>Automatrix_CLI.py:227</code>)은
+      랜드마크 파일에 대해 짝짓기 로직 전체를 우회한다.</p>
+
+      <pre><code>suffix_map = {
+    "_CB": ("Cranial Base", "CBReg_matrix.tfm"),
+    "_L":  ("Maxilla",      "MAXReg_matrix.tfm"),
+    "_U":  ("Mandible",     "MANDReg_matrix.tfm"),
+}
+matrix_path = os.path.join(args.matrix_lineEdit, subdir,
+                           f"{patient_id}_OutReg", f"{patient_id}_{matrix_filename}")</code></pre>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p>세 가지 문제, 모두 확인 가능:</p>
+        <ol>
+          <li><strong><code>_L</code>과 <code>_U</code>가 뒤바뀌어 있다</strong>. 저장소의 나머지 부분에서 쓰는 규약과 반대다.
+          <code>AREG_IOS/dataset.py:231</code>과
+          <code>AREG/IOS.py:122</code>는
+          <code>Lower = ["Lower", "_L", "L_", "Mandibule", "Md"]</code>와
+          <code>Upper = ["Upper", "_U", "U_", "Maxilla", "Mx"]</code>를 정의한다. 여기서는 <code>_L</code>이
+          Maxilla를, <code>_U</code>가 Mandible을 가리킨다.</li>
+          <li><strong><code>matrix_lineEdit</code>는 존재하지 않는다</strong>. CLI의 <code>argparse</code>
+          (<code>Automatrix_CLI.py:329</code>: 인자는
+          <code>input_patient, input_matrix, reference_file, suffix,
+          matrix_name, fromAreg, output_folder, log_path, is_seg</code>)에 없다. 따라서 이 분기는
+          타는 즉시 <code>AttributeError</code>를 일으킨다.</li>
+          <li><strong>이 분기는 결코 타지 않는다</strong>. <code>CheckBoxSuffixBased</code>("From AReg" 라벨)는
+          <code>setup</code>에서 <code>self.ui.CheckBoxSuffixBased.setVisible(False)</code>로 숨겨지므로
+          (<code>AutoMatrix.py:296</code>) <code>fromAreg</code>는
+          항상 <code>"False"</code>다. 사용되지 않는 코드다 — 1과 2가 한 번도 눈에 띄지 않은
+          이유다.</li>
+        </ol>
+      </div>
+
+      <p>그래도 <code>MAXReg_matrix.tfm</code>이라는 이름은 <a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a>의 실제와 맞다.
+      AREG_CBCT는 <code>patient + "_" + reg_type + add_name + "_matrix.tfm"</code>을 기록하며, <code>add_name</code>의
+      기본값은 <code>Reg</code>다(<code>AREG.ui:571</code>).
+      따라서 이 경로는 다른 모듈에 속한 편집 가능한 텍스트 필드의 기본값에
+      의존한다.</p>
+
+      <h2 id="sorties">9. 출력</h2>
+
+      <pre><code>matrix_suffix = f"_{Path(matrix).stem}" if args.matrix_name == "True" else ""
+out_suffix    = f"{args.suffix}{matrix_suffix}"
+out_file      = outpath.split(extension_scan)[0] + out_suffix + extension_scan</code></pre>
+
+      <p>입력 디렉터리 트리가 출력 폴더에 재현된다
+      (<code>scan.replace(input_patient, output_folder)</code>). 기본 접미사는 <code>_apply</code>,
+      <code>checkBoxMatrixName</code>은 <strong>기본으로 체크되어 있다</strong>
+      (<code>AutoMatrix.ui:342</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>README는 이 점에서 낡았다. README는
+        <code>patient1_T1_MA_apply_matrix1.nii.gz</code>를 안내한다. 이전 버전은 행렬 이름에서
+        환자 키 뒤에 오는 부분을 추출했지만(<code>basename.split(ext)[0].split(key)[1]</code>),
+        CLI는 <strong>전체</strong> <code>Path(matrix).stem</code>을 쓴다. 따라서
+        <code>patient1_MAXReg_matrix.tfm</code>에 대한 실제 출력은
+        <code>patient1_T1_MA_apply_patient1_MAXReg_matrix.nii.gz</code>다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>환자당 행렬이 여러 개일 때 "Add matrix name"의 체크를 해제하면
+        출력이 서로 덮어쓴다</strong>. 모든 행렬에 대해 파일 이름이
+        같기 때문이다.</p>
+      </div>
+
+      <p><code>.tfm</code>은 결코 생성되지 않는다. AutoMatrix는 변환을 소비할 뿐,
+      기록하지 않는다.</p>
+
+      <h2 id="predit-calcule">10. 예측되는 것과 계산되는 것</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>블록</th><th>성격</th><th>실행 위치</th></tr></thead>
+          <tbody>
+            <tr><td>변환 읽기</td><td><span class="badge calcule">계산</span> ITK TransformIO</td><td>CLI</td></tr>
+            <tr><td>파일 ↔ 행렬 짝짓기</td><td><span class="badge calcule">계산</span> 문자열 쪼개기</td><td>CLI (그리고 위젯에 있는 서로 달라진 복사본)</td></tr>
+            <tr><td>볼륨</td><td><span class="badge calcule">계산</span> <code>sitk.ResampleImageFilter</code>, 선형 또는 최근접 이웃</td><td>CLI</td></tr>
+            <tr><td>랜드마크</td><td><span class="badge calcule">계산</span> 점마다 <code>T⁻¹.TransformPoint</code></td><td>CLI</td></tr>
+            <tr><td>미러 행렬</td><td><span class="badge calcule">계산</span> 내려받은 고정 <code>.tfm</code>, <code>diag(-1,1,1)</code></td><td>GitHub 릴리스</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>신경망은 어디에도 없다.</p>
+
+      <h2 id="environnement">11. 실행 환경</h2>
+
+      <p>설치할 것이 없다. <code>SimpleITK</code>, <code>numpy</code>, <code>vtk</code>, <code>qt</code>는 이미
+      Slicer에 있다. conda도 CUDA도 없다. 유일한 네트워크 접근은 미러 행렬
+      다운로드이며, Mirror 체크박스를 체크했을 때만 일어난다.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p><code>log_path</code> 파라미터가 있음에도 진행 표시줄은 로그 파일로부터 값을 받지 않는다.
+        <code>DisplayAutomatrix.isProgress</code>
+        (<code>Progress.py:39</code>)는 <code>log_path</code>의
+        mtime을 확인하지만 <strong>CLI는 그 파일에 전혀 기록하지 않는다</strong>. 진행률은
+        실제로는 CLI가 스캔마다 내보내는 <code>&lt;filter-progress&gt;0 / 2 / 0&lt;/filter-progress&gt;</code> 시퀀스
+        (<code>Automatrix_CLI.py:314</code>)와
+        <code>if kwds["progress"] == 200</code>(<code>isProgress</code> 안)를 거친다. 각 print 사이의 <code>time.sleep(0.2)</code>에 의존하는
+        간접적이고 취약한 프로토콜이다.</p>
+      </div>
+
+
+      <h2 id="pieges">12. 함정과 취약 지점</h2>
+
+      <div class="callout warn">
+        <div class="callout-title">요약</div>
+        <ul>
+          <li><strong><code>.npy</code>는 동작하지 않는다</strong>(<a href="#formats">§3</a>). UI와 README가 내세우는데도 그렇다.</li>
+          <li><strong>메시는 더 이상 동작하지 않는다</strong>(<a href="#types-donnees">§5</a>). UI와 README가 내세우는데도 그렇다. 커밋 <code>7bc362b</code>에서 생긴 회귀.</li>
+          <li><strong><code>.txt</code>는 원시 4×4 행렬을 받지 않는다</strong>(<a href="#formats">§3</a>). ITK의 텍스트 형식만 받는다.</li>
+          <li><strong>랜드마크의 <code>coordinateSystem</code>을 전혀 읽지 않는다</strong>(<a href="#ras-lps">§4.2</a>).</li>
+          <li><strong>합성 없음</strong>: 한 환자에 행렬 N개면 연쇄가 아니라 파일 N개가 나온다(<a href="#composition">§4.3</a>).</li>
+          <li><strong>출력 덮어쓰기</strong>: 행렬이 여러 개인데 <code>checkBoxMatrixName</code>의 체크를 해제한 경우(<a href="#sorties">§9</a>).</li>
+          <li><strong><code>OnEndProcess</code>가 <code>self.nb_scans</code>로 나눈다</strong>(<code>AutoMatrix.py:953</code>). 보호 장치가 없어, 입력 폴더가 비어 있으면 처리가 끝날 때 <code>ZeroDivisionError</code>가 난다.</li>
+          <li><strong><code>CheckGoodEntre</code>는 논리적으로 틀렸다</strong>(<code>AutoMatrix.py:1013</code>). 확장자 검사가 <code>len(dico['.vtk'])==0 and len(dico['.vtp']) and len(dico['.stl']) and …</code>인데, 비교인 것은 첫 항뿐이다. 나머지는 불리언으로 평가되는 정수이므로 "Folder empty or wrong type" 경고는 일어나기 힘든 조합에서만 뜬다. 정말로 빈 폴더는 검증을 통과한다.</li>
+          <li><strong><code>onPredictButton</code>은 오류가 나도 멈추지 않는다</strong>. <code>TestProcess</code>가 튜플 <code>(ok, out)</code>을 반환하므로 <code>isinstance(error, str)</code> 검사(<code>AutoMatrix.py:766</code>)는 항상 거짓이고, 필드가 비어 있어도 처리가 시작된다.</li>
+          <li><strong><code>.split(extension_scan)[0]</code></strong>은 <strong>첫</strong> 번째 출현 위치에서 자른다. 폴더 이름에 확장자와 같은 부분 문자열이 들어 있는 경로는 잘려 버린다.</li>
+          <li><strong><code>defined</code>가 아닌 랜드마크</strong>는 이전 좌표계에 남아, 같은 파일 안에서 변환된 점과 섞인다(<a href="#types-donnees">§5</a>).</li>
+          <li><strong>"From AReg" 경로는 사용되지 않으며 고장 나 있다</strong>(<a href="#appariement">§8</a>).</li>
+          <li><strong>사용되지 않는 코드</strong>: 위젯의 <code>saveOutput</code> / <code>UpdateProgressBar</code> / <code>UpdateTime</code>, <code>AutoMatrixLogic.process</code>, <code>ResampleImage</code>의 <code>reference is None</code> 분기, <code>registerSampleData</code>(존재하지 않는 <code>.png</code> 파일을 참조).</li>
+          <li><code>Automatrix_CLI.xml</code>의 메타데이터는 여전히 Slicer 템플릿 그대로다(<code>FirstName LastName (Institution)</code>, <code>NIH grant NXNNXXNNNNNN-NNXN</code>).</li>
+        </ul>
+      </div>
+
+      <h2 id="litterature">13. 문헌</h2>
+
+      <p>AutoMatrix를 다룬 논문은 없다. 연구실을 위해 작성된 일괄 적용 유틸리티다
+      (Gaëlle Leroux, UoM/DCBIA). 과학적 내용은
+      전적으로 행렬을 <em>생성하는</em> 모듈들 — AREG, <a href="../ASO/ASO.html">ASO</a>, <a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a>,
+      <a href="../FlexReg/FlexReg.html">FlexReg</a> — 에 있으며, 각 모듈의 페이지에서 다룬다.</p>
+
+      <p>변환 규약에 관해 최신 참고 자료는 논문이 아니라 ITK / Slicer
+      문서다.</p>
+
+      <ul>
+        <li><a href="https://slicer.readthedocs.io/en/latest/user_guide/modules/transforms.html">Transforms — Slicer user guide</a>
+        (fixed→moving 방향, Slicer의 RAS 대 ITK의 LPS)</li>
+        <li><a href="https://slicer.readthedocs.io/en/latest/user_guide/coordinate_systems.html">Coordinate systems — Slicer developer guide</a></li>
+        <li><a href="https://simpleitk.readthedocs.io/en/master/link_ImageRegistrationMethod1_docs.html">SimpleITK — Transforms and Resampling</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+        <li><a href="https://github.com/GaelleLeroux/DCBIA_Apply_matrix">DCBIA_Apply_matrix</a> —
+        원래 저장소. README가 인용하는 미러 행렬과 테스트 세트를
+        아직 호스팅한다</li>
+      </ul>
+
+      <p><strong>전체 참고문헌: <a href="SOURCES.html">SOURCES.html</a></strong> — 검색은 했으나 결과는
+      없다. AutoMatrix를 설명하거나 인용한 문헌은 없다. 받아 둘 자료가 없으므로
+      이 폴더에 받아 둔 것도 없다.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← 모든 도구 페이지</a> ·
+        <a href="SOURCES.html">이 도구의 참고문헌</a> ·
+        출처: <code>AutoMatrix.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

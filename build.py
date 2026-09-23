@@ -204,6 +204,10 @@ def build_lang(lang):
 GENERIC_TITLES = {
     "bug confirme", "bug confirme :", "defaut", "defaut confirme", "piege", "pieges",
     "verifie", "note", "attention", "avertissement", "remarque", "a savoir",
+    "confirmed bug", "pitfall", "trap", "gotcha", "verified", "warning",
+    "bug confirmado", "armadilha", "verificado", "nota", "atencao",
+    "확인된 버그", "함정", "확인됨", "참고", "주의",
+    "บั๊กที่ยืนยันแล้ว", "ข้อควรระวัง", "ตรวจสอบแล้ว", "หมายเหตุ",
 }
 
 
@@ -223,7 +227,13 @@ def constat_label(title, text):
     return clean(first, 110) or title
 
 
-KIND_LABEL = {"bug": "Défaut confirmé", "warn": "Piège", "ok": "Vérifié", "note": "Note"}
+KIND_LABEL = {
+ "fr": {"bug": "Défaut confirmé", "warn": "Piège", "ok": "Vérifié", "note": "Note"},
+ "en": {"bug": "Confirmed bug", "warn": "Pitfall", "ok": "Verified", "note": "Note"},
+ "pt": {"bug": "Bug confirmado", "warn": "Armadilha", "ok": "Verificado", "note": "Nota"},
+ "ko": {"bug": "확인된 버그", "warn": "함정", "ok": "확인됨", "note": "참고"},
+ "th": {"bug": "บั๊กที่ยืนยันแล้ว", "warn": "ข้อควรระวัง", "ok": "ตรวจสอบแล้ว", "note": "หมายเหตุ"},
+}
 KIND_ORDER = ["bug", "warn", "ok", "note"]
 
 
@@ -232,13 +242,30 @@ CONSTAT_INTRO = {
                     "{n} encarts des fiches. Relevé en documentant, pas en cherchant des bugs."),
  "en": ("Findings", "Everything reading the code turned up, gathered from the {n} callouts "
                     "across the pages. Noted while documenting, not while hunting for bugs."),
+ "pt": ("Constatações", "Tudo o que a leitura do código revelou, reunido a partir dos {n} "
+                        "destaques das páginas. Anotado ao documentar, não ao caçar bugs."),
+ "ko": ("발견 사항", "코드를 읽으며 드러난 모든 것을 각 페이지의 강조 상자 {n}개에서 모았다. "
+                  "버그를 찾으려 한 것이 아니라 문서화하면서 기록한 것이다."),
+ "th": ("ข้อค้นพบ", "ทุกสิ่งที่การอ่านโค้ดเปิดเผยออกมา รวบรวมจากกล่องเน้น {n} กล่องในทุกหน้า "
+                "บันทึกไว้ระหว่างการจัดทำเอกสาร ไม่ใช่ระหว่างการไล่หาบั๊ก"),
+}
+
+# filtres de la page des constats : (outil, tous, placeholder, aria-label)
+CONSTAT_FILTERS = {
+ "fr": ("Outil", "tous", "filtrer le texte…", "Filtrer les constats"),
+ "en": ("Tool", "all", "filter text…", "Filter the findings"),
+ "pt": ("Ferramenta", "todas", "filtrar o texto…", "Filtrar as constatações"),
+ "ko": ("도구", "전체", "텍스트 필터…", "발견 사항 필터"),
+ "th": ("เครื่องมือ", "ทั้งหมด", "กรองข้อความ…", "กรองข้อค้นพบ"),
 }
 
 
 def write_constats(lang, constats):
     """Page statique agrégeant tous les callouts. Aucun fetch : tout est inline,
     donc la page marche aussi en file://."""
-    sidebar = nav.sidebar(lang, "atlas", "findings", 1)
+    sidebar = nav.sidebar(lang, "atlas", "findings", 1, nav.FILES[lang]["findings"])
+    kl = KIND_LABEL[lang]
+    f_tool, f_all, f_ph, f_aria = CONSTAT_FILTERS[lang]
 
     tools = sorted({c["tool"] for c in constats})
     counts = {k: sum(1 for c in constats if c["kind"] == k) for k in KIND_ORDER}
@@ -250,7 +277,7 @@ def write_constats(lang, constats):
         rows.append(
             f'<article class="constat" data-kind="{c["kind"]}" data-tool="{html.escape(c["tool"])}">'
             f'<div class="constat-head">'
-            f'<span class="badge k-{c["kind"]}">{KIND_LABEL[c["kind"]]}</span> '
+            f'<span class="badge k-{c["kind"]}">{kl[c["kind"]]}</span> '
             f'<a class="constat-tool" href="{html.escape(c["url"])}">{html.escape(c["tool"])}</a>'
             f'<span class="constat-title">{html.escape(c["title"])}</span>'
             f'</div>'
@@ -260,7 +287,7 @@ def write_constats(lang, constats):
 
     chips = "".join(
         f'<button class="chip" data-filter-kind="{k}" aria-pressed="false">'
-        f'<span class="dot k-{k}"></span>{KIND_LABEL[k]} <b>{counts[k]}</b></button>'
+        f'<span class="dot k-{k}"></span>{kl[k]} <b>{counts[k]}</b></button>'
         for k in KIND_ORDER
     )
     opts = "".join(f'<option value="{html.escape(t)}">{html.escape(t)}</option>' for t in tools)
@@ -273,7 +300,7 @@ def write_constats(lang, constats):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Constats — sadt-atlas</title>
+<title>{title} — SADT Atlas</title>
 <link rel="stylesheet" href="../assets/style.css">
 <script src="../assets/site.js"></script>
 </head>
@@ -284,16 +311,16 @@ def write_constats(lang, constats):
     <article class="content wide">
       <header class="page-head">
         <div class="breadcrumb"><a href="index.html">sadt-atlas</a></div>
-        <h1>Constats</h1>
+        <h1>{title}</h1>
         <p class="lede">{lede}</p>
       </header>
 
       <div class="filters">
         <div class="chips">{chips}</div>
-        <label class="filter-tool">Outil
-          <select id="tool-filter"><option value="">tous</option>{opts}</select>
+        <label class="filter-tool">{f_tool}
+          <select id="tool-filter"><option value="">{f_all}</option>{opts}</select>
         </label>
-        <input type="search" id="constat-search" placeholder="filtrer le texte…" aria-label="Filtrer les constats">
+        <input type="search" id="constat-search" placeholder="{f_ph}" aria-label="{f_aria}">
         <span class="filter-count" id="constat-count"></span>
       </div>
 
@@ -320,21 +347,23 @@ NAV_RX = re.compile(r'<nav class="sidebar">.*?</nav>', re.S)
 
 
 def page_params(rel):
-    """chemin relatif à la racine -> (lang, section, current, depth) ou None."""
+    """chemin relatif à la racine -> (lang, section, current, depth, rel) ou None,
+    rel étant le chemin de la page dans sa langue."""
     parts = rel.split("/")
     if len(parts) < 2 or parts[0] not in nav.LANGS:
         return None
     lang, rest = parts[0], parts[1:]
     fl = nav.FILES[lang]
+    rel = "/".join(rest)
     if len(rest) == 1:
         f = rest[0]
         cur = {"index.html": "home", fl["findings"]: "findings",
                fl["glossary"]: "glossary"}.get(f, "home")
-        return lang, "atlas", cur, 1
+        return lang, "atlas", cur, 1, rel
     folder, f = rest[0], rest[1]
     if folder == "guide":
-        return lang, "guide", ("home" if f == "index.html" else os.path.splitext(f)[0]), 2
-    return lang, "atlas", folder, 2
+        return lang, "guide", ("home" if f == "index.html" else os.path.splitext(f)[0]), 2, rel
+    return lang, "atlas", folder, 2, rel
 
 
 def sync_nav():
@@ -379,6 +408,24 @@ PAPERS_UI = {
         "free": "free full text",
         "biblio": "The tool's full bibliography — what was found, and what was looked for "
                   "without success — is in <a href=\"{href}\">its sources</a>."},
+ "pt": {"h2": "Para saber mais",
+        "self": "Sobre o próprio {tool}",
+        "around": "Em torno do método",
+        "free": "texto completo gratuito",
+        "biblio": "A bibliografia completa da ferramenta — o que foi encontrado, e o que foi "
+                  "procurado sem sucesso — está em <a href=\"{href}\">suas fontes</a>."},
+ "ko": {"h2": "더 읽을거리",
+        "self": "{tool} 자체에 관한 문헌",
+        "around": "방법론 관련 문헌",
+        "free": "무료 전문",
+        "biblio": "이 도구의 전체 참고문헌 — 찾아낸 것과 찾아봤지만 없었던 것 — 은 "
+                  "<a href=\"{href}\">출처 페이지</a>에 있습니다."},
+ "th": {"h2": "อ่านเพิ่มเติม",
+        "self": "เกี่ยวกับ {tool} โดยตรง",
+        "around": "เกี่ยวกับวิธีการ",
+        "free": "ฉบับเต็มอ่านฟรี",
+        "biblio": "บรรณานุกรมทั้งหมดของเครื่องมือนี้ — ทั้งสิ่งที่พบ และสิ่งที่ค้นแล้วไม่พบ — "
+                  "อยู่ใน<a href=\"{href}\">หน้าแหล่งอ้างอิง</a>"},
 }
 
 
@@ -474,6 +521,12 @@ VIDEO_UI = {
         "min": "{m} min {s:02d}", "sec": "{s} s"},
  "en": {"label": "On video", "chan": "DCBIA Videos channel", "short": "overview",
         "min": "{m} min {s:02d}", "sec": "{s} s"},
+ "pt": {"label": "Em vídeo", "chan": "canal DCBIA Videos", "short": "apresentação",
+        "min": "{m} min {s:02d}", "sec": "{s} s"},
+ "ko": {"label": "영상", "chan": "DCBIA Videos 채널", "short": "개요",
+        "min": "{m}분 {s:02d}초", "sec": "{s}초"},
+ "th": {"label": "วิดีโอ", "chan": "ช่อง DCBIA Videos", "short": "ภาพรวม",
+        "min": "{m} นาที {s:02d} วินาที", "sec": "{s} วินาที"},
 }
 
 
@@ -526,7 +579,7 @@ def sync_videos():
 
 
 LANDING = """<!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -537,11 +590,13 @@ LANDING = """<!doctype html>
 <body>
 <div class="landing">
   <h1>SADT Atlas</h1>
-  <p>Comment fonctionne chaque outil de SlicerAutomatedDentalTools.<br>
-     How each SlicerAutomatedDentalTools module works.</p>
+  <p>How each SlicerAutomatedDentalTools module works.</p>
   <div class="choices">
-    <a href="fr/guide/index.html"><b>Français</b><small>Guide et Atlas</small></a>
-    <a href="en/guide/index.html"><b>English</b><small>Guide and Atlas</small></a>
+    <a href="en/guide/index.html" hreflang="en"><b>English</b><small>Guide and Atlas</small></a>
+    <a href="fr/guide/index.html" hreflang="fr"><b>Français</b><small>Guide et Atlas</small></a>
+    <a href="pt/guide/index.html" hreflang="pt"><b>Português</b><small>Guia e Atlas</small></a>
+    <a href="ko/guide/index.html" hreflang="ko"><b>한국어</b><small>가이드와 아틀라스</small></a>
+    <a href="th/guide/index.html" hreflang="th"><b>ไทย</b><small>คู่มือและแอตลาส</small></a>
   </div>
 </div>
 </body>
@@ -561,6 +616,15 @@ GUIDE_INTRO = {
  "en": ("User guide",
         "What each tool does, what to feed it, what it returns — without going into the "
         "code. For the internal mechanisms, switch to the Atlas."),
+ "pt": ("Guia de uso",
+        "O que cada ferramenta faz, o que fornecer a ela, o que ela devolve — sem entrar no "
+        "código. Para os mecanismos internos, passe para o Atlas."),
+ "ko": ("사용 가이드",
+        "각 도구가 무엇을 하는지, 무엇을 넣어야 하는지, 무엇을 돌려주는지 — 코드는 다루지 "
+        "않습니다. 내부 동작이 궁금하다면 아틀라스로 넘어가십시오."),
+ "th": ("คู่มือการใช้งาน",
+        "เครื่องมือแต่ละตัวทำอะไร ต้องป้อนอะไรให้ และได้อะไรกลับมา — โดยไม่ลงรายละเอียดโค้ด "
+        "หากต้องการเข้าใจกลไกภายใน ให้ไปที่แอตลาส"),
 }
 
 
@@ -679,6 +743,152 @@ GUIDE_ABOUT = {
         <a href="#text">Text &amp; language</a></li>
       </ul>
 """,
+ "pt": """      <h2 id="pour-qui">Para quem é este guia</h2>
+      <p>Para quem abre o SlicerAutomatedDentalTools no 3D Slicer e quer usá-lo:
+      clínicos, pesquisadores, estudantes. Ele não pressupõe saber ler código nem saber o
+      que é uma rede neural. Se o que interessa é o funcionamento interno — qual modelo é
+      chamado, quando, sobre quais dados — é o <a href="../index.html">Atlas</a> que você
+      procura: as duas seções cobrem os mesmos {n} módulos, cada uma por uma ponta.</p>
+
+      <h2 id="pourquoi">Por que ele existe</h2>
+      <p>A extensão reúne {n} módulos escritos por equipes diferentes, em épocas
+      diferentes. A documentação deles se resume, conforme o caso, a algumas linhas de
+      README, a uma página de projeto, ou a nada. Vários se comportam de forma diferente do
+      que a publicação descreve: o artigo documenta uma versão que o código não executa
+      mais.</p>
+      <p>Este guia foi escrito lendo o código de cada módulo, não a sua documentação. Ele
+      diz, portanto, o que a ferramenta faz de fato quando você clica, inclusive quando isso
+      incomoda: <strong>{warn} avisos e {bug} bugs</strong> são assinalados no ponto exato
+      em que você corre o risco de tropeçar neles. Nada é corrigido aqui — o objetivo é que
+      você não perca um dia com isso.</p>
+
+      <h2 id="plan">O que você encontra em cada página</h2>
+      <p>Todas seguem o mesmo plano, para que você saiba onde olhar sem reler tudo:</p>
+      <ul>
+        <li><strong>Quando usar</strong> — a que problema a ferramenta responde, e os casos
+        em que ela não serve para nada.</li>
+        <li><strong>O que você precisa, o que você obtém</strong> — as entradas esperadas,
+        o formato delas, e o que sai no fim.</li>
+        <li><strong>Passo a passo</strong> — as etapas em ordem, campo por campo.</li>
+        <li><strong>Se algo der errado</strong> — as falhas frequentes e o que as
+        provoca.</li>
+        <li><strong>Para saber mais</strong> — as publicações por trás da ferramenta, quando
+        existem, e o link para a página do Atlas.</li>
+      </ul>
+
+      <h2 id="commencer">Por onde começar</h2>
+      <p>Se você sabe qual ferramenta procura, escolha-a na lista abaixo. Senão, parta do
+      que você precisa fazer:</p>
+      <ul>
+        <li>Comparar dois exames do mesmo paciente ao longo do tempo →
+        <a href="#registration">Registro</a></li>
+        <li>Isolar estruturas em um CBCT →
+        <a href="#segmentation">Segmentação</a></li>
+        <li>Posicionar pontos de referência anatômicos, ou reorientar um exame →
+        <a href="#landmarks">Landmarks e orientação</a></li>
+        <li>Medir, classificar ou prever a partir de uma forma →
+        <a href="#analysis">Análise</a></li>
+        <li>Recortar ou aplicar uma matriz, em lote →
+        <a href="#utilities">Utilitários</a></li>
+        <li>Extrair ou anonimizar texto clínico →
+        <a href="#text">Texto e linguagem</a></li>
+      </ul>
+""",
+ "ko": """      <h2 id="pour-qui">이 가이드의 대상</h2>
+      <p>3D Slicer에서 SlicerAutomatedDentalTools를 열고 사용하려는 모든 분 — 임상의,
+      연구자, 학생 — 을 위한 가이드입니다. 코드를 읽을 줄 알거나 신경망이 무엇인지 알 필요는
+      없습니다. 내부 동작 — 어떤 모델이 언제, 어떤 데이터로 호출되는지 — 이 궁금하다면
+      <a href="../index.html">아틀라스</a>를 보십시오. 두 섹션은 같은 {n}개 모듈을 서로
+      반대쪽에서 다룹니다.</p>
+
+      <h2 id="pourquoi">왜 만들었는가</h2>
+      <p>이 확장 기능은 서로 다른 팀이 서로 다른 시기에 작성한 {n}개 모듈을 모아 놓은
+      것입니다. 문서는 경우에 따라 README 몇 줄, 프로젝트 페이지 하나, 혹은 아예 없습니다.
+      여러 모듈이 논문에 기술된 것과 다르게 동작합니다. 논문이 설명하는 버전을 코드가 더
+      이상 실행하지 않기 때문입니다.</p>
+      <p>이 가이드는 각 모듈의 문서가 아니라 코드를 읽고 작성했습니다. 따라서 클릭했을 때
+      도구가 실제로 무엇을 하는지, 불편한 부분까지 그대로 적었습니다.
+      <strong>경고 {warn}건과 버그 {bug}건</strong>을 실제로 부딪히기 쉬운 바로 그 지점에
+      표시해 두었습니다. 여기서 고친 것은 없습니다 — 그 때문에 하루를 허비하지 않게 하는 것이
+      목적입니다.</p>
+
+      <h2 id="plan">각 페이지의 구성</h2>
+      <p>모든 페이지가 같은 구성을 따르므로 전부 다시 읽지 않고도 찾을 곳을 알 수 있습니다.</p>
+      <ul>
+        <li><strong>언제 쓰는가</strong> — 도구가 해결하는 문제와, 쓸모가 없는
+        경우.</li>
+        <li><strong>필요한 것, 얻는 것</strong> — 필요한 입력과 그 형식, 그리고 최종
+        결과물.</li>
+        <li><strong>사용 절차</strong> — 순서대로, 항목 하나하나.</li>
+        <li><strong>문제가 생기면</strong> — 자주 일어나는 실패와 그 원인.</li>
+        <li><strong>더 읽을거리</strong> — 도구의 바탕이 된 논문(있는 경우)과 아틀라스
+        페이지로 가는 링크.</li>
+      </ul>
+
+      <h2 id="commencer">어디서 시작할까</h2>
+      <p>찾는 도구를 이미 알고 있다면 아래 목록에서 고르십시오. 그렇지 않다면 하려는 일에서
+      출발하십시오.</p>
+      <ul>
+        <li>같은 환자의 두 검사를 시간에 따라 비교 →
+        <a href="#registration">정합</a></li>
+        <li>CBCT에서 구조물 분리 →
+        <a href="#segmentation">분할</a></li>
+        <li>해부학적 랜드마크 배치, 또는 스캔 방향 바로잡기 →
+        <a href="#landmarks">랜드마크 &amp; 방향 정렬</a></li>
+        <li>형상으로부터 측정·분류·예측 →
+        <a href="#analysis">분석</a></li>
+        <li>일괄 크롭 또는 행렬 적용 →
+        <a href="#utilities">유틸리티</a></li>
+        <li>임상 텍스트 추출 또는 익명화 →
+        <a href="#text">텍스트 &amp; 언어</a></li>
+      </ul>
+""",
+ "th": """      <h2 id="pour-qui">คู่มือนี้เขียนให้ใคร</h2>
+      <p>สำหรับทุกคนที่เปิด SlicerAutomatedDentalTools ใน 3D Slicer แล้วต้องการใช้งาน
+      ไม่ว่าจะเป็นทันตแพทย์ นักวิจัย หรือนักศึกษา ไม่จำเป็นต้องอ่านโค้ดเป็น หรือรู้ว่าโครงข่ายประสาทเทียมคืออะไร
+      หากสิ่งที่สนใจคือการทำงานภายใน — โมเดลใดถูกเรียก เมื่อใด กับข้อมูลใด — ให้ดูที่
+      <a href="../index.html">แอตลาส</a> แทน ทั้งสองส่วนครอบคลุม {n} โมดูลเดียวกัน
+      แต่มองจากคนละด้าน</p>
+
+      <h2 id="pourquoi">ทำไมจึงมีคู่มือนี้</h2>
+      <p>ส่วนขยายนี้รวม {n} โมดูลที่เขียนโดยทีมต่าง ๆ ในช่วงเวลาต่างกัน เอกสารของแต่ละโมดูล
+      มีตั้งแต่ README ไม่กี่บรรทัด หน้าโครงการหนึ่งหน้า ไปจนถึงไม่มีเลย หลายโมดูลทำงานต่างจาก
+      ที่บทความตีพิมพ์อธิบายไว้ เพราะบทความบรรยายเวอร์ชันที่โค้ดไม่ได้รันแล้ว</p>
+      <p>คู่มือนี้เขียนจากการอ่านโค้ดของแต่ละโมดูล ไม่ใช่จากเอกสาร จึงบอกสิ่งที่เครื่องมือทำจริง
+      เมื่อคุณคลิก รวมถึงเรื่องที่ไม่สะดวกด้วย: <strong>คำเตือน {warn} รายการและบั๊ก {bug} รายการ</strong>
+      ถูกระบุไว้ตรงจุดที่คุณมีโอกาสเจอ ที่นี่ไม่ได้แก้ไขอะไร — เป้าหมายคือไม่ให้คุณเสียเวลาทั้งวัน
+      กับเรื่องเหล่านี้</p>
+
+      <h2 id="plan">ในแต่ละหน้ามีอะไรบ้าง</h2>
+      <p>ทุกหน้าใช้โครงสร้างเดียวกัน เพื่อให้รู้ว่าต้องดูตรงไหนโดยไม่ต้องอ่านใหม่ทั้งหมด</p>
+      <ul>
+        <li><strong>ใช้เมื่อใด</strong> — เครื่องมือแก้ปัญหาอะไร และกรณีที่ใช้ไม่ได้ผล</li>
+        <li><strong>สิ่งที่ต้องใช้ สิ่งที่จะได้</strong> — อินพุตที่ต้องการ รูปแบบไฟล์
+        และผลลัพธ์ที่ได้ในตอนท้าย</li>
+        <li><strong>ขั้นตอน</strong> — ขั้นตอนตามลำดับ ทีละช่อง</li>
+        <li><strong>หากเกิดปัญหา</strong> — ความล้มเหลวที่พบบ่อยและสาเหตุ</li>
+        <li><strong>อ่านเพิ่มเติม</strong> — บทความเบื้องหลังเครื่องมือ (ถ้ามี)
+        และลิงก์ไปยังหน้าแอตลาส</li>
+      </ul>
+
+      <h2 id="commencer">เริ่มจากตรงไหน</h2>
+      <p>หากรู้แล้วว่าต้องการเครื่องมือใด เลือกได้จากรายการด้านล่าง หากยังไม่รู้
+      ให้เริ่มจากสิ่งที่ต้องทำ:</p>
+      <ul>
+        <li>เปรียบเทียบการตรวจสองครั้งของผู้ป่วยคนเดียวกันตามเวลา →
+        <a href="#registration">การลงทะเบียนภาพ</a></li>
+        <li>แยกโครงสร้างออกจาก CBCT →
+        <a href="#segmentation">การแบ่งส่วน</a></li>
+        <li>วางจุดสังเกตทางกายวิภาค หรือจัดภาพสแกนให้ตั้งตรง →
+        <a href="#landmarks">จุดสังเกตและการจัดแนว</a></li>
+        <li>วัด จำแนก หรือทำนายจากรูปทรง →
+        <a href="#analysis">การวิเคราะห์</a></li>
+        <li>ครอปหรือใช้เมทริกซ์แบบกลุ่ม →
+        <a href="#utilities">เครื่องมือเสริม</a></li>
+        <li>ดึงข้อมูลหรือลบข้อมูลระบุตัวตนจากข้อความทางคลินิก →
+        <a href="#text">ข้อความและภาษา</a></li>
+      </ul>
+""",
 }
 
 
@@ -713,7 +923,7 @@ def write_guide_index(lang):
 </head>
 <body class="guide">
 <div class="layout">
-{nav.sidebar(lang, "guide", "home", 2)}
+{nav.sidebar(lang, "guide", "home", 2, "guide/index.html")}
   <div class="main">
     <article class="content">
       <header class="page-head">

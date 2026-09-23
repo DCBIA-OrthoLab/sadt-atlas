@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoCrop3D — 가이드 — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="utilitaires">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/AutoCrop3D.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/AutoCrop3D.html" hreflang="fr" title="Français">FR</a><a href="../../pt/guide/AutoCrop3D.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/guide/AutoCrop3D.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/AutoCrop3D.html" aria-current="true"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../AutoCrop3D/AutoCrop3D.html"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html" aria-current="page">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/AutoCrop3D/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">가이드</a> › 유틸리티</div>
+        <h1>AutoCrop3D — 볼륨 시리즈 잘라내기</h1>
+        <p class="lede">AutoCrop3D는 볼륨 폴더를 공통 관심 영역에 맞춰, 또는 환자별로 다른
+        영역에 맞춰 일괄로 잘라냅니다. 신경망도, 다운로드할 모델도 없습니다.
+        거의 즉시 끝나는 기하학적 자르기이며, 복셀 값은 전혀 건드리지 않습니다.</p>
+      </header>
+
+      <h2 id="quand">언제 쓰는가</h2>
+      <p>시리즈가 너무 크거나 시야(field of view)가 제각각이라 그대로 처리하기 어려울 때
+      씁니다. 분할 도구(AMASSS, BatchDentalSeg) 전에 실행해 처리할 양을 줄이거나,
+      분할 후에 실행해 필요한 영역만 남길 수 있습니다. AutoCrop3D는 이미 만든 분할에서
+      빠른 미리보기용 VTK 메시를 생성할 수도 있습니다.</p>
+
+      <h2 id="roi">관심 영역 준비하기</h2>
+      <p>자를 영역은 Slicer ROI 파일(<code>.mrk.json</code>) 하나에서만
+      옵니다. 대표가 되는 환자에서 장면에 <b>Markups &gt; ROI</b> 상자를 놓고,
+      조정한 뒤 저장하십시오. 쓰는 방법은 두 가지입니다. ROI 하나를 폴더의 모든 볼륨에
+      적용하거나, 환자마다 ROI를 하나씩 쓰는 것입니다. 후자라면 짝짓기가 되도록 각 ROI 파일
+      이름을 해당 볼륨과 같은 접두어로 시작하게 하십시오(아래 참고).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">ROI는 축에 정렬된 상자여야 하며, 그대로 저장해야 합니다</div>
+        <p>빠른 자르기 경로는 ROI 파일에 선언된 방향과 좌표계를 완전히
+        무시합니다. 중심과 크기만 읽고, 볼륨의 축에 정렬된 상자라고 가정합니다.
+        회전된 ROI는 회전되지 않은 것처럼 취급되고, 잘못된 좌표계로 저장된 ROI는 오류 메시지
+        하나 없이 중심이 어긋납니다. 빠른 경로는 Slicer가 기본값으로 저장하는 방식 그대로의
+        반듯한 상자에서만 동작합니다. 실제로 회전된 ROI라면 아래를 보십시오.</p>
+      </div>
+
+      <h2 id="besoin">필요한 것, 얻는 것</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>준비할 것</h4>
+          <ul>
+            <li>볼륨 폴더 — <code>.nii.gz</code>, <code>.nii</code>,
+            <code>.nrrd.gz</code>, <code>.nrrd</code>, <code>.gipl.gz</code>, 또는
+            <code>.gipl</code></li>
+            <li>ROI 파일(<code>.mrk.json</code>), 또는 환자별 ROI가 든 폴더</li>
+            <li>출력 접미사(기본값 "cropped")</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>결과물</h4>
+          <ul>
+            <li>입력마다 잘라낸 볼륨 하나, 입력 폴더 구조를 그대로 재현</li>
+            <li>선택 사항: 잘라낸 분할마다 VTK 메시 하나</li>
+            <li>변환 파일은 없음 — 기하 정보는 전부 볼륨 자체에 들어 있습니다</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">사용 절차</h2>
+      <ol class="steps">
+        <li><strong>ROI를 놓고 저장합니다.</strong> 시리즈 전체에 상자 하나, 또는
+        환자마다 하나씩 볼륨과 짝이 맞는 이름으로 저장합니다.</li>
+        <li><strong>입력 볼륨 폴더를 지정합니다.</strong> AutoCrop3D는
+        폴더 전체를 한 번에 처리합니다.</li>
+        <li><strong>ROI 파일 또는 폴더를 지정합니다.</strong> 파일 하나는 모든 볼륨에
+        적용되고, 여러 개는 환자별로 짝지어집니다.</li>
+        <li><strong>출력 접미사를 고릅니다</strong>. 필요하면 "Keep the same
+        size as input"(입력과 같은 크기 유지)을 켜서 원래 기하 정보 전체를 보존하고,
+        ROI 밖은 모두 0으로 채웁니다.</li>
+        <li><strong>회전된 ROI인 경우에만:</strong> "Use module Crop Volume for tilted
+        images"를 체크합니다. 그 전에 아래 경고를 읽으십시오.</li>
+        <li><strong>출력 폴더를 지정한 뒤</strong> 실행합니다.</li>
+      </ol>
+
+      <h2 id="preserve">보존되는 것</h2>
+      <p>이것이 이 도구의 핵심입니다. 기본 자르기 경로는 결코 리샘플링하지 않습니다.
+      복셀 블록을 추출하고 볼륨의 원점을 다시 계산할 뿐이며, spacing,
+      방향, 복셀 값은 원본과 비트 단위로 동일하게 유지됩니다. 실무적으로는
+      전체 볼륨에서 계산한 정합 행렬이 잘라낸 볼륨에서도 수정 없이 그대로
+      유효합니다. 물리 좌표가 전혀 움직이지 않았기 때문입니다. 따라서 정합한 뒤에
+      잘라내도 아무것도 다시 계산할 필요가 없습니다.</p>
+
+      <h2 id="coince">문제가 생기면</h2>
+      <div class="callout warn">
+        <div class="callout-title">ROI 파일이 정확히 하나 든 폴더 → 오류</div>
+        <p>환자별 ROI를 쓰는데 폴더에 <code>.mrk.json</code> 파일이
+        하나뿐이면, 모듈은 이를 모든 볼륨에 적용하지 않고 오류를 냅니다. 이 경우에는
+        그 파일이 든 폴더가 아니라 파일 자체를 공통 ROI로 직접 지정하십시오.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">환자별 ROI: 밑줄 때문에 짝짓기가 깨집니다</div>
+        <p>비교할 때 볼륨 이름과 ROI 이름은 같은 방식으로 나뉘지 않습니다.
+        밑줄이 없는 환자 ID(<code>MA0001_Scan.nii.gz</code> /
+        <code>MA0001_ROI.mrk.json</code>)는 잘 짝지어지지만, ID 자체에 밑줄이 있으면
+        짝짓기가 깨져 그 환자는 건너뜁니다. 나머지 일괄 처리는 멈추지 않습니다(로그에 경고가
+        기록됩니다).</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">자르기 자체는 받아들이는 형식을 인터페이스가 거부합니다</div>
+        <p>인터페이스의 입력 검사는 압축된 볼륨만 인식합니다
+        (<code>.nii.gz</code>, <code>.nrrd.gz</code>, <code>.gipl.gz</code>). 압축되지 않은
+        <code>.nii</code>나 <code>.nrrd</code> 파일 폴더는 자르기 자체는 문제없이 처리하는데도
+        거부됩니다("Wrong type of patient file detected"). 압축을 풀거나, 한 일괄 처리에 두 형식을 섞지 마십시오.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">"Use module Crop Volume for tilted images": 먼저 읽으십시오</div>
+        <p>실제로 회전된 ROI를 다루는 유일한 방법이지만, 두 가지가
+        달라집니다. 첫째, 볼륨을 ROI 자체의 좌표계로 리샘플링합니다. 복셀 값이
+        바뀌므로 "리샘플링 없음, 정합 행렬은 여전히 유효"라는 장점이 더 이상
+        적용되지 않습니다. 둘째, 처리하는 환자마다 Slicer 장면 전체를 비웁니다.
+        보존하고 싶은 데이터를 불러와 두었다면 사용하지 마십시오.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">분할로부터 VTK 메시 생성</div>
+        <p>출력 경로 어딘가에 "seg"가 나타나면(예: <code>Segmentations/</code> 폴더)
+        자동으로 작동합니다. 부수적이고 취약한 기능으로
+        여기십시오. 메시가 잘라낸 볼륨과 정확히 겹친다는 보장이 없고, 모든
+        구조가 같은 색으로 나오며, 레이블이 여섯 개를 넘는 분할은 메시를 전혀
+        만들지 않습니다 — 오류 메시지도 없이.</p>
+      </div>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">더 읽을거리</h2>
+      <p>유틸리티 모듈입니다. 자체 논문이 없으며 필요하지도 않습니다. Slicer가 이미 할 수 있는 자르기(cropping)를 일괄로 적용합니다.</p>
+      <h3 id="autour">방법론 관련 문헌</h3>
+      <ul>
+        <li><strong>Documentation 3D Slicer</strong> — <a href="https://slicer.readthedocs.io/en/latest/user_guide/modules/cropvolume.html"><em>Crop Volume</em></a>. 이 모듈의 바탕이 되는 Slicer 모듈입니다. 여기서 보이는 보간, 샘플링 계수, 등방성이 실제로 무엇을 뜻하는지 설명합니다.</li>
+        <li><strong>Barone et al., Orthod Craniofac Res 2025</strong> — <a href="https://doi.org/10.1111/ocr.12895"><em>Deep Learning-Based Three-Dimensional Analysis Reveals Distinct Patterns of Condylar Remodelling After Orthognathic Surgery in Skeletal Class III Patients</em></a>. 이 일괄 자르기를 준비 단계로 사용한 연구실의 연구입니다. 이 모듈의 쓰임새를 보여 주는 예입니다.</li>
+      </ul>
+      <p>이 도구의 전체 참고문헌 — 찾아낸 것과 찾아봤지만 없었던 것 — 은 <a href="../AutoCrop3D/SOURCES.html">출처 페이지</a>에 있습니다.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../AutoCrop3D/AutoCrop3D.html">
+        <b>실제 동작 방식 →</b>
+        <span>아틀라스 페이지: ROI를 읽는 방식, 음의 방향을 처리하는 방식,
+        원점은 바뀌지만 복셀은 바뀌지 않는 이유, 그리고 설정 관련 함정의
+        전체 목록.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← 전체 가이드</a> ·
+        <a href="../AutoCrop3D/AutoCrop3D.html">아틀라스 페이지</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

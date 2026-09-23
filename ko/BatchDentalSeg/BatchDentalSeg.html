@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BatchDentalSeg — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="segmentation">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/BatchDentalSeg/BatchDentalSeg.html" hreflang="en" title="English">EN</a><a href="../../fr/BatchDentalSeg/BatchDentalSeg.html" hreflang="fr" title="Français">FR</a><a href="../../pt/BatchDentalSeg/BatchDentalSeg.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/BatchDentalSeg/BatchDentalSeg.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/BatchDentalSeg.html"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../BatchDentalSeg/BatchDentalSeg.html" aria-current="true"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html" aria-current="page">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/BatchDentalSeg/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › 분할</div>
+        <h1>BatchDentalSeg</h1>
+        <p class="lede">CT/CBCT 스캔 묶음에 대해 <code>nnUNetv2_predict</code>를 구동하는 대기열. 서로 바꿔 쓸 수 있는 가중치 번들 네 개(DentalSegmentator와 그 변형 세 개)를 쓰며, 그 주변의 안전장치, 기하 정보 복원, 내보내기 작업 전부를 담당한다.</p>
+        <div class="meta-row">
+          <a class="badge paper" href="https://doi.org/10.1016/j.jdent.2024.105130" target="_blank" rel="noopener" title="DentalSegmentator. 모듈의 변형 모델들은 발표되지 않았다.">Dot 2024 · J Dent</a>
+          <span class="badge cli">BATCHDENTALSEG</span>
+          <span class="badge cli">nnUNetv2_predict</span>
+          <span class="badge neutral">conda 없음 — Slicer의 Python + nnunetv2</span>
+          <a class="badge neutral" href="SOURCES.html">참고문헌</a>
+        </div>
+      </header>
+
+      <p>CT/CBCT 스캔의 치아·악안면 일괄 분할. 이 모듈은 신경망이 아니다:
+      <strong>대기열이자 오케스트레이터</strong>로서
+      <code>nnUNetv2_predict</code>를 감싸며, 서로 바꿔 쓸 수 있는 가중치 번들 네 개를 쓴다. 학습은
+      모두 이 저장소 밖에서 이루어진다. 여기에 작성된 것은 모델 선택, 메모리 안전장치, 기하 정보
+      복원, 내보내기다.</p>
+
+      <h2 id="situation">1. 파이프라인에서의 위치</h2>
+
+      <p><strong>저장소의 다른 어떤 모듈도 BatchDentalSeg를 호출하지 않으며</strong>, BatchDentalSeg도
+      저장소의 다른 모듈을 호출하지 않는다. 종단 도구다. 다만 <strong>외부 Slicer 확장</strong>인
+      <code>NNUNet</code>
+      (<a href="https://github.com/KitwareMedical/SlicerNNUnet" target="_blank" rel="noopener">SlicerNNUNetLib</a>)에 의존하며, 여기서
+      세 클래스를 사용한다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>호출 대상</th><th>출처</th><th>역할</th></tr></thead>
+          <tbody>
+            <tr><td><code>SlicerNNUNetLib.InstallLogic</code></td><td>NNUNet 확장</td><td><code>setupPythonRequirements()</code>: Slicer의 Python에 nnunetv2 설치</td></tr>
+            <tr><td><code>SlicerNNUNetLib.Parameter</code></td><td>NNUNet 확장</td><td>모델 디렉터리 트리를 검증하고 명령줄을 구성</td></tr>
+            <tr><td><code>SlicerNNUNetLib.SegmentationLogic</code></td><td>NNUNet 확장</td><td>볼륨을 임시 폴더에 NIfTI로 쓰고, <code>nnUNetv2_predict</code>를 <code>QProcess</code>로 실행하고, 분할 결과를 다시 로드</td></tr>
+            <tr><td><code>OpenAnatomyExport</code></td><td>SlicerOpenAnatomy 확장</td><td>glTF 내보내기 전용. 없으면 실행 중에 설치</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>이 모듈은 <strong>DentalSegmentator의 일괄 처리 변형</strong>이다(확장
+      <a href="https://github.com/gaudot/SlicerDentalSegmentator" target="_blank" rel="noopener">gaudot/SlicerDentalSegmentator</a>).
+      위젯, 아이콘, 가중치 다운로드 메커니즘을 여기서 재사용한다.
+      <code>BATCHDENTALSEG.py:30</code>에 선언된 기여자에는 원래
+      팀(Dot, Gajny, Fenioux, Pelletier)과 UoM에서 추가된 인원(Tulissi)이 섞여 있다.</p>
+
+      <h2 id="fichiers">2. 관련 파일</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>역할</th><th>크기</th></tr></thead>
+          <tbody>
+            <tr><td><code>BATCHDENTALSEG.py</code></td><td><code>ScriptedLoadableModule</code>을 감싸며, 위젯만 생성</td><td>83줄</td></tr>
+            <tr><td><code>SegmentationWidget.py</code></td><td><strong>모든 것</strong>: UI, 대기열, 모델 선택, 메모리 보호, 잘라내기, 레이블, 내보내기</td><td>2940줄</td></tr>
+            <tr><td><code>Queue.py</code></td><td>영속 대기열, <code>QueueItem</code> / <code>SegmentationQueue</code></td><td>204줄</td></tr>
+            <tr><td><code>PythonDependencyChecker.py</code></td><td>DentalSegmentator 가중치의 다운로드와 최신 여부 확인</td><td>184줄</td></tr>
+            <tr><td><code>Utils.py</code>, <code>Signal.py</code>, <code>IconPath.py</code></td><td>Qt 보조 코드</td><td></td></tr>
+            <tr><td><code>Resources/ML/</code></td><td>가중치 루트. 저장소에는 <code>Dataset111_453CT/.../dataset.json</code>과 <code>plans.json</code>이 포함됨</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>모든 것이 <strong>Slicer의 Python</strong> 안에서 실행된다. <code>nnUNetv2_predict</code>는
+      <strong>자식 프로세스</strong>(<code>QProcess</code>)로, 한 번에 스캔 하나씩 실행된다. <a href="../AMASSS/AMASSS.html">AMASSS</a>와는 다르다. AMASSS는
+      <a class="gterm" href="../glossary.html#g-nnunet" title="용어집 보기">nnU-Net</a> Python API를 프로세스 내에서 호출한다.</p>
+
+      <p><code>Resources/ML</code>은 목록에 <strong>없다</strong>: <code>MODULE_PYTHON_RESOURCES</code>
+      (<code>CMakeLists.txt</code>)에 등재되지 않았다. 따라서 설치된 확장에서는
+      이 폴더가 전적으로 실행 중에 생성된다. <code>.pth</code> 파일은 <code>.gitignore</code>로 제외된다.</p>
+
+      <h2 id="entrees">3. 입력, 폴더 탐색, 이름 규칙</h2>
+
+      <h3 id="entrees-acceptees">3.1 허용되는 입력</h3>
+
+      <p><code>listVolumes()</code> (<code>Queue.py:28</code>)는
+      네 패턴에 대해 <strong>비재귀적</strong> <code>glob</code>을 수행한다: <code>*.nii</code>, <code>*.nii.gz</code>,
+      <code>*.gipl</code>, <code>*.gipl.gz</code>. 하위 폴더는 방문하지 않으며, <strong>NRRD는
+      인식되지 않는다</strong>. NRRD는 Slicer의 기본 형식이고, 저장소의 다른 모듈들이 흔히
+      만들어 내는 형식이다.</p>
+
+      <p><code>volumeStem()</code>은 복합 접미사를 떼어 낸다: <code>case01.nii.gz</code> → <code>case01</code>
+      (<code>Path.stem</code>이라면 <code>case01.nii</code>가 남는다).</p>
+
+      <h3 id="entrees-file">3.2 대기열</h3>
+
+      <p>항목 하나 = 폴더 하나가 아니라 <strong>스캔 하나</strong>다
+      (<code>QueueItem</code>, <code>Queue.py:52</code>):
+      <code>inputPath</code>, <code>outputDir</code>, <code>model</code>, <code>device</code>, <code>status</code>, <code>error</code>, <code>durationSec</code>,
+      <code>autoCrop</code>. 따라서 한 세션에서 서로 다른 모델로 여러 폴더를
+      쌓아 둘 수 있다.</p>
+
+      <p><code>addFolder()</code>는 <code>&lt;outputDir&gt;/&lt;stem&gt;_Segmentation.nii.gz</code>가 이미
+      있거나(<em>Skip scans already segmented</em> 체크박스, 기본으로 체크됨) 이미 대기열에 있는
+      스캔을 건너뛴다.</p>
+
+      <p><strong>영속성</strong>: 스캔마다 상태가
+      <code>&lt;outputDir&gt;/.batchdentalseg_queue.json</code>에 다시 기록된다. 다시 로드할 때
+      <code>running</code> 상태로 남은 스캔(추론 도중 Slicer가 종료된 경우)은 <strong>되감겨</strong> <code>pending</code>이 되고,
+      인덱스도 그 스캔으로 돌아간다.</p>
+
+      <p><code>isChunkBoundary()</code>: <code>chunkSize</code>개 스캔마다(기본 5), <code>_coolDown()</code>이
+      철저한 정리를 한다. 고아 노드 제거, <code>torch.cuda.empty_cache()</code>
+      + <code>ipc_collect()</code>, <code>gc.collect()</code>.</p>
+
+      <h3 id="entrees-reseau">3.3 신경망이 실제로 보는 것</h3>
+
+      <p>위젯은 아무 전처리도 하지 않는다. <code>SegmentationLogic._prepareInferenceDir()</code>가
+      <code>slicer.util.exportNode(volumeNode, &lt;tmp&gt;/input/volume_0000.nii.gz)</code>를 수행하며, <strong>전처리는
+      전부 nnU-Net이 한다</strong>:
+      <code>transpose_forward</code>에 따른 축 전치, 계획의 <code>spacing</code>으로 리샘플링, <code>CTNormalization</code>
+      (학습 세트의 0.5% / 99.5% 백분위수로 자른 뒤, 그 평균과 표준편차로
+      표준화).</p>
+
+      <p>이 저장소에 작성된 유일한 전처리는 <strong>자동 잘라내기</strong>(§5.2)이며,
+      선택 사항이고 메모리 실패 후 재실행에만 쓰인다.</p>
+
+      <h2 id="modeles">4. 네 모델</h2>
+
+      <h3 id="modeles-combo">4.1 콤보 박스가 선택하는 것</h3>
+
+      <p><code>onApplyClickedForVolume()</code>
+      (<code>SegmentationWidget.py:1729</code>)은
+      거의 같은 분기 네 개로 된 <code>if/elif</code>다. 각 분기는 같은 객체를
+      만든다:</p>
+
+      <pre><code>Parameter(folds="0", modelPath=basePath, device=self.deviceComboBox.currentText)</code></pre>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 920 260" role="img" aria-label="코드의 진입점 하나에서 가중치 번들 네 개로">
+          <rect class="d-box-a" x="330" y="14" width="260" height="46" rx="6"/>
+          <text class="d-label" x="460" y="33" text-anchor="middle">onApplyClickedForVolume()</text>
+          <text class="d-label-s" x="460" y="48" text-anchor="middle">if / elif — 같은 Parameter(...)</text>
+
+          <path class="d-arrow" d="M460 60 V80"/>
+          <path class="d-arrow" d="M460 80 H115"/>
+          <path class="d-arrow" d="M460 80 H345"/>
+          <path class="d-arrow" d="M460 80 H575"/>
+          <path class="d-arrow" d="M460 80 H805"/>
+          <path class="d-arrow" d="M115 80 V100"/>
+          <path class="d-arrow" d="M345 80 V100"/>
+          <path class="d-arrow" d="M575 80 V100"/>
+          <path class="d-arrow" d="M805 80 V100"/>
+          <path class="d-arrow-head" d="M115 100 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M345 100 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M575 100 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M805 100 l-4 -7 h8 z"/>
+
+          <rect class="d-box-n" x="10" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="115" y="122" text-anchor="middle">DentalSegmentator</text>
+          <text class="d-mono" x="115" y="140" text-anchor="middle">Dataset111_453CT</text>
+          <text class="d-label-s" x="115" y="157" text-anchor="middle">레이블 5개 — 영구치열</text>
+          <text class="d-label-s" x="115" y="172" text-anchor="middle">Upper Skull, Mandible,</text>
+          <text class="d-label-s" x="115" y="185" text-anchor="middle">Upper/Lower Teeth, canal</text>
+
+          <rect class="d-box-n" x="240" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="345" y="122" text-anchor="middle">PediatricDentalsegmentator</text>
+          <text class="d-mono" x="345" y="140" text-anchor="middle">Dataset001_380CT</text>
+          <text class="d-label-s" x="345" y="157" text-anchor="middle">레이블 5개 — 표는</text>
+          <text class="d-label-s" x="345" y="172" text-anchor="middle">DentalSegmentator와 같음,</text>
+          <text class="d-label-s" x="345" y="185" text-anchor="middle">혼합치열</text>
+
+          <rect class="d-box-n" x="470" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="575" y="122" text-anchor="middle">NasoMaxillaDentSeg</text>
+          <text class="d-mono" x="575" y="140" text-anchor="middle">Dataset001_max4</text>
+          <text class="d-label-s" x="575" y="157" text-anchor="middle">레이블 6개 — 상악골을</text>
+          <text class="d-label-s" x="575" y="172" text-anchor="middle">두개골에서 분리</text>
+          <text class="d-label-s" x="575" y="185" text-anchor="middle">(이름 결함, §9)</text>
+
+          <rect class="d-box-n" x="700" y="102" width="210" height="90" rx="6"/>
+          <text class="d-label" x="805" y="122" text-anchor="middle">UniversalLabDentalsegmentator</text>
+          <text class="d-mono" x="805" y="140" text-anchor="middle">Dataset002_380CT</text>
+          <text class="d-label-s" x="805" y="157" text-anchor="middle">레이블 55개 — 치아를</text>
+          <text class="d-label-s" x="805" y="172" text-anchor="middle">하나씩, UI 설명과 달리</text>
+          <text class="d-label-s" x="805" y="185" text-anchor="middle">“Upper Skull” 없음</text>
+
+          <path class="d-arrow" d="M115 192 V212"/>
+          <path class="d-arrow" d="M345 192 V212"/>
+          <path class="d-arrow" d="M575 192 V212"/>
+          <path class="d-arrow" d="M805 192 V212"/>
+          <path class="d-arrow-head" d="M115 212 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M345 212 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M575 212 l-4 -7 h8 z"/>
+          <path class="d-arrow-head" d="M805 212 l-4 -7 h8 z"/>
+          <text class="d-mono" x="115" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="345" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="575" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="805" y="228" text-anchor="middle">nnUNetv2_predict</text>
+        </svg>
+        <figcaption>콤보 박스의 네 항목은 모두 같은 코드를 거친다. 바뀌는 것은 데이터셋 폴더와 레이블 표뿐이다.</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>콤보 박스의 이름</th><th><code>Resources/ML</code> 아래 폴더</th><th>가중치 출처</th></tr></thead>
+          <tbody>
+            <tr><td><code>DentalSegmentator</code></td><td><code>Dataset111_453CT/nnUNetTrainer__nnUNetPlans__3d_fullres</code></td><td><strong>최신 릴리스</strong>의 zip(<code>gaudot/SlicerDentalSegmentator</code>), GitHub API로 확인</td></tr>
+            <tr><td><code>PediatricDentalsegmentator</code></td><td><code>Dataset001_380CT/...</code></td><td><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/PEDIATRICDENTALSEG_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/PEDIATRICDENTALSEG_MODEL</a>의 파일 3개</td></tr>
+            <tr><td><code>NasoMaxillaDentSeg</code></td><td><code>Dataset001_max4/...</code></td><td><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/NASOMAXILLADENTSEG_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/NASOMAXILLADENTSEG_MODEL</a></td></tr>
+            <tr><td><code>UniversalLabDentalsegmentator</code></td><td><code>Dataset002_380CT/...</code></td><td><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/UNIVERSALLAB_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/UNIVERSALLAB_MODEL</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>마지막 세 모델은 같은 방식을 따른다:
+      <code>&lt;basePath&gt;/fold_0/checkpoint_final.pth</code>가 없으면 파일 세 개
+      (<code>checkpoint_final.pth</code>, <code>dataset.json</code>, <code>plans.json</code>)를
+      <code>slicer.util.downloadFile</code>로 다운로드한다. 체크섬도, 버전 관리도, 이어받기도
+      없다: 중단된 다운로드는 잘린 체크포인트를 남기고, 코드는 다음 실행에서 이를
+      있는 것으로 간주한다.</p>
+
+      <p>DentalSegmentator는 별도 경로를 거친다.
+      <code>PythonDependencyChecker</code>:
+      <code>Github().get_repo("gaudot/SlicerDentalSegmentator")</code>, 그다음 나열된 <strong>첫 번째 릴리스의
+      첫 번째 에셋</strong>을 스트리밍으로 받아 압축을 푼다. 사용된 URL은
+      <code>Resources/ML/download_info.json</code>에 저장되며, 더 최신 릴리스가 있으면
+      업데이트 안내가 뜬다. 저장소에 커밋된 파일은
+      <a href="https://github.com/gaudot/SlicerDentalSegmentator/releases/download/v1.0.0-alpha/Dataset111_453CT_v100.zip" target="_blank" rel="noopener">Dataset111_453CT_v100.zip</a>을 가리킨다.</p>
+
+      <h3 id="modeles-nnunet">4.2 코드로 확인한 nnU-Net</h3>
+
+      <p>그렇다, 이름만이 아니라 실제로 nnU-Net v2다. 증거는 호출
+      사슬에 있다: <code>Parameter.asArgList()</code>는 말 그대로 다음을 구성한다</p>
+
+      <pre><code>nnUNetv2_predict -i &lt;tmp&gt;/input -o &lt;tmp&gt;/output
+  -d Dataset111_453CT -tr nnUNetTrainer -p nnUNetPlans -c 3d_fullres
+  -f 0 -npp 1 -nps 1 -step_size 0.5 -device cuda -chk checkpoint_final.pth --disable_tta</code></pre>
+
+      <p><code>-d</code>, <code>-tr</code>, <code>-p</code>, <code>-c</code>는 <strong>폴더 이름에서 추론된다</strong>: 부모 폴더가
+      <code>Dataset…</code>를 주고, 설정 폴더의 이름을 <code>__</code>로 나눠
+      (trainer, plan, configuration)을 얻는다. 그래서 다음 구조가 필요하다:
+      <code>Dataset&lt;id&gt;/&lt;trainer&gt;__&lt;plan&gt;__&lt;conf&gt;/fold_&lt;i&gt;/checkpoint_final.pth</code>.</p>
+
+      <p>사용자에게 노출되지 않는 매개변수,
+      <code>SlicerNNUNetLib.Parameter</code>의 기본값: <code>stepSize = 0.5</code>, <code>disableTta = True</code>(테스트 시
+      미러 증강 없음), <code>folds = "0"</code>(<strong>단일 fold</strong>, 앙상블은
+      절대 없음), <code>nProcessPreprocessing = nProcessSegmentationExport = 1</code>, macOS에서는
+      <code>0</code>으로 강제(macOS에서는 multiprocessing 때문에 nnU-Net이 쓰기 단계에서 멈춘다).</p>
+
+      <p>UI가 제공하는 유일한 설정은 장치다: <code>cuda</code> / <code>cpu</code> / <code>mps</code>. 사용할 수
+      없으면 대기열 전체에 대해 질문이 <strong>한 번</strong>만 나오고
+      (<code>_deviceFallbackAccepted</code>), <em>Unattended</em> 모드에서는 CPU 폴백이
+      자동으로 수락된다.</p>
+
+      <p><code>nnUNet_raw</code>, <code>nnUNet_preprocessed</code>, <code>nnUNet_results</code>는 모두
+      모델 폴더를 가리킨다. 프로세스 수준 환경 변수 세 개이며,
+      <code>SegmentationLogic._startInferenceProcess</code>가 기록한다. <code>os.environ</code>은 전역이므로,
+      같은 Slicer 세션에서 동시에 실행되는 두 추론은 서로 간섭할 것이다.
+      여기서는 대기열이 엄격히 순차적이므로 문제가 생기지 않는다.</p>
+
+      <h3 id="modeles-architecture">4.3 아키텍처와 계획 — 확인 가능한 것</h3>
+
+      <p>저장소에 JSON 파일이 있는 것은 <code>Dataset111_453CT</code>(DentalSegmentator)뿐이다.
+      <code>plans.json</code> 요약:</p>
+
+      <pre><code>UNet_class_name = PlainConvUNet     base/max features = 32 / 320
+n_conv_per_stage encoder [2,2,2,2,2,2]  decoder [2,2,2,2,2]
+pool_op_kernel_sizes = [1,1,1], 4 x [2,2,2], [2,2,1]   conv_kernel 6 x [3,3,3]
+patch_size = [128, 160, 112]    spacing = [0.4492, 0.3120, 0.4492] mm
+transpose_forward = transpose_backward = [1, 0, 2]     batch_size = 2, batch_dice
+normalization_schemes = CTNormalization
+foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</code></pre>
+
+      <p>이 <code>plans.json</code>은 <strong>nnU-Net 2.4 이전 형식</strong>이다(평면
+      <code>UNet_class_name</code> / <code>pool_op_kernel_sizes</code> 필드, <code>architecture</code> 블록 없음).
+      반면 <a href="../AMASSS/AMASSS.html">AMASSS</a> 번들은 새 형식을 쓴다. 둘 다 현재 nnunetv2에서
+      읽을 수 있다.</p>
+
+      <p>나머지 세 모델의 계획은 <strong>저장소로부터 확인할 수
+      없다</strong>: 다운로드와 함께 들어온다. 이들에 대해 알려진 것은 모두 위젯에 하드코딩된
+      딕셔너리(§4.4)와 README에서 나온다.</p>
+
+      <h3 id="modeles-labels">4.4 모델별 생성 레이블</h3>
+
+      <p><code>_get_active_label_map()</code>
+      (<code>SegmentationWidget.py:1847</code>)이
+      <strong>기준</strong> 표다: 출력 NIfTI에 기록되는 값을
+      이 표가 정한다.</p>
+
+      <p><strong>DentalSegmentator와 PediatricDentalsegmentator</strong> — <span class="badge predit">레이블 5개</span>로 동일하며,
+      번들 111의 <code>dataset.json</code>으로 확인된다: 1 Upper Skull(상악골
+      포함), 2 Mandible, 3 Upper Teeth, 4 Lower Teeth, 5 Mandibular canal. 따라서 둘을
+      구분하는 것은 <strong>출력이 아니라 학습 데이터</strong>다: 영구치열
+      (<code>453CT</code>, 7개 기관) 대 혼합치열(<code>380CT</code>). 코드는
+      둘을 엄밀하게 똑같이 다룬다. 레이블 표도, 색도, 후처리도 같고,
+      <code>_modelBasePath</code>만 다르다.</p>
+
+      <p><strong>NasoMaxillaDentSeg</strong> — <span class="badge predit">레이블 6개</span>, 상악골이 두개골에서 <strong>분리</strong>되어 있다:
+      1 Upper Skull, 2 Mandible, <strong>3 Maxilla</strong>, 4 Upper Teeth, 5 Lower Teeth,
+      6 Mandibular canal.</p>
+
+      <p><strong>UniversalLabDentalsegmentator</strong> — <span class="badge predit">레이블 55개</span>: 영구치 32개에
+      하나씩 번호를 매기고(1 = 상악 우측 제3대구치(3<sup>rd</sup> molar) → 32 = 하악 우측 제3대구치(3<sup>rd</sup> molar),
+      상악 치열궁을 돈 뒤 하악 치열궁을 도는 순서), 이어서
+      유치 20개(33 → 52), 그다음 <code>Mandible</code> = 53, <code>Maxilla</code> = 54,
+      <code>Mandibular canal</code> = 55. "Upper Skull"은 없다: UI 설명이 보여 주는 것,
+      README가 말하는 것과 달리 이 모델은 두개관을 분할하지 않는다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>UI에 표시되는 <code>UniversalLabDentalsegmentator</code>의 설명과 저장소 README는 두개관 분할을 예고한다. 실제 모델에는 "Upper Skull" 레이블이 없다: 치아에 번호를 매기고, 하악골/상악골/하악관을 더할 뿐이다.</p>
+      </div>
+
+      <p>값은 각 세그먼트에 <code>LabelValue</code> 태그로 설정되며
+      (<code>_segmentLabelValue</code>), 태그가 있으면 <strong>이름보다 우선한다</strong>.</p>
+
+      <h2 id="coeur">5. 학습되지 않은 핵심부</h2>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 980 230" role="img" aria-label="입력 볼륨에서 출력 파일까지의 전체 파이프라인">
+          <rect class="d-box" x="10" y="70" width="150" height="60" rx="6"/>
+          <text class="d-label" x="85" y="96" text-anchor="middle">입력 볼륨</text>
+          <text class="d-label-s" x="85" y="112" text-anchor="middle">.nii / .nii.gz / .gipl</text>
+
+          <path class="d-arrow" d="M160 100 H205"/>
+          <path class="d-arrow-head" d="M205 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="210" y="60" width="185" height="80" rx="6"/>
+          <text class="d-label" x="302" y="82" text-anchor="middle">nnU-Net 전처리</text>
+          <text class="d-label-s" x="302" y="98" text-anchor="middle">전치, 리샘플링,</text>
+          <text class="d-label-s" x="302" y="112" text-anchor="middle">CTNormalization</text>
+          <text class="d-label-s" x="302" y="127" text-anchor="middle">(plans.json 기반)</text>
+
+          <path class="d-arrow" d="M395 100 H440"/>
+          <path class="d-arrow-head" d="M440 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="445" y="60" width="180" height="80" rx="6"/>
+          <text class="d-label" x="535" y="85" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-label-s" x="535" y="101" text-anchor="middle">PlainConvUNet 3D</text>
+          <text class="d-label-s" x="535" y="115" text-anchor="middle">fold 1개, TTA 없음</text>
+          <text class="d-label-s" x="535" y="129" text-anchor="middle">신경망 예측</text>
+
+          <path class="d-arrow" d="M625 100 H670"/>
+          <path class="d-arrow-head" d="M670 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="675" y="60" width="150" height="80" rx="6"/>
+          <text class="d-label" x="750" y="85" text-anchor="middle">레이블 맵</text>
+          <text class="d-label-s" x="750" y="101" text-anchor="middle">단일 내보내기</text>
+          <text class="d-label-s" x="750" y="115" text-anchor="middle">+ numpy LUT</text>
+          <text class="d-label-s" x="750" y="129" text-anchor="middle">(원 격자로 복원</text>
+
+          <path class="d-arrow" d="M825 100 H870"/>
+          <path class="d-arrow-head" d="M870 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="875" y="55" width="95" height="90" rx="6"/>
+          <text class="d-label" x="922" y="80" text-anchor="middle">출력</text>
+          <text class="d-label-s" x="922" y="96" text-anchor="middle">NIfTI</text>
+          <text class="d-label-s" x="922" y="110" text-anchor="middle">STL/OBJ</text>
+          <text class="d-label-s" x="922" y="124" text-anchor="middle">VTK, glTF</text>
+
+          <path class="d-arrow" d="M535 140 V170 H302 V140"/>
+          <path class="d-arrow-head" d="M302 140 l-7 4 v-8 z"/>
+          <text class="d-label-s" x="418" y="185" text-anchor="middle">메모리 실패 ⇒ 자동 잘라내기(§5.2) ⇒ 재시도</text>
+        </svg>
+        <figcaption>학습된 부분은 단 한 단계뿐이다. 나머지(전처리, 재구성, 재실행 루프)는 모두 계산이다.</figcaption>
+      </figure>
+
+      <h3 id="coeur-labelmap">5.1 레이블 맵 재구성과 기하 정보 복원</h3>
+
+      <p><code>_buildLabelArray()</code>
+      (<code>SegmentationWidget.py:1912</code>):</p>
+
+      <p><code>ExportSegmentsToLabelmapNode</code>를 한 번만 호출하되, <code>segmentId</code>의
+      명시적 목록을 넘긴다(이것이 "내보낸 값 <em>i</em>+1 ↔ <code>segIds[i]</code>" 대응을 고정한다). 그다음
+      numpy LUT가 한 번의 패스로 공식 값으로 다시 매핑한다
+      (<code>lut[exported]</code>). 이전 버전은 세그먼트마다 볼륨 전체 범위를 한 번씩
+      래스터화했다: UniversalLab에서는 전악 CBCT를 55번
+      래스터화한 셈이다.</p>
+
+      <h3 id="coeur-crop">5.2 자동 잘라내기(메모리 실패 후 재실행)</h3>
+
+      <p>선택 사항이며, 명시적 확인 후 <em>Retry failed</em>로 시작된다.
+      <code>_applyAutoCrop()</code>
+      (<code>SegmentationWidget.py:1017</code>):</p>
+
+      <ul>
+        <li>스케일에 관계없이 동작하는 <strong>공기/조직 임계값</strong>: <code>array.min() &lt; −800</code>이면
+          Hounsfield 단위이며 임계값은 <code>−500</code>, 그렇지 않으면 <code>min + 0.15 × (p99.5 − min)</code>;</li>
+        <li>임계값을 넘는 복셀의 경계 상자를
+          <code>_CROP_MARGIN_MM = 15.0</code> mm(축마다 복셀로 환산)만큼 확장;</li>
+        <li>복셀의 <code>_CROP_MIN_GAIN = 0.85</code>보다 많이 남으면 <strong>잘라내기를
+          포기한다</strong>: 15% 미만을 줄이자고 위험을 감수할 가치는 없다;</li>
+        <li>부분 볼륨은 간격과 축을 유지하며, <strong>원점만 이동한다</strong>
+          (<code>ijkToRas.MultiplyPoint([i0,j0,k0,1])</code>). 보간은 전혀 없다.</li>
+      </ul>
+
+      <p><code>_restoreCropToOriginalGrid()</code>는 단순한 인덱스 오프셋으로 레이블 맵을 원래 크기의
+      배열에 다시 붙여 넣는다: 따라서 출력은 항상 촬영된 스캔의
+      격자 위에 있다.</p>
+
+      <h3 id="coeur-memoire">5.3 메모리 보호 — 세 겹의 방어</h3>
+
+      <p>코드 주석이 실제 사례를 알려 준다: 한 스캔이 125 GB 컴퓨터에서 114 GB를
+      채우고 OOM killer에 의해 종료되었는데, multiprocessing 워커가 살아남아
+      메모리를 계속 붙잡고 있었다.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 900 170" role="img" aria-label="메모리 방어 세 겹: 이전, 도중, 이후">
+          <rect class="d-box" x="10" y="20" width="260" height="100" rx="6"/>
+          <text class="d-label" x="140" y="42" text-anchor="middle">a) 이전: 사전 추정</text>
+          <text class="d-label-s" x="140" y="60" text-anchor="middle">_estimatePeakRamGb()</text>
+          <text class="d-label-s" x="140" y="76" text-anchor="middle">FOV, 간격, 레이블 수</text>
+          <text class="d-label-s" x="140" y="92" text-anchor="middle">예산 = 여유 RAM × 85%</text>
+          <text class="d-label-s" x="140" y="108" text-anchor="middle">초과 ⇒ 실행 없이 실패</text>
+
+          <path class="d-arrow" d="M270 70 H315"/>
+          <path class="d-arrow-head" d="M315 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="320" y="20" width="260" height="100" rx="6"/>
+          <text class="d-label" x="450" y="42" text-anchor="middle">b) 도중: 감시</text>
+          <text class="d-label-s" x="450" y="60" text-anchor="middle">_onMemCheck, 3000 ms마다</text>
+          <text class="d-label-s" x="450" y="76" text-anchor="middle">연속 초과 2회</text>
+          <text class="d-label-s" x="450" y="92" text-anchor="middle">(일시적 급등이 아님)</text>
+          <text class="d-label-s" x="450" y="108" text-anchor="middle">⇒ 종료 명령</text>
+
+          <path class="d-arrow" d="M580 70 H625"/>
+          <path class="d-arrow-head" d="M625 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="630" y="20" width="260" height="100" rx="6"/>
+          <text class="d-label" x="760" y="42" text-anchor="middle">c) 이후: 회수</text>
+          <text class="d-label-s" x="760" y="60" text-anchor="middle">_killInferenceTree(): 트리 전체</text>
+          <text class="d-label-s" x="760" y="76" text-anchor="middle">_reclaimStrayProcesses(): 고아</text>
+          <text class="d-label-s" x="760" y="92" text-anchor="middle">nnunetv2_predict / nnunetv2.inference</text>
+          <text class="d-label-s" x="760" y="108" text-anchor="middle">"Free memory" 버튼</text>
+        </svg>
+        <figcaption>메모리 보호의 세 겹 방어. 각각 nnU-Net 프로세스 수명 주기의 서로 다른 시점을 담당한다.</figcaption>
+      </figure>
+
+      <p><strong>a) 사전 추정</strong>, <code>_estimatePeakRamGb()</code>
+      (<code>SegmentationWidget.py:1161</code>).
+      시야의 물리적 부피는 간격과 무관하므로, 리샘플링된 복셀 수는
+      <code>fovMm3 / targetVoxelMm3</code>와 같다. 최대치는
+      <code>convert_predicted_logits_to_segmentation_with_correct_shape</code>에서 도달하며, 여기서 클래스마다
+      다음이 공존한다: 슬라이딩 윈도 누산기(리샘플링된 격자 위의 <code>torch.half</code>,
+      2바이트), 그 float64 사본(4D 배열 전체에 한 번에 적용되는 <code>data = data.astype(float)</code>,
+      8바이트), 그리고 <code>reshaped_final</code>(원 격자 위의 <code>torch.half</code>,
+      2바이트). 따라서
+      <code>logitsGb = (10 × C × Vresampled + 2 × C × Voriginal) / 2³⁰</code>에,
+      <code>8 × (Voriginal + Vresampled)</code>(<code>skimage.resize</code>의 float64 임시 배열)를 더하고,
+      <code>_RAM_FIXED_OVERHEAD_GB = 4.0</code>(torch, 가중치, 워커)을 더한다. <code>spacing</code>과
+      레이블 수는 <strong>같은</strong> 설정 폴더에서 읽는다. 한 모델의 간격과 다른 모델의 레이블 수를
+      섞지 않기 위해서다.</p>
+
+      <p>예산 = <code>free RAM × ramLimitSpinBox</code>(기본값 <strong>85%</strong>). 이를 넘으면 스캔은
+      이유와 함께 <code>failed</code>로 표시되며, nnU-Net은 시작조차 하지 않는다.</p>
+
+      <p><strong>b) 실행 중 감시</strong>: <code>_onMemCheck</code>가
+      <code>_RAM_SAMPLE_MS = 3000</code> ms마다 표본을 채취한다. 종료하려면 <code>_RAM_CONSECUTIVE_HITS = 2</code>번
+      연속 초과가 필요하다(일시적 급등 때문에 멀쩡한 스캔을 버려서는 안 된다).</p>
+
+      <p><strong>c) 메모리 회수</strong>: <code>_killInferenceTree()</code>는 <strong>트리 전체</strong>를 종료한다.
+      <code>QProcess.kill()</code>은 직계 자식에게만 닿는데, nnU-Net은
+      multiprocessing을 쓰기 때문이다. <code>_reclaimStrayProcesses()</code>는 명령줄에
+      <code>nnunetv2_predict</code>, <code>nnunetv2/inference</code>, <code>nnunet</code>이 들어 있으면서
+      더 이상 소유자가 없는 프로세스를 정리한다. <em>Free memory</em> 버튼은 이를 수동으로 수행한다.</p>
+
+      <h3 id="coeur-fin">5.4 보조 완료 감지</h3>
+
+      <p><code>_checkInferenceCompletionFallback()</code>
+      (<code>SegmentationWidget.py:2514</code>):
+      nnU-Net 출력에 "done with volume" 줄이 나타나면, 타이머가
+      1.5초마다 출력 파일 크기를 확인한다. <strong>연속 두 번 같은
+      값</strong>이면 ⇒ <code>QProcess</code>의 <code>finished</code> 시그널이
+      오지 않았더라도 강제로 마무리한다. 40번 시도(60초) 후에는 포기한다.</p>
+
+      <p>추가 안전장치: 스캔별 감시 타이머
+      (<code>itemTimeoutSpinBox</code>, 기본 <strong>60분</strong>)가 스캔을 실패로 표시하고
+      다음 스캔으로 넘어간다. <code>_finishCurrentItem</code>이 <strong>유일한 종료 지점</strong>이며,
+      <code>_itemFinalized</code>로 이중 진행을 막는다.</p>
+
+      <h3 id="coeur-miroir">5.5 좌우 반전 보정(UniversalLab 전용)</h3>
+
+      <p><code>onResolveMirroring()</code>
+      (<code>SegmentationWidget.py:1308</code>),
+      UniversalLab에서만 보이는 버튼. 신경망이 좌우를 자주 혼동하며,
+      보정은 순수하게 기하학적이다:</p>
+
+      <ol>
+        <li>공식 레이블 맵 재구성(§5.1), 그다음 전경 복셀마다 <a class="gterm" href="../glossary.html#g-ras" title="용어집 보기">RAS</a> <em>R</em> 좌표를
+          <strong>numpy로</strong> 계산(<code>m00·x + m01·y + m02·z + m03</code>). 이전
+          버전은 복셀마다, 레이블마다 <code>vtkMatrix4x4.MultiplyPoint</code>를 한 번씩
+          호출했다;</li>
+        <li><strong>시상면</strong> = 네 중절치(레이블 8, 9, 24, 25)의 <em>R</em> 무게중심 평균.
+          하나라도 없으면 보정을 거부한다;</li>
+        <li>좌우가 있는 레이블마다, 평면의 반대쪽에 있는 복셀은 대칭 레이블의 값을 받는다
+          (이름에서 <code>left</code> ↔ <code>right</code>를 바꿔 만든 표). <code>{53, 54, 55}</code>는 <strong>보호된다</strong>.</li>
+      </ol>
+
+      <p>결과는 새 노드 <code>&lt;name&gt;_Mirrored</code>에 들어가며, 원본은 유지된다.</p>
+
+      <h3 id="coeur-postproc">5.6 빠진 후처리</h3>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><code>_postProcessSegments()</code>는 로그 두 줄만 남긴다.
+        <code>_keepLargestIsland()</code>와 <code>_removeSmallIsland()</code>(
+        <code>_minimumIslandSize_mm3 = 60</code>을 쓸 예정이었던 것)는 <strong>어디에서도 호출되지 않는다</strong>. 원
+        DentalSegmentator에서 물려받은 사용되지 않는 코드다. 따라서 형태학적 정리는 전혀 적용되지 않는다:
+        나오는 것은 nnU-Net의 원시 출력이며, 번들에 내부 후처리가 있으면 그것만
+        적용된다.</p>
+      </div>
+
+      <h2 id="sorties">6. 출력</h2>
+
+      <p><code>onInferenceFinished</code>는 어떤 형식이 체크되었든 <strong>항상</strong>
+      <code>&lt;outputFolder&gt;/&lt;stem&gt;_Segmentation.nii.gz</code>를 쓴다:
+      <code>_get_active_label_map</code>의 값을 담고, 원본 볼륨의 기하 정보(간격, 원점, <code>IJKToRAS</code>)를 따르는
+      레이블 맵이다. 잘라내기가 있었다면 잘라내기 전 상태로 되돌린다. 이것이
+      <code>expectedOutputPath()</code>가 스캔이 이미 처리되었는지 판단할 때 찾는 파일이다.</p>
+
+      <p>추가 형식은 체크박스로 고르며, 모두 같은 폴더에 기록된다:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>형식</th><th>함수</th><th>이름 규칙</th><th>세부</th></tr></thead>
+          <tbody>
+            <tr><td>STL, OBJ</td><td><code>ExportSegmentsClosedSurfaceRepresentationToFiles</code></td><td>세그먼트마다 파일 하나</td><td>스무딩 1.0, 병합 없음</td></tr>
+            <tr><td>VTK(레이블별)</td><td><code>_exportVTKPerLabel</code></td><td><code>&lt;segNodeName&gt;_&lt;labelName&gt;.vtk</code></td><td>정리 → <code>vtkWindowedSincPolyDataFilter</code>(60회, <code>passBand</code> 0.05, 경계/날카로운 모서리/non-manifold 스무딩) → 셀 법선 → <code>vtkQuadricDecimation</code> 40% → <strong>RAS→<a class="gterm" href="../glossary.html#g-lps" title="용어집 보기">LPS</a> 반전</strong>(<code>Scale(-1,-1,1)</code>), 바이너리</td></tr>
+            <tr><td>VTK(병합)</td><td><code>_exportMergedVTK</code></td><td><code>&lt;segNodeName&gt;_merged.vtk</code></td><td><code>vtkDiscreteMarchingCubes</code> <strong>존재하는 레이블마다 윤곽선 하나</strong>, 같은 스무딩 사슬, 그다음 레이블별 임계 처리, 40% 간소화, 상수 <code>Label</code> 셀 배열, 연결, LPS 반전</td></tr>
+            <tr><td>NIfTI(체크박스)</td><td><code>ExportSegmentsBinaryLabelmapRepresentationToFiles</code></td><td>세그먼트마다 <strong>이진</strong> <code>.nii.gz</code> 하나</td><td>위의 레이블 맵과 혼동하지 말 것</td></tr>
+            <tr><td>glTF</td><td><code>OpenAnatomyExport</code></td><td></td><td>간소화 비율 조절 가능(기본 0.9). 필요하면 SlicerOpenAnatomy를 설치</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>메시 파일 이름은 스캔 이름이 아니라 분할 <strong>노드</strong>의 이름,
+      <code>&lt;stem&gt;_Segmentation</code>에서 나온다. 세그먼트 이름은
+      <code>re.sub(r"[^0-9A-Za-z_-]+", "_", ...)</code>로 정리된다.</p>
+
+      <p>메시 내보내기 실패는 <strong>스캔을 실패로 만들지 않는다</strong>: NIfTI는 이미
+      기록되었고, 스캔은 <code>done</code>으로 표시되며 <code>export warning</code>이 붙는다.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">확인됨 — 코드에서 수정됨</div>
+        <p><code>_exportMergedVTK</code>의 코드에 기록된, 수정된 버그:
+        <code>vtkDiscreteMarchingCubes.SetValue</code>는 레이블 값이 아니라 윤곽선 <strong>인덱스</strong>를
+        받는다. 레이블을 인덱스로 넘기면 인덱스 0이 윤곽선 값
+        0.0으로 남아서, 배경이 윤곽선 추출, 스무딩, 법선 계산을 거친 뒤에야 버려졌다.</p>
+      </div>
+
+      <h2 id="predit">7. 예측되는 것과 계산되는 것</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>블록</th><th>성격</th><th>위치</th></tr></thead>
+          <tbody>
+            <tr><td>전처리(전치, 리샘플링, <code>CTNormalization</code>)</td><td><span class="badge calcule">계산</span> 결정론적, <code>plans.json</code> 기반</td><td><code>nnUNetv2_predict</code>, 자식 프로세스</td></tr>
+            <tr><td>분할</td><td><span class="badge predit">예측</span> <code>PlainConvUNet</code> 3D 신경망, fold 1개, TTA 없음</td><td>같음</td></tr>
+            <tr><td>자동 잘라내기</td><td><span class="badge calcule">계산</span> 기하(공기 임계값 + 경계 상자)</td><td>위젯, numpy</td></tr>
+            <tr><td>원 격자로 복원</td><td><span class="badge calcule">계산</span> 인덱스 오프셋, 보간 없음</td><td>위젯, numpy</td></tr>
+            <tr><td>레이블 맵 재구성</td><td><span class="badge calcule">계산</span> 단일 내보내기 + LUT</td><td>위젯, VTK/numpy</td></tr>
+            <tr><td>좌우 반전 보정</td><td><span class="badge calcule">계산</span> 기하(절치 기준 시상면)</td><td>위젯, numpy</td></tr>
+            <tr><td>메시</td><td><span class="badge calcule">계산</span> <a class="gterm" href="../glossary.html#g-marching-cubes" title="용어집 보기">marching cubes</a> + windowed-sinc + quadric 간소화</td><td>위젯, VTK</td></tr>
+            <tr><td>메모리 추정과 보호</td><td><span class="badge calcule">계산</span> <a class="gterm" href="../glossary.html#g-fov" title="용어집 보기">FOV</a>와 계획에 대한 산술</td><td>위젯, psutil</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>학습된 것은 네 체크포인트뿐이며, 이 저장소 밖에 있다.</p>
+
+      <h2 id="environnement">8. 실행 환경</h2>
+
+      <p><strong>세션당 한 번</strong>, 첫 <em>Apply</em> 시에
+      <code>_runSetupThenStartQueue()</code>
+      (<code>SegmentationWidget.py:1651</code>)가 설치한다:</p>
+
+      <ol>
+        <li><code>pip install light-the-torch</code>, 그다음 <code>python -m light_the_torch install torch
+          torchvision</code> — <code>ltt</code>가 감지된 드라이버에 맞는 CUDA 휠을 고르며,
+          <strong>버전은 고정되지 않는다</strong>;</li>
+        <li><code>pip install numexpr&gt;=2.10.2</code>;</li>
+        <li><code>pip install numpy&lt;2.0 numexpr&gt;=2.10.2 psutil</code>,
+          <code>PipRunner</code>(UI에 제어를 돌려주는 <code>QProcess</code>)를 통해;</li>
+        <li><code>SlicerNNUNetLib.InstallLogic().setupPythonRequirements()</code>: <code>nnunetv2</code>,
+          이 저장소 밖;</li>
+        <li><code>PythonDependencyChecker.downloadWeightsIfNeeded()</code>: DentalSegmentator 가중치
+          만.</li>
+      </ol>
+
+      <p><code>numpy&lt;2.0</code>인 이유는 <a href="../AMASSS/AMASSS.html">AMASSS</a>와 같다: 현재 torch 휠은
+      numpy 1.x에 맞춰 컴파일되어 있다.</p>
+
+      <p><strong>NNUNet 확장은 수동으로 설치해야 한다</strong>: 없으면
+      감지되어(<code>import SlicerNNUNetLib</code>) 설치 후 재시작하라는 메시지가 나온다.
+      반면 <code>SlicerOpenAnatomy</code>는 첫 glTF 내보내기 때 스스로
+      설치된다.</p>
+
+      <p>conda 환경도, WSL도 없다. GPU는 선택 사항이며(<code>cpu</code>, <code>mps</code> 사용 가능),
+      폴백 메시지에 따르면 그 대가는 "스캔당 약 1시간"이다.</p>
+
+      <h2 id="pieges">9. 함정과 취약 지점</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그 — NasoMaxillaDentSeg</div>
+        <p><strong>NasoMaxillaDentSeg에서 세그먼트 이름과 레이블 표가
+        어긋난다.</strong> <code>_get_active_label_map</code>은 <code>Maxilla = 3</code>,
+        <code>Upper Teeth = 4</code>, <code>Lower Teeth = 5</code>, <code>Mandibular canal = 6</code>을 주는데,
+        <code>_updateSegmentationDisplay</code>
+        (<code>SegmentationWidget.py:2385</code>)는
+        <code>Segment_1..6</code>의 이름을 다음 목록으로 바꾼다:
+        <code>["Upper Skull", "Mandible", "Upper Teeth", "Lower Teeth", "Mandibular canal", "Maxilla "]</code>.</p>
+        <p>첫 번째 효과는 내보내기 문제 이전에 <strong>화면에서 보인다</strong>: 목록이
+        표의 순서와 다르므로, 마지막 네 세그먼트가
+        잘못된 이름, 잘못된 색, 잘못된 불투명도를 받는다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>세그먼트</th><th>실제 구조</th><th>표시되는 이름</th></tr></thead>
+            <tbody>
+              <tr><td><code>Segment_3</code></td><td>Maxilla</td><td>"Upper Teeth"</td></tr>
+              <tr><td><code>Segment_4</code></td><td>Upper Teeth</td><td>"Lower Teeth"</td></tr>
+              <tr><td><code>Segment_5</code></td><td>Lower Teeth</td><td>"Mandibular canal"</td></tr>
+              <tr><td><code>Segment_6</code></td><td>Mandibular canal</td><td>"Maxilla"(끝에 공백 포함)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>수정 방법은 공백만 지우는 것이 아니라, 목록(과 함께 쓰이는 <code>colors</code>,
+        <code>opacities</code> 목록)을 <code>_get_active_label_map</code>에 맞게 다시 정렬하는
+        것이다.</p>
+        <p>그런데 이름 변경은 <strong>먼저</strong> 일어나고, 그 뒤에 <code>LabelValue</code> 태그가 설정되며,
+        <code>_segmentLabelValue</code>는 이때 이름으로 폴백한다: 실제로 레이블 3(상악골)을 담은
+        <code>Segment_3</code>은 "Upper Teeth"로 이름이 바뀌어 <strong>값 4로
+        내보내진다</strong>. 더 나쁜 것은, <code>"Maxilla "</code>에 <strong>끝 공백</strong>이 있다는 점이다: 표
+        조회가 실패하고, <code>Segment_6</code>(하악관)은
+        "unexpected segment"로 로그에 남은 채 NIfTI에서 <strong>사라진다</strong>. 반면 나머지 세 모델에서는
+        두 목록이 완벽하게 대응한다.</p>
+      </div>
+
+      <ul>
+        <li><strong><code>onApplyClickedForVolume</code>의 네 분기는 복사해 붙인 것이다</strong>:
+          UniversalLab 분기는 여전히 변수 이름이 <code>pediatricCheckpoint</code>이고
+          "Downloading pediatricdentalseg model…"을 로그에 남긴다. 겉모습의 문제이지만, 로그를 읽을 때
+          오해를 부른다.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>DentalSegmentator 가중치를 다운로드하면 나머지 세 모델이 지워진다</strong>:
+        <code>downloadWeights()</code>는 <code>shutil.rmtree(self.destWeightFolder)</code>를
+        <code>Resources/ML</code>에 대해 수행하는데, 이 폴더에는 <code>Dataset001_380CT</code>, <code>Dataset001_max4</code>,
+        <code>Dataset002_380CT</code>도 들어 있다. 그리고 <code>areWeightsMissing()</code>은 <code>rglob("dataset.json")</code>을
+        <strong>어디서든</strong> 찾는다(<code>Resources/ML</code> 아래 전체): 소아용 모델만
+        있어도 검사기는 DentalSegmentator가 설치되어 있다고 믿는다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>취약한 릴리스 해석</strong>: 모든 릴리스의 모든 에셋 중
+        <code>assets[0]</code>을 쓰며, <strong>인증되지 않은</strong> GitHub 클라이언트를 통한다(IP당 시간당 60회 요청).
+        최신 릴리스의 맨 앞에 에셋이 추가되면 다운로드되는 모델이 바뀐다. 또한
+        하나씩 다운로드되는 세 체크포인트에 대해 <strong>무결성 검사가 없다</strong>:
+        잘린 파일과 완전한 파일을 구별할 수 없다.</p>
+      </div>
+
+      <ul>
+        <li><strong>NRRD가 인식되지 않고</strong> 하위 폴더를 탐색하지 않는다
+          (<code>listVolumes</code>). 반면 저장소의 다른 모듈들은 NRRD와 폴더 트리를 흔히
+          만들어 낸다. <strong>이름 충돌</strong>이 가능하다: 다른 폴더에 있는 두 스캔이
+          같은 기본 이름을 가지면 같은
+          <code>&lt;stem&gt;_Segmentation.nii.gz</code>를 덮어쓴다.</li>
+        <li><strong>단일 fold, 앙상블은 절대 없음</strong>(<code>folds="0"</code>): 번들에
+          <code>fold_1..4</code>가 들어 있어도 무시된다.</li>
+        <li><strong><code>os.environ['nnUNet_results']</code></strong>는 스캔마다
+          <code>SegmentationLogic</code>이 다시 쓴다: 여기서는 무해하지만(순차 대기열),
+          같은 Slicer 세션에서 다른 nnU-Net 추론이 실행되면 위험하다.</li>
+        <li><strong>사용되지 않는 코드</strong>: <code>_saveSegmentationAsNifti</code>, <code>_postProcessSegments</code>,
+          <code>_keepLargestIsland</code>, <code>_removeSmallIsland</code>, <code>onExportClicked</code>(해당
+          버튼이 일괄 처리 레이아웃에 연결되어 있지 않다).</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong><code>Resources/ML</code>은 CMake로 설치되지 않는다</strong>: 패키지된 확장에는
+        저장소의 <code>dataset.json</code> / <code>plans.json</code>이 없으며, 가중치가 다운로드되기
+        전까지 사전 메모리 추정(§5.3)은 <code>None</code>을 반환한다.
+        이 경우 스캔을 그대로 통과시킨다.</p>
+      </div>
+
+      <h2 id="litterature">10. 문헌</h2>
+
+      <p><strong>DentalSegmentator</strong>는 발표되었다:</p>
+
+      <blockquote>
+        <p>Dot G., Chaurasia A., Dubois G., Savoldelli C., Haghighat S., Azimian S.,
+        Rahbar Taramsari A., Sivaramakrishnan G., Issa J., Dubey A., Schouman T.,
+        Gajny L. <em>DentalSegmentator: robust open source deep learning-based CT and CBCT
+        image segmentation.</em> Journal of Dentistry 147:105130, 2024.
+        <a href="https://doi.org/10.1016/j.jdent.2024.105130" target="_blank" rel="noopener">doi:10.1016/j.jdent.2024.105130</a>
+        — PMID 38878813</p>
+      </blockquote>
+
+      <p>nnU-Net v2(가중치의 Zenodo 서지 정보에 따르면 v2.2), 학습에는 7개 기관의
+      <strong>CT 및 CBCT 스캔 470건</strong>, 구조 5개, 256건의 hold-out 테스트
+      (내부 133건, 외부 123건): DSC 내부 92.2 ± 6.3%, 외부
+      94.2 ± 7.4%. 여기 포함된 <code>dataset.json</code>은 <code>numTraining = 453</code>을 밝히며,
+      기술된 말뭉치와 일치한다.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">확인됨</div>
+        <p>이 모델에 대해서는 코드와 논문이 일치한다. 가중치는
+        <a href="https://zenodo.org/records/10829675" target="_blank" rel="noopener">Zenodo</a>에도 CC-BY-4.0으로 공개되어 있다
+        (concept DOI <a href="https://doi.org/10.5281/zenodo.10829674" target="_blank" rel="noopener">10.5281/zenodo.10829674</a>).
+        다만 이 모듈은 Zenodo가 아니라 GitHub 릴리스에서 가중치를 가져온다.</p>
+      </div>
+
+      <p>방법론적 기반:</p>
+
+      <blockquote>
+        <p>Isensee F., Jaeger P.F., Kohl S.A.A., Petersen J., Maier-Hein K.H. <em>nnU-Net: a
+        self-configuring method for deep learning-based biomedical image segmentation.</em>
+        Nature Methods 18(2):203-211, 2021.
+        <a href="https://doi.org/10.1038/s41592-020-01008-z" target="_blank" rel="noopener">doi:10.1038/s41592-020-01008-z</a></p>
+      </blockquote>
+
+      <p><strong>세 변형 모델은 저장소에서 어떤 출판물과도 연결되어 있지 않다.</strong>
+      저장소 README는 PediatricDentalSegmentator와 UniversalLabDentalSegmentator에 대해
+      혼합치열 CBCT 스캔 513건을, NasoMaxillaDentalSegmentator에 대해 135건을 제시하지만,
+      참고문헌도 테스트 세트도 없다. 이 수치는 코드 어디에서도
+      확인할 수 없다: 해당 <code>dataset.json</code>
+      파일은 가중치 다운로드와 함께 들어올 뿐이다. 이를 다루는 출판물이 나올 때까지는 내부 주장으로
+      취급할 것.</p>
+
+      <ul>
+        <li><a href="https://github.com/gaudot/SlicerDentalSegmentator" target="_blank" rel="noopener">gaudot/SlicerDentalSegmentator</a> — 원 확장이자 DentalSegmentator 가중치의 출처</li>
+        <li><a href="https://github.com/KitwareMedical/SlicerNNUnet" target="_blank" rel="noopener">KitwareMedical/SlicerNNUnet</a> — 필수 확장 <code>NNUNet</code></li>
+        <li><a href="https://github.com/MIC-DKFZ/nnUNet" target="_blank" rel="noopener">MIC-DKFZ/nnUNet</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools" target="_blank" rel="noopener">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>전체 참고문헌, 받아 둔 PDF, 열람 링크: <a href="SOURCES.html">SOURCES.md</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← 모든 페이지</a> ·
+        <a href="SOURCES.html">이 도구의 참고문헌</a> ·
+        출처: <code>BatchDentalSeg.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

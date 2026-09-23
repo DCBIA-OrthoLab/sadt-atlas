@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SurgMovPred — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="analyse">
+<div class="layout">
+
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/SurgMovPred/SurgMovPred.html" hreflang="en" title="English">EN</a><a href="../../fr/SurgMovPred/SurgMovPred.html" hreflang="fr" title="Français">FR</a><a href="../../pt/SurgMovPred/SurgMovPred.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/SurgMovPred/SurgMovPred.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/SurgMovPred.html"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../SurgMovPred/SurgMovPred.html" aria-current="true"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html" aria-current="page">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › 분석</div>
+        <h1>SurgMovPred</h1>
+        <p class="lede">두부계측 측정값 스프레드시트가 들어가고, 예측된 골 변위 스프레드시트가 나온다. 목표값마다 하나씩, 스태킹된 scikit-learn 회귀기 112개이며, 신경망도, 영상도, 메시도 없다.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="미발표 — 확장 기능의 README에도 이 모듈은 올라 있지 않다.">미발표</a>
+          <span class="badge cli">SurgMovPred_CLI</span>
+          <span class="badge neutral">conda 없음 — Slicer 자체 Python</span>
+          <a class="badge neutral" href="SOURCES.html">참고문헌</a>
+        </div>
+      </header>
+
+      <p><strong>두부계측 측정값 스프레드시트</strong>로부터 악교정 수술의 수술 이동을
+      예측한다. 신경망도, 영상도, 메시도 없다. 예측할 값마다 하나씩 스태킹된 scikit-learn
+      회귀기 112개를 Excel/CSV 파일에 행 단위로 적용한다.</p>
+
+      <h2 id="situation">1. 파이프라인에서의 위치</h2>
+
+      <p>고립된 도구다. 저장소의 어떤 것도 이 도구를 호출하지 않고, 이 도구도 저장소의 어떤 것도
+      호출하지 않는다. 볼륨도, 메시도, 랜드마크도 읽지 않는다. 입력은 스프레드시트
+      폴더이고, 출력은 또 다른 스프레드시트다.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1050 140" role="img" aria-label="입력 스프레드시트부터 출력 스프레드시트까지 SurgMovPred 전체 파이프라인">
+          <rect class="d-box-a" x="10" y="40" width="140" height="54" rx="6"/>
+          <text class="d-label" x="80" y="62" text-anchor="middle">입력 시트</text>
+          <text class="d-label-s" x="80" y="78" text-anchor="middle">.csv / .xlsx / .ods</text>
+
+          <path class="d-arrow" d="M150 67 H175"/>
+          <path class="d-arrow-head" d="M175 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="175" y="40" width="150" height="54" rx="6"/>
+          <text class="d-label" x="250" y="62" text-anchor="middle">열 이름 정리</text>
+          <text class="d-label" x="250" y="76" text-anchor="middle">+ ID 감지</text>
+
+          <path class="d-arrow" d="M325 67 H350"/>
+          <path class="d-arrow-head" d="M350 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="350" y="40" width="150" height="54" rx="6"/>
+          <text class="d-label" x="425" y="62" text-anchor="middle">패키지 112개</text>
+          <text class="d-label" x="425" y="76" text-anchor="middle">로드 (~1.5 GB)</text>
+
+          <path class="d-arrow" d="M500 67 H525"/>
+          <path class="d-arrow-head" d="M525 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="525" y="40" width="150" height="54" rx="6"/>
+          <text class="d-label" x="600" y="62" text-anchor="middle">StandardScaler</text>
+          <text class="d-label-s" x="600" y="78" text-anchor="middle">계산, 패키지별</text>
+
+          <path class="d-arrow" d="M675 67 H700"/>
+          <path class="d-arrow-head" d="M700 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="700" y="40" width="170" height="54" rx="6"/>
+          <text class="d-label" x="785" y="62" text-anchor="middle">StackingRegressor</text>
+          <text class="d-label-s" x="785" y="78" text-anchor="middle">예측, 112회</text>
+
+          <path class="d-arrow" d="M870 67 H895"/>
+          <path class="d-arrow-head" d="M895 67 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="895" y="40" width="145" height="54" rx="6"/>
+          <text class="d-label" x="967" y="62" text-anchor="middle">predictions_outputs</text>
+          <text class="d-label-s" x="967" y="78" text-anchor="middle">.xlsx / .csv</text>
+        </svg>
+        <figcaption>전체 파이프라인: 결정론적 정리 뒤에 목표값마다 하나씩 독립적인 회귀 112개. Slicer 3D 장면으로 되돌아가는 단계는 없다.</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>호출 대상</th><th>방식</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge cli">SurgMovPred_CLI</span></td><td><code>slicer.cli.run(slicer.modules.surgmovpred_cli, …)</code> (<code>SurgMovPred.py:842</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>모듈은 MRML 장면에 연결되어 있지 않다. <code>vtkMRMLNode</code>를 만들지도, 읽지도,
+      변환하지도 않는다. pandas 스크립트 위에 얹힌 실행용 인터페이스다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><a href="../CNE/CNE.html">CNE</a> 모듈(임상 노트 요약)에서 복사·붙여넣기로 남은 흔적이며,
+        실제 파이프라인으로 오해하면 안 된다. <code>helpText</code>는 <em>"This tool helps to
+        create summaries of clinical notes"</em>라고 하고, <code>parameterNodeWrapper</code>는
+        <code>notesFolder_input</code> / <code>modelType</code> / <code>notesType</code>으로 문서화되어 있으며, <code>process()</code>는 여전히
+        인자 이름을 <code>notesFolder_input</code> / <code>notesFolder_output</code>으로 쓴다
+        (<code>SurgMovPred.py:236</code>, <code>SurgMovPred.py:815</code>).</p>
+      </div>
+
+      <h2 id="fichiers">2. 관련 파일</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>역할</th><th>실행 위치</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>SurgMovPred/SurgMovPred.py</code></td>
+              <td>위젯: 폴더 선택기 3개, 모델과 테스트 파일 다운로드, 의존성 설치, QSS 약 400줄</td>
+              <td>Slicer Python</td>
+            </tr>
+            <tr>
+              <td><code>SurgMovPred_CLI/SurgMovPred_CLI.py</code></td>
+              <td>처리 전체: 읽기, 열 이름 정리, <code>predict</code>, 쓰기</td>
+              <td>Slicer Python (스크립트 CLI)</td>
+            </tr>
+            <tr>
+              <td><code>SurgMovPred/Resources/UI/SurgMovPred.ui</code></td>
+              <td>필드 3개(<code>inputFolderLineEdit</code>, <code>modelFolderLineEdit</code>, <code>outputFolderLineEdit</code>) + 버튼 4개</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>위치 매개변수는 세 개뿐이다(<code>inputFolder</code>, <code>modelPath</code>, <code>outputFolder</code>,
+      <code>SurgMovPred_CLI.xml</code>). 설정할 수 있는 것은 없다 — 임계값도, 목표값
+      선택도, 골격 분류 옵션도 없다.</p>
+
+      <h2 id="entree">3. 입력과 전처리</h2>
+
+      <p><strong>허용 형식.</strong> <code>load_data_from_directory()</code>
+      (<code>SurgMovPred_CLI.py:141</code>)는 폴더 안의 모든
+      <code>*.csv</code>, <code>*.xlsx</code>, <code>*.ods</code> 파일(확장자 소문자
+      <strong>와</strong> 대문자 모두)을 모아 읽고(<code>read_csv</code>, <code>read_excel</code>,
+      <code>read_excel(engine='odf')</code>) <strong>이어 붙인다</strong>
+      (<code>pd.concat(..., ignore_index=True)</code>). 하위 폴더로 재귀하지 않는다.
+      Excel 통합 문서는 <strong>첫 번째 시트</strong>만 읽는다 — 공식 테스트 파일에는 시트가
+      일곱 개(<code>all_data</code>, <code>demographics</code>,
+      <code>Invivo_ceph</code>, <code>surgical_mov</code>, <code>dolp_ceph_T0</code>, <code>dolp_ceph_T1</code>,
+      <code>dolp_ceph_total</code>) 있고, 첫 번째 자리에 있는 것은 <code>all_data</code>다.</p>
+
+      <p><strong>열 이름 정규화</strong>, <code>clean_name()</code>
+      (<code>SurgMovPred_CLI.py:39</code>)은 학습 때 쓰인 철자로 되돌리기 위해
+      입력에 적용된다.</p>
+
+      <ol>
+        <li><code>"</code>, <code>\</code>, <code>[</code>, <code>]</code> 제거;</li>
+        <li><code>[0-9a-zA-Z_']</code> 밖의 모든 문자는 <code>_</code>가 된다 — 아포스트로피는
+        <strong>일부러 유지한다</strong>(코드 주석: <code>Jarabak's</code>와 <code>SM_A'_CP</code>를 위해);</li>
+        <li>반복된 <code>_</code>를 하나로 줄이고 양 끝을 잘라 냄;</li>
+        <li><code>"total"</code> → <code>"Total"</code>;</li>
+        <li>이름이 숫자로 시작하면 <code>f_</code> 접두어.</li>
+      </ol>
+
+      <p>이 정리로 실제 특징 이름이 설명된다: <code>SM-A-FH&nbsp;&nbsp;</code>(테스트 파일에서 뒤에
+      공백 두 개)는 <code>SM_A_FH</code>가 되고, <code>Jarabak's ratio&nbsp;&nbsp;</code>는
+      <code>Jarabak's_ratio</code>가, <code>FMA(MP-FH) Ang_2D</code>는 <code>FMA_MP_FH_Ang_2D</code>가 된다.</p>
+
+      <p><strong>환자 식별자.</strong> <code>find_id_column()</code>
+      (<code>SurgMovPred_CLI.py:81</code>)은 대소문자를 구분하지 않는 패턴 8개
+      (<code>#</code>, <code>id</code>, <code>patient id</code>, <code>patient number</code>,
+      <code>subject</code>, …)를 시험한 뒤, 마지막 수단으로 "patient"와 "id"를 모두 포함하는
+      열을 찾는다. 테스트 파일에서는 열 이름이 <code>#</code>이다. 실패하면 출력 열
+      <code>IDPatient</code>는 단순 경고와 함께 <code>pd.NA</code>로 채워진다.</p>
+
+      <p><strong>값 정규화.</strong> 모델 패키지마다 <strong>자체</strong>
+      <code>StandardScaler</code> <span class="badge calcule">계산</span>(중심화 + 스케일링,
+      <code>with_mean=True</code>, <code>with_std=True</code>)를 담고 있으며, 예측 직전에 적용된다
+      (<code>SurgMovPred_CLI.py:237</code>). 결측값 대체는 없다. 결측값은
+      <code>NaN</code>으로 출력까지 그대로 전파된다.</p>
+
+      <p><strong><code>_T0</code> 접미사에 대한 허용</strong>(<code>SurgMovPred_CLI.py:223</code>):
+      모델이 <code>X_T0</code>를 기대하는데 열 이름이 <code>X</code>이면 받아들인다.</p>
+
+      <div class="callout">
+        <div class="callout-title">참고</div>
+        <p>허용은 이것 하나뿐이다. 다른 특징이 하나라도 빠지면 <strong>모델 전체</strong>가
+        경고와 함께 건너뛰어지고, 해당 열은 결과에서
+        빠진다.</p>
+      </div>
+
+      <h2 id="modeles">4. 모델</h2>
+
+      <p>가중치는 <strong>저장소에 없다</strong>. <code>onDownloadDefaultModel()</code>
+      (<code>SurgMovPred.py:782</code>)이 다음을 다운로드하고 압축을 푼다.</p>
+
+      <pre><code>https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/SurgMovPred/all_models.zip
+  -&gt; Documents/SlicerDownloads/SurgMovPred/Models/all_models/</code></pre>
+
+      <p><strong>706 MB</strong>, 폴더 112개, 각각 약 13 MB짜리 <code>stacking_package.pkl</code> 하나.
+      <code>load_all_model_packages()</code>는 재귀적으로 <code>Path.glob("**/stacking_package.pkl")</code>을
+      수행하고 <code>package['target_name']</code>으로 색인한다. 선택기를 <code>all_models/</code>에
+      지정하면 112개 모델이 모두 로드되고, 하위 폴더 하나를 지정하면 하나만 로드된다. CLI 도움말은
+      <code>saved_models/class_1</code>, <code>saved_models/class_None</code> 폴더를 언급하지만 —
+      <strong>골격 분류별 계층 구조는 공개된 아카이브에 존재하지 않으며</strong>, 아카이브는
+      평평한 구조다.</p>
+
+      <h3 id="modeles-paquet">4.1 패키지의 내용</h3>
+
+      <p>각 <code>.pkl</code>은 키가 네 개인 <code>joblib</code> 사전이며,
+      <code>SurgMovPred_CLI.py:212</code>에서 그대로 사용된다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>키</th><th>내용</th></tr></thead>
+          <tbody>
+            <tr><td><code>target_name</code></td><td>목표값 이름, 예: <code>Mx_ALL_APoint_P-/A+_Pred</code> (<code>-</code>, <code>/</code>, <code>+</code>가 들어간 원래 형태)</td></tr>
+            <tr><td><code>features_names</code></td><td>특징 이름 <strong>145개</strong>의 순서 있는 목록</td></tr>
+            <tr><td><code>scaler</code></td><td>적합된 <code>sklearn.preprocessing.StandardScaler</code></td></tr>
+            <tr><td><code>model</code></td><td>적합된 <code>sklearn.ensemble.StackingRegressor</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout ok">
+        <div class="callout-title">확인됨</div>
+        <p>이 정보는
+        <code>all_models/Mn_MB_Genioplasty_Total_Pred/stacking_package.pkl</code>과
+        <code>all_models/Mx_ALL_APoint_P-_A_Pred/stacking_package.pkl</code>에서 직접 읽었다(피클 스트림
+        검사, 실행하지 않음). 145개 특징은 두 패키지에서 동일하다. 나머지 110개도 같다는
+        형식적 보장은 없지만, 크기가 거의 같다(13.17–13.19 MB)는 점이 이를
+        강하게 시사한다.</p>
+      </div>
+
+      <h3 id="modeles-architecture">4.2 구조</h3>
+
+      <p>신경망은 없다. <strong>기본 회귀기 세 개와 선형 메타 회귀기 하나로 이루어진
+      스태킹 앙상블</strong>이며, <code>_sklearn_version = 1.6.1</code>로 직렬화되었다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>역할</th><th>추정기</th><th>피클에서 읽을 수 있는 매개변수</th></tr></thead>
+          <tbody>
+            <tr><td>기본 <code>multitask_elasticnet</code></td><td><code>ElasticNetCV</code></td><td><code>l1_ratio</code> 그리드, <code>n_alphas</code>, <code>eps</code>, <code>selection='cyclic'</code></td></tr>
+            <tr><td>기본 <code>lgbm</code></td><td><code>lightgbm.sklearn.LGBMRegressor</code></td><td><code>boosting_type='gbdt'</code>, <code>objective='regression'</code>, <code>num_leaves=31</code></td></tr>
+            <tr><td>기본 <code>gaussian_process</code></td><td><code>GaussianProcessRegressor</code></td><td>커널 <code>Product(ConstantKernel, RBF)</code>, <code>optimizer='fmin_l_bfgs_b'</code>, <code>normalize_y</code></td></tr>
+            <tr><td>메타</td><td><code>LinearRegression</code></td><td><code>stack_method='predict'</code>, <code>passthrough=False</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 850 260" role="img" aria-label="스태킹 구조: 기본 회귀기 세 개를 선형 메타 회귀로 결합">
+          <rect class="d-box-a" x="10" y="103" width="150" height="54" rx="6"/>
+          <text class="d-label" x="85" y="125" text-anchor="middle">특징 145개</text>
+          <text class="d-label" x="85" y="139" text-anchor="middle">표준화됨</text>
+
+          <path class="d-arrow" d="M160 130 L230 37"/>
+          <path class="d-arrow-head" d="M230 37 l-9 -1 l4 -8 z"/>
+          <path class="d-arrow" d="M160 130 H230"/>
+          <path class="d-arrow-head" d="M230 130 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M160 130 L230 223"/>
+          <path class="d-arrow-head" d="M230 223 l-9 1 l4 -9 z"/>
+
+          <rect class="d-box-n" x="230" y="10" width="170" height="54" rx="6"/>
+          <text class="d-label" x="315" y="30" text-anchor="middle">ElasticNetCV</text>
+          <text class="d-label-s" x="315" y="44" text-anchor="middle">기본 — 예측</text>
+          <text class="d-label-s" x="315" y="57" text-anchor="middle">multitask_elasticnet</text>
+
+          <rect class="d-box-n" x="230" y="103" width="170" height="54" rx="6"/>
+          <text class="d-label" x="315" y="123" text-anchor="middle">LGBMRegressor</text>
+          <text class="d-label-s" x="315" y="137" text-anchor="middle">기본 — 예측</text>
+          <text class="d-label-s" x="315" y="150" text-anchor="middle">lightgbm gbdt</text>
+
+          <rect class="d-box-n" x="230" y="196" width="170" height="54" rx="6"/>
+          <text class="d-label" x="315" y="216" text-anchor="middle">GaussianProcessRegressor</text>
+          <text class="d-label-s" x="315" y="230" text-anchor="middle">기본 — 예측</text>
+          <text class="d-label-s" x="315" y="243" text-anchor="middle">Constant × RBF 커널</text>
+
+          <path class="d-arrow" d="M400 37 L470 123"/>
+          <path class="d-arrow-head" d="M470 123 l-9 -2 l2 -9 z"/>
+          <path class="d-arrow" d="M400 130 H470"/>
+          <path class="d-arrow-head" d="M470 130 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M400 223 L470 137"/>
+          <path class="d-arrow-head" d="M470 137 l-2 9 l-9 -3 z"/>
+
+          <rect class="d-box-n" x="470" y="103" width="170" height="54" rx="6"/>
+          <text class="d-label" x="555" y="123" text-anchor="middle">LinearRegression</text>
+          <text class="d-label-s" x="555" y="137" text-anchor="middle">메타 — 예측</text>
+          <text class="d-label-s" x="555" y="150" text-anchor="middle">passthrough=False</text>
+
+          <path class="d-arrow" d="M640 130 H690"/>
+          <path class="d-arrow-head" d="M690 130 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="690" y="103" width="150" height="54" rx="6"/>
+          <text class="d-label" x="765" y="123" text-anchor="middle">예측값 1개</text>
+          <text class="d-label-s" x="765" y="139" text-anchor="middle">목표값 112개 중 하나</text>
+        </svg>
+        <figcaption>메타 모델은 세 기본 모델의 예측만 보며(<code>passthrough=False</code>), 원래의 특징 145개는 결코 보지 않는다.</figcaption>
+      </figure>
+
+      <p><code>passthrough=False</code>는 메타 모델이 원래의 특징 145개가 아니라 세 기본 모델의 예측<strong>만</strong>
+      본다는 뜻이다. <code>stack_method='predict'</code>:
+      기본 모델마다 스칼라 값 하나, 따라서 입력이 세 개인 선형 회귀다.</p>
+
+      <p>파일 크기의 대부분(특징 145개에 13 MB)은 학습 행렬을 보관하는
+      <code>GaussianProcessRegressor</code>와
+      <a class="gterm" href="../glossary.html#g-lightgbm" title="용어집 보기">LightGBM</a> 부스터에서 나온다.</p>
+
+      <p>학습은 저장소에 없다. 스크립트도, 데이터셋도, 지표도, 시드도 없다.
+      <strong>저장소로부터 알 수 없는 것</strong>: 코호트 규모, 검증 프로토콜,
+      목표값별 성능.</p>
+
+      <h3 id="modeles-features">4.3 특징 145개</h3>
+
+      <p>네 계열이며, <code>features_names</code>에서 재구성하고 테스트 파일의
+      <code>all_data</code> 시트와 대조했다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>계열</th><th>개수</th><th>예</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>세 기준 평면에 대한 점 위치 — <strong>FH</strong>(프랑크푸르트 수평면), <strong>MSP</strong>(정중시상면), <strong>CP</strong>(관상면)</td>
+              <td>~76</td>
+              <td><code>SM_A_FH</code>, <code>SM_GoL_MSP</code>, <code>SM_PNS_CP</code>, <code>SM_CoR_FH</code></td>
+            </tr>
+            <tr>
+              <td>연조직 점, 아포스트로피로 표시</td>
+              <td>~20</td>
+              <td><code>SM_N'_FH</code>, <code>SM_Sn'_MSP</code>, <code>SM_ULip'_FH</code>, <code>SM_Pg'_MSP</code></td>
+            </tr>
+            <tr>
+              <td>고전적인 2D 두부계측 측정값</td>
+              <td>~12</td>
+              <td><code>SNA</code>, <code>SM_ANB_signed</code>, <code>SM_Witts</code>, <code>LAFH</code>, <code>Jarabak's_ratio</code>, <code>UAFH_LAFH</code>, <code>FMA_MP_FH_Ang_2D</code>, <code>IMPA_L1_MP_Ang_2D</code>, <code>U1_to_SN_Ang_2D</code>, <code>SM_Mx_Width</code>, <code>SM_Mn_Width</code>, <code>OP_to_FH_Ang_2D</code></td>
+            </tr>
+            <tr>
+              <td>교합/치아 측정값, <code>_T0</code>와 <code>_Total</code> 접미사가 붙은 두 세트</td>
+              <td>2 × ~18</td>
+              <td><code>MxMn_Overjet_R_T0</code> / <code>MxMn_Overjet_R_Total</code>, <code>MxMn_Molar_Relationship_L_T0</code>, <code>Mn_Gonions_to_Midline_Distances_R_Total</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>두 세트 <code>_T0</code> / <code>_Total</code>이 정확히 무엇을 뜻하는지는 저장소 어디에도
+      문서화되어 있지 않다. 이름(<code>T0</code> = 이전, <code>Total</code> = 전체 변화량)과
+      둘 다 <strong>입력</strong> 쪽에 있다는 사실로 보아, 모델은 수술 전 상태<em>와</em>
+      목표 <a class="gterm" href="../glossary.html#g-occlusal" title="용어집 보기">교합</a> 결과를 받아 수행해야 할 골
+      변위를 추론하는 것으로 보인다 — 이는 <strong>추론</strong>이지, 코드가 주장하는
+      바가 아니다.</p>
+
+      <p>테스트 파일의 <code>Gender</code>, <code>Surg</code>, <code>Genio</code>, <code>3piece</code>, <code>assymetry</code>,
+      <code>Skl_Cl_2</code> 열은 검사한 두 패키지의 특징 145개에
+      나오지 않는다. 읽힌 뒤 무시된다.</p>
+
+      <h3 id="modeles-cibles">4.4 무엇을 예측하는가</h3>
+
+      <p>목표값 112개 = <strong>구조 28개 × 성분 4개</strong>.</p>
+
+      <p>목표값 이름으로 본 성분: <code>P-/A+</code>(후방 음수 / 전방
+      양수), <code>R-/L+</code>(우측 음수 / 좌측 양수), <code>Down+</code>(수직, 아래쪽
+      양수), 그리고 <code>Total</code>. 따라서 앞의 셋은 두부계측 좌표계(CP, MSP, FH)에서
+      변위 벡터의 부호 있는 성분이고, 네 번째는 거의 확실히 그 크기다 — <strong>이름에서
+      추론한 것이며, 단위(mm)는 어디에도 적혀 있지 않다</strong>.</p>
+
+      <p>구조 28개:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>분절</th><th>점</th></tr></thead>
+          <tbody>
+            <tr><td>상악골, <code>Mx_ALL_*</code> (10)</td><td>APoint, ANS, PNS, U3CanineTip L/R, U6MesialCuspTip L/R, UpperIncisorTip L/R, UpperIncisorTipMidpoint</td></tr>
+            <tr><td>하악골, <code>Mn_ALL_*</code> (17)</td><td>BPoint, Gnathion, Menton, Pogonion, Gonion L/R, ChinSideCut L/R, MandibleBackCut L/R, L3CanineTip L/R, L6MesialCuspTip L/R, LowerIncisorTip L/R, LowerIncisorTipMidpoint</td></tr>
+            <tr><td>이부성형술, <code>Mn_MB_Genioplasty</code> (1)</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>ALL</code>은 골 분절 전체(한 덩어리로 움직이는 상악골 또는 하악골)를,
+      <code>MB</code>는 이부성형 분절을 가리킨다. 따라서 예측되는 것은 강체 변환이 아니라
+      <strong>각 분절에 강체로 붙어 있는 랜드마크 점들의</strong> 변위이며(<span class="badge predit">예측</span>),
+      상악골의 점 10개가 서로 일관되도록 강제하는
+      장치는 없다(§7 참조).</p>
+
+      <h2 id="traitement">5. 핵심 처리</h2>
+
+      <p><code>predict_all_targets()</code>(<code>SurgMovPred_CLI.py:194</code>), 전체:</p>
+
+      <pre><code>for target_name, pack in packages.items():
+    X_target = df_cleaned[[feature_source[f] for f in pack['features_names']]]
+    X_target.columns = pack['features_names']
+    X_scaled = pack['scaler'].transform(X_target)
+    predictions_by_target[target_name] = pack['model'].predict(
+        pd.DataFrame(X_scaled, columns=..., index=df_cleaned.index))</code></pre>
+
+      <p>사후 보정도, 범위 제한도, 목표값 간 일관성도, 신뢰
+      구간도 없다 — <code>GaussianProcessRegressor</code>는 표준편차를 낼 수 있지만,
+      요청받지 않는다. 각 목표값은 독립적으로 처리되며, 목표값마다 <code>try/except</code>가
+      있다. 충돌한 목표값은 다른 목표값을 중단시키지 않고, 해당 열이 그냥
+      사라진다.</p>
+
+      <p>112개 모델이 모두 한꺼번에 메모리에 로드된다(<code>load_all_model_packages</code>). 즉
+      데이터를 읽기도 전에 <strong>RAM 약 1.5 GB</strong>를 쓴다.</p>
+
+      <h2 id="sorties">6. 출력</h2>
+
+      <p><code>save_results()</code>는 출력 폴더에 내용이 같은 파일 두 개를 쓴다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>내용</th></tr></thead>
+          <tbody>
+            <tr><td><code>predictions_outputs.xlsx</code></td><td>입력 환자당 한 행, <code>IDPatient</code> 열 다음에 예측된 목표값마다 한 열</td></tr>
+            <tr><td><code>predictions_outputs.csv</code></td><td>동일</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>두 경우 모두 <code>index=True</code>: pandas 인덱스(0, 1, 2…)가 이름 없는
+      열이 된다. 열 이름은 패키지의 원래 <code>target_name</code>이므로 <code>/</code>와
+      <code>+</code>가 들어간다(<code>Mx_ALL_APoint_P-/A+_Pred</code>).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>결과를 다시 적용하는 과정이 전혀 없다.</strong> 행렬을 만들거나,
+        메시를 옮기거나, Slicer 노드를 만들거나, 뷰를 여는 것이 아무것도 없다. 예측은
+        스프레드시트에서 멈춘다. "예측을 어떻게 다시 적용해 시각화 가능한 결과를
+        만드는가"라는 질문에 이 저장소는 답하지 않는다 — 값을 수술 계획 소프트웨어로
+        옮기는 것은 사용자의 몫이다.</p>
+      </div>
+
+      <h2 id="predit-vs-calcule">7. 예측되는 것과 계산되는 것</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>블록</th><th>성격</th><th>위치</th></tr></thead>
+          <tbody>
+            <tr><td>열 이름 정리, ID 감지</td><td><span class="badge calcule">계산</span> 결정론적 (정규식)</td><td>CLI</td></tr>
+            <tr><td>표준화</td><td><span class="badge calcule">계산</span> 학습된 <code>StandardScaler</code></td><td>CLI</td></tr>
+            <tr><td>변위 112개 예측</td><td><span class="badge predit">예측</span> 스태킹 ElasticNetCV + LightGBM + GP, 메타 <code>LinearRegression</code></td><td>CLI, CPU</td></tr>
+            <tr><td>단일 분절 변환으로의 통합</td><td><strong>존재하지 않음</strong></td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 760 200" role="img" aria-label="한 분절의 점들이 강체 통합 단계 없이 독립적으로 예측된다">
+          <rect class="d-box-n" x="10" y="73" width="190" height="54" rx="6"/>
+          <text class="d-label" x="105" y="93" text-anchor="middle">상악 점 10개</text>
+          <text class="d-label-s" x="105" y="109" text-anchor="middle">독립 회귀 40개</text>
+
+          <path class="d-arrow" d="M200 100 H255" stroke-dasharray="4 4"/>
+          <path class="d-arrow-head" d="M255 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="255" y="73" width="230" height="54" rx="6" stroke-dasharray="4 4"/>
+          <text class="d-label" x="370" y="93" text-anchor="middle">강체 변환</text>
+          <text class="d-label-s" x="370" y="109" text-anchor="middle">저장소에 존재하지 않음</text>
+
+          <path class="d-arrow" d="M485 100 H540" stroke-dasharray="4 4"/>
+          <path class="d-arrow-head" d="M540 100 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="540" y="73" width="210" height="54" rx="6" stroke-dasharray="4 4"/>
+          <text class="d-label" x="645" y="93" text-anchor="middle">일관된 변위</text>
+          <text class="d-label-s" x="645" y="109" text-anchor="middle">메시에 적용 가능 — 가정</text>
+        </svg>
+        <figcaption>점선 상자는 코드에 존재하지 않는다. 골 분절 전체에 대해 일관된 강체 이동을 보장하는 것은 없다.</figcaption>
+      </figure>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>상악골의 점 10개는 독립된 모델 40개로 예측된다. 예측된 변위가 상악 블록의
+        강체 이동과 양립한다는 보장은 없다. 후처리 단계(예측된 점에 대한 최소제곱 강체
+        맞춤)가 자연스러운 보완이 되겠지만, 그런 단계는
+        없다.</p>
+      </div>
+
+      <h2 id="environnement">8. 실행 환경</h2>
+
+      <p>모든 것이 Slicer의 Python 안에서 실행된다. <code>check_dependencies()</code>
+      (<code>SurgMovPred.py:156</code>)는 Apply를 누를 때<strong>마다</strong> 호출된다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>값</th></tr></thead>
+          <tbody>
+            <tr><td>패키지</td><td><code>pandas</code>, <code>joblib</code>, <code>openpyxl</code>, <code>scikit-learn</code>, <code>lightgbm</code></td></tr>
+            <tr><td>목록에서 빠진 것</td><td><code>odfpy</code> — <code>read_excel(engine='odf')</code>가 광고된 <code>.ods</code> 파일을 읽으려면 필요한데도</td></tr>
+            <tr><td>numpy</td><td><code>slicer.util.pip_install("numpy==2.4.0")</code> <strong>무조건</strong>, Apply 때마다</td></tr>
+            <tr><td>macOS</td><td><code>ensure_mac_openmp()</code>가 <code>libomp.dylib</code>를 <code>mac.r-project.org</code>에서 내려받아 Slicer의 <code>cli-modules</code> 폴더에 넣은 뒤 <code>RTLD_GLOBAL</code>로 로드한다 — LightGBM에 필요</td></tr>
+            <tr><td>컴파일</td><td><code>CC=gcc</code> / <code>CXX=g++</code>를 <code>pip_install</code> 동안 강제하고, 이후 복원</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p><code>pip_install("numpy==2.4.0")</code>은 <strong>무조건, Apply를 누를 때마다
+        실행된다</strong>. 실행 중인 Slicer 세션에서 numpy를 바꿔 넣는 것은 바로 확장 기능의
+        다른 곳에서 scipy import를 깨뜨리는 원인이다(Slicer의 scipy는 Slicer의 numpy에 맞춰
+        컴파일되어 있다). 모듈에서 단연 가장 위험한 지점이며, 주 버튼이
+        이를 촉발한다.</p>
+      </div>
+
+      <p>설치는 conda 없이, GPU 없이, torch 없이 이루어진다.</p>
+
+      <p>CLI는 scikit-learn의 <code>InconsistentVersionWarning</code>을 숨긴다
+      (<code>SurgMovPred_CLI.py:19</code>). 패키지는 scikit-learn 1.6.1로 직렬화되었고,
+      그때그때 설치된 버전으로 역직렬화된다. 주석은 그 위험을 감수한다
+      ("models are tested for compatibility before being shipped").</p>
+
+      <h2 id="pieges">9. 함정과 취약 지점</h2>
+
+      <ul>
+        <li><strong>실행할 때마다 <code>pip_install("numpy==2.4.0")</code>.</strong> 실행 중인
+        Slicer 세션에서 numpy를 바꿔 넣는 것은 바로 확장 기능의 다른 곳에서 scipy import를
+        깨뜨리는 원인이다(Slicer의 scipy는 Slicer의 numpy에 맞춰 컴파일되어 있다). 모듈에서
+        단연 가장 위험한 지점이며, 주 버튼이 이를 촉발한다.</li>
+        <li><strong>동작하지 않는 "test files" 버튼</strong>: <code>DownloadTestFiles()</code>
+        (<code>SurgMovPred.py:763</code>)는 <code>TestFiles.zip</code>을 다운로드하기는 하지만,
+        입력/출력 필드를 채우는 것은 <code>if os.path.exists(.../V_FACE/DefaultList)</code>일 때뿐이다 — VFACE
+        모듈에서 복사·붙여넣기로 남은 흔적이다. <a href="../VFACE/VFACE.html">VFACE</a>의 테스트 데이터가 없으면 아카이브는
+        다운로드된 뒤 무시된다.</li>
+        <li><strong><code>.ods</code>는 광고되지만, <code>odfpy</code>는 설치되지 않는다</strong>(<code>check_dependencies</code>
+        기준). (다만 Anonymizer 모듈이 설치하므로, 두 모듈을 모두 쓴 컴퓨터에서는 문제가
+        가려질 수 있다.)</li>
+        <li><strong>특징 하나 누락 = 모델 하나가 조용히 건너뛰어짐.</strong> 로그에는
+        "Model 'X' skipped: missing N input feature(s)"라고 나오지만, 출력 파일 자체는 그냥
+        열이 하나 적을 뿐이다. 이름이 잘못 붙은 스프레드시트는 실패 없이 예측 열이 하나도 없는
+        <code>predictions_outputs.xlsx</code>를 만들 수 있다.</li>
+        <li><strong>입력 파일을 무작정 이어 붙임</strong>: 열이 서로 다른 스프레드시트 두 개는
+        <code>NaN</code>을 만들고, <code>model.predict</code>는 <code>NaN</code>에서 예외를 일으킨다 —
+        오류는 목표값별로 잡히므로, 결과는 일부만 나오고 그 사실은 거의
+        드러나지 않는다.</li>
+        <li><strong>Excel 시트는 하나만 읽는다.</strong> 첫 시트가 데이터 시트가 아닌
+        통합 문서는 빈 결과를 낸다.</li>
+        <li><strong>모델 1.5 GB를 무조건 로드</strong>한다. 예측할 행이 하나뿐이어도,
+        사용자가 목표값 하나에만 관심이 있어도 마찬가지다.</li>
+        <li><strong>출력에 불확실성이 없다.</strong> 세 기본 모델 중 하나가
+        가우시안 프로세스인데도 그렇다.</li>
+        <li><strong>같은 분절의 점들 사이에 강체 일관성이 없다</strong>(§7).</li>
+        <li><code>helpText</code>, 매개변수 노드의 docstring, <code>process()</code>의
+        인자 이름은 전혀 다른 도구(임상 노트 요약)를 기술한다.</li>
+      </ul>
+
+      <h2 id="litterature">10. 문헌</h2>
+
+      <p><strong>SurgMovPred를 다루는 논문은 없다.</strong> 저장소도, 릴리스도,
+      README도 어떤 참고문헌을 인용하지 않으며, 모듈 이름으로 검색해도 아무것도
+      나오지 않는다. 이 모듈은 확장 기능의 README에도 올라 있지 않다.</p>
+
+      <p>출판된 맥락이며, 이 코드에 대한 기술과 혼동해서는 안 된다.</p>
+
+      <ul>
+        <li><a href="https://pubmed.ncbi.nlm.nih.gov/35132764/">Machine-learning-based approach for predicting postoperative skeletal changes for orthognathic surgical planning (PubMed 35132764)</a> —
+        제기된 문제는 같지만(수술 전 측정값으로 수술 후 골격 변위 예측), 이 연구가
+        이 가중치의 출처라는 근거는 없다.</li>
+        <li><a href="https://onlinelibrary.wiley.com/doi/10.1111/ocr.12805">Oliveira, Cevidanes, Bianchi et al., <em>Artificial intelligence as a prediction tool for orthognathic surgery assessment</em>, Orthodontics &amp; Craniofacial Research, 2024</a> —
+        같은 팀(UNC/Pacific)이지만 대상이 다르다. 이동 자체가 아니라, 측면 두부계측
+        방사선사진으로 수술의 <em>필요 여부</em>를 예측한다.</li>
+        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10024836/">Prediction of orthognathic surgery plan from 3D cephalometric analysis via deep learning (PMC10024836)</a> —
+        같은 목표, 딥러닝 접근. 반면 SurgMovPred는 고전적인 표 형식
+        모델이다.</li>
+      </ul>
+
+      <p>기반 도구는 문서화되어 있다:
+      <a href="https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.StackingRegressor.html"><code>StackingRegressor</code></a>
+      와 <a href="https://lightgbm.readthedocs.io/">LightGBM</a>.</p>
+
+      <p>상세 참고문헌, 받아 둔 파일, 방문할 링크:
+      <a href="SOURCES.html">SOURCES.html</a> — 이 모듈을 다룬 NA-MIC Project Week 45(Boston, 2026)
+      페이지를 포함하며, 이것이 찾은 유일한 1차 출처다
+      (<a href="2026_Buisson_NAMIC_PW45_surgery_movement.html">2026_Buisson_NAMIC_PW45_surgery_movement.html</a>).</p>
+
+      <footer class="footer">
+        <a href="../index.html">← 모든 도구 페이지</a> ·
+        <a href="SOURCES.html">이 도구의 참고문헌</a> ·
+        출처: <code>SurgMovPred.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

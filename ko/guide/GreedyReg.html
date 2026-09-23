@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GreedyReg — 가이드 — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="recalage">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/GreedyReg.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/GreedyReg.html" hreflang="fr" title="Français">FR</a><a href="../../pt/guide/GreedyReg.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/guide/GreedyReg.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/GreedyReg.html" aria-current="true"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../GreedyReg/GreedyReg.html"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html" aria-current="page">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/GreedyReg/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">가이드</a> › 정합</div>
+        <h1>GreedyReg — ITK-SNAP 엔진으로 CBCT 두 개를 정합하기</h1>
+        <p class="lede">GreedyReg는 ITK-SNAP의 <strong>greedy</strong> 엔진을 구동해 같은 환자의
+        CBCT 두 개(T1과 T2)를 정렬합니다. 주 계산에는 신경망이 없고, 따로 설치할 것도
+        없습니다. 결과는 예측이 아니라 고전적인 강도 기반 최적화에서 나옵니다.</p>
+      </header>
+
+      <h2 id="quand">언제 쓰는가</h2>
+      <p>같은 모달리티의 CBCT 두 개 — 예를 들어 치료 전/후 추적 관찰 — 를 정합하면서
+      계산을 세밀하게 제어하고 싶을 때 씁니다. 어떤 메트릭을 쓸지, 자유도를 몇으로 할지,
+      필요하면 마스크로 최적화를 한 영역에 집중시킬지를 정할 수 있습니다. 처리 사슬의 끝에 오는
+      도구로, SADT의 다른 어떤 도구도 그 결과를 사용하지 않습니다. 결과 변환을 Slicer의
+      다른 곳에서 다시 써야 한다면 이 모듈은 적합하지 않습니다. 이 모듈의 행렬은 greedy 전용
+      형식이며 Slicer 변환 파일이 아닙니다.</p>
+
+      <div class="callout">
+        <div class="callout-title">모드는 셋, 실제 정합은 하나</div>
+        <p>실제로 강도 기반 정합을 수행하는 것은 <strong>Automatic Registration</strong>(자동 정합)뿐입니다.
+        <strong>Manual Alignment</strong>(수동 정렬)와
+        <strong>Distant Registration</strong>(원거리 정합)은 시작점을 준비할 뿐이며, 이후에
+        다듬어야 합니다.</p>
+      </div>
+
+      <h2 id="besoin">필요한 것, 얻는 것</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>준비할 것</h4>
+          <ul>
+            <li><code>.nii.gz</code> 형식의 CBCT 폴더 두 개: 고정 볼륨(T1)용 하나,
+            이동 볼륨(T2)용 하나</li>
+            <li>문자로 시작하고 이어서 숫자가 오는 파일 이름. 예:
+            <code>A01_T1.nii.gz</code>. 이 규칙 덕분에 GreedyReg가 같은 환자의 T1과 T2를
+            짝지을 수 있습니다. 다른 이름 규칙은 경고 없이 짝지어지지 않습니다</li>
+            <li>선택 사항: 고정 볼륨 공간에 있는 마스크(분할 또는 레이블맵)</li>
+            <li>선택 사항: 초기화 행렬, 또는 모듈 안에서 수행한 수동 사전 정렬</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>결과물</h4>
+          <ul>
+            <li>T1 격자로 리샘플링된 T2(<code>.nii.gz</code>)와 찾아낸 어파인
+            행렬</li>
+            <li>Distant 모드에서는 시작 행렬만 나오며, 정합된 볼륨은 나오지 않습니다</li>
+            <li>생성된 행렬은 Slicer 변환 형식이 아니라 greedy 고유 형식입니다.
+            그대로는 변환 노드로 불러와지지 않으며, SADT의 다른 어떤 도구도 이를
+            재사용하지 않습니다</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="modes">세 가지 모드와 선택 방법</h2>
+      <ul>
+        <li><strong>Manual Alignment.</strong> 이동 볼륨을 손으로 움직입니다(슬라이더,
+        또는 빠른 중심 맞추기용 "Center T2 on T1" 버튼). 두 CBCT가 이미 가까이 있고,
+        실제 계산을 돌리기 전에 대략적인 조정만 남았을 때 유용합니다.</li>
+        <li><strong>Automatic Registration.</strong> 실제로 정합하는 유일한 모드입니다.
+        greedy 엔진이 영상 강도로부터 강체 또는 어파인 변환을 최적화합니다.
+        여기서 메트릭(기본값 NMI는 강도가 이질적일 때, NCC는 국소 상관, SSD는 두 볼륨이
+        같은 모달리티일 때)과 자유도(강체 또는 완전 어파인)를 고릅니다.</li>
+        <li><strong>Distant Registration (Large Misalignment).</strong> 처음부터 기하학적으로
+        멀리 떨어져 있는 두 스캔을 위한 모드입니다. "Distant"는 이 거리를 뜻하며, 원격
+        계산을 뜻하지 않습니다. 엔진과 예측 가중치를 처음 한 번 다운로드하는 것 외에는 아무것도
+        컴퓨터 밖으로 나가지 않으며, 환자 데이터는 절대 나가지 않습니다. 이 모드는
+        해부학적 랜드마크 몇 개(두개저, 하악골 또는 상악골 — 한 번에 한 영역)를 예측하고,
+        이로부터 시작 행렬을 구합니다. 정합된 볼륨은 만들지 않으므로, 항상 이어서
+        Automatic Registration으로 다듬으십시오.</li>
+      </ul>
+      <p>실제로는: 두 CBCT가 이미 대략 겹쳐 있다면 바로 Manual, 이어서 Automatic으로
+      가십시오. 멀리 떨어져 있다면 Distant Registration으로 시작한 뒤 Automatic으로
+      다듬으십시오.</p>
+
+      <h2 id="marche">사용 절차</h2>
+      <ol class="steps">
+        <li><strong>볼륨을 나눕니다.</strong> 고정 CBCT(T1)용 폴더 하나, 이동 CBCT(T2)용
+        폴더 하나. 각 파일 이름에는 같은 환자 식별자가 들어가야
+        합니다.</li>
+        <li><strong>필요하면 마스크를 추가합니다.</strong> 마스크는 고정
+        볼륨 공간에 있어야 합니다. 최적화가 기울기를 찾는 곳이 거기이기 때문입니다.</li>
+        <li><strong>어긋남이 크면 사전 정렬합니다.</strong> 차이가 작으면 Manual 모드에서
+        손으로, 크면 Distant Registration으로 합니다.</li>
+        <li><strong>Automatic Registration으로 전환합니다.</strong> 메트릭과
+        자유도(강체 또는 어파인)를 고른 뒤 실행합니다.</li>
+        <li><strong>여러 증례를 처리하려면</strong> T1/T2 폴더 전체를 바로 지정하십시오. 일괄
+        처리가 식별자로 짝지어진 쌍들을 차례로 처리합니다.</li>
+        <li><strong>Slicer를 닫기 전에 결과를 저장합니다</strong>. 이것이 왜 중요한지는
+        아래를 보십시오.</li>
+      </ol>
+
+      <h2 id="coince">문제가 생기면</h2>
+      <div class="callout warn">
+        <div class="callout-title">Distant 모드에서는 "Save Registered Volume"이 아무 일도 하지 않습니다</div>
+        <p>이 모드는 정합된 볼륨이 아니라 시작 행렬만 만듭니다. 그래서 이
+        버튼은 항상 "No result to save!"라고 응답합니다. 대신 "Save Transform Matrix"를 쓰거나,
+        바로 Automatic Registration으로 넘어가 저장할 만한 볼륨을 얻으십시오.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">Distant 모드의 오해를 부르는 체크박스</div>
+        <p>여러 구조(두개저, 하악골, 상악골)를 체크해도 합쳐지지
+        않습니다. 실제로는 한 영역만 쓰이며, 어떤 상자를 체크했든 고정된 우선순위(두개저,
+        그다음 하악골, 그다음 상악골)에 따라 선택됩니다.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">일괄 처리에서는 한 번의 실패가 전부를 멈추며, 항상 분명히 드러나지는 않습니다</div>
+        <p>폴더 전체를 처리할 때 처음 실패한 증례가 실행 전체를 멈춥니다. 재개도, 남은 증례
+        목록도 없습니다. Distant 모드에서는 랜드마크 예측 실패가 항상 눈에 띄는 오류로
+        나타나지는 않습니다. 보이는 신호라고는 로그의 조용한 "only 0
+        matched landmarks" 한 줄뿐일 수 있습니다.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">임시 폴더는 정리되지 않습니다</div>
+        <p>자동 정합 후든 수동 세션 후든, 모듈은 작업 폴더를 지우지
+        않습니다. 긴 시리즈에서는 디스크 사용량이 쌓이니 가끔 직접 정리하십시오. 다만 반드시
+        결과를 저장한 뒤에 하십시오. Automatic 모드에서 "Save Registered Volume"이 파일을
+        가져오는 곳도 그 폴더이기 때문입니다.</p>
+      </div>
+
+      <h2 id="apres">그다음</h2>
+      <p>계측에 쓰기 전에 항상 Slicer에서 정합된 볼륨을 고정 CBCT 위에 겹쳐
+      눈으로 결과를 확인하십시오. 그리고 내보낸 행렬은 Slicer나 ITK 변환이 아니라
+      단순한 greedy 형식 파일이라는 점을 기억하십시오. 이 모듈 밖에서 다시 쓰려면
+      GreedyReg가 직접 해 주지 않는 변환 작업이 필요합니다.</p>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">더 읽을거리</h2>
+      <h3 id="sur-outil">GreedyReg 자체에 관한 문헌</h3>
+      <ul>
+        <li><strong>Venet et al., arXiv 2019</strong> — <a href="https://arxiv.org/abs/1904.11929"><em>Accurate and Robust Alignment of Variable-Stained Histologic Images Using a General-Purpose Greedy Diffeomorphic Registration Tool</em></a>. 이 모듈이 단순히 구동만 하는 엔진인 <code>greedy</code>의 논문입니다. 분량이 짧으며, 저자들이 인용을 요청하는 논문입니다.</li>
+      </ul>
+      <h3 id="autour">방법론 관련 문헌</h3>
+      <ul>
+        <li><strong>Yushkevich et al., NeuroImage 2006</strong> — <a href="https://doi.org/10.1016/j.neuroimage.2006.01.015"><em>User-guided 3D active contour segmentation of anatomical structures: Significantly improved efficiency and reliability</em></a>. <code>greedy</code>가 파생된 ITK-SNAP의 참고문헌입니다. 이 모듈은 ITK-SNAP의 용어 일부를 가져다 씁니다.</li>
+        <li><strong>Documentation de greedy</strong> — <a href="https://greedy.readthedocs.io/en/latest/reference.html"><em>greedy — command reference</em></a>. 엔진의 전체 옵션 목록입니다. 인터페이스의 설정 하나가 무엇을 뜻하는지 알고 싶을 때 참고합니다.</li>
+      </ul>
+      <p>이 도구의 전체 참고문헌 — 찾아낸 것과 찾아봤지만 없었던 것 — 은 <a href="../GreedyReg/SOURCES.html">출처 페이지</a>에 있습니다.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../GreedyReg/GreedyReg.html">
+        <b>실제 동작 방식 →</b>
+        <span>아틀라스 페이지: greedy 바이너리와 CLI의 정확한 역할, 모드별로 무엇이
+        예측이고 무엇이 계산인지, 행렬 형식, 그리고 코드에서 발견한
+        한계를 다룹니다.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← 전체 가이드</a> ·
+        <a href="../GreedyReg/GreedyReg.html">아틀라스 페이지</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

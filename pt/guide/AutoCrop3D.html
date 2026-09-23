@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoCrop3D — Guia — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="utilitaires">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/AutoCrop3D.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/AutoCrop3D.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/guide/AutoCrop3D.html" hreflang="ko" title="한국어">KO</a><a href="../../th/guide/AutoCrop3D.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/AutoCrop3D.html" aria-current="true"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../AutoCrop3D/AutoCrop3D.html"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html" aria-current="page">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/AutoCrop3D/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">Guia</a> › Utilitários</div>
+        <h1>AutoCrop3D — recortar uma série de volumes</h1>
+        <p class="lede">O AutoCrop3D recorta em lote uma pasta de volumes segundo uma região de
+        interesse comum, ou segundo uma região própria de cada paciente. Nenhuma rede, nenhum modelo a baixar:
+        é um recorte geométrico, quase instantâneo, que nunca altera os valores dos seus voxels.</p>
+      </header>
+
+      <h2 id="quand">Quando usar</h2>
+      <p>Sempre que uma série for grande demais ou heterogênea demais em campo de visão para ser processada tal
+      como está: rode-o antes de um segmentador (AMASSS, BatchDentalSeg) para reduzir o que precisa ser
+      processado, ou depois, para manter apenas a região útil. O AutoCrop3D também pode
+      gerar uma malha VTK a partir de uma segmentação que você já produziu, para uma visualização rápida.</p>
+
+      <h2 id="roi">Preparar a região de interesse</h2>
+      <p>A região a recortar vem de um único arquivo de ROI do Slicer (<code>.mrk.json</code>), e de
+      nada mais: posicione uma caixa <b>Markups &gt; ROI</b> na cena sobre um paciente
+      representativo, ajuste-a e salve-a. Duas formas de usá-la: uma ROI aplicada a todos os volumes
+      da pasta, ou uma ROI por paciente — nesse caso, dê a cada arquivo de ROI o mesmo
+      prefixo dos volumes correspondentes, para que o pareamento funcione (ver abaixo).</p>
+
+      <div class="callout warn">
+        <div class="callout-title">A ROI deve ser uma caixa alinhada aos eixos, salva tal como está</div>
+        <p>O caminho de recorte rápido ignora completamente a orientação e o sistema de coordenadas
+        declarados no arquivo de ROI: ele só lê o centro e o tamanho, e supõe uma caixa
+        alinhada aos eixos do volume. Uma ROI girada é tratada como se não fosse, e uma
+        ROI salva no sistema de coordenadas errado desloca o centro sem nenhuma mensagem de
+        erro. O caminho rápido só funciona com caixas retas, salvas da forma como o Slicer as grava
+        por padrão; para uma ROI realmente girada, ver abaixo.</p>
+      </div>
+
+      <h2 id="besoin">O que você precisa, o que você obtém</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>A fornecer</h4>
+          <ul>
+            <li>Uma pasta de volumes — <code>.nii.gz</code>, <code>.nii</code>,
+            <code>.nrrd.gz</code>, <code>.nrrd</code>, <code>.gipl.gz</code> ou
+            <code>.gipl</code></li>
+            <li>Um arquivo de ROI (<code>.mrk.json</code>), ou uma pasta com uma ROI por paciente</li>
+            <li>Um sufixo de saída ("cropped" por padrão)</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>O que sai</h4>
+          <ul>
+            <li>Um volume recortado por entrada, reproduzindo a estrutura da pasta de entrada</li>
+            <li>Opcional: uma malha VTK por segmentação recortada</li>
+            <li>Nenhum arquivo de transformação — a geometria fica inteiramente no próprio volume</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 id="marche">Passo a passo</h2>
+      <ol class="steps">
+        <li><strong>Posicione e salve a sua ROI.</strong> Uma caixa para a série inteira, ou uma
+        por paciente, nomeada de acordo com os seus volumes.</li>
+        <li><strong>Indique a pasta de volumes de entrada.</strong> O AutoCrop3D processa a
+        pasta inteira de uma vez.</li>
+        <li><strong>Indique o arquivo ou a pasta de ROI.</strong> Um único arquivo é aplicado a
+        todos; vários são casados por paciente.</li>
+        <li><strong>Escolha um sufixo de saída</strong> e, se precisar, "Keep the same
+        size as input" (manter o mesmo tamanho da entrada) para preservar toda a geometria original, com tudo o que está fora da
+        ROI zerado.</li>
+        <li><strong>Somente para ROI girada:</strong> marque "Use module Crop Volume for tilted
+        images" — leia o aviso abaixo antes de fazê-lo.</li>
+        <li><strong>Defina uma pasta de saída</strong> e depois rode.</li>
+      </ol>
+
+      <h2 id="preserve">O que é preservado</h2>
+      <p>É todo o interesse da ferramenta: o caminho de recorte padrão nunca reamostra. Ele
+      apenas extrai um bloco de voxels e recalcula a origem do volume; espaçamento,
+      orientação e valores dos voxels ficam idênticos bit a bit ao original. Na prática,
+      uma matriz de registro calculada sobre o volume completo continua válida, sem alteração, no
+      volume recortado, porque as coordenadas físicas nunca se moveram — você pode recortar depois de
+      registrar sem recalcular nada.</p>
+
+      <h2 id="coince">Se algo der errado</h2>
+      <div class="callout warn">
+        <div class="callout-title">Uma pasta com exatamente um arquivo de ROI → erro</div>
+        <p>Se você usa ROIs por paciente mas a pasta contém apenas um
+        arquivo <code>.mrk.json</code>, o módulo dá erro em vez de aplicá-lo a todos os
+        volumes. Nesse caso, aponte diretamente para esse arquivo como ROI única compartilhada, em vez
+        de apontar para a pasta que o contém.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">ROI por paciente: o pareamento quebra em um underscore</div>
+        <p>Os nomes de volume e os nomes de ROI não são cortados da mesma forma quando são comparados.
+        Identificadores de paciente sem underscore (<code>MA0001_Scan.nii.gz</code> /
+        <code>MA0001_ROI.mrk.json</code>) são casados sem problema; um underscore dentro do próprio identificador
+        quebra o pareamento e esse paciente é pulado, sem interromper o resto do
+        lote (um aviso é gravado no log).</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">A interface recusa formatos que o recorte em si aceita</div>
+        <p>A verificação de entrada da interface só reconhece volumes compactados
+        (<code>.nii.gz</code>, <code>.nrrd.gz</code>, <code>.gipl.gz</code>). Uma pasta de arquivos
+        <code>.nii</code> ou <code>.nrrd</code> não compactados é recusada ("Wrong
+        type of patient file detected") embora o recorte em si os trate sem problema:
+        descompacte-os, ou não misture os dois no mesmo lote.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">"Use module Crop Volume for tilted images": leia antes</div>
+        <p>É a única forma de tratar uma ROI realmente girada, mas ela muda duas
+        coisas. Primeiro, ela reamostra o volume no referencial próprio da ROI: os valores dos voxels são
+        modificados, então a vantagem "nenhuma reamostragem, matriz de registro ainda válida" deixa de
+        valer. Segundo, ela esvazia toda a cena do Slicer a cada paciente processado:
+        não a use se você tiver dados carregados que queira manter.</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">Gerar uma malha VTK a partir de uma segmentação</div>
+        <p>É acionado automaticamente sempre que "seg" aparece em qualquer lugar do caminho de saída (uma
+        pasta <code>Segmentations/</code>, por exemplo). Trate isso como uma função secundária e frágil:
+        não há garantia de que a malha se alinhe exatamente com o volume recortado, todas as
+        estruturas saem na mesma cor, e uma segmentação com mais de seis labels
+        não produz malha nenhuma — sem mensagem de erro.</p>
+      </div>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">Para saber mais</h2>
+      <p>Um módulo utilitário: não tem publicação própria e não precisa de uma. Ele aplica em lote o recorte que o Slicer já sabe fazer.</p>
+      <h3 id="autour">Em torno do método</h3>
+      <ul>
+        <li><strong>Documentation 3D Slicer</strong> — <a href="https://slicer.readthedocs.io/en/latest/user_guide/modules/cropvolume.html"><em>Crop Volume</em></a>. O módulo do Slicer por trás deste: o que realmente significam a interpolação, o fator de amostragem e a isotropia que você encontra aqui.</li>
+        <li><strong>Barone et al., Orthod Craniofac Res 2025</strong> — <a href="https://doi.org/10.1111/ocr.12895"><em>Deep Learning-Based Three-Dimensional Analysis Reveals Distinct Patterns of Condylar Remodelling After Orthognathic Surgery in Skeletal Class III Patients</em></a>. Um estudo do laboratório em que esse recorte em lote é uma etapa de preparação — um exemplo da utilidade do módulo.</li>
+      </ul>
+      <p>A bibliografia completa da ferramenta — o que foi encontrado, e o que foi procurado sem sucesso — está em <a href="../AutoCrop3D/SOURCES.html">suas fontes</a>.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../AutoCrop3D/AutoCrop3D.html">
+        <b>Como funciona de verdade →</b>
+        <span>A página do Atlas: como a ROI é lida, como as direções negativas são tratadas,
+        por que a origem muda mas não os voxels, e a lista completa das armadilhas de
+        configuração.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← Todos os guias</a> ·
+        <a href="../AutoCrop3D/AutoCrop3D.html">Página do Atlas</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

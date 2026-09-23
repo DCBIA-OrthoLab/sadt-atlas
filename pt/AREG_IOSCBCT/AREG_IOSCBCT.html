@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AREG_IOSCBCT — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="recalage">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/AREG_IOSCBCT/AREG_IOSCBCT.html" hreflang="en" title="English">EN</a><a href="../../fr/AREG_IOSCBCT/AREG_IOSCBCT.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/AREG_IOSCBCT/AREG_IOSCBCT.html" hreflang="ko" title="한국어">KO</a><a href="../../th/AREG_IOSCBCT/AREG_IOSCBCT.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/AREG_IOSCBCT.html"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../AREG_IOSCBCT/AREG_IOSCBCT.html" aria-current="true"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html" aria-current="page">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/AREG_IOSCBCT/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Registro</div>
+        <h1>AREG_IOSCBCT — pipeline completo</h1>
+        <p class="lede">Registro <strong>multimodal</strong>: colocar um escaneamento intraoral (IOS) no referencial de uma
+        CBCT do mesmo paciente. A CLI é inteiramente geométrica — não carrega nenhum peso.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="Montagem interna: nenhuma publicação descreve este módulo.">não publicado</a>
+          <span class="badge cli">areg_ioscbct</span>
+          <span class="badge neutral">Python do Slicer</span>
+          <span class="badge calcule">sem rede na CLI</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliografia</a>
+        </div>
+      </header>
+
+      <p>Nada a ver com o <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a>, que é longitudinal (T1 → T2, mesma modalidade): aqui as duas nuvens
+      de pontos vêm de sensores diferentes, e não há "patch estável" em comum.</p>
+
+      <p>Duas etapas sucessivas de correspondência, <strong>nenhuma rede dentro da CLI</strong>:</p>
+      <ol>
+        <li><strong>12 landmarks oclusais</strong> (pontos de referência anatômicos) preditos dos dois lados por duas redes diferentes (<a href="../ALI/ALI.html">ALI_CBCT</a>
+        no volume, <a href="../ALI/ALI.html">ALI_IOS</a> na malha) → transformação rígida de <a class="gterm" href="../glossary.html#g-procrustes" title="Ver glossário">Procrustes</a>
+        (<code>vtkLandmarkTransform</code>) que serve de pré-alinhamento;</li>
+        <li><strong><a class="gterm" href="../glossary.html#g-icp" title="Ver glossário">ICP</a></strong> da superfície IOS sobre uma <strong><a class="gterm" href="../glossary.html#g-isosurface" title="Ver glossário">isossuperfície</a> da CBCT extraída por <a class="gterm" href="../glossary.html#g-marching-cubes" title="Ver glossário">marching cubes</a>
+        com limiar 400</strong>.</li>
+      </ol>
+
+      <p>A CLI em si é, portanto, inteiramente geométrica. A inteligência está a montante, nos módulos que o
+      orquestrador empilha à frente dela.</p>
+
+      <h2 id="situation">1. Onde se situa no pipeline</h2>
+
+      <p><code>AREG_IOSCBCT/AREG_IOSCBCT.py</code> é chamado apenas por
+      <code>AREG/AREG_Method/IOSCBCT.py</code>, que define três modos. Ele próprio não chama nada.</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Modo</th><th>Classe</th><th>Etapas empilhadas antes do AREG_IOSCBCT</th></tr></thead>
+        <tbody>
+          <tr><td>Registration</td><td><code>Reg_IOSCBCT</code> (<code>IOSCBCT.py:392</code>)</td><td><strong>nenhuma</strong>: o usuário fornece IOS, CBCT e as duas pastas de landmarks</td></tr>
+          <tr><td>Semi-Automated</td><td><code>Semi_IOSCBCT</code> (<code>IOSCBCT.py:157</code>)</td><td><code>CrownSegmentationcli</code> → <code>ALI_CBCT</code> → <code>ALI_IOS</code></td></tr>
+          <tr><td>Fully-Automated</td><td><code>Auto_IOSCBCT</code> (<code>IOSCBCT.py:469</code>)</td><td>7 etapas, ver §2</td></tr>
+        </tbody>
+      </table></div>
+
+      <p>Trata-se, portanto, de fato de <strong>um orquestrador com uma CLI terminal fina</strong>. O pipeline real é a
+      lista de processos construída por <code>Process()</code>.</p>
+
+      <h3 id="sequence">Sequência completa do modo Fully-Automated</h3>
+
+      <p><code>IOSCBCT.py:605</code>. As duas modalidades são preparadas separadamente e só são colocadas em contato no
+      último momento.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 740 300" role="img" aria-label="As duas modalidades são preparadas separadamente e depois reunidas no registro">
+          <text class="d-label-s" x="18" y="24">Caminho CBCT</text>
+          <rect class="d-box"   x="18"  y="34" width="120" height="38" rx="5"/>
+          <text class="d-label" x="78"  y="52" text-anchor="middle">CBCT bruta</text>
+          <text class="d-label-s" x="78" y="65" text-anchor="middle">1 · reamostr. 0.3³</text>
+          <path class="d-arrow" d="M138 53 H166"/><path class="d-arrow-head" d="M166 53 l-7 -4 v8 z"/>
+          <rect class="d-box-n" x="168" y="34" width="118" height="38" rx="5"/>
+          <text class="d-label" x="227" y="52" text-anchor="middle">PRE_ASO_CBCT</text>
+          <text class="d-label-s" x="227" y="65" text-anchor="middle">2 · rede</text>
+          <path class="d-arrow" d="M286 53 H314"/><path class="d-arrow-head" d="M314 53 l-7 -4 v8 z"/>
+          <rect class="d-box-n" x="316" y="34" width="110" height="38" rx="5"/>
+          <text class="d-label" x="371" y="52" text-anchor="middle">ALI_CBCT</text>
+          <text class="d-label-s" x="371" y="65" text-anchor="middle">3 · rede</text>
+          <path class="d-arrow" d="M426 53 H454"/><path class="d-arrow-head" d="M454 53 l-7 -4 v8 z"/>
+          <rect class="d-box"   x="456" y="34" width="122" height="38" rx="5"/>
+          <text class="d-label" x="517" y="52" text-anchor="middle">SEMI_ASO_CBCT</text>
+          <text class="d-label-s" x="517" y="65" text-anchor="middle">4 · gold</text>
+          <path class="d-arrow" d="M578 53 H606"/><path class="d-arrow-head" d="M606 53 l-7 -4 v8 z"/>
+          <rect class="d-box-n" x="608" y="34" width="114" height="38" rx="5"/>
+          <text class="d-label" x="665" y="52" text-anchor="middle">ALI_CBCT 2ª</text>
+          <text class="d-label-s" x="665" y="65" text-anchor="middle">7 · 12 landmarks</text>
+
+          <text class="d-label-s" x="18" y="130">Caminho IOS</text>
+          <rect class="d-box"   x="18"  y="140" width="120" height="38" rx="5"/>
+          <text class="d-label" x="78"  y="158" text-anchor="middle">IOS bruto</text>
+          <path class="d-arrow" d="M138 159 H166"/><path class="d-arrow-head" d="M166 159 l-7 -4 v8 z"/>
+          <rect class="d-box-n" x="168" y="140" width="118" height="38" rx="5"/>
+          <text class="d-label" x="227" y="158" text-anchor="middle">DentalModelSeg</text>
+          <text class="d-label-s" x="227" y="171" text-anchor="middle">5 · rede</text>
+          <path class="d-arrow" d="M286 159 H314"/><path class="d-arrow-head" d="M314 159 l-7 -4 v8 z"/>
+          <rect class="d-box"   x="316" y="140" width="110" height="38" rx="5"/>
+          <text class="d-label" x="371" y="158" text-anchor="middle">PRE_ASO_IOS</text>
+          <text class="d-label-s" x="371" y="171" text-anchor="middle">6 · gold</text>
+          <path class="d-arrow" d="M426 159 H606"/><path class="d-arrow-head" d="M606 159 l-7 -4 v8 z"/>
+          <rect class="d-box-n" x="608" y="140" width="114" height="38" rx="5"/>
+          <text class="d-label" x="665" y="158" text-anchor="middle">ALI_IOS</text>
+          <text class="d-label-s" x="665" y="171" text-anchor="middle">8 · 12 landmarks</text>
+
+          <path class="d-arrow" d="M665 72 V210 H420"/>
+          <path class="d-arrow" d="M665 178 V210"/>
+          <path class="d-arrow-head" d="M420 210 l7 -4 v8 z"/>
+          <rect class="d-box-a" x="230" y="228" width="190" height="48" rx="6"/>
+          <text class="d-label" x="325" y="248" text-anchor="middle">9 · AREG_IOSCBCT</text>
+          <text class="d-label-s" x="325" y="264" text-anchor="middle">Procrustes e ICP — geométrico</text>
+        </svg>
+        <figcaption>As caixas roxas contêm uma rede; a CLI final (em destaque) não contém nenhuma.
+        O modo Semi pula as etapas 1–4 e 6.</figcaption>
+      </figure>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Módulo</th><th>Entrada</th><th>Saída</th><th>Papel</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>MRI2CBCT_resample_cbct_mri</code></td><td>CBCT bruta</td><td><code>&lt;out&gt;/CBCT Resampled/CBCT</code></td><td>reamostragem isotrópica <code>spacing=[0.3,0.3,0.3]</code>, <code>center=True</code></td></tr>
+          <tr><td>2</td><td><code>PRE_ASO_CBCT</code></td><td>↑</td><td><code>&lt;out&gt;/PRE ASO CBCT</code></td><td>pré-orientação da CBCT (modelos <code>PreASO</code>)</td></tr>
+          <tr><td>3</td><td><code>ALI_CBCT</code></td><td>↑</td><td>idem</td><td>landmarks de orientação (<code>N S Ba RPo…</code> ou <code>IF ANS PNS UR1O UR6O UL6O</code> conforme a referência)</td></tr>
+          <tr><td>4</td><td><code>SEMI_ASO_CBCT</code></td><td>↑</td><td><code>&lt;out&gt;/Oriented CBCT</code></td><td>orientação final sobre um arquivo gold, sufixo <code>Or</code></td></tr>
+          <tr><td>5</td><td><code>CrownSegmentationcli</code></td><td>IOS bruto</td><td><code>&lt;out&gt;/Seg IOS</code></td><td><code>Universal_ID</code>, <code>model=latest</code>, <code>suffix=Seg</code></td></tr>
+          <tr><td>6</td><td><code>PRE_ASO_IOS</code></td><td>↑</td><td><code>&lt;out&gt;/PRE ASO IOS</code></td><td>orientação do IOS sobre o gold, dentes <code>UR6,UR4,UL4,UL6</code>, sufixo <code>Or</code></td></tr>
+          <tr><td>7</td><td><code>ALI_CBCT</code> (2ª passagem)</td><td><code>Oriented CBCT</code></td><td><code>&lt;out&gt;/CBCT Landmarks</code></td><td><strong>os 12 landmarks de registro</strong></td></tr>
+          <tr><td>8</td><td><code>ALI_IOS</code></td><td><code>PRE ASO IOS</code></td><td><code>&lt;out&gt;/IOS Landmarks</code></td><td><strong>os mesmos 12 landmarks, lado IOS</strong></td></tr>
+          <tr><td>9</td><td><code>AREG_IOSCBCT</code></td><td>tudo o que está acima</td><td><code>&lt;out&gt;/Registered IOS</code></td><td>transformação por landmarks + ICP</td></tr>
+        </tbody>
+      </table></div>
+
+      <p>O modo Semi pula 1–4 e 6: ele segmenta o IOS e depois executa diretamente as duas etapas <a href="../ALI/ALI.html">ALI</a> e o registro. Seu
+      <code>IOS_folder</code> aponta para <code>&lt;out&gt;/Seg IOS/liste_csv_file_Seg</code>, a subpasta que o
+      <code>CrownSegmentationcli</code> cria a partir do nome base do csv que recebeu
+      (<code>IOSCBCT.py:368</code>).</p>
+
+      <h3 id="landmarks">Os 12 landmarks comuns</h3>
+
+      <p>Idênticos dos dois lados, são o pivô de todo o registro:</p>
+      <pre><code>LL1O LL3O LL6O LR1O LR3O LR6O UL1O UL3O UL6O UR1O UR3O UR6O</code></pre>
+
+      <p>Sufixo <code>O</code> = ponto <strong><a class="gterm" href="../glossary.html#g-occlusal" title="Ver glossário">oclusal</a></strong> do dente. Do lado CBCT eles são passados ao
+      <code>ALI_CBCT</code> como <code>lm_type</code>, do lado IOS ao <code>ALI_IOS</code> como <code>teeth</code> com
+      <code>lm_type='O'</code>, <code>image_size=224</code>, <code>blur_radius=0</code>,
+      <code>faces_per_pixel=1</code> (<code>IOSCBCT.py:335</code> e <code>IOSCBCT.py:839</code>).</p>
+
+      <p>As duas famílias de redes são, portanto:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Rede</th><th>Natureza</th><th>Pesos</th></tr></thead>
+        <tbody>
+          <tr><td><a href="../ALI/ALI.html">DentalModelSeg</a></td><td>multivista sobre malha, incluída no pacote pip <code>shapeaxi</code></td><td><code>latest</code>, fora do repositório</td></tr>
+          <tr><td><a href="../ALI/ALI.html">ALI_CBCT</a></td><td><a class="gterm" href="../glossary.html#g-rl" title="Ver glossário">agentes de aprendizado por reforço</a> no volume, <code>spacing=[1,0.3]</code>, <code>speed_per_scale=[1,1]</code>, <code>agent_FOV=[64,64,64]</code>, <code>spawn_radius=10</code></td><td>release <code>v0.1-v2.0_models</code> (Cranial_Base, Upper/Lower Teeth…)</td></tr>
+          <tr><td><a href="../ALI/ALI.html">ALI_IOS</a></td><td>multivista 224² por dente, pico de <a class="gterm" href="../glossary.html#g-heatmap" title="Ver glossário">heatmap</a></td><td><a href="https://github.com/baptistebaquero/ALIDDM/releases/download/v1.0.3/Models.zip">ALIDDM v1.0.3 Models.zip</a></td></tr>
+        </tbody>
+      </table></div>
+
+      <p>A CLI AREG_IOSCBCT em si <strong>não carrega nenhum peso</strong>.</p>
+
+      <h2 id="ou-ca-tourne">2. Onde roda</h2>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Elemento</th><th>Valor</th></tr></thead>
+        <tbody>
+          <tr><td>Execução</td><td><code>slicer.cli.run(slicer.modules.areg_ioscbct, ...)</code> — <strong>Python do Slicer</strong>, não conda</td></tr>
+          <tr><td>Exceção</td><td>a etapa <code>CrownSegmentationcli</code> passa por <code>run_conda_tool("seg")</code> (<code>AREG/AREG.py:1611</code>)</td></tr>
+          <tr><td>Dependências instaladas no Slicer</td><td><code>pyvista==0.47.3</code>, <code>scipy</code>, <code>numpy</code>, <code>SimpleITK</code> (<code>AREG/AREG.py:1458</code>)</td></tr>
+          <tr><td>GPU</td><td><strong>não necessária</strong> na CLI: nenhum <code>torch</code> é importado</td></tr>
+          <tr><td>Passagem de parâmetros</td><td>via <code>AREG_IOSCBCT/AREG_IOSCBCT.xml</code>, 5 argumentos posicionais; este <strong>está atualizado</strong></td></tr>
+        </tbody>
+      </table></div>
+
+      <pre><code>IOS_folder  CBCT_folder  IOS_lm_folder  CBCT_lm_folder  output</code></pre>
+
+      <p>Essa é a diferença estrutural em relação ao <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a>: o AREG_IOS é um módulo conda lançado à mão com
+      <code>python -m</code>, o AREG_IOSCBCT é uma verdadeira CLI do Slicer.</p>
+
+      <h2 id="appariement">3. Pareamento dos arquivos</h2>
+
+      <p><code>getPatients()</code> (<code>AREG_IOSCBCT.py:339</code>) percorre as quatro pastas e constrói uma chave
+      <code>&lt;patient_id&gt;_&lt;timepoint&gt;</code>.</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Extração</th><th>Regex</th><th>Observação</th></tr></thead>
+        <tbody>
+          <tr><td>Tempo</td><td><code>[Tt]([0-2])</code></td><td><strong>apenas T0, T1, T2</strong>. Um <code>_T3</code> não corresponde a nada → paciente ignorado em silêncio</td></tr>
+          <tr><td>Arcada</td><td><code>(?:^|_)(?:u|upper)(?=_|\.|$)</code> e o mesmo para <code>l/lower</code></td><td>a letra precisa ser um elemento delimitado. Um <code>u</code> isolado no meio do nome não conta mais — antes, <code>P001_T1_L_Surface.vtk</code> era lido como "upper" e registrado contra os landmarks errados</td></tr>
+          <tr><td>Paciente</td><td><code>([A-Za-z]+)[_]?([0-9]+)[_]?[Tt][0-2]</code></td><td>letras + dígitos colados</td></tr>
+          <tr><td>Normalização</td><td>sublinhados removidos, zeros à esquerda retirados</td><td><code>P_0001</code>, <code>P001</code>, <code>P00001</code> → <code>P1</code></td></tr>
+        </tbody>
+      </table></div>
+
+      <p>Extensões esperadas: <strong>IOS somente <code>.vtk</code></strong>, <strong>CBCT somente
+      <code>.nii.gz</code></strong>, landmarks <code>.json</code>.</p>
+
+      <p>Cada paciente precisa fornecer <strong>sete</strong> entradas: <code>ios_upper</code>,
+      <code>ios_lower</code>, <code>cbct</code>, <code>ios_lm_upper</code>, <code>ios_lm_lower</code>,
+      <code>cbct_lm_upper</code>, <code>cbct_lm_lower</code>. Uma chave ausente lança um <code>KeyError</code>
+      no laço principal, capturado pelo <code>try/except</code> por paciente → o paciente é simplesmente
+      pulado com um log de erro.</p>
+
+      <p>A mesma normalização de identificadores é reimplementada do lado do widget em
+      <code>Review._normalisedId()</code> (<code>AREG/AREG_Method/Review.py:210</code>), justamente para
+      encontrar a CBCT original correspondente a um IOS registrado cujo nome foi normalizado.</p>
+
+      <h2 id="correspondance">4. A correspondência entre as duas modalidades</h2>
+
+      <p>Resposta curta às três hipóteses possíveis: <strong>landmarks comuns para o pré-alinhamento, depois
+      ICP sobre uma superfície extraída da CBCT por limiarização</strong>. <strong>Não</strong> há segmentação
+      dentária do lado CBCT, e a segmentação do lado IOS serve apenas para que o <a href="../ALI/ALI.html">ALI_IOS</a> aponte suas câmeras
+      dente por dente.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 720 260" role="img" aria-label="Pré-alinhamento por landmarks e depois ICP sobre uma isossuperfície limiarizada">
+          <rect class="d-box"   x="20"  y="20" width="150" height="42" rx="5"/>
+          <text class="d-label" x="95"  y="40" text-anchor="middle">Volume CBCT</text>
+          <text class="d-label-s" x="95" y="54" text-anchor="middle">.nii.gz</text>
+          <path class="d-arrow" d="M170 41 H208"/><path class="d-arrow-head" d="M208 41 l-7 -4 v8 z"/>
+          <rect class="d-box"   x="210" y="20" width="182" height="42" rx="5"/>
+          <text class="d-label" x="301" y="40" text-anchor="middle">marching cubes · limiar 400</text>
+          <text class="d-label-s" x="301" y="54" text-anchor="middle">osso + esmalte, sem distinção</text>
+          <path class="d-arrow" d="M392 41 H430"/><path class="d-arrow-head" d="M430 41 l-7 -4 v8 z"/>
+          <rect class="d-box"   x="432" y="20" width="150" height="42" rx="5"/>
+          <text class="d-label" x="507" y="40" text-anchor="middle">Isossuperfície LPS</text>
+          <text class="d-label-s" x="507" y="54" text-anchor="middle">alvo fixo</text>
+
+          <rect class="d-box"   x="20"  y="102" width="150" height="42" rx="5"/>
+          <text class="d-label" x="95"  y="122" text-anchor="middle">Malha IOS</text>
+          <text class="d-label-s" x="95" y="136" text-anchor="middle">.vtk — móvel</text>
+
+          <rect class="d-box-n" x="210" y="96" width="182" height="54" rx="5"/>
+          <text class="d-label" x="301" y="116" text-anchor="middle">12 landmarks × 2</text>
+          <text class="d-label-s" x="301" y="131" text-anchor="middle">ALI_CBCT e ALI_IOS</text>
+          <text class="d-label-s" x="301" y="144" text-anchor="middle">preditos a montante</text>
+
+          <path class="d-arrow" d="M392 123 H430"/><path class="d-arrow-head" d="M430 123 l-7 -4 v8 z"/>
+          <rect class="d-box-a" x="432" y="102" width="150" height="42" rx="5"/>
+          <text class="d-label" x="507" y="120" text-anchor="middle">Procrustes rígido</text>
+          <text class="d-label-s" x="507" y="135" text-anchor="middle">6 gdl, sem escala</text>
+
+          <path class="d-arrow" d="M170 123 H208"/><path class="d-arrow-head" d="M208 123 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M507 144 V182"/><path class="d-arrow-head" d="M507 188 l-4 -7 h8 z"/>
+          <path class="d-arrow" d="M507 62 V88"/>
+
+          <rect class="d-box-a" x="380" y="190" width="256" height="48" rx="6"/>
+          <text class="d-label" x="508" y="210" text-anchor="middle">ICP — Kabsch/SVD iterado, KD-tree</text>
+          <text class="d-label-s" x="508" y="226" text-anchor="middle">max_dist 1 mm · até 2000 iterações</text>
+          <text class="d-mono"  x="20"  y="212">as duas arcadas registradas</text>
+          <text class="d-mono"  x="20"  y="228">independentemente</text>
+        </svg>
+        <figcaption>O pré-alinhamento por landmarks é o que torna o ICP utilizável: combinado com a janela de 1 mm,
+        ele elimina tudo o que não está logo abaixo da superfície oclusal.</figcaption>
+      </figure>
+
+      <h3 id="surface-cbct">4.1 A superfície da CBCT</h3>
+
+      <p><code>load_data()</code> (<code>AREG_IOSCBCT.py:315</code>):</p>
+      <pre><code>image = sitk.ReadImage(scan_path)
+ijk_to_lps = np.eye(4)
+ijk_to_lps[:3, :3] = direction @ np.diag(spacing)
+ijk_to_lps[:3, 3]  = origin
+vol = pv.wrap(sitk.GetArrayFromImage(image).transpose(2, 1, 0))
+cbct_raw_mesh = vol.contour(isosurfaces=[400])
+cbct_surface  = cbct_raw_mesh.transform(ijk_to_lps, inplace=False)</code></pre>
+
+      <ul>
+        <li><code>GetArrayFromImage</code> retorna <code>(z,y,x)</code>, o <code>transpose(2,1,0)</code> volta a
+        <code>(x,y,z)</code> para que <code>pv.wrap</code> produza um <code>ImageData</code> com spacing unitário
+        no espaço de índices;</li>
+        <li><code>contour(isosurfaces=[400])</code> = <strong>marching cubes no valor 400</strong>. Unidade
+        implícita: HU se a CBCT estiver calibrada. Esse limiar está <strong>fixo no código</strong> e captura osso
+        <strong>e</strong> esmalte, sem distinção;</li>
+        <li>a matriz <code>ijk_to_lps</code>, reconstruída à mão, leva a isossuperfície de volta para coordenadas físicas
+        <strong><a class="gterm" href="../glossary.html#g-lps" title="Ver glossário">LPS</a></strong>.</li>
+      </ul>
+
+      <p>Isso é coerente com o resto: <code>ALI_CBCT</code> e <code>ALI_IOS</code> gravam ambos
+      <code>"coordinateSystem": "LPS"</code> (<code>ALI_CBCT/ALI_CBCT_utils/io.py:36</code>,
+      <code>ALI_IOS/ALI_IOS_utils/io.py:85</code>), e os <code>.vtk</code> estão em LPS. Nenhuma inversão é
+      portanto necessária, e nenhuma é feita.</p>
+
+      <h3 id="appariement-labels">4.2 Pareamento dos landmarks por rótulo</h3>
+
+      <p><code>_pair_landmarks()</code> (<code>AREG_IOSCBCT.py:54</code>) mantém apenas os rótulos
+      <strong>presentes dos dois lados</strong>, na ordem dos rótulos IOS, e registra no log quais estão ausentes
+      da CBCT.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Correção importante</div>
+        <p><code>vtkLandmarkTransform</code> exige tantos pontos de origem quanto de destino; com listas de
+        tamanhos diferentes, ele escreve um erro no stderr e <strong>retorna a identidade</strong>, e assim o
+        pré-alinhamento desaparecia sem que nada o indicasse. E parear duas listas parciais por posição
+        associava pontos que não tinham nada a ver entre si.</p>
+      </div>
+
+      <h3 id="pre-alignement">4.3 O pré-alinhamento rígido</h3>
+
+      <p><code>align_by_landmarks()</code> (<code>AREG_IOSCBCT.py:108</code>):</p>
+      <pre><code>landmark_transform = vtk.vtkLandmarkTransform()
+landmark_transform.SetSourceLandmarks(points_moving)   # IOS
+landmark_transform.SetTargetLandmarks(points_fixed)    # CBCT
+landmark_transform.SetModeToRigidBody()                # 6 dof, no scaling</code></pre>
+
+      <p>Duas salvaguardas, ambas recaindo na identidade (um <code>vtk.vtkMatrix4x4()</code> novo) com um
+      aviso explícito:</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Salvaguarda</th><th>Constante</th><th>Justificativa no código</th></tr></thead>
+        <tbody>
+          <tr><td>Número de pares</td><td><code>MIN_LANDMARK_PAIRS = 3</code></td><td>um ponto = translação pura, dois pontos deixam livre uma rotação em torno do eixo</td></tr>
+          <tr><td>Resíduo RMS</td><td><code>MAX_LANDMARK_RESIDUAL_MM = 10.0</code>, ajustável pela variável de ambiente <code>AREG_MAX_LANDMARK_RESIDUAL</code></td><td>uma transformação rígida preserva as distâncias: um resíduo grande prova que os dois conjuntos não descrevem a mesma anatomia</td></tr>
+        </tbody>
+      </table></div>
+
+      <p><code>_alignment_residual()</code> (<code>AREG_IOSCBCT.py:67</code>) aplica a matriz a cada
+      landmark móvel e calcula o RMS das diferenças.</p>
+
+      <p>Retorna a malha transformada, a matriz e <strong>os landmarks IOS transformados</strong> — são estes
+      últimos que vão parar no json de saída.</p>
+
+      <h3 id="icp">4.4 O ICP</h3>
+
+      <p><code>run_icp_point_to_plane()</code> (<code>AREG_IOSCBCT.py:163</code>), chamado com
+      <code>max_dist=1.0</code> (o valor padrão de <code>1.5</code> nunca é usado).</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Parâmetro</th><th>Valor</th><th>Efeito</th></tr></thead>
+        <tbody>
+          <tr><td><code>max_iterations</code></td><td>2000</td><td></td></tr>
+          <tr><td><code>max_dist</code></td><td>1.0 mm</td><td>correspondências mais distantes rejeitadas (<code>valid_mask</code>)</td></tr>
+          <tr><td><code>rmse_threshold</code></td><td>1e-8</td><td>convergência pela variação do RMSE dos inliers</td></tr>
+          <tr><td><code>fitness_threshold</code></td><td>1e-8</td><td>convergência pela variação da taxa de inliers</td></tr>
+          <tr><td>Condição de parada extra</td><td><code>&lt; 3</code> correspondências válidas</td><td></td></tr>
+          <tr><td>Estrutura</td><td><code>scipy.spatial.cKDTree</code> sobre os pontos <strong>fixos</strong>, construída <strong>uma vez</strong> fora do laço</td><td></td></tr>
+          <tr><td>Consulta</td><td><code>kdtree.query(..., k=1, workers=-1)</code></td><td>paralelizada em todos os núcleos; é o custo dominante</td></tr>
+        </tbody>
+      </table></div>
+
+      <p>A cada iteração: correspondências por vizinho mais próximo, filtragem por <code>max_dist</code>, depois
+      estimação rígida <strong>por <a class="gterm" href="../glossary.html#g-svd" title="Ver glossário">SVD</a> de <a class="gterm" href="../glossary.html#g-kabsch" title="Ver glossário">Kabsch</a></strong> sobre os centroides recentrados, com correção do determinante
+      (<code>Vt[-1,:] *= -1</code> se <code>det(R) &lt; 0</code>) para proibir reflexões. A
+      transformação é composta à esquerda (<code>transformation = delta @ transformation</code>) e
+      <strong>reaplicada aos pontos originais</strong> a cada rodada, o que evita o acúmulo de erro.</p>
+
+      <div class="callout bug">
+        <div class="callout-title">A função não faz o que o nome diz</div>
+        <p>Ela se chama <code>run_icp_point_to_plane</code>; de fato calcula <code>fixed_normals</code> via
+        <code>compute_normals(inplace=True)</code> sobre uma cópia da malha fixa — e <strong>nunca as
+        usa</strong>. O critério minimizado é <code>‖R·s + t − d‖²</code>, ou seja, o clássico
+        <strong>point-to-point</strong>. As normais são calculadas e descartadas a cada chamada, duas vezes
+        por paciente, sobre uma isossuperfície de marching cubes que pode chegar a centenas de milhares de faces.</p>
+      </div>
+
+      <p><strong>O que o ICP realmente registra</strong>: a malha IOS inteira (cada vértice é um ponto
+      móvel) contra <strong>toda</strong> a isossuperfície em 400 — osso alveolar, esmalte, cortical,
+      artefatos, ruído de limiarização. Não há restrição aos dentes, nem máscara, nem ponderação. O que torna o
+      resultado utilizável é unicamente a combinação de <em>um bom pré-alinhamento por landmarks</em> +
+      <em>uma janela de correspondência de 1 mm</em>, que na prática elimina tudo o que não está logo abaixo da
+      superfície oclusal.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Oclusão sem restrição</div>
+        <p>As duas arcadas são registradas <strong>independentemente</strong> contra a mesma isossuperfície, com duas
+        matrizes separadas <code>mat_icp_upper</code> e <code>mat_icp_lower</code> — a oclusão relativa
+        não é restringida.</p>
+      </div>
+
+      <h2 id="sorties">5. Saídas</h2>
+
+      <p><code>save_registered_ios()</code> (<code>AREG_IOSCBCT.py:272</code>) e
+      <code>apply_matrix_and_save_landmarks()</code> (<code>AREG_IOSCBCT.py:278</code>), tudo em
+      <code>&lt;output&gt;</code> (= <code>&lt;folder_output&gt;/Registered IOS</code> nos modos Semi e
+      Auto):</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Arquivo</th><th>Conteúdo</th></tr></thead>
+        <tbody>
+          <tr><td><code>&lt;pid&gt;_Reg_U.vtk</code></td><td>IOS superior, transformação por landmarks <strong>e depois</strong> ICP aplicados</td></tr>
+          <tr><td><code>&lt;pid&gt;_Reg_L.vtk</code></td><td>idem, inferior</td></tr>
+          <tr><td><code>&lt;pid&gt;_lm_Reg_U.mrk.json</code></td><td><strong>o json da CBCT</strong>, com cada <code>position</code> substituída pela do landmark IOS registrado de mesmo rótulo</td></tr>
+          <tr><td><code>&lt;pid&gt;_lm_Reg_L.mrk.json</code></td><td>idem</td></tr>
+        </tbody>
+      </table></div>
+
+      <p><code>&lt;pid&gt;</code> é o identificador <strong>normalizado</strong> (<code>P1</code>, não
+      <code>P_0001</code>): os nomes de saída, portanto, não se parecem com os nomes de entrada, daí o
+      <code>_matchAcrossNaming()</code> em <code>AREG/AREG_Method/Review.py:226</code>.</p>
+
+      <p>Os json de saída são uma escolha discutível: o contêiner vem da CBCT (exibição, ids,
+      ordem), mas as coordenadas vêm do IOS. <code>_write_positions()</code> (<code>AREG_IOSCBCT.py:81</code>) faz a correspondência
+      <strong>por rótulo</strong> e <strong>remove</strong> os pontos de controle da CBCT que não têm equivalente IOS, em vez
+      de deixá-los na posição original. A versão anterior indexava por posição: uma CBCT com um
+      landmark contra seis do lado IOS gravava as coordenadas de <code>UL1O</code> sob o rótulo
+      <code>UR6O</code>.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Nenhum <code>.tfm</code> é produzido</div>
+        <p>Nem a matriz dos landmarks nem a do ICP são gravadas em disco; apenas as geometrias transformadas
+        o são. Isso é assumido no nível do widget: a página de revisão
+        <code>ioscbct_registration</code> é do tipo <code>VIEW</code>, não <code>REGISTRATION</code>, com o
+        texto "This step writes no matrix, so the result cannot be moved here"
+        (<code>AREG/AREG_Method/Review.py:680</code>) — portanto o operador não pode corrigir o registro com o
+        mouse como pode fazer no <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> ou no AREG_CBCT.</p>
+      </div>
+
+      <p>Se nenhum paciente pôde ser registrado, <code>main()</code> lança um <code>RuntimeError</code>
+      (<code>AREG_IOSCBCT.py:577</code>): sem isso, o laço <code>try/except/continue</code> terminava com código 0
+      e uma pasta de saída vazia, e o Slicer relatava o pipeline como bem-sucedido.</p>
+
+      <h2 id="predit-calcule">6. O que é predito e o que é calculado</h2>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Bloco</th><th>Natureza</th><th>Onde</th></tr></thead>
+        <tbody>
+          <tr><td>Reamostragem da CBCT</td><td><span class="badge calcule">geométrico</span></td><td><code>slicer.cli.run(mri2cbct_resample_cbct_mri)</code></td></tr>
+          <tr><td>Pré-orientação da CBCT</td><td><span class="badge predit">rede</span> (PreASO)</td><td><code>slicer.cli.run(pre_aso_cbct)</code></td></tr>
+          <tr><td>Landmarks da CBCT (×2 passagens)</td><td><span class="badge predit">rede</span> (<a href="../ALI/ALI.html">ALI_CBCT</a>, agentes RL)</td><td><code>slicer.cli.run(ali_cbct)</code></td></tr>
+          <tr><td>Orientação da CBCT</td><td><span class="badge calcule">geométrico</span>, arquivo gold</td><td><code>slicer.cli.run(semi_aso_cbct)</code></td></tr>
+          <tr><td>Segmentação das coroas no IOS</td><td><span class="badge predit">rede</span> (<a href="../ALI/ALI.html">DentalModelSeg</a>)</td><td><code>conda run -n shapeaxi</code></td></tr>
+          <tr><td>Orientação do IOS</td><td><span class="badge calcule">geométrico</span>, 4 centroides + ICP sobre o gold</td><td><code>slicer.cli.run(pre_aso_ios)</code></td></tr>
+          <tr><td>Landmarks do IOS</td><td><span class="badge predit">rede</span> (<a href="../ALI/ALI.html">ALI_IOS</a> multivista)</td><td><code>slicer.cli.run(ali_ios)</code></td></tr>
+          <tr><td>Isossuperfície da CBCT</td><td><span class="badge calcule">geométrico</span>, marching cubes em 400</td><td>CLI</td></tr>
+          <tr><td>Pré-alinhamento</td><td><span class="badge calcule">geométrico</span>, Procrustes rígido VTK</td><td>CLI</td></tr>
+          <tr><td>ICP</td><td><span class="badge calcule">geométrico</span>, Kabsch/SVD iterado, KD-tree</td><td>CLI</td></tr>
+        </tbody>
+      </table></div>
+
+      <p>Em outras palavras: <strong>a CLI AREG_IOSCBCT não aprende nem prediz absolutamente nada</strong>. Ela consome dois
+      conjuntos de landmarks preditos em outro lugar e uma isossuperfície limiarizada.</p>
+
+      <h2 id="pieges">7. Armadilhas e pontos frágeis</h2>
+
+      <div class="callout warn">
+        <div class="callout-title">O limiar 400 está fixo no código</div>
+        <p>E nunca é exposto. Em uma CBCT não calibrada em HU, ou com outra reconstrução, a
+        isossuperfície captura outra coisa e o ICP registra contra ruído. É o parâmetro com mais
+        chance de precisar mudar de um centro para outro.</p>
+      </div>
+
+      <ul>
+        <li><strong><code>run_icp_point_to_plane</code> é point-to-point.</strong> As normais são
+        calculadas e descartadas. Ou o nome está errado, ou a implementação está incompleta — de qualquer forma, um
+        mantenedor que conte com point-to-plane (melhor convergência em superfícies lisas, menos deslizamento
+        tangencial) vai se decepcionar.</li>
+        <li><strong>Duas modalidades, uma única CBCT por chave de paciente</strong>, mas <strong>as duas arcadas
+        obrigatórias</strong>. Um paciente do qual só a arcada superior foi escaneada lança um <code>KeyError</code>
+        e desaparece da execução com uma simples linha de log.</li>
+        <li><strong>A CBCT precisa estar em <code>.nii.gz</code>.</strong> O <code>NumberScan</code> do lado do widget, porém,
+        conta <code>.nrrd .nii .gipl</code> e suas variantes <code>.gz</code>
+        (<code>IOSCBCT.py:32</code>): a barra de progresso pode anunciar pacientes que a CLI nunca verá.</li>
+        <li><strong>Tempos limitados a T0–T2</strong> por <code>[Tt]([0-2])</code> — ver o comentário
+        <code>TIMEPOINT-SUFFIX</code> em <code>AREG_IOSCBCT.py:372</code> e a nota central em
+        <code>AREG_CBCT/AREG_CBCT_utils/utils.py:83</code>.</li>
+        <li><strong>Colisão de identificadores após a normalização</strong>: <code>P001</code> e <code>P1</code>
+        viram a mesma chave, portanto o mesmo paciente. Nada detecta isso em <code>getPatients</code>; só o
+        widget, mais tarde, avisa que há vários candidatos (<code>Review.py:243</code>).</li>
+        <li><strong>Código morto</strong>: <code>load_data()</code> calcula <code>lm_cbct_U/L</code> e
+        <code>lm_ios_U/L</code> via <code>get_landmarks()</code> (indexação <strong>posicional</strong>, sem
+        rótulos), e os quatro são imediatamente sobrescritos por <code>_pair_landmarks()</code>
+        (<code>AREG_IOSCBCT.py:507</code>). Só <code>cbct_surface</code> é usado. Da mesma forma:
+        <code>DisplayAREGIOSCBCT</code> está <strong>definida duas vezes</strong> em
+        <code>AREG/AREG_Method/Progress.py</code> (linhas 135 e 182), a segunda ocultando a primeira; e
+        <code>PatientScanLandmark</code> (<code>IOSCBCT.py:40</code>) não é chamada em lugar nenhum.</li>
+        <li><strong><code>DisplayAREGIOSCBCT(0)</code></strong> é instanciada com
+        <code>nb_progress_total = 0</code> nos três modos: <code>self.progress / 0</code> →
+        <code>ZeroDivisionError</code> se a barra de progresso for atualizada. Ela só é atualizada sob a
+        condição <code>progress == 200 and updateProgessBar == False</code>, o que explica por que isso passa
+        despercebido.</li>
+        <li><strong><code>fitness</code> e <code>inlier_rmse</code> são lidos depois do laço do ICP</strong>. Com
+        <code>max_iterations = 0</code> (impossível aqui, mas frágil) ou uma saída no primeiro
+        <code>break</code> com <code>&lt; 3</code> correspondências, eles estão definidos — mas o código não
+        se protege contra isso.</li>
+        <li><strong><code>pyvista</code> é instalado no Python do Slicer</strong>, fixado na versão
+        <code>0.47.3</code>. É uma dependência pesada que só está lá por este módulo (<code>pv.wrap</code>,
+        <code>contour</code>, <code>transform</code>, <code>read</code>, <code>save</code>) e poderia ser
+        substituída por VTK direto, que já está presente.</li>
+      </ul>
+
+      <div class="callout bug">
+        <div class="callout-title">O pré-alinhamento pode ser a identidade sem aviso visível</div>
+        <p>Isso é registrado como aviso, nunca como erro: uma execução inteira pode ter ficado sem nenhum
+        pré-alinhamento e ainda assim gerar arquivos. Verifique as linhas de log <code>Skipping the pre-alignment</code>
+        antes de confiar em um lote.</p>
+      </div>
+
+      <h2 id="litterature">8. Literatura</h2>
+
+      <div class="callout">
+        <div class="callout-title">Não publicado</div>
+        <p><strong>Nenhum artigo cobre o AREG_IOSCBCT tal como está implementado aqui.</strong> A linhagem publicada pelo
+        grupo cobre a orientação e o registro de CBCT
+        (<a href="https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5">Automated Orientation and
+        Registration of CBCT Scans, LNCS 2023</a>) e o registro longitudinal de IOS (AReg IOS, LNCS 2023); os
+        módulos de landmarks que ele consome têm cada um o seu
+        (<a href="https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642">ALI_CBCT</a>). A parte multimodal
+        IOS↔CBCT parece ser uma montagem interna, não publicada.</p>
+      </div>
+
+      <p>A vizinhança metodológica na literatura — para comparação, não como descrição deste
+      código:</p>
+
+      <ul>
+        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10669060/">Novel Procedure for Automatic
+        Registration between CBCT and Intraoral Scan Data Supported with 3D Segmentation</a>: mesmo problema,
+        mas <strong>com</strong> segmentação dentária dos dois lados, depois RANSAC + ICP. Erro relatado de
+        0,234 ± 0,019 mm. O AREG_IOSCBCT escolhe explicitamente o caminho mais leve: landmarks em vez de
+        segmentação volumétrica, isossuperfície limiarizada em vez de dentes segmentados.</li>
+        <li><a href="https://link.springer.com/article/10.1007/s00784-025-06183-x">Automatic multimodal
+        registration of CBCT and intraoral scans: a systematic review and meta-analysis</a>: revisão
+        sistemática, contrapõe as abordagens geométricas (confiáveis, de baixo custo) às abordagens aprendidas.</li>
+        <li><a href="https://arxiv.org/pdf/2112.01784">Fully automatic integration of dental CBCT images and
+        full-arch intraoral impressions</a>: variante com identificação dente a dente e correção do erro de
+        stitching.</li>
+      </ul>
+
+      <p>Referências de repositório:</p>
+      <ul>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+        <li><a href="https://github.com/lucanchling/AREG">AREG (repositório original)</a></li>
+        <li><a href="https://github.com/baptistebaquero/ALIDDM/releases/tag/v1.0.3">ALIDDM — pesos do ALI_IOS</a></li>
+      </ul>
+
+      <p>Bibliografia detalhada, arquivos recuperados e links para consultar: <a href="SOURCES.html">SOURCES</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Todas as fichas</a> ·
+        <a href="SOURCES.html">Bibliografia desta ferramenta</a> ·
+        Fonte: <code>AREG_IOSCBCT.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

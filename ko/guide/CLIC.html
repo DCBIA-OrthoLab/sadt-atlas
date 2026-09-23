@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLIC — 가이드 — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body class="guide" data-cat="analyse">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/guide/CLIC.html" hreflang="en" title="English">EN</a><a href="../../fr/guide/CLIC.html" hreflang="fr" title="Français">FR</a><a href="../../pt/guide/CLIC.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/guide/CLIC.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/CLIC.html" aria-current="true"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../CLIC/CLIC.html"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../guide/FlexReg.html">FlexReg</a></li>
+      <li><a href="../guide/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../guide/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../guide/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../guide/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../guide/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../guide/AMASSS.html">AMASSS</a></li>
+      <li><a href="../guide/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../guide/ALI.html">ALI</a></li>
+      <li><a href="../guide/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../guide/VFACE.html">VFACE</a></li>
+      <li><a href="../guide/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../guide/CLIC.html" aria-current="page">CLIC</a></li>
+      <li><a href="../guide/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../guide/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../guide/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../guide/CNE.html">CNE</a></li>
+      <li><a href="../guide/MedX.html">MedX</a></li>
+      <li><a href="../guide/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../guide/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/CLIC/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="index.html">가이드</a> › 분석</div>
+        <h1>CLIC — CBCT에서 매복 견치 찾아 분류하기</h1>
+        <p class="lede">CLIC는 CBCT를 슬라이스 단위로 훑어 매복 견치를 표시하고, 각 견치가
+        골에 대해 어디에 위치하는지 알려 줍니다: <strong>협측(buccal)</strong>,
+        <strong>양측 피질골(bicortical)</strong>, <strong>구개측(palatal)</strong>. 원시 볼륨에서
+        바로 시작하므로 사전 분할이나 랜드마크 지정이 필요 없습니다.</p>
+      </header>
+
+      <div class="callout bug">
+        <div class="callout-title">진행 표시줄이 움직이지 않습니다. 정상입니다</div>
+        <p>도구가 실행되는 동안 진행 표시줄은 0에 머물고, 처리가 끝난 뒤에도 Slicer 장면에는
+        아무것도 나타나지 않습니다. 충돌이 아닙니다. 결과 파일은 어쨌든 출력 폴더에 저장됩니다.
+        <strong>직접 찾아서 불러와야 합니다</strong>. 저장 위치는 아래를 참고하십시오.</p>
+      </div>
+
+      <h2 id="quand">언제 쓰는가</h2>
+      <p>매복 견치가 하나 이상 있는 CBCT가 있고, 견치를 하나하나 눈으로 살펴보지 않고도 각
+      견치가 피질골의 어느 쪽에 있는지 알고 싶을 때 사용합니다. CLIC는 다른 모듈에 의존하지
+      않습니다. AMASSS, ASO, ALI를 먼저 실행할 필요가 없습니다.</p>
+
+      <h2 id="besoin">필요한 것, 얻는 것</h2>
+      <div class="io-grid">
+        <div class="io-card">
+          <h4>준비할 것</h4>
+          <ul>
+            <li><code>.nii</code> 또는 <code>.nii.gz</code> 형식의 CBCT 스캔 폴더</li>
+            <li>학습된 모델(한 번만 내려받으면 됩니다)</li>
+            <li>명시적으로 지정한 출력 폴더</li>
+          </ul>
+        </div>
+        <div class="io-card">
+          <h4>결과물</h4>
+          <ul>
+            <li>스캔마다 하위 폴더 하나, 그 안에 <code>.nii.gz</code> 레이블 맵</li>
+            <li>가능한 복셀 값 세 가지: 협측, 양측 피질골, 구개측</li>
+            <li>정합 없이 원본 스캔 위에 바로 겹쳐 볼 수 있음</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">허용되지만 실제로는 동작하지 않는 형식</div>
+        <p>파일 선택 창에는 <code>.nrrd</code>, <code>.mha</code>,
+        <code>.mhd</code>도 표시됩니다. 사용하지 마십시오. 처리 단계는
+        <code>.nii</code>/<code>.nii.gz</code>만 읽을 수 있으며, 선택 창이 허용했더라도 다른
+        형식에서는 실패합니다.</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">Linux 전용</div>
+        <p>README에 뭐라고 쓰여 있든, 이 모듈은 Windows에서 동작하는 경로가 없습니다. Linux용
+        Slicer 설치본에서 실행하십시오.</p>
+      </div>
+
+      <h2 id="marche">사용 절차</h2>
+      <ol class="steps">
+        <li><strong>모델을 내려받습니다.</strong> 전용 버튼이 학습된 신경망을 가져옵니다.
+        한 번만 하면 됩니다.</li>
+        <li><strong>입력 폴더를 지정합니다.</strong> 하위 폴더가 든 폴더가 아니라
+        <code>.nii.gz</code> 파일이 바로 들어 있는 평평한 폴더여야 합니다.</li>
+        <li><strong>출력 폴더를 고릅니다.</strong> 이 단계는 필수입니다. 출력 폴더가 없으면
+        처리가 시작되기도 전에 실패합니다.</li>
+        <li><strong>실행합니다.</strong> 첫 실행에서는 계산 환경도 함께 설정하므로 이후
+        실행보다 오래 걸립니다.</li>
+        <li><strong>화면에서 아무것도 움직이지 않더라도</strong> 끝날 때까지 기다립니다. 처리는
+        스캔 단위로 진행되며, 중간에 시각적 피드백이 없습니다.</li>
+      </ol>
+
+      <h2 id="resultat">결과는 어디에 있나</h2>
+      <p>처리가 끝나면 지정한 출력 폴더를 여십시오. 처리된 스캔마다 하위 폴더가 하나 있고,
+      각 폴더 안에 <code>.nii.gz</code> 파일이 있습니다. 파일 이름에는 인터페이스에 표시된
+      접미사(기본값 <code>seg</code>)가 붙어 있습니다. 이 파일을 분할 볼륨으로 Slicer에 직접 불러오십시오.
+      이미 원본 스캔에 맞춰져 있으므로 정합이 필요 없습니다. 값 1, 2, 3은 각각 협측, 양측
+      피질골, 구개측에 해당합니다.</p>
+
+      <h2 id="coince">문제가 생기면</h2>
+      <div class="callout warn">
+        <div class="callout-title">Cancel이 아무 효과가 없습니다</div>
+        <p>실행 중인 계산도, 그 아래의 프로세스도 멈추지 않습니다. 정말로 중단해야 한다면
+        Slicer를 닫으십시오.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">첫 실행에는 인터넷 연결이 필요합니다</div>
+        <p>신경망을 구성할 때 학습된 모델을 적용하기 전에 범용 사전 학습 가중치를 먼저
+        내려받습니다. 첫 시도에서 연결이 없으면 처리가 실패합니다.</p>
+      </div>
+      <div class="callout warn">
+        <div class="callout-title">폴더에 모델 파일이 두 개 있음</div>
+        <p>모델 폴더에 모델 파일이 둘 이상 있으면, 알파벳순으로 가장 앞선 이름의 파일이 경고
+        없이 사용됩니다. 혼동을 피하려면 이 폴더에 <code>.pth</code> 파일을 하나만
+        두십시오.</p>
+      </div>
+
+      <!-- papers:start -->
+      <h2 id="lire-plus">더 읽을거리</h2>
+      <p>이 모듈은 아직 논문이 없습니다. 유일한 공개 설명은 NA-MIC 프로젝트 페이지입니다.</p>
+      <h3 id="sur-outil">CLIC 자체에 관한 문헌</h3>
+      <ul>
+        <li><strong>NA-MIC Project Week 43, Montréal 2025</strong> — <a href="https://projectweek.na-mic.org/PW43_2025_Montreal/Projects/InterpretableDeepLearningForTheDetectionAndClassificationOfImpactedCaninesAndSeverityOfRootResorption/"><em>Interpretable Deep Learning for the Detection and Classification of Impacted Canines and severity of root resorption</em></a>. 프로젝트 보고서입니다. 목표, 데이터, 그리고 당시의 작업 진행 상황을 다룹니다.</li>
+      </ul>
+      <h3 id="autour">방법론 관련 문헌</h3>
+      <ul>
+        <li><strong>He et al., ICCV 2017</strong> — <a href="https://arxiv.org/abs/1703.06870"><em>Mask R-CNN</em></a>. 이 모듈이 실행하는 구조입니다. 객체를 검출하는 동시에 그 마스크를 생성합니다.</li>
+        <li><strong>Swaity et al., Scientific Reports 2023</strong> — <a href="https://doi.org/10.1038/s41598-023-49613-0"><em>Deep learning driven segmentation of maxillary impacted canine on cone beam computed tomography images</em></a>. 다른 연구팀이 같은 문제를 다룬 연구로, 독립된 증례군에서 측정한 오차를 제시합니다.</li>
+        <li><strong>Pirayesh et al., BMC Oral Health 2024</strong> — <a href="https://doi.org/10.1186/s12903-024-04718-4"><em>A hierarchical deep learning approach for diagnosing impacted canine-induced root resorption</em></a>. 치근 흡수 측면을 다룹니다. 심각도를 어떻게 등급화하는지, 그리고 사람 관찰자와 비교하면 어떤지 보여 줍니다.</li>
+      </ul>
+      <p>이 도구의 전체 참고문헌 — 찾아낸 것과 찾아봤지만 없었던 것 — 은 <a href="../CLIC/SOURCES.html">출처 페이지</a>에 있습니다.</p>
+      <!-- papers:end -->
+
+      <a class="deep-link" href="../CLIC/CLIC.html">
+        <b>실제 동작 방식 →</b>
+        <span>아틀라스 페이지: 분류와 위치 검출을 함께 맡는 단일 신경망, 레이블 맵을 만드는
+        임계값 처리, 그리고 코드에서 발견된 결함.</span>
+      </a>
+
+      <footer class="footer">
+        <a href="index.html">← 모든 가이드</a> ·
+        <a href="../CLIC/CLIC.html">아틀라스 페이지</a>
+      </footer>
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLIC — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="analyse">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, ferramenta por ferramenta</small></a>
+    <div class="lang-switch">
+      <a href="../../en/CLIC/CLIC.html" hreflang="en" title="English">EN</a><a href="../../fr/CLIC/CLIC.html" hreflang="fr" title="Français">FR</a><span class="cur">PT</span><a href="../../ko/CLIC/CLIC.html" hreflang="ko" title="한국어">KO</a><a href="../../th/CLIC/CLIC.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/CLIC.html"><b>Guia</b><small>como usar as ferramentas</small></a>
+      <a href="../CLIC/CLIC.html" aria-current="true"><b>Atlas</b><small>como funciona no código</small></a>
+    </div>
+    <div class="nav-group"><h4>Registro</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentação</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks e orientação</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Análise</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html" aria-current="page">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilitários</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Texto e linguagem</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Transversal</h4><ul>
+      <li><a href="../findings.html">Constatações</a></li>
+      <li><a href="../glossary.html">Glossário</a></li>
+    </ul></div>
+  </nav>
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/CLIC/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Análise</div>
+        <h1>CLIC</h1>
+        <p class="lede">O CLIC segmenta uma CBCT corte a corte com uma Mask R-CNN e classifica cada instância detectada como canino impactado vestibular, bicortical ou palatino — classificação e localização saem da mesma passagem pela rede.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="Não publicado — apenas uma página da NA-MIC Project Week 43 o descreve.">não publicado</a>
+          <span class="badge cli">clic_runner.py</span>
+          <span class="badge neutral">ambiente conda: clic_env</span>
+          <span class="badge neutral">Python 3.9</span>
+          <a class="badge neutral" href="SOURCES.html">Bibliografia</a>
+        </div>
+      </header>
+
+      <p><em>Classification and Localization of Impacted Canines.</em> Segmentação de instâncias
+      2D, corte a corte, de uma CBCT por uma <strong>Mask R-CNN do torchvision</strong>, cuja
+      classe predita codifica a posição intraóssea do canino impactado:
+      <strong>vestibular, bicortical, palatino</strong>.</p>
+
+      <p>O nome do módulo promete duas tarefas; o código tem <strong>uma única rede</strong>. Não
+      há rede de classificação separada, nem rede de localização separada, nem cabeça de
+      regressão de coordenadas. A classificação é o rótulo da instância
+      (<code>pr["labels"]</code>); a localização é a máscara (<code>pr["masks"]</code>) — ambas saem
+      da mesma passagem pela Mask R-CNN. Tudo o que segue decorre disso.</p>
+
+      <h2 id="situation">1. Onde se situa no pipeline</h2>
+
+      <p>Autônomo nos dois sentidos: nenhum módulo do repositório chama o CLIC, e o
+      CLIC não chama nenhum outro módulo do repositório. Ele não chama nada além do seu
+      próprio runner:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Chamado</th><th>Quando</th><th>Como</th></tr></thead>
+          <tbody>
+            <tr><td><code>CLIC/runner/clic_runner.py</code></td><td>uma vez por exame</td><td><code>CondaSetUpCall.condaRunFilePython(runner, ["--params_json=…"], "clic_env")</code></td></tr>
+            <tr><td>release <code>CLIC_model/final_model.pth</code></td><td>botão <em>Download Model</em></td><td><code>requests.get</code>, gravado em <code>~/Documents/CLIC_Models</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Ele parte da CBCT bruta.</strong> Sem segmentação prévia, sem landmarks, sem
+      orientação: o módulo lê um <code>.nii</code>/<code>.nii.gz</code> e produz um mapa de rótulos. Ele
+      não depende de forma alguma de <a href="../AMASSS/AMASSS.html">AMASSS</a>, <a href="../ASO/ASO.html">ASO</a> ou <a href="../ALI/ALI.html">ALI</a>.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 700 170" role="img" aria-label="O CLIC é autônomo: um único fluxo da CBCT ao mapa de rótulos, sem dependência a montante nem a jusante">
+          <rect class="d-box-a" x="20" y="10" width="200" height="46" rx="6"/>
+          <text class="d-label" x="120" y="30" text-anchor="middle">Release GitHub</text>
+          <text class="d-label-s" x="120" y="45" text-anchor="middle">final_model.pth</text>
+          <path class="d-arrow" d="M120 56 V78"/>
+          <path class="d-arrow-head" d="M120 78 l-4 -7 h8 z"/>
+
+          <rect class="d-box" x="10" y="90" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="110" text-anchor="middle">CBCT bruta</text>
+          <text class="d-label-s" x="100" y="125" text-anchor="middle">.nii / .nii.gz</text>
+          <path class="d-arrow" d="M190 115 H250"/>
+          <path class="d-arrow-head" d="M250 115 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="255" y="90" width="220" height="50" rx="6"/>
+          <text class="d-label" x="365" y="110" text-anchor="middle">clic_runner.py</text>
+          <text class="d-label-s" x="365" y="125" text-anchor="middle">amb. clic_env, GPU se houver</text>
+          <path class="d-arrow" d="M475 115 H535"/>
+          <path class="d-arrow-head" d="M535 115 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="540" y="90" width="150" height="50" rx="6"/>
+          <text class="d-label" x="615" y="110" text-anchor="middle">Mapa de rótulos</text>
+          <text class="d-label-s" x="615" y="125" text-anchor="middle">.nii.gz, 0/1/2/3</text>
+
+          <text class="d-label-s" x="365" y="160" text-anchor="middle">nenhum módulo a montante nem a jusante — o CLIC não depende de AMASSS, ASO nem ALI</text>
+        </svg>
+        <figcaption>O CLIC é autônomo nos dois sentidos: não chama nenhum outro módulo do pipeline e não é chamado por nenhum.</figcaption>
+      </figure>
+
+      <h2 id="fichiers">2. Arquivos envolvidos</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Arquivo</th><th>Papel</th><th>Onde roda</th></tr></thead>
+          <tbody>
+            <tr><td><code>CLIC/CLIC.py</code></td><td>widget, 622 linhas, das quais ~230 são uma folha de estilo escura e ~50 são patches de conda</td><td>Python do Slicer</td></tr>
+            <tr><td><code>CLIC/runner/clic_runner.py</code></td><td><strong>todo o processamento</strong>, 110 linhas</td><td>ambiente conda <code>clic_env</code>, GPU se houver</td></tr>
+            <tr><td><code>CLIC/Resources/UI/CLIC.ui</code></td><td>a interface</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Sem CLI do Slicer, sem <code>.xml</code>, sem camada do tipo <code>MedX_Method</code>: o widget grava um
+      JSON de parâmetros em <code>slicer.app.temporaryPath</code> e lança o runner como um
+      script Python autônomo dentro do ambiente conda.</p>
+
+      <p>O widget importa <code>CondaSetUp</code> <strong>no nível do módulo</strong>
+      (<code>CLIC/CLIC.py:18</code>) sem declará-lo em <code>parent.dependencies</code>:
+      sem o SlicerConda instalado, o CLIC simplesmente não carrega, sem nenhuma mensagem
+      útil.</p>
+
+      <p>Ele sempre instancia <code>CondaSetUpCall()</code> (<code>CLIC/CLIC.py:62</code>), nunca
+      <code>CondaSetUpCallWsl</code>: ao contrário de <a href="../MedX/MedX.html">MedX</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a> e dos outros, <strong>o CLIC
+      não tem caminho WSL</strong>. No Windows ele vai chamar o caminho Unix do SlicerConda, e a
+      ordem dos argumentos de <code>condaRunFilePython</code> difere entre as duas classes
+      (<code>(file, args, env)</code> do lado Unix, <code>(file, env, args)</code> do lado WSL) —
+      a lista de argumentos seria enviada como nome do ambiente. O módulo é, na prática,
+      exclusivo para Linux, apesar do README.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>Sem caminho WSL: <code>CondaSetUpCallWsl</code> nunca é instanciado. No Windows, a
+        ordem dos argumentos de <code>condaRunFilePython</code> esperada pelo caminho Unix (usado por
+        engano) não é a do caminho WSL — a lista de argumentos seria enviada como nome do
+        ambiente. O CLIC é, na prática, exclusivo para Linux.</p>
+      </div>
+
+      <h2 id="entrees">3. Entradas e pré-processamento</h2>
+
+      <h3 id="collecte">3.1 Coleta dos exames</h3>
+
+      <p><code>_collect_scans()</code> (<code>CLIC/CLIC.py:316</code>) aceita
+      <code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>, <code>.mha</code>, <code>.mhd</code> e segue uma regra em duas etapas:</p>
+
+      <ol>
+        <li>se houver <strong>subpastas</strong> contendo pelo menos um arquivo válido, retorna a
+        lista dessas <strong>subpastas</strong>;</li>
+        <li>caso contrário, a lista dos arquivos válidos da pasta.</li>
+      </ol>
+
+      <p>O caso 1 produz <code>Path</code>s de diretórios, passados tal qual como
+      <code>input_path</code> ao runner, que faz <code>nib.load(str(inp))</code>: falha imediata.
+      O caso nominal é, portanto, uma pasta plana de <code>.nii.gz</code>.</p>
+
+      <p>Além disso, o runner só usa o <strong>nibabel</strong>: <code>.nrrd</code>, <code>.mha</code>, <code>.mhd</code> são
+      aceitos pelo filtro do widget e ilegíveis para o runner.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>O filtro de seleção do widget aceita <code>.nrrd</code>, <code>.mha</code> e <code>.mhd</code>
+        além de <code>.nii</code>/<code>.nii.gz</code>, mas o runner só consegue carregar com o
+        <strong>nibabel</strong>: esses três formatos passam pelo filtro e falham no carregamento.</p>
+      </div>
+
+      <h3 id="pretraitement">3.2 O pré-processamento real do volume</h3>
+
+      <p>Cabe em três linhas (<code>CLIC/runner/clic_runner.py:88</code>):</p>
+
+      <pre><code>sl = _norm(vol[..., z])                                    # min-max of the slice
+t  = torch.from_numpy(sl).unsqueeze(0).repeat(3, 1, 1).float().to(device)
+pr = model([t])[0]</code></pre>
+
+      <p>Ou seja:</p>
+
+      <ul>
+        <li><strong>fatiamento em cortes axiais</strong> ao longo do 3<sup>º</sup> eixo do array
+        nibabel, na ordem de armazenamento do arquivo — e não segundo uma orientação anatômica
+        recalculada. Nenhuma reorientação <a class="gterm" href="../glossary.html#g-ras" title="Ver glossário">RAS</a>/<a class="gterm" href="../glossary.html#g-lps" title="Ver glossário">LPS</a> é feita; o código nunca olha
+        <code>nii.affine</code>, a não ser para regravá-lo;</li>
+        <li><strong>normalização min-max por corte</strong> (<code>_norm</code>,
+        <code>CLIC/runner/clic_runner.py:53</code>): <code>(x - min) / (max - min)</code>,
+        e um corte constante vira zero. Sem janelamento em Hounsfield, sem recorte por
+        percentis, sem estatísticas volumétricas: <strong>cada corte tem o seu próprio
+        contraste</strong>, e um corte que contém apenas ar é esticado por toda a faixa
+        dinâmica;</li>
+        <li><strong>replicação em 3 canais</strong> para corresponder à entrada RGB do backbone
+        ImageNet;</li>
+        <li><strong>sem crop, sem ROI, sem reamostragem explícita</strong>, sem reescala de voxel.</li>
+      </ul>
+
+      <p>O único redimensionamento vem do próprio torchvision: o
+      <code>GeneralizedRCNNTransform</code> embutido no modelo padroniza com as médias
+      ImageNet (<code>[0.485,0.456,0.406]</code> / <code>[0.229,0.224,0.225]</code>) e redimensiona para
+      que o lado menor tenha <strong>800 px</strong>, limitado a <strong>1333 px</strong> no lado maior.
+      É um padrão do torchvision, não uma escolha feita no repositório — uma
+      CBCT de 512×512 é assim ampliada para 800×800 antes do backbone.</p>
+
+      <h2 id="modele">4. O modelo</h2>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1400 140" role="img" aria-label="Pipeline completo por corte: fatiamento, normalização, replicação, redimensionamento torchvision, Mask R-CNN, limiarização, gravação no mapa de rótulos">
+          <rect class="d-box" x="10" y="40" width="150" height="60" rx="6"/>
+          <text class="d-label" x="85" y="65" text-anchor="middle">Corte axial Z</text>
+          <text class="d-label-s" x="85" y="80" text-anchor="middle">ordem do arquivo</text>
+          <path class="d-arrow" d="M160 70 H190"/>
+          <path class="d-arrow-head" d="M190 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="195" y="40" width="165" height="60" rx="6"/>
+          <text class="d-label" x="277" y="65" text-anchor="middle">Normalização</text>
+          <text class="d-label-s" x="277" y="80" text-anchor="middle">min-max, por corte</text>
+          <path class="d-arrow" d="M360 70 H390"/>
+          <path class="d-arrow-head" d="M390 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="395" y="40" width="145" height="60" rx="6"/>
+          <text class="d-label" x="467" y="65" text-anchor="middle">Replicação</text>
+          <text class="d-label-s" x="467" y="80" text-anchor="middle">3 canais RGB</text>
+          <path class="d-arrow" d="M540 70 H570"/>
+          <path class="d-arrow-head" d="M570 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="575" y="40" width="210" height="60" rx="6"/>
+          <text class="d-label" x="680" y="60" text-anchor="middle">Resize 800/1333</text>
+          <text class="d-label-s" x="680" y="76" text-anchor="middle">+ norm. ImageNet</text>
+          <text class="d-label-s" x="680" y="90" text-anchor="middle">(interno ao torchvision)</text>
+          <path class="d-arrow" d="M785 70 H815"/>
+          <path class="d-arrow-head" d="M815 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="820" y="35" width="230" height="70" rx="6"/>
+          <text class="d-label" x="935" y="60" text-anchor="middle">Mask R-CNN</text>
+          <text class="d-label-s" x="935" y="76" text-anchor="middle">ResNet50-FPN, 4 classes</text>
+          <text class="d-label-s" x="935" y="91" text-anchor="middle">rede — prediz</text>
+          <path class="d-arrow" d="M1050 70 H1080"/>
+          <path class="d-arrow-head" d="M1080 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="1085" y="40" width="150" height="60" rx="6"/>
+          <text class="d-label" x="1160" y="60" text-anchor="middle">Limiares</text>
+          <text class="d-label-s" x="1160" y="76" text-anchor="middle">escore ≥ 0.7</text>
+          <text class="d-label-s" x="1160" y="90" text-anchor="middle">máscara &gt; 0.5</text>
+          <path class="d-arrow" d="M1235 70 H1265"/>
+          <path class="d-arrow-head" d="M1265 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="1270" y="40" width="120" height="60" rx="6"/>
+          <text class="d-label" x="1330" y="65" text-anchor="middle">Mapa rótulos</text>
+          <text class="d-label-s" x="1330" y="80" text-anchor="middle">sobrescrita</text>
+        </svg>
+        <figcaption>O único caminho algorítmico do CLIC, repetido para cada corte axial. Toda a decisão clínica (vestibular / bicortical / palatino) sai da caixa "rede" — o resto é aritmética determinística.</figcaption>
+      </figure>
+
+      <h3 id="architecture">4.1 Arquitetura</h3>
+
+      <p><code>_blank_model(nc)</code> (<code>CLIC/runner/clic_runner.py:44</code>), chamada
+      com <code>nc = 4</code>:</p>
+
+      <pre><code>m = maskrcnn_resnet50_fpn(weights=None)
+m.roi_heads.box_predictor  = FastRCNNPredictor(in_f, nc)
+m.roi_heads.mask_predictor = MaskRCNNPredictor(in_fm, 256, nc)</code></pre>
+
+      <ul>
+        <li><strong>backbone</strong>: ResNet-50 + FPN (<code>_resnet_fpn_extractor</code>, 5 níveis);</li>
+        <li><strong>RPN</strong> e depois <strong>ROI heads</strong>: cabeça de caixas (<code>FastRCNNPredictor</code>: <code>cls_score</code>
+        4 classes, <code>bbox_pred</code> 16 saídas) e cabeça de máscara (<code>MaskRCNNPredictor</code>, camada
+        oculta de 256, 4 canais de saída, máscaras de 28×28 por ROI);</li>
+        <li><code>weights=None</code>, mas <code>weights_backbone</code> mantém o seu padrão
+        <code>ResNet50_Weights.IMAGENET1K_V1</code>: <strong>construir o modelo baixa os pesos
+        ImageNet do ResNet-50</strong> (e depois <code>load_state_dict</code> os sobrescreve). Primeira
+        execução offline = falha. Efeito colateral útil: como <code>is_trained</code> é <code>True</code>, a
+        normalização é <code>FrozenBatchNorm2d</code> e não <code>BatchNorm2d</code>, o que precisa
+        corresponder ao modelo de treinamento para que as chaves do <code>state_dict</code>
+        batam.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><code>weights_backbone</code> mantém o seu padrão <code>ResNet50_Weights.IMAGENET1K_V1</code> mesmo
+        quando <code>weights=None</code>: a simples construção do modelo dispara um download dos
+        pesos ImageNet do ResNet-50. Primeira execução offline = falha, antes mesmo de
+        chegar a <code>final_model.pth</code>.</p>
+      </div>
+
+      <p>4 classes = fundo + 3. A correspondência rótulo → nome só existe no
+      widget, em <code>_legend()</code> (<code>CLIC/CLIC.py:361</code>):</p>
+
+      <p><span class="badge predit">predito</span> a rede só produz os inteiros 1/2/3; o nome e a cor abaixo são uma convenção do widget, ausente do runner.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Rótulo</th><th>Significado</th><th>Cor</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Vestibular</td><td>verde <code>(0,1,0)</code></td></tr>
+            <tr><td>2</td><td>Bicortical</td><td>amarelo <code>(1,1,0)</code></td></tr>
+            <tr><td>3</td><td>Palatino</td><td>marrom <code>(.6,.4,.2)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>O runner não conhece esses nomes: ele grava os inteiros 1, 2, 3.</p>
+
+      <h3 id="poids">4.2 Os pesos</h3>
+
+      <p>URL fixa no código (<code>CLIC/CLIC.py:333</code>):</p>
+
+      <pre><code>https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/CLIC_model/final_model.pth</code></pre>
+
+      <p>Destino <code>~/Documents/CLIC_Models/final_model.pth</code>. O runner não
+      procura esse nome: ele pega <code>sorted(model_dir.glob("*.pth"))[0]</code>
+      (<code>CLIC/runner/clic_runner.py:76</code>), <strong>o primeiro <code>.pth</code> em
+      ordem alfabética</strong>. Dois modelos na pasta, e é o nome do arquivo que decide.
+      <code>IndexError</code> não tratado se a pasta estiver vazia.</p>
+
+      <p>O arquivo é um <code>state_dict</code> puro (<code>model.load_state_dict(torch.load(...))</code>), não
+      um checkpoint Lightning: sem hiperparâmetros, sem classes, sem versão. O
+      conjunto de treinamento, o número de cortes anotados e as métricas não podem ser
+      determinados a partir do repositório.</p>
+
+      <h3 id="sorties-reseau">4.3 O que a rede produz literalmente</h3>
+
+      <p><span class="badge predit">rede</span> para cada corte, <code>model([t])[0]</code> retorna o dicionário padrão do torchvision:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Chave</th><th>Forma</th><th>Conteúdo</th></tr></thead>
+          <tbody>
+            <tr><td><code>boxes</code></td><td><code>(N,4)</code></td><td>caixas <code>x1,y1,x2,y2</code> no referencial redimensionado, levadas de volta ao tamanho original pela transformação</td></tr>
+            <tr><td><code>labels</code></td><td><code>(N,)</code></td><td>inteiro 1..3</td></tr>
+            <tr><td><code>scores</code></td><td><code>(N,)</code></td><td>escore de classe, decrescente</td></tr>
+            <tr><td><code>masks</code></td><td><code>(N,1,H,W)</code></td><td><strong>probabilidade por pixel</strong>, float em [0,1]</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>com os limiares padrão a montante do torchvision: <code>box_score_thresh=0.05</code>,
+      <code>box_nms_thresh=0.5</code>, <code>box_detections_per_img=100</code>.</p>
+
+      <h3 id="label-map">4.4 Das saídas da rede ao mapa de rótulos</h3>
+
+      <p>Dois limiares, ambos fixos no código
+      (<code>CLIC/runner/clic_runner.py:93</code>):</p>
+
+      <pre><code>keep = pr["scores"] &gt;= 0.7                     # confiance d'instance
+for mk, lb in zip((pr["masks"][keep] &gt; .5).squeeze(1).cpu().numpy(),
+                  pr["labels"][keep].cpu().numpy()):
+    seg[..., z][mk] = int(lb)</code></pre>
+
+      <ul>
+        <li><strong>0.7</strong> sobre o escore da instância;</li>
+        <li><strong>0.5</strong> sobre a probabilidade da máscara, o que a binariza;</li>
+        <li>a atribuição é uma <strong>sobrescrita</strong>, não um voto: se duas instâncias
+        se sobrepõem, a processada <strong>por último</strong> (portanto a de menor escore,
+        já que o torchvision ordena por escore decrescente) fica com o pixel. Um
+        conflito vestibular/palatino no mesmo voxel é decidido pelo menor escore;</li>
+        <li>nada restringe o número de instâncias por corte, nem a um canino
+        nem a dois.</li>
+      </ul>
+
+      <p><strong>Nenhuma coerência 3D é imposta.</strong> Cada corte é classificado de forma independente;
+      não há suavização entre cortes, nem análise de componentes conexos, nem
+      voto majoritário ao longo da pilha. Dois cortes vizinhos podem ter duas
+      classes diferentes para o mesmo dente. Quem quiser "a classe do paciente"
+      precisa agregá-la por conta própria — o módulo não a produz.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>A sobreposição entre duas instâncias é resolvida por <strong>sobrescrita</strong>, não por voto:
+        a instância processada por último — portanto a de menor escore, já que o torchvision
+        ordena por escore decrescente — fica com o pixel. E como nada impõe
+        coerência entre cortes vizinhos, dois cortes adjacentes podem classificar
+        o mesmo dente de forma diferente.</p>
+      </div>
+
+      <h2 id="coeur">5. O núcleo algorítmico</h2>
+
+      <p>Não há parte não aprendida, além da limiarização: nem <a class="gterm" href="../glossary.html#g-icp" title="Ver glossário">ICP</a>, nem
+      morfologia, nem extração de componentes, nem medição. O runner inteiro é:
+      carregar o modelo, percorrer Z, limiarizar, gravar. Toda a decisão está dentro
+      da <span class="badge predit">Mask R-CNN</span>.</p>
+
+      <h2 id="sorties">6. Pós-processamento e saídas</h2>
+
+      <pre><code>out_dir  = out_root / inp.stem
+out_path = out_dir / f"{inp.stem}_{suffix}.nii.gz"
+nib.save(nib.Nifti1Image(seg.astype(np.int16), nii.affine, nii.header), out_path)</code></pre>
+
+      <ul>
+        <li>uma <strong>subpasta por exame</strong>, com o nome do exame;</li>
+        <li>sufixo vindo de <code>suffixLineEdit</code>, padrão <code>"seg"</code>;</li>
+        <li><code>Path.stem</code> aplicado a <code>X.nii.gz</code> dá <strong><code>X.nii</code></strong>: a pasta se chama <code>X.nii</code> e
+        o arquivo <code>X.nii_seg.nii.gz</code>. Feio, mas sem consequência funcional;</li>
+        <li><code>affine</code> e <code>header</code> são <strong>retomados do volume de entrada</strong>: o mapa de rótulos
+        se sobrepõe sem registro. O <code>header</code> original descreve um tipo de dado em ponto
+        flutuante enquanto os dados são <code>int16</code>; o <code>Nifti1Image</code> ajusta o
+        <code>dtype</code> do header na gravação;</li>
+        <li>o tipo é <code>int16</code> com valores 0/1/2/3.</li>
+      </ul>
+
+      <div class="callout">
+        <div class="callout-title">Nota</div>
+        <p>O nome <code>X.nii_seg.nii.gz</code> vem de <code>Path.stem</code> aplicado a <code>X.nii.gz</code>, que
+        só remove uma extensão e retorna <code>X.nii</code>. Feio, mas sem consequência
+        funcional.</p>
+      </div>
+
+      <p>Do lado do widget, o carregamento do resultado passa pela fila <code>ui_q</code>: a
+      ação <code>"segmentation"</code> chama <code>slicer.util.loadSegmentation(path)</code> e depois
+      <code>_legend()</code>, que colore os segmentos <strong>pela ordem de índice</strong> (<code>cols.get(i+1, …)</code>)
+      e não pelo valor do rótulo. Se uma classe estiver ausente do volume, as cores se deslocam.
+      <code>_legend()</code> também desenha três <code>vtkTextActor</code>s nas vistas Red/Yellow/Green,
+      marcados com um atributo <code>_leg</code> para poderem ser removidos na próxima atualização.</p>
+
+      <h2 id="predit-calcule">7. O que é predito e o que é calculado</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bloco</th><th>Natureza</th><th>Onde</th></tr></thead>
+          <tbody>
+            <tr><td>Normalização min-max por corte</td><td><span class="badge calcule">calculado</span> aritmética, 2 linhas</td><td><code>clic_env</code></td></tr>
+            <tr><td>Redimensionamento 800/1333 + padronização ImageNet</td><td><span class="badge calcule">calculado</span> determinístico, <strong>interno ao torchvision</strong></td><td><code>clic_env</code></td></tr>
+            <tr><td>Detecção, classificação, máscara</td><td><span class="badge predit">predito</span> <strong>rede</strong>: Mask R-CNN ResNet50-FPN, 4 classes</td><td><code>clic_env</code>, GPU se houver</td></tr>
+            <tr><td>Limiares 0.7 / 0.5 e gravação no volume</td><td><span class="badge calcule">calculado</span> aritmética</td><td><code>clic_env</code></td></tr>
+            <tr><td>Cores e legenda</td><td><span class="badge neutral">Slicer</span></td><td>widget</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Todo o conteúdo clínico — <em>é um canino impactado, e de que lado da
+      cortical ele está</em> — sai apenas da rede. Não há verificação
+      a posteriori.</p>
+
+      <h2 id="environnement">8. Ambiente</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>Valor</th><th>Fonte</th></tr></thead>
+          <tbody>
+            <tr><td>Ambiente conda</td><td><strong><code>clic_env</code></strong> (próprio do CLIC)</td><td><code>CLIC/CLIC.py:120</code></td></tr>
+            <tr><td>Python</td><td><strong>3.9</strong></td><td><code>CLIC/CLIC.py:167</code></td></tr>
+            <tr><td>Criação</td><td><code>numpy&lt;2.0.0</code>, <code>scipy</code>, <code>nibabel</code>, <code>requests</code></td><td>idem</td></tr>
+            <tr><td>Depois, via pip</td><td><code>torch==2.2.0</code>, <code>torchvision==0.17.0</code>, <code>torchaudio==2.2.0</code> a partir do índice <strong>cu118</strong></td><td><code>CLIC/CLIC.py:182</code></td></tr>
+            <tr><td>Depois</td><td><code>pip install 'numpy&lt;2.0'</code> uma segunda vez</td><td><code>CLIC/CLIC.py:204</code></td></tr>
+            <tr><td>GPU</td><td>opcional, fallback automático para CPU</td><td><code>CLIC/runner/clic_runner.py:73</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>_ensure_env()</code> (<code>CLIC/CLIC.py:158</code>) é executada de novo <strong>a cada clique em
+      Predict</strong>: as duas chamadas <code>pip install</code> rodam de novo, mesmo quando tudo já está
+      no lugar (o pip responde rápido, mas consulta a rede mesmo assim). <code>self._env_ready</code>
+      é definido e nunca relido.</p>
+
+      <p>O segundo <code>pip install</code> passa <code>"'numpy&lt;2.0'"</code> — com as aspas simples incluídas
+      na string. Dependendo de como o SlicerConda monta o comando
+      (<code>shell=True</code> com uma string do lado Unix), o argumento pode chegar
+      corretamente sem aspas ou não. A detecção de falha, por sua vez, procura
+      <code>"error"</code> ou <code>"failed"</code> na saída retornada: qualquer aviso do pip contendo
+      essas palavras faz a etapa de preparação falhar.</p>
+
+      <h3 id="rustine-conda">O patch de conda</h3>
+
+      <p><code>CLICWidget.__init__</code> (<code>CLIC/CLIC.py:62</code>–<code>112</code>)
+      aplica em tempo de execução um patch em <code>getCondaExecutable</code> e <code>getCondaPath</code> do SlicerConda:</p>
+
+      <ol>
+        <li>corrige um <code>/bin/bin/</code> duplicado no caminho;</li>
+        <li>senão, <code>shutil.which("conda")</code>;</li>
+        <li>senão, <strong><code>/home/luciacev/anaconda3/bin/conda</code> fixo no código</strong>.</li>
+      </ol>
+
+      <p>E <code>fixed_getCondaPath</code> retorna <strong><code>/home/luciacev/anaconda3</code> assim que
+      essa pasta existe</strong>, antes mesmo de considerar o caminho configurado pelo usuário. Um
+      caminho de uma máquina de desenvolvimento específica fica assim versionado no
+      repositório e tem prioridade sobre a configuração do SlicerConda. Deve ser
+      tratado como dívida, não como comportamento intencional.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p><code>fixed_getCondaPath</code> retorna <code>/home/luciacev/anaconda3</code> assim que essa
+        pasta existe na máquina, antes mesmo de olhar a configuração do SlicerConda
+        do usuário — um caminho de máquina de desenvolvimento está versionado e tem
+        prioridade.</p>
+      </div>
+
+      <h2 id="pieges">9. Armadilhas e pontos frágeis</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">Bug confirmado</div>
+        <p>O runner emite seus marcadores via <code>logger.info</code>, com o formatter
+        <code>'%(name)s - %(levelname)s - (%(filename)s:%(lineno)d) - %(message)s'</code>
+        (<code>CLIC/runner/clic_runner.py:39</code>). As linhas recebidas têm a forma
+        <code>CLIC_runner - INFO - (clic_runner.py:60) - [SEG] /path</code>, então os testes
+        <code>ln.startswith("[PROGRESS]")</code> e <code>ln.startswith("[SEG]")</code>
+        (<code>CLIC/CLIC.py:268</code>) <strong>nunca são verdadeiros</strong>. Consequência: a barra de progresso
+        fica em zero e <strong>a segmentação produzida nunca é carregada no
+        Slicer</strong> — embora seja gravada corretamente em disco. Correção mínima: analisar
+        com <code>"[SEG]" in ln</code> e cortar a partir do marcador.</p>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 720 230" role="img" aria-label="O runner prefixa suas linhas de log, o widget testa startswith no marcador: a comparação sempre falha">
+          <rect class="d-box" x="20" y="20" width="310" height="80" rx="6"/>
+          <text class="d-label" x="175" y="42" text-anchor="middle">Saída real do runner</text>
+          <text class="d-mono" x="175" y="64" text-anchor="middle">CLIC_runner - INFO -</text>
+          <text class="d-mono" x="175" y="80" text-anchor="middle">(clic_runner.py:60) - [SEG] /path</text>
+
+          <rect class="d-box" x="390" y="20" width="310" height="80" rx="6"/>
+          <text class="d-label" x="545" y="42" text-anchor="middle">Teste do widget (CLIC.py:268)</text>
+          <text class="d-mono" x="545" y="66" text-anchor="middle">ln.startswith("[SEG]")</text>
+          <text class="d-label-s" x="545" y="84" text-anchor="middle">espera que a linha comece pelo marcador</text>
+
+          <text class="d-label" x="360" y="65" text-anchor="middle" font-size="22">≠</text>
+
+          <path class="d-arrow" d="M360 105 V150"/>
+          <path class="d-arrow-head" d="M360 150 l-4 -7 h8 z"/>
+
+          <rect class="d-box-a" x="80" y="155" width="560" height="60" rx="6"/>
+          <text class="d-label" x="360" y="178" text-anchor="middle">startswith("[SEG]") nunca é verdadeiro</text>
+          <text class="d-label-s" x="360" y="196" text-anchor="middle">barra travada em 0% — a segmentação gravada em disco nunca é carregada no Slicer</text>
+        </svg>
+        <figcaption>A troca de <code>print</code> por <code>logging</code> quebrou o protocolo ainda descrito no cabeçalho do runner.</figcaption>
+      </figure>
+
+      <div class="callout warn">
+        <div class="callout-title">Armadilha</div>
+        <p>Sem pasta de saída escolhida, o widget ainda assim grava a chave
+        <code>"output_dir"</code> no JSON, com valor <code>None</code>. Do lado do runner,
+        <code>P.get("output_dir", inp.parent)</code> então retorna <code>None</code> — a chave existe, então
+        o padrão não se aplica — e <code>Path(None)</code> levanta um <code>TypeError</code>: o
+        runner quebra.</p>
+      </div>
+
+      <ul>
+        <li><strong>A barra de progresso e o carregamento automático do resultado estão
+        quebrados.</strong> O runner emite seus marcadores via <code>logger.info</code>, com o formatter
+        <code>'%(name)s - %(levelname)s - (%(filename)s:%(lineno)d) - %(message)s'</code>
+        (<code>CLIC/runner/clic_runner.py:39</code>). As linhas recebidas
+        têm a forma <code>CLIC_runner - INFO - (clic_runner.py:60) - [SEG] /path</code>, então
+        os testes <code>ln.startswith("[PROGRESS]")</code> e <code>ln.startswith("[SEG]")</code>
+        (<code>CLIC/CLIC.py:268</code>) <strong>nunca são verdadeiros</strong>. Consequências: a
+        barra fica em zero e a segmentação produzida <strong>nunca é carregada no
+        Slicer</strong> — embora seja gravada corretamente em disco. A troca de
+        <code>print</code> por <code>logging</code> quebrou o protocolo ainda descrito no cabeçalho
+        do runner (<code>CLIC/runner/clic_runner.py:12-16</code>). Correção mínima:
+        analisar com <code>"[SEG]" in ln</code> e cortar a partir do marcador.</li>
+        <li><strong>De qualquer forma, nada é incremental.</strong> <code>condaRunFilePython</code> faz um
+        <code>subprocess.run(...).stdout</code> e retorna <code>f"Result: {result.stdout}"</code>: toda
+        a saída chega <strong>em um só bloco, ao fim do exame</strong>. Mesmo com os
+        marcadores corrigidos, o progresso saltaria de 0 a 100% por exame.</li>
+        <li><strong>O botão Cancel não faz nada</strong>: <code>_on_cancel</code> (<code>CLIC/CLIC.py:288</code>)
+        apenas grava uma linha de log. Ele não toca nem <code>cancel_evt</code> nem o
+        subprocesso.</li>
+        <li><strong>Sem pasta de saída escolhida, o runner quebra.</strong> O widget sempre
+        grava a chave <code>"output_dir"</code> no JSON, com <code>None</code> se o operador não
+        escolheu nada;
+        <code>P.get("output_dir", inp.parent)</code> então retorna <code>None</code> — o padrão não
+        se aplica, pois a chave existe — e <code>Path(None)</code> levanta um <code>TypeError</code>. A
+        caixa de seleção <em>Save Predictions in Input Folder</em> do <code>.ui</code> <strong>não está
+        conectada a nada</strong>.</li>
+        <li><strong><code>self.output_dir</code> não é convertido para <code>str</code> no JSON</strong>: ele
+        já é uma string do lado de <code>_browse</code>, assim como <code>model_folder</code> — coerente,
+        exceto que <code>input_path</code> é um <code>Path</code> explicitamente convertido. A vigiar em
+        caso de reescrita.</li>
+        <li><strong>O laço de espera bloqueia o Slicer</strong>: <code>_on_predict</code> roda em um
+        <code>while not cancel_evt.wait(0.05)</code> com <code>processEvents()</code>, e a thread de trabalho
+        espera o subprocesso. A UI continua responsiva, mas o botão <em>Predict</em>
+        é o único ponto de saída.</li>
+        <li><strong>Normalização por corte</strong>: a classe predita em um corte depende do
+        contraste local recalculado, não das unidades Hounsfield. Duas aquisições
+        com campos de visão diferentes não apresentam a mesma imagem à
+        rede.</li>
+        <li>O <code>.ui</code> declara <strong>dois widgets <code>QTextEdit</code> chamados <code>logTextEdit</code></strong>
+        (<code>CLIC/Resources/UI/CLIC.ui:343</code> e
+        <code>353</code>): <code>childWidgetVariables</code> só guarda
+        um, e o outro fica vazio na tela.</li>
+        <li><strong>Código morto</strong>: <code>_clean_env()</code> (<code>CLIC/CLIC.py:39</code>),
+        <code>initializeParameterNode</code> (<code>pass</code>), <code>_updateAllLabelsColor</code>,
+        <code>_updateDynamicWidgetsColor</code>, <code>_updateMRMLNodeComboBoxColor</code>, os imports
+        <code>glob</code>, <code>subprocess</code>, <code>urllib.request</code>, <code>Optional</code>,
+        <code>CLIC/testing/test_CanineSegmentation.py</code>
+        (arquivo vazio), e o import não usado de <code>torch</code> em
+        <code>MedX_CLI/MedX_Dashboard/MedX_Dashboard.py</code> — mencionado aqui
+        porque o mesmo copiar-e-colar aparece em vários módulos.</li>
+        <li><code>CLIC/__pycache__/CLIC.cpython-312.pyc</code> está versionado no repositório.</li>
+      </ul>
+
+      <h2 id="litterature">10. Literatura</h2>
+
+      <p><strong>Nenhum artigo trata do CLIC.</strong> O trabalho correspondente é anunciado sob o
+      título <em>Interpretable Deep Learning for the Detection and Classification of
+      Impacted Canines and severity of root resorption</em> (Tulissi, Cevidanes, Prieto),
+      apresentado na <strong>NA-MIC Project Week 43 (Montreal, 2025)</strong> — um projeto em
+      andamento, não uma publicação. O código original vem do repositório
+      pessoal <code>ashmoy/maskRcnn</code>, de onde também vêm os exames de teste citados pelo
+      README (<code>MN138.nii</code>, <code>UM06.nii</code>).</p>
+
+      <p>Não confundir com os trabalhos vizinhos abaixo, que não produziram
+      este código:</p>
+
+      <ul>
+        <li>a localização vestibular/palatina de caninos impactados é tradicionalmente feita
+        <strong>em radiografias panorâmicas</strong>, com uma CNN de classificação de imagens (não uma Mask
+        R-CNN em CBCT);</li>
+        <li>várias equipes publicam <strong>segmentação 3D</strong> de caninos impactados em
+        CBCT (U-Net volumétrica/<a class="gterm" href="../glossary.html#g-nnunet" title="Ver glossário">nnU-Net</a>), sem classificar a posição
+        cortical.</li>
+      </ul>
+
+      <p>A especificidade do CLIC — uma classe <em>bicortical</em> além do par vestibular/palatino,
+      predita corte a corte em 2D na CBCT — não é descrita em nenhum
+      desses artigos. Não apresente os números deles como sendo deste módulo.</p>
+
+      <ul>
+        <li><a href="https://projectweek.na-mic.org/PW43_2025_Montreal/">NA-MIC Project Week 43 (2025)</a></li>
+        <li><a href="https://arxiv.org/abs/1703.06870">Mask R-CNN (He et al., 2017)</a></li>
+        <li><a href="https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.maskrcnn_resnet50_fpn.html">torchvision — maskrcnn_resnet50_fpn</a></li>
+        <li><a href="https://link.springer.com/article/10.1186/s12880-025-02143-9">Buccal or palatal? AI-based localization of impacted maxillary canines using panoramic radiographs (BMC Med Imaging, 2025)</a></li>
+        <li><a href="https://link.springer.com/article/10.1186/s12903-025-07117-5">Deep learning-based 3D automatic segmentation of impacted canines in CBCT scans (BMC Oral Health, 2025)</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>Bibliografia detalhada, arquivos recuperados e links a visitar:
+      <a href="SOURCES.html">SOURCES.md</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← Todas as páginas</a> ·
+        <a href="SOURCES.html">Bibliografia desta ferramenta</a> ·
+        Fonte: <code>CLIC.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

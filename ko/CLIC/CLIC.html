@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLIC — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="analyse">
+<div class="layout">
+
+  <nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
+    <div class="lang-switch">
+      <a href="../../en/CLIC/CLIC.html" hreflang="en" title="English">EN</a><a href="../../fr/CLIC/CLIC.html" hreflang="fr" title="Français">FR</a><a href="../../pt/CLIC/CLIC.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/CLIC/CLIC.html" hreflang="th" title="ไทย">TH</a>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/CLIC.html"><b>가이드</b><small>도구 사용법</small></a>
+      <a href="../CLIC/CLIC.html" aria-current="true"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    </div>
+    <div class="nav-group"><h4>정합</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분할</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>랜드마크 &amp; 방향 정렬</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>분석</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html" aria-current="page">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>유틸리티</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>텍스트 &amp; 언어</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>공통 주제</h4><ul>
+      <li><a href="../findings.html">발견 사항</a></li>
+      <li><a href="../glossary.html">용어집</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/CLIC/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › 분석</div>
+        <h1>CLIC</h1>
+        <p class="lede">CLIC는 Mask R-CNN으로 CBCT를 슬라이스 단위로 분할하고, 검출된 각 인스턴스를 협측, 양측 피질골(bicortical), 구개측 매복 견치로 분류한다. 분류와 위치 검출은 같은 신경망 한 번의 순전파에서 함께 나온다.</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="미발표 — NA-MIC Project Week 43 페이지 하나만 이를 기술한다.">미발표</a>
+          <span class="badge cli">clic_runner.py</span>
+          <span class="badge neutral">conda 환경: clic_env</span>
+          <span class="badge neutral">Python 3.9</span>
+          <a class="badge neutral" href="SOURCES.html">참고문헌</a>
+        </div>
+      </header>
+
+      <p><em>Classification and Localization of Impacted Canines.</em> <strong>torchvision Mask R-CNN</strong>으로
+      CBCT를 2D 슬라이스 단위로 인스턴스 분할하며, 예측된 클래스가 매복 견치의 골내 위치를
+      나타낸다:
+      <strong>협측, 양측 피질골, 구개측</strong>.</p>
+
+      <p>모듈 이름은 두 가지 작업을 약속하지만, 코드에는 <strong>신경망이 하나뿐이다</strong>. 별도의
+      분류 신경망도, 별도의 위치 검출 신경망도, 좌표 회귀 헤드도 없다. 분류는 인스턴스 레이블
+      (<code>pr["labels"]</code>)이고, 위치 검출은 마스크(<code>pr["masks"]</code>)다. 둘 다
+      같은 Mask R-CNN 순전파에서 나온다. 아래 내용은 모두 이 사실에서 따라 나온다.</p>
+
+      <h2 id="situation">1. 파이프라인에서의 위치</h2>
+
+      <p>양방향으로 독립적이다. 저장소의 어떤 모듈도 CLIC를 호출하지 않고,
+      CLIC도 저장소의 다른 모듈을 호출하지 않는다. 자신의
+      러너(runner)만 호출한다:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>호출 대상</th><th>시점</th><th>방법</th></tr></thead>
+          <tbody>
+            <tr><td><code>CLIC/runner/clic_runner.py</code></td><td>스캔마다 한 번</td><td><code>CondaSetUpCall.condaRunFilePython(runner, ["--params_json=…"], "clic_env")</code></td></tr>
+            <tr><td>릴리스 <code>CLIC_model/final_model.pth</code></td><td><em>Download Model</em> 버튼</td><td><code>requests.get</code>, <code>~/Documents/CLIC_Models</code>에 저장</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>원시 CBCT에서 시작한다.</strong> 사전 분할도, 랜드마크도, 방향 정렬도
+      필요 없다. 모듈은 <code>.nii</code>/<code>.nii.gz</code>를 읽고 레이블 맵을 출력한다.
+      <a href="../AMASSS/AMASSS.html">AMASSS</a>, <a href="../ASO/ASO.html">ASO</a>, <a href="../ALI/ALI.html">ALI</a> 어느 것에도 전혀 의존하지 않는다.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 700 170" role="img" aria-label="CLIC는 독립적이다: CBCT에서 레이블 맵까지 단일 흐름이며, 상류·하류 의존성이 없다">
+          <rect class="d-box-a" x="20" y="10" width="200" height="46" rx="6"/>
+          <text class="d-label" x="120" y="30" text-anchor="middle">GitHub 릴리스</text>
+          <text class="d-label-s" x="120" y="45" text-anchor="middle">final_model.pth</text>
+          <path class="d-arrow" d="M120 56 V78"/>
+          <path class="d-arrow-head" d="M120 78 l-4 -7 h8 z"/>
+
+          <rect class="d-box" x="10" y="90" width="180" height="50" rx="6"/>
+          <text class="d-label" x="100" y="110" text-anchor="middle">원시 CBCT</text>
+          <text class="d-label-s" x="100" y="125" text-anchor="middle">.nii / .nii.gz</text>
+          <path class="d-arrow" d="M190 115 H250"/>
+          <path class="d-arrow-head" d="M250 115 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="255" y="90" width="220" height="50" rx="6"/>
+          <text class="d-label" x="365" y="110" text-anchor="middle">clic_runner.py</text>
+          <text class="d-label-s" x="365" y="125" text-anchor="middle">clic_env 환경, GPU 가능 시</text>
+          <path class="d-arrow" d="M475 115 H535"/>
+          <path class="d-arrow-head" d="M535 115 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="540" y="90" width="150" height="50" rx="6"/>
+          <text class="d-label" x="615" y="110" text-anchor="middle">레이블 맵</text>
+          <text class="d-label-s" x="615" y="125" text-anchor="middle">.nii.gz, 0/1/2/3</text>
+
+          <text class="d-label-s" x="365" y="160" text-anchor="middle">상류·하류 모듈 없음 — AMASSS, ASO, ALI 어느 것에도 의존하지 않음</text>
+        </svg>
+        <figcaption>CLIC는 양방향으로 독립적이다. 파이프라인의 다른 어떤 모듈도 호출하지 않고, 어떤 모듈에게서도 호출되지 않는다.</figcaption>
+      </figure>
+
+      <h2 id="fichiers">2. 관련 파일</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>역할</th><th>실행 위치</th></tr></thead>
+          <tbody>
+            <tr><td><code>CLIC/CLIC.py</code></td><td>위젯, 622줄. 그중 약 230줄은 어두운 스타일시트, 약 50줄은 conda 패치</td><td>Slicer Python</td></tr>
+            <tr><td><code>CLIC/runner/clic_runner.py</code></td><td><strong>모든 처리</strong>, 110줄</td><td><code>clic_env</code> conda 환경, GPU 가능 시</td></tr>
+            <tr><td><code>CLIC/Resources/UI/CLIC.ui</code></td><td>인터페이스</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Slicer CLI도, <code>.xml</code>도, <code>MedX_Method</code> 같은 계층도 없다. 위젯이
+      매개변수 JSON을 <code>slicer.app.temporaryPath</code>에 쓰고, conda 환경 안에서 러너를
+      독립 Python 스크립트로 실행한다.</p>
+
+      <p>위젯은 <code>CondaSetUp</code>을 <strong>모듈 수준에서</strong> 임포트하지만
+      (<code>CLIC/CLIC.py:18</code>) <code>parent.dependencies</code>에 선언하지 않는다.
+      SlicerConda가 설치되어 있지 않으면 CLIC는 아예 로드되지 않으며, 도움이 되는
+      메시지도 없다.</p>
+
+      <p>항상 <code>CondaSetUpCall()</code>을 인스턴스화하고(<code>CLIC/CLIC.py:62</code>),
+      <code>CondaSetUpCallWsl</code>은 절대 쓰지 않는다. <a href="../MedX/MedX.html">MedX</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a> 등과 달리 <strong>CLIC에는
+      WSL 경로가 없다</strong>. Windows에서는 SlicerConda의 Unix 경로를 호출하게 되는데,
+      <code>condaRunFilePython</code>의 인자 순서가 두 클래스에서 다르다
+      (Unix 쪽은 <code>(file, args, env)</code>, WSL 쪽은 <code>(file, env, args)</code>).
+      인자 리스트가 환경 이름으로 전달될 것이다. README와 달리 이 모듈은 사실상
+      Linux 전용이다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>WSL 경로 없음: <code>CondaSetUpCallWsl</code>은 한 번도 인스턴스화되지 않는다. Windows에서는
+        (잘못 사용되는) Unix 경로가 기대하는 <code>condaRunFilePython</code>의 인자 순서가
+        WSL 경로의 순서와 다르다. 인자 리스트가 환경 이름으로 전달될 것이다.
+        CLIC는 사실상 Linux 전용이다.</p>
+      </div>
+
+      <h2 id="entrees">3. 입력과 전처리</h2>
+
+      <h3 id="collecte">3.1 스캔 수집</h3>
+
+      <p><code>_collect_scans()</code>(<code>CLIC/CLIC.py:316</code>)는
+      <code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>, <code>.mha</code>, <code>.mhd</code>를 받아들이며, 두 단계 규칙을 따른다:</p>
+
+      <ol>
+        <li>유효한 파일을 하나 이상 담은 <strong>하위 폴더</strong>가 있으면, 이
+        <strong>하위 폴더</strong>들의 목록을 반환한다;</li>
+        <li>그렇지 않으면 폴더 안의 유효한 파일 목록을 반환한다.</li>
+      </ol>
+
+      <p>1번 경우는 디렉터리 <code>Path</code>를 만들어, 그대로
+      <code>input_path</code>로 러너에 넘긴다. 러너는 <code>nib.load(str(inp))</code>를 실행하므로 즉시 실패한다.
+      따라서 정상 경로는 <code>.nii.gz</code> 파일이 바로 들어 있는 평평한 폴더다.</p>
+
+      <p>게다가 러너는 <strong>nibabel</strong>만 사용한다. <code>.nrrd</code>, <code>.mha</code>, <code>.mhd</code>는
+      위젯의 필터를 통과하지만 러너는 읽지 못한다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>위젯의 선택 필터는 <code>.nrrd</code>, <code>.mha</code>, <code>.mhd</code>를
+        <code>.nii</code>/<code>.nii.gz</code>와 함께 받아들이지만, 러너는
+        <strong>nibabel</strong>로만 로드할 수 있다. 이 세 형식은 필터를 통과한 뒤 로드에 실패한다.</p>
+      </div>
+
+      <h3 id="pretraitement">3.2 실제 볼륨 전처리</h3>
+
+      <p>세 줄이면 끝난다(<code>CLIC/runner/clic_runner.py:88</code>):</p>
+
+      <pre><code>sl = _norm(vol[..., z])                                    # min-max of the slice
+t  = torch.from_numpy(sl).unsqueeze(0).repeat(3, 1, 1).float().to(device)
+pr = model([t])[0]</code></pre>
+
+      <p>즉:</p>
+
+      <ul>
+        <li><strong>축상(axial) 슬라이스로 자르기</strong>: nibabel 배열의 3<sup>번째</sup> 축을 따라 자른다.
+        다시 계산한 해부학적 방향이 아니라 파일의 저장 순서를 따른다.
+        <a class="gterm" href="../glossary.html#g-ras" title="용어집 보기">RAS</a>/<a class="gterm" href="../glossary.html#g-lps" title="용어집 보기">LPS</a> 재정렬은 하지 않으며, 코드는
+        <code>nii.affine</code>을 다시 쓸 때 말고는 들여다보지 않는다;</li>
+        <li><strong>슬라이스별 min-max 정규화</strong>(<code>_norm</code>,
+        <code>CLIC/runner/clic_runner.py:53</code>): <code>(x - min) / (max - min)</code>이며,
+        값이 일정한 슬라이스는 0이 된다. 하운스필드(Hounsfield) 윈도잉도, 백분위수
+        클리핑도, 볼륨 전체 통계도 없다. <strong>슬라이스마다 대비가 제각각이며</strong>,
+        공기만 담긴 슬라이스도 전체 동적 범위로
+        늘어난다;</li>
+        <li>ImageNet 백본의 RGB 입력에 맞추기 위한 <strong>3채널 복제</strong>;</li>
+        <li><strong>크롭도, ROI도, 명시적 리샘플링도 없고</strong>, 복셀 크기 조정도 없다.</li>
+      </ul>
+
+      <p>유일한 크기 조정은 torchvision 자체에서 나온다. 모델에 내장된
+      <code>GeneralizedRCNNTransform</code>이 ImageNet 평균·표준편차
+      (<code>[0.485,0.456,0.406]</code> / <code>[0.229,0.224,0.225]</code>)로 표준화하고, 짧은 변이
+      <strong>800 px</strong>가 되도록(긴 변은 최대 <strong>1333 px</strong>) 크기를 바꾼다.
+      이는 torchvision 기본값이지 저장소에서 내린 선택이 아니다. 따라서
+      512×512 CBCT는 백본에 들어가기 전에 800×800으로 확대된다.</p>
+
+      <h2 id="modele">4. 모델</h2>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1400 140" role="img" aria-label="슬라이스별 전체 파이프라인: 슬라이스 자르기, 정규화, 복제, torchvision 크기 조정, Mask R-CNN, 임계값 처리, 레이블 맵에 쓰기">
+          <rect class="d-box" x="10" y="40" width="150" height="60" rx="6"/>
+          <text class="d-label" x="85" y="65" text-anchor="middle">축상 슬라이스 Z</text>
+          <text class="d-label-s" x="85" y="80" text-anchor="middle">파일 순서</text>
+          <path class="d-arrow" d="M160 70 H190"/>
+          <path class="d-arrow-head" d="M190 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="195" y="40" width="165" height="60" rx="6"/>
+          <text class="d-label" x="277" y="65" text-anchor="middle">정규화</text>
+          <text class="d-label-s" x="277" y="80" text-anchor="middle">min-max, 슬라이스별</text>
+          <path class="d-arrow" d="M360 70 H390"/>
+          <path class="d-arrow-head" d="M390 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="395" y="40" width="145" height="60" rx="6"/>
+          <text class="d-label" x="467" y="65" text-anchor="middle">복제</text>
+          <text class="d-label-s" x="467" y="80" text-anchor="middle">RGB 3채널</text>
+          <path class="d-arrow" d="M540 70 H570"/>
+          <path class="d-arrow-head" d="M570 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="575" y="40" width="210" height="60" rx="6"/>
+          <text class="d-label" x="680" y="60" text-anchor="middle">Resize 800/1333</text>
+          <text class="d-label-s" x="680" y="76" text-anchor="middle">+ ImageNet 정규화</text>
+          <text class="d-label-s" x="680" y="90" text-anchor="middle">(torchvision 내부)</text>
+          <path class="d-arrow" d="M785 70 H815"/>
+          <path class="d-arrow-head" d="M815 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="820" y="35" width="230" height="70" rx="6"/>
+          <text class="d-label" x="935" y="60" text-anchor="middle">Mask R-CNN</text>
+          <text class="d-label-s" x="935" y="76" text-anchor="middle">ResNet50-FPN, 4클래스</text>
+          <text class="d-label-s" x="935" y="91" text-anchor="middle">신경망 — 예측</text>
+          <path class="d-arrow" d="M1050 70 H1080"/>
+          <path class="d-arrow-head" d="M1080 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="1085" y="40" width="150" height="60" rx="6"/>
+          <text class="d-label" x="1160" y="60" text-anchor="middle">임계값</text>
+          <text class="d-label-s" x="1160" y="76" text-anchor="middle">score ≥ 0.7</text>
+          <text class="d-label-s" x="1160" y="90" text-anchor="middle">mask &gt; 0.5</text>
+          <path class="d-arrow" d="M1235 70 H1265"/>
+          <path class="d-arrow-head" d="M1265 70 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="1270" y="40" width="120" height="60" rx="6"/>
+          <text class="d-label" x="1330" y="65" text-anchor="middle">레이블 맵</text>
+          <text class="d-label-s" x="1330" y="80" text-anchor="middle">덮어쓰기</text>
+        </svg>
+        <figcaption>CLIC의 유일한 알고리즘 경로로, 모든 축상 슬라이스마다 반복된다. 임상적 판단(협측 / 양측 피질골 / 구개측)은 전부 "신경망" 상자에서 나오며, 나머지는 결정론적 산술이다.</figcaption>
+      </figure>
+
+      <h3 id="architecture">4.1 아키텍처</h3>
+
+      <p><code>_blank_model(nc)</code>(<code>CLIC/runner/clic_runner.py:44</code>)는
+      <code>nc = 4</code>로 호출된다:</p>
+
+      <pre><code>m = maskrcnn_resnet50_fpn(weights=None)
+m.roi_heads.box_predictor  = FastRCNNPredictor(in_f, nc)
+m.roi_heads.mask_predictor = MaskRCNNPredictor(in_fm, 256, nc)</code></pre>
+
+      <ul>
+        <li><strong>백본(backbone)</strong>: ResNet-50 + FPN(<code>_resnet_fpn_extractor</code>, 5단계);</li>
+        <li><strong>RPN</strong> 다음 <strong>ROI 헤드</strong>: 박스 헤드(<code>FastRCNNPredictor</code>: <code>cls_score</code>
+        4클래스, <code>bbox_pred</code> 출력 16개)와 마스크 헤드(<code>MaskRCNNPredictor</code>, 은닉
+        층 256, 출력 채널 4개, ROI당 28×28 마스크);</li>
+        <li><code>weights=None</code>이지만 <code>weights_backbone</code>은 기본값
+        <code>ResNet50_Weights.IMAGENET1K_V1</code>을 유지한다. <strong>모델을 구성하는 순간
+        ResNet-50의 ImageNet 가중치를 내려받는다</strong>(그 후 <code>load_state_dict</code>가 이를 덮어쓴다).
+        오프라인 첫 실행 = 실패. 유용한 부수 효과: <code>is_trained</code>가 <code>True</code>이므로
+        정규화 층이 <code>FrozenBatchNorm2d</code>가 되며 <code>BatchNorm2d</code>가 아니다. 이는
+        <code>state_dict</code> 키가 맞도록 학습 시 모델과
+        일치해야 한다.</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><code>weights_backbone</code>은 기본값 <code>ResNet50_Weights.IMAGENET1K_V1</code>을
+        유지하며, <code>weights=None</code>일 때도 마찬가지다. 모델을 구성하기만 해도
+        ResNet-50의 ImageNet 가중치 다운로드가 시작된다. 오프라인 첫 실행 = 실패이며,
+        <code>final_model.pth</code>에 도달하기도 전이다.</p>
+      </div>
+
+      <p>4클래스 = 배경 + 3. 레이블과 이름의 대응은 위젯의
+      <code>_legend()</code>(<code>CLIC/CLIC.py:361</code>)에만 존재한다:</p>
+
+      <p><span class="badge predit">예측</span> 신경망은 정수 1/2/3만 출력한다. 아래의 이름과 색은 위젯의 관례이며, 러너에는 없다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>레이블</th><th>의미</th><th>색</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>협측(Buccal)</td><td>초록 <code>(0,1,0)</code></td></tr>
+            <tr><td>2</td><td>양측 피질골(Bicortical)</td><td>노랑 <code>(1,1,0)</code></td></tr>
+            <tr><td>3</td><td>구개측(Palatal)</td><td>갈색 <code>(.6,.4,.2)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>러너는 이 이름들을 모른다. 정수 1, 2, 3을 쓸 뿐이다.</p>
+
+      <h3 id="poids">4.2 가중치</h3>
+
+      <p>하드코딩된 URL(<code>CLIC/CLIC.py:333</code>):</p>
+
+      <pre><code>https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/CLIC_model/final_model.pth</code></pre>
+
+      <p>저장 위치는 <code>~/Documents/CLIC_Models/final_model.pth</code>. 러너는 이 이름을
+      찾지 않는다. <code>sorted(model_dir.glob("*.pth"))[0]</code>
+      (<code>CLIC/runner/clic_runner.py:76</code>), 즉 <strong>알파벳순으로 첫 번째 <code>.pth</code></strong>를
+      가져간다. 폴더에 모델이 두 개 있으면 파일 이름이 결정한다.
+      폴더가 비어 있으면 처리되지 않은 <code>IndexError</code>가 난다.</p>
+
+      <p>파일은 순수한 <code>state_dict</code>(<code>model.load_state_dict(torch.load(...))</code>)이며,
+      Lightning 체크포인트가 아니다. 하이퍼파라미터도, 클래스 정보도, 버전도 없다. 학습
+      데이터셋, 주석된 슬라이스 수, 성능 지표는 저장소에서
+      알아낼 수 없다.</p>
+
+      <h3 id="sorties-reseau">4.3 신경망이 문자 그대로 출력하는 것</h3>
+
+      <p><span class="badge predit">신경망</span> 각 슬라이스에 대해 <code>model([t])[0]</code>은 표준 torchvision 딕셔너리를 반환한다:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>키</th><th>형태</th><th>내용</th></tr></thead>
+          <tbody>
+            <tr><td><code>boxes</code></td><td><code>(N,4)</code></td><td>크기 조정된 좌표계의 박스 <code>x1,y1,x2,y2</code>. 변환이 원래 크기로 되돌림</td></tr>
+            <tr><td><code>labels</code></td><td><code>(N,)</code></td><td>정수 1..3</td></tr>
+            <tr><td><code>scores</code></td><td><code>(N,)</code></td><td>클래스 점수, 내림차순</td></tr>
+            <tr><td><code>masks</code></td><td><code>(N,1,H,W)</code></td><td><strong>픽셀별 확률</strong>, [0,1] 범위의 실수</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>상류에는 torchvision 기본 임계값이 적용된다: <code>box_score_thresh=0.05</code>,
+      <code>box_nms_thresh=0.5</code>, <code>box_detections_per_img=100</code>.</p>
+
+      <h3 id="label-map">4.4 신경망 출력에서 레이블 맵으로</h3>
+
+      <p>임계값 두 개, 둘 다 하드코딩되어 있다
+      (<code>CLIC/runner/clic_runner.py:93</code>):</p>
+
+      <pre><code>keep = pr["scores"] &gt;= 0.7                     # confiance d'instance
+for mk, lb in zip((pr["masks"][keep] &gt; .5).squeeze(1).cpu().numpy(),
+                  pr["labels"][keep].cpu().numpy()):
+    seg[..., z][mk] = int(lb)</code></pre>
+
+      <ul>
+        <li>인스턴스 점수에 <strong>0.7</strong>;</li>
+        <li>마스크 확률에 <strong>0.5</strong>, 이것으로 이진화한다;</li>
+        <li>할당은 투표가 아니라 <strong>덮어쓰기</strong>다. 두 인스턴스가
+        겹치면 <strong>마지막으로</strong> 처리된 인스턴스(torchvision은 점수 내림차순으로
+        정렬하므로 점수가 가장 낮은 것)가 그 픽셀을 차지한다. 같은 복셀에서의
+        협측/구개측 충돌은 가장 낮은 점수가 결정한다;</li>
+        <li>슬라이스당 인스턴스 수를 제한하는 것은 없다. 견치 하나로도,
+        둘로도 제한하지 않는다.</li>
+      </ul>
+
+      <p><strong>3D 일관성은 전혀 강제되지 않는다.</strong> 각 슬라이스는 독립적으로 분류된다.
+      슬라이스 간 평활화도, 연결 성분 분석도, 스택 전체의 다수결도
+      없다. 이웃한 두 슬라이스가 같은 치아에 서로 다른 클래스를 줄 수
+      있다. "환자의 클래스"를 원하는 사람은 직접
+      집계해야 한다. 모듈은 이를 만들어 내지 않는다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>두 인스턴스가 겹치면 투표가 아니라 <strong>덮어쓰기</strong>로 결정된다.
+        마지막으로 처리된 인스턴스, 즉 torchvision이 점수 내림차순으로 정렬하므로
+        점수가 가장 낮은 인스턴스가 그 픽셀을 차지한다. 또한 이웃 슬라이스 간
+        일관성을 강제하는 것이 없으므로, 인접한 두 슬라이스가 같은 치아를
+        다르게 분류할 수 있다.</p>
+      </div>
+
+      <h2 id="coeur">5. 알고리즘의 핵심</h2>
+
+      <p>임계값 처리 외에는 학습되지 않은 부분이 없다. <a class="gterm" href="../glossary.html#g-icp" title="용어집 보기">ICP</a>도,
+      형태학 연산도, 성분 추출도, 측정도 없다. 러너 전체는 이렇다:
+      모델을 로드하고, Z를 따라 반복하고, 임계값을 적용하고, 쓴다. 판단 전체가
+      <span class="badge predit">Mask R-CNN</span> 안에 있다.</p>
+
+      <h2 id="sorties">6. 후처리와 출력</h2>
+
+      <pre><code>out_dir  = out_root / inp.stem
+out_path = out_dir / f"{inp.stem}_{suffix}.nii.gz"
+nib.save(nib.Nifti1Image(seg.astype(np.int16), nii.affine, nii.header), out_path)</code></pre>
+
+      <ul>
+        <li>스캔 이름을 딴 <strong>스캔별 하위 폴더</strong>;</li>
+        <li>접미사는 <code>suffixLineEdit</code>에서 오며, 기본값은 <code>"seg"</code>;</li>
+        <li><code>Path.stem</code>을 <code>X.nii.gz</code>에 적용하면 <strong><code>X.nii</code></strong>가 된다. 폴더 이름은 <code>X.nii</code>,
+        파일 이름은 <code>X.nii_seg.nii.gz</code>가 된다. 보기 흉하지만 기능상 영향은 없다;</li>
+        <li><code>affine</code>과 <code>header</code>는 <strong>입력 볼륨에서 가져온다</strong>. 레이블 맵은
+        정합 없이 겹쳐진다. 원래 <code>header</code>는 부동소수점 데이터 형식을 기술하지만
+        데이터는 <code>int16</code>이다. <code>Nifti1Image</code>가 저장 시 헤더의
+        <code>dtype</code>을 조정한다;</li>
+        <li>형식은 <code>int16</code>이고 값은 0/1/2/3이다.</li>
+      </ul>
+
+      <div class="callout">
+        <div class="callout-title">참고</div>
+        <p><code>X.nii_seg.nii.gz</code>라는 이름은 <code>Path.stem</code>을 <code>X.nii.gz</code>에 적용한 결과로,
+        확장자를 하나만 떼어 내 <code>X.nii</code>를 반환하기 때문이다. 보기 흉하지만 기능상
+        영향은 없다.</p>
+      </div>
+
+      <p>위젯 쪽에서는 결과 로드가 <code>ui_q</code> 큐를 거친다.
+      <code>"segmentation"</code> 동작이 <code>slicer.util.loadSegmentation(path)</code>를 호출한 뒤
+      <code>_legend()</code>를 호출하는데, 이 함수는 세그먼트를 레이블 값이 아니라 <strong>인덱스 순서로</strong>(<code>cols.get(i+1, …)</code>)
+      색칠한다. 볼륨에 어떤 클래스가 없으면 색이 밀린다.
+      <code>_legend()</code>는 Red/Yellow/Green 뷰에 <code>vtkTextActor</code> 세 개도 그리며,
+      다음 갱신 때 제거할 수 있도록 <code>_leg</code> 속성으로 표시해 둔다.</p>
+
+      <h2 id="predit-calcule">7. 예측되는 것과 계산되는 것</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>블록</th><th>성격</th><th>위치</th></tr></thead>
+          <tbody>
+            <tr><td>슬라이스별 min-max 정규화</td><td><span class="badge calcule">계산</span> 산술, 2줄</td><td><code>clic_env</code></td></tr>
+            <tr><td>800/1333 크기 조정 + ImageNet 표준화</td><td><span class="badge calcule">계산</span> 결정론적, <strong>torchvision 내부</strong></td><td><code>clic_env</code></td></tr>
+            <tr><td>검출, 분류, 마스크</td><td><span class="badge predit">예측</span> <strong>신경망</strong>: Mask R-CNN ResNet50-FPN, 4클래스</td><td><code>clic_env</code>, GPU 가능 시</td></tr>
+            <tr><td>0.7 / 0.5 임계값과 볼륨에 다시 쓰기</td><td><span class="badge calcule">계산</span> 산술</td><td><code>clic_env</code></td></tr>
+            <tr><td>색과 범례</td><td><span class="badge neutral">Slicer</span></td><td>위젯</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>임상적 내용 전체, 즉 <em>이것이 매복 견치인가, 그리고 피질골의 어느 쪽에
+      있는가</em>는 오직 신경망에서만 나온다. 사후
+      검증은 없다.</p>
+
+      <h2 id="environnement">8. 실행 환경</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>값</th><th>출처</th></tr></thead>
+          <tbody>
+            <tr><td>Conda 환경</td><td><strong><code>clic_env</code></strong>(CLIC 전용)</td><td><code>CLIC/CLIC.py:120</code></td></tr>
+            <tr><td>Python</td><td><strong>3.9</strong></td><td><code>CLIC/CLIC.py:167</code></td></tr>
+            <tr><td>생성</td><td><code>numpy&lt;2.0.0</code>, <code>scipy</code>, <code>nibabel</code>, <code>requests</code></td><td>같음</td></tr>
+            <tr><td>이어서 pip로</td><td><code>torch==2.2.0</code>, <code>torchvision==0.17.0</code>, <code>torchaudio==2.2.0</code>, <strong>cu118</strong> 인덱스에서</td><td><code>CLIC/CLIC.py:182</code></td></tr>
+            <tr><td>그다음</td><td><code>pip install 'numpy&lt;2.0'</code>을 한 번 더</td><td><code>CLIC/CLIC.py:204</code></td></tr>
+            <tr><td>GPU</td><td>선택 사항, CPU로 자동 대체</td><td><code>CLIC/runner/clic_runner.py:73</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>_ensure_env()</code>(<code>CLIC/CLIC.py:158</code>)는 <strong>Predict를 클릭할
+      때마다</strong> 다시 실행된다. 모든 것이 이미 갖춰져 있어도 두 <code>pip install</code> 호출이
+      다시 돌아간다(pip은 빨리 반환하지만 그래도 네트워크에 질의한다). <code>self._env_ready</code>는
+      설정되지만 다시 읽히지 않는다.</p>
+
+      <p>두 번째 <code>pip install</code>은 <code>"'numpy&lt;2.0'"</code>를 넘기는데, 작은따옴표가
+      문자열 안에 포함되어 있다. SlicerConda가 명령을 조립하는 방식
+      (Unix 쪽은 문자열과 함께 <code>shell=True</code>)에 따라, 인자가 따옴표가 제대로 벗겨진 채
+      도착할 수도, 아닐 수도 있다. 한편 실패 감지는 반환된 출력에서
+      <code>"error"</code> 또는 <code>"failed"</code>를 찾는다. 이 단어가 들어간 pip 경고는
+      무엇이든 준비 단계를 실패로 만든다.</p>
+
+      <h3 id="rustine-conda">conda 패치</h3>
+
+      <p><code>CLICWidget.__init__</code>(<code>CLIC/CLIC.py:62</code>–<code>112</code>)는
+      SlicerConda의 <code>getCondaExecutable</code>과 <code>getCondaPath</code>를 실행 중에 패치한다:</p>
+
+      <ol>
+        <li>경로에 중복된 <code>/bin/bin/</code>을 고친다;</li>
+        <li>그렇지 않으면 <code>shutil.which("conda")</code>;</li>
+        <li>그것도 아니면 <strong>하드코딩된 <code>/home/luciacev/anaconda3/bin/conda</code></strong>.</li>
+      </ol>
+
+      <p>그리고 <code>fixed_getCondaPath</code>는 <strong><code>/home/luciacev/anaconda3</code> 폴더가
+      존재하기만 하면 이를 반환한다</strong>. 사용자가 설정한 경로를 고려하기도 전이다.
+      특정 개발 머신 한 대의 경로가 저장소에 버전 관리되어 들어가 있고,
+      SlicerConda 설정보다 우선한다. 의도된 동작이 아니라 기술 부채로
+      다뤄야 한다.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><code>fixed_getCondaPath</code>는 머신에 <code>/home/luciacev/anaconda3</code> 폴더가
+        존재하기만 하면 이를 반환한다. 사용자의 SlicerConda 설정을 보기도 전이다.
+        개발 머신의 경로가 버전 관리되어 들어가 있고
+        우선권을 가진다.</p>
+      </div>
+
+      <h2 id="pieges">9. 함정과 취약 지점</h2>
+
+      <div class="callout bug">
+        <div class="callout-title">확인된 버그</div>
+        <p>러너는 <code>logger.info</code>로 마커를 출력하며, 포매터는
+        <code>'%(name)s - %(levelname)s - (%(filename)s:%(lineno)d) - %(message)s'</code>
+        (<code>CLIC/runner/clic_runner.py:39</code>)다. 받는 줄은
+        <code>CLIC_runner - INFO - (clic_runner.py:60) - [SEG] /path</code> 형태이므로, 검사
+        <code>ln.startswith("[PROGRESS]")</code>와 <code>ln.startswith("[SEG]")</code>
+        (<code>CLIC/CLIC.py:268</code>)는 <strong>절대 참이 되지 않는다</strong>. 결과: 진행 표시줄이
+        0에 머물고 <strong>생성된 분할 결과가 Slicer에 절대 로드되지
+        않는다</strong>. 그래도 디스크에는 제대로 저장된다. 최소 수정:
+        <code>"[SEG]" in ln</code>으로 파싱하고 마커부터 잘라 낸다.</p>
+      </div>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 720 230" role="img" aria-label="러너는 로그 줄 앞에 접두사를 붙이고, 위젯은 마커로 startswith를 검사한다: 비교는 항상 실패한다">
+          <rect class="d-box" x="20" y="20" width="310" height="80" rx="6"/>
+          <text class="d-label" x="175" y="42" text-anchor="middle">실제 러너 출력</text>
+          <text class="d-mono" x="175" y="64" text-anchor="middle">CLIC_runner - INFO -</text>
+          <text class="d-mono" x="175" y="80" text-anchor="middle">(clic_runner.py:60) - [SEG] /path</text>
+
+          <rect class="d-box" x="390" y="20" width="310" height="80" rx="6"/>
+          <text class="d-label" x="545" y="42" text-anchor="middle">위젯 검사 (CLIC.py:268)</text>
+          <text class="d-mono" x="545" y="66" text-anchor="middle">ln.startswith("[SEG]")</text>
+          <text class="d-label-s" x="545" y="84" text-anchor="middle">줄이 마커로 시작하길 기대</text>
+
+          <text class="d-label" x="360" y="65" text-anchor="middle" font-size="22">≠</text>
+
+          <path class="d-arrow" d="M360 105 V150"/>
+          <path class="d-arrow-head" d="M360 150 l-4 -7 h8 z"/>
+
+          <rect class="d-box-a" x="80" y="155" width="560" height="60" rx="6"/>
+          <text class="d-label" x="360" y="178" text-anchor="middle">startswith("[SEG]")는 절대 참이 아님</text>
+          <text class="d-label-s" x="360" y="196" text-anchor="middle">진행 표시줄 0%에 멈춤 — 디스크의 분할 결과는 Slicer에 로드되지 않음</text>
+        </svg>
+        <figcaption><code>print</code>에서 <code>logging</code>으로 바꾸면서, 러너 헤더에 아직 적혀 있는 프로토콜이 깨졌다.</figcaption>
+      </figure>
+
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p>출력 폴더를 고르지 않아도 위젯은 JSON에
+        <code>"output_dir"</code> 키를 <code>None</code>으로 쓴다. 러너 쪽에서는
+        <code>P.get("output_dir", inp.parent)</code>가 <code>None</code>을 반환하고(키가 존재하므로
+        기본값이 적용되지 않는다), <code>Path(None)</code>이 <code>TypeError</code>를 일으킨다.
+        러너가 죽는다.</p>
+      </div>
+
+      <ul>
+        <li><strong>진행 표시줄과 결과 자동 로드가
+        고장 나 있다.</strong> 러너는 <code>logger.info</code>로 마커를 출력하며, 포매터는
+        <code>'%(name)s - %(levelname)s - (%(filename)s:%(lineno)d) - %(message)s'</code>
+        (<code>CLIC/runner/clic_runner.py:39</code>)다. 받는 줄은
+        <code>CLIC_runner - INFO - (clic_runner.py:60) - [SEG] /path</code> 형태이므로,
+        검사 <code>ln.startswith("[PROGRESS]")</code>와 <code>ln.startswith("[SEG]")</code>
+        (<code>CLIC/CLIC.py:268</code>)는 <strong>절대 참이 되지 않는다</strong>. 결과:
+        표시줄은 0에 머물고 생성된 분할 결과는 <strong>Slicer에 절대 로드되지
+        않는다</strong>. 그래도 디스크에는 제대로 저장된다.
+        <code>print</code>에서 <code>logging</code>으로 바꾸면서 러너 헤더
+        (<code>CLIC/runner/clic_runner.py:12-16</code>)에 아직 적혀 있는 프로토콜이 깨졌다. 최소 수정:
+        <code>"[SEG]" in ln</code>으로 파싱하고 마커부터 잘라 낸다.</li>
+        <li><strong>어차피 점진적으로 나오는 것은 없다.</strong> <code>condaRunFilePython</code>은
+        <code>subprocess.run(...).stdout</code>을 실행하고 <code>f"Result: {result.stdout}"</code>를 반환한다.
+        출력 전체가 <strong>스캔이 끝날 때 한 덩어리로</strong> 도착한다. 마커를 고쳐도
+        진행률은 스캔마다 0에서 100%로 건너뛸 것이다.</li>
+        <li><strong>Cancel 버튼은 아무 일도 하지 않는다</strong>: <code>_on_cancel</code>(<code>CLIC/CLIC.py:288</code>)은
+        로그 한 줄만 쓴다. <code>cancel_evt</code>도
+        하위 프로세스도 건드리지 않는다.</li>
+        <li><strong>출력 폴더를 고르지 않으면 러너가 죽는다.</strong> 위젯은 항상
+        JSON에 <code>"output_dir"</code> 키를 쓰며, 사용자가 아무것도 고르지 않았으면 <code>None</code>으로
+        쓴다.
+        그러면 <code>P.get("output_dir", inp.parent)</code>가 <code>None</code>을 반환하고(키가 존재하므로
+        기본값이 적용되지 않는다), <code>Path(None)</code>이 <code>TypeError</code>를 일으킨다.
+        <em>Save Predictions in Input Folder</em> 체크박스(<code>.ui</code>에 있음)는 <strong>아무것에도
+        연결되어 있지 않다</strong>.</li>
+        <li><strong><code>self.output_dir</code>은 JSON용으로 <code>str</code>로 변환되지 않는다</strong>.
+        <code>_browse</code> 쪽에서 이미 문자열이고, <code>model_folder</code>도 마찬가지다. 일관적이긴
+        하지만 <code>input_path</code>만은 명시적으로 변환되는 <code>Path</code>다. 재작성할 때
+        주의할 점이다.</li>
+        <li><strong>대기 루프가 Slicer를 붙잡는다</strong>: <code>_on_predict</code>는
+        <code>while not cancel_evt.wait(0.05)</code> 루프를 <code>processEvents()</code>와 함께 돌고, 작업 스레드는
+        하위 프로세스를 기다린다. UI는 반응하지만, <em>Predict</em>
+        버튼이 유일한 탈출구다.</li>
+        <li><strong>슬라이스별 정규화</strong>: 슬라이스에서 예측되는 클래스는 하운스필드 단위가 아니라
+        다시 계산된 국소 대비에 좌우된다. 촬영 범위(FOV)가 다른 두 촬영은
+        신경망에 같은 영상을
+        보여 주지 않는다.</li>
+        <li><code>.ui</code>는 <strong><code>QTextEdit</code> 위젯 두 개를 같은 이름 <code>logTextEdit</code>로</strong> 선언한다
+        (<code>CLIC/Resources/UI/CLIC.ui:343</code>와
+        <code>353</code>). <code>childWidgetVariables</code>는 하나만
+        유지하므로, 다른 하나는 화면에서 비어 있다.</li>
+        <li><strong>사용되지 않는 코드</strong>: <code>_clean_env()</code>(<code>CLIC/CLIC.py:39</code>),
+        <code>initializeParameterNode</code>(<code>pass</code>), <code>_updateAllLabelsColor</code>,
+        <code>_updateDynamicWidgetsColor</code>, <code>_updateMRMLNodeComboBoxColor</code>,
+        <code>glob</code>, <code>subprocess</code>, <code>urllib.request</code>, <code>Optional</code> 임포트,
+        <code>CLIC/testing/test_CanineSegmentation.py</code>
+        (빈 파일), 그리고 쓰이지 않는 <code>torch</code> 임포트(위치:
+        <code>MedX_CLI/MedX_Dashboard/MedX_Dashboard.py</code>).
+        마지막 것은 같은 복사·붙여넣기가 여러 모듈에서 나타나기 때문에 여기서 언급한다.</li>
+        <li><code>CLIC/__pycache__/CLIC.cpython-312.pyc</code>가 저장소에 커밋되어 있다.</li>
+      </ul>
+
+      <h2 id="litterature">10. 문헌</h2>
+
+      <p><strong>CLIC를 다룬 논문은 없다.</strong> 해당 작업은
+      <em>Interpretable Deep Learning for the Detection and Classification of
+      Impacted Canines and severity of root resorption</em>(Tulissi, Cevidanes, Prieto)이라는 제목으로 예고되어,
+      <strong>NA-MIC Project Week 43(몬트리올, 2025)</strong>에서 발표되었다. 진행 중인
+      프로젝트이지 논문이 아니다. 원래 코드는 개인
+      저장소 <code>ashmoy/maskRcnn</code>에서 왔으며, README가 인용하는 테스트 스캔
+      (<code>MN138.nii</code>, <code>UM06.nii</code>)도 그곳에서 왔다.</p>
+
+      <p>아래의 관련 연구와 혼동하지 말 것. 이 코드를 만든 것은
+      그 연구들이 아니다:</p>
+
+      <ul>
+        <li>매복 견치의 협측/구개측 위치 판별은 전통적으로
+        <strong>파노라마 방사선 사진에서</strong> 영상 분류 CNN으로 이루어진다(CBCT에서의 Mask
+        R-CNN이 아니다);</li>
+        <li>여러 연구팀이 CBCT에서 매복 견치의 <strong>3D 분할</strong>을 발표했지만
+        (체적 U-Net/<a class="gterm" href="../glossary.html#g-nnunet" title="용어집 보기">nnU-Net</a>), 피질골 대비 위치는
+        분류하지 않는다.</li>
+      </ul>
+
+      <p>CLIC의 특징, 즉 협측/구개측 쌍에 더해 <em>양측 피질골(bicortical)</em> 클래스를 두고
+      CBCT에서 2D 슬라이스 단위로 예측한다는 점은 이 논문들 어디에도
+      기술되어 있지 않다. 그 수치를 이 모듈의 수치로 제시하지 말 것.</p>
+
+      <ul>
+        <li><a href="https://projectweek.na-mic.org/PW43_2025_Montreal/">NA-MIC Project Week 43 (2025)</a></li>
+        <li><a href="https://arxiv.org/abs/1703.06870">Mask R-CNN (He et al., 2017)</a></li>
+        <li><a href="https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.maskrcnn_resnet50_fpn.html">torchvision — maskrcnn_resnet50_fpn</a></li>
+        <li><a href="https://link.springer.com/article/10.1186/s12880-025-02143-9">Buccal or palatal? AI-based localization of impacted maxillary canines using panoramic radiographs (BMC Med Imaging, 2025)</a></li>
+        <li><a href="https://link.springer.com/article/10.1186/s12903-025-07117-5">Deep learning-based 3D automatic segmentation of impacted canines in CBCT scans (BMC Oral Health, 2025)</a></li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>자세한 참고문헌, 받아 둔 파일, 방문할 링크:
+      <a href="SOURCES.html">SOURCES.md</a>.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← 모든 페이지</a> ·
+        <a href="SOURCES.html">이 도구의 참고문헌</a> ·
+        원본: <code>CLIC.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>
