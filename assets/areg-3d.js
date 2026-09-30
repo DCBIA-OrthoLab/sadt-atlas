@@ -13,6 +13,7 @@
 (function () {
   "use strict";
 
+  var LM = [255, 176, 84];
   var FIXED = [150, 178, 205];   /* T1, la reference */
   var MOVING = [232, 154, 92];   /* T2, ce qui bouge */
   var MASK = [120, 220, 175];
@@ -20,6 +21,7 @@
   /* Les six etapes de VoxelBasedRegistration, dans l'ordre du code. Cote
      Atlas on les joue toutes ; cote Guide seule la derniere compte. */
   var STEPS = [
+    { k: "ali",     ms: 1500 },   /* AMONT : ALI place les reperes         */
     { k: "read",    ms:  700 },   /* lire le T2 mobile en itk.F            */
     { k: "predict", ms: 1800 },   /* AMASSS predit les trois masques       */
     { k: "mask",    ms: 1300 },   /* masquer le T1 : ce que voit elastix   */
@@ -102,7 +104,7 @@
       }
       /* Cote Atlas on part de la premiere etape ; cote Guide on va droit au
          resultat, c'est ce que le lecteur du Guide veut voir. */
-      run = { i: full ? 0 : 3, t: 0 };
+      run = { i: full ? 0 : 4, t: 0 };
       current = ID();
       masks.forEach(function (m) { m.gen = 0; m.alpha = 0; });
       fig.classList.add("v3d-sim");
@@ -129,21 +131,39 @@
       var f = Math.min(1, run.t / st.ms);
       chip(full ? run.i : -1);
 
+      if (st.k === "ali") {
+        /* Version rapide : les reperes tombent, sans la marche des agents --
+           celle-la est le sujet de la fiche ALI, pas de celle-ci. Ce sont
+           les points qu'ALI_CBCT a reellement ecrits pour ce scan. */
+        var keys = Object.keys(data.landmarks || {});
+        var n = Math.max(1, Math.round(keys.length * f));
+        scene.setMarks(keys.slice(0, n).map(function (k) {
+          return { p: data.landmarks[k], c: [LM[0] / 255, LM[1] / 255, LM[2] / 255], s: 0.016 };
+        }));
+        say(stepName("ali") + " " + n + "/" + keys.length);
+        paint(0, 1, 0);
+        if (run.t >= st.ms + 350) { run.i += 1; run.t = 0; }
+        return true;
+      }
       if (st.k === "read") {
         say(stepName("read"));
-        paint(0, 1, 1);
+        scene.setMarks([]);
+        paint(0, 1, f);
       } else if (st.k === "predict") {
         /* Les masques sortent du reseau comme dans la scene AMASSS : un
            balayage, parce que l'inference parcourt le volume. */
         var mine = "M_" + active.code;
         masks.forEach(function (m) { m.gen = m.code === mine ? f : 0; m.alpha = m.code === mine ? 0.34 : 0; });
         say(stepName("predict") + " " + active.label);
-        paint(null, 1, 1);
+        /* Le T2 s'efface pendant la segmentation : sinon l'orange couvre le
+           masque et on ne voit pas ce qui est en train d'etre predit. Il
+           revient pour le recalage, qui est son affaire. */
+        paint(null, 1, 1 - f);
       } else if (st.k === "mask") {
         /* Le T1 est masque : elastix ne verra que l'interieur. On efface le
-           reste plutot que de le decrire. */
+           reste plutot que de le decrire. Le T2 reste absent. */
         say(stepName("mask"));
-        paint(0.34, 1 - 0.72 * f, 1 - 0.72 * f);
+        paint(0.34, 1 - 0.72 * f, 0);
       } else if (st.k === "elastix") {
         var e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
         current = partial(new Float32Array(active.m), e);
@@ -151,7 +171,8 @@
            surface se mesure hors ligne, sur les maillages pleins. */
         var gap = active.before + (active.after - active.before) * e;
         say(stepName("elastix") + " — " + gap.toFixed(2) + " mm");
-        paint(0.34, 0.28, 1);
+        /* Le T2 revient en fondu : c'est lui qui bouge maintenant. */
+        paint(0.34, 0.28, Math.min(1, f * 3));
       } else if (st.k === "matrix") {
         say(stepName("matrix"));
         paint(0.20, 0.28 + 0.18 * f, 1);

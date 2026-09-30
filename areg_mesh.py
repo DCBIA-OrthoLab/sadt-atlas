@@ -45,6 +45,13 @@ MATRICES = {
     "MAX":  "Registered/Maxilla/C_0001_OutReg/C_0001_MAXReg_matrix.tfm",
 }
 
+#: Les reperes qu'ALI_CBCT place en amont, en mode Orientation. Le CLI est
+#: appele avec lm_type = "'N','S','Ba','RPo','LPo','LOr','ROr'" (CBCT.py:756)
+#: et ce fichier est sa sortie, deja dans le repere du T1 oriente -- celui de
+#: la scene. N manque : l'agent ne l'a pas trouve sur ce scan, et on ne
+#: l'invente pas.
+LANDMARKS = "T1Or/C_0001_T1_lm_Or.mrk.json"
+
 BONE = 500.0
 SIGMA = 1.5
 SKULL_TRIS = 30000
@@ -180,7 +187,19 @@ def main():
         out[:3, 3] = (R @ centre + t - centre) / span
         return [round(float(x), 7) for x in out.T.reshape(16)]
 
+    lms = {}
+    lp = os.path.join(B, LANDMARKS)
+    if os.path.exists(lp):
+        d = json.load(open(lp, encoding="utf-8"))["markups"][0]
+        for cp in d["controlPoints"]:
+            v = np.array(cp["position"], dtype=float)
+            lms[cp["label"]] = [round(float((v[k] - centre[k]) / span), 5)
+                                for k in range(3)]
+        print("  reperes d'ALI en amont : %d (%s)"
+              % (len(lms), ", ".join(sorted(lms))))
+
     payload = webmesh.encode(meshes, focus_on=["T1"], extra={
+        "landmarks": lms,
         "regions": [{"code": c, "label": regs[c]["label"], "m": to_scene(regs[c]["M"]),
                      "deg": regs[c]["deg"], "mm": regs[c]["mm"],
                      "before": regs[c]["before"], "after": regs[c]["after"]}
