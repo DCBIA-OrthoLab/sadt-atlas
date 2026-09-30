@@ -442,6 +442,82 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <p>All three writes are guarded by <code>if not os.path.exists(...)</code>: <strong>rerunning on
       a non-empty output folder rewrites nothing</strong> and still ends in success.</p>
 
+      <h3 id="cbct-maths">4.5 The orientation, written out</h3>
+
+      <p>Everything above is prose about code. Here is the same thing as arithmetic,
+      because two of ASO's choices only become visible once they are written down.
+      Notation: <math><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math>
+      is landmark <math><mi>A</mi></math> on the scan being oriented,
+      <math><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math>
+      the same landmark on the gold.</p>
+
+<figure class="formula"><figcaption>1. Translation onto the first landmark &mdash; computed, then thrown away</figcaption><math display="block"><mrow><mover><mi>t</mi><mo>&#x2192;</mo></mover><mo>=</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math></figure>
+
+      <p>The translation moves the source so the rotations can be computed on
+      superimposed points. It is then dropped: <code>TransformMatrix =
+      RotationTransformMatrix</code>, with the translation commented out of the
+      product. The volume is never translated &mdash; <code>PRE_ASO_CBCT</code>
+      already centred it on the origin.</p>
+
+<figure class="formula"><figcaption>2. First rotation &mdash; the vectors are folded into the positive octant first</figcaption><math display="block"><mrow><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>=</mo><mrow><mo>|</mo><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>B</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>=</mo><mrow><mo>|</mo><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>B</mi></msub><mo>&#x2212;</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow></mrow></math></figure>
+
+      <p><strong>Read those bars carefully.</strong> They are a component-wise
+      absolute value, not a norm. Both vectors are folded into the positive octant
+      before the angle is taken, so what follows is the angle between
+      <math><mrow><mo>|</mo><mover><mi>u</mi><mo>&#x2192;</mo></mover><mo>|</mo></mrow></math>
+      and <math><mrow><mo>|</mo><mover><mi>v</mi><mo>&#x2192;</mo></mover><mo>|</mo></mrow></math>,
+      which is <em>not</em> the angle between
+      <math><mover><mi>u</mi><mo>&#x2192;</mo></mover></math> and
+      <math><mover><mi>v</mi><mo>&#x2192;</mo></mover></math>. A landmark pair
+      pointing one way and its gold counterpart pointing the opposite way give the
+      same vector here.</p>
+
+<div class="formula"><math display="block"><mrow><msub><mi>&#x3b8;</mi><mn>1</mn></msub><mo>=</mo><mi>arccos</mi><mrow><mo stretchy="true" fence="true">(</mo><mfrac><mrow><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#x22c5;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow><mrow><mrow><mo>&#x2225;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#x2225;</mo></mrow><mrow><mo>&#x2225;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>&#x2225;</mo></mrow></mrow></mfrac><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><msub><mover><mi>a</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>=</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#xd7;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math></div>
+
+      <p>In the code the two vectors are first divided by their largest component
+      (<code>v1_u = v1 / np.amax(v1)</code>). That is a positive scaling, so it
+      cancels in both the quotient and the cross product: it changes nothing.</p>
+
+<figure class="formula"><figcaption>3. Second rotation &mdash; a roll about the axis just aligned, with an angle taken from a third landmark</figcaption><math display="block"><mrow><msub><mi>&#x3b8;</mi><mn>2</mn></msub><mo>=</mo><mi>&#x2220;</mi><mrow><mo stretchy="true" fence="true">(</mo><mrow><mo>|</mo><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>C</mi></msub><mo>&#x2212;</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo>,</mo><mrow><mo>|</mo><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>C</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><msub><mover><mi>a</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>=</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math></figure>
+
+      <p>The second rotation is the other surprise. Its axis is not a cross product
+      but <math><mrow><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math>
+      itself &mdash; the axis the previous step just aligned. It is a roll around
+      that axis, and its angle comes from a <em>third</em> landmark. Rolling about
+      an already-aligned axis cannot undo that alignment, which is why the order
+      matters.</p>
+
+<figure class="formula"><figcaption>4. The rotation matrix &mdash; quaternion form of Rodrigues</figcaption><math display="block"><mrow><mi>&#x3b1;</mi><mo>=</mo><mi>cos</mi><mfrac><mi>&#x3b8;</mi><mn>2</mn></mfrac><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mo>,</mo><mi>&#x3b3;</mi><mo>,</mo><mi>&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mo>&#x2212;</mo><mover><mover><mi>a</mi><mo>&#x2192;</mo></mover><mo>&#x302;</mo></mover><mi>sin</mi><mfrac><mi>&#x3b8;</mi><mn>2</mn></mfrac></mrow></math></figure>
+<div class="formula"><math display="block"><mrow><mi>R</mi><mo>=</mo><mrow><mo stretchy="true" fence="true">[</mo><mtable><mtr><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b3;</mi><mo>+</mo><mi>&#x3b1;</mi><mi>&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b4;</mi><mo>&#x2212;</mo><mi>&#x3b1;</mi><mi>&#x3b3;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd></mtr><mtr><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b3;</mi><mo>&#x2212;</mo><mi>&#x3b1;</mi><mi>&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b3;</mi><mi>&#x3b4;</mi><mo>+</mo><mi>&#x3b1;</mi><mi>&#x3b2;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd></mtr><mtr><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b4;</mi><mo>+</mo><mi>&#x3b1;</mi><mi>&#x3b3;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b3;</mi><mi>&#x3b4;</mi><mo>&#x2212;</mo><mi>&#x3b1;</mi><mi>&#x3b2;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup></mrow></mtd></mtr></mtable><mo stretchy="true" fence="true">]</mo></mrow></mrow></math></div>
+
+      <p>Two sign flips cancel here: the vector part carries a minus, and the matrix
+      is written transposed relative to the usual quaternion form. The result is the
+      ordinary Rodrigues rotation of <math><mi>&#x3b8;</mi></math> about
+      <math><mover><mover><mi>a</mi><mo>&#x2192;</mo></mover><mo>&#x302;</mo></mover></math>.
+      The same function serves FlexReg and ASO_IOS.</p>
+
+<figure class="formula"><figcaption>5. Composition &mdash; the translation of step 1 never enters the product</figcaption><math display="block"><mrow><mi>M</mi><mo>=</mo><msub><mi>R</mi><mi>icp</mi></msub><msub><mi>R</mi><mn>2</mn></msub><msub><mi>R</mi><mn>1</mn></msub><mo>&#x2003;</mo><mo>&#x2003;</mo><mrow><mo>(</mo><msub><mi>R</mi><mi>icp</mi></msub><mrow><mo>[</mo><mn>0:3</mn><mo>,</mo><mn>3</mn><mo>]</mo></mrow><mo>=</mo><mn>0</mn><mo>)</mo></mrow></mrow></math></figure>
+
+      <p>The ICP contributes a rotation only: its translation column is explicitly
+      zeroed (<code>TransformMatrixBis[:3, 3] = [0, 0, 0]</code>). The composite is
+      therefore a pure rotation about the world origin.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Why this is not a fit</div>
+        <p>With <math><mi>N</mi></math> paired landmarks there is a closed-form
+        rotation that minimises the sum of squared distances &mdash; Kabsch, by the
+        singular value decomposition of the cross-covariance:</p>
+<figure class="formula"><figcaption>What a least-squares fit would compute &mdash; and what ASO does <em>not</em> do</figcaption><math display="block"><mrow><mi>H</mi><mo>=</mo><munder><mo>&#x2211;</mo><mi>k</mi></munder><mrow><mo stretchy="true" fence="true">(</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>k</mi></msub><mo>&#x2212;</mo><mover><mover><mi>p</mi><mo>&#x2192;</mo></mover><mo>&#xaf;</mo></mover><mo stretchy="true" fence="true">)</mo></mrow><msup><mrow><mo stretchy="true" fence="true">(</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>k</mi></msub><mo>&#x2212;</mo><mover><mover><mi>q</mi><mo>&#x2192;</mo></mover><mo>&#xaf;</mo></mover><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x22a4;</mo></msup><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><mi>H</mi><mo>=</mo><mi>U</mi><mi>&#x3a3;</mi><msup><mi>V</mi><mo>&#x22a4;</mo></msup><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><mi>R</mi><mo>=</mo><mi>V</mi><mi>D</mi><msup><mi>U</mi><mo>&#x22a4;</mo></msup></mrow></math></figure>
+        <p>with <math><mrow><mi>D</mi><mo>=</mo><mi>diag</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>1</mn><mo>,</mo><mi>det</mi><mo>(</mo><mi>V</mi><msup><mi>U</mi><mo>&#x22a4;</mo></msup><mo>)</mo><mo>)</mo></mrow></math>
+        guarding against a reflection. ASO computes nothing of the sort. It builds
+        two rotations from a triplet, keeps the triplet that happens to score best
+        over up to 2500 draws, and hands the result to an ICP that re-pairs the
+        points by nearest neighbour rather than by label. It is a search, not a
+        solution &mdash; which is exactly why the numbers in the viewer above show
+        the ICP doing more of the turning than the initialization it is supposed to
+        refine.</p>
+      </div>
+
       <h2 id="aso-ios">5. ASO_IOS</h2>
 
       <h3 id="mode-auto-ios">5.1 Automatic mode — crown centroids</h3>
