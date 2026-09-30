@@ -94,6 +94,21 @@
     "}"
   ].join("\n");
 
+  /* Ce que le reseau d'ALI_IOS voit VRAIMENT. La texture n'est pas une
+     couleur : c'est la normale par sommet remappee en RGB,
+     (n*0.5+0.5)*255 (surface.py:171). D'ou ces verts et ces roses. */
+  var NORMAL_FRAG = [
+    "#version 300 es",
+    "precision highp float;",
+    "in vec3 vNrm; in vec3 vPos;",
+    "uniform float uDim;",
+    "out vec4 o;",
+    "void main(){",
+    "  vec3 n = normalize(vNrm);",
+    "  o = vec4(mix(vec3(0.12), n * 0.5 + 0.5, uDim), 1.0);",
+    "}"
+  ].join("\n");
+
   /* ---- algebre : quatre matrices ne justifient pas une bibliotheque ---- */
   function mul(a, b) {
     var r = new Float32Array(16), i, j, k, s;
@@ -165,7 +180,12 @@
     var prog = program(gl, VERT, FRAG);
     var pick = program(gl, VERT, PICK);
     var mark = program(gl, MARK_VERT, MARK_FRAG);
-    this.prog = prog; this.markProg = mark;
+    var nrm = program(gl, VERT, NORMAL_FRAG);
+    this.prog = prog; this.markProg = mark; this.normProg = nrm;
+    this.nu = {};
+    ["uMVP", "uModel", "uOffset", "uDim"].forEach(function (n) {
+      this.nu[n] = gl.getUniformLocation(nrm, n);
+    }, this);
     var u = {};
     ["uMVP", "uModel", "uColor", "uAlpha", "uDim", "uOffset", "uSweep", "uSky", "uGround"]
       .forEach(function (n) { u[n] = gl.getUniformLocation(prog, n); });
@@ -245,6 +265,7 @@
     this.pickW = this.pickH = 0;
 
     this.onFrame = opts.onFrame || null;
+    this.onOverlay = opts.onOverlay || null;
     this.onPick = opts.onPick || null;
     this.onHover = opts.onHover || null;
     this.bindInput();
@@ -456,6 +477,43 @@
       gl.enable(gl.DEPTH_TEST);
     }
     gl.bindVertexArray(null);
+    if (this.onOverlay) { this.onOverlay(); }
+  };
+
+  /* Le medaillon : une seconde passe dans un coin de la meme toile, depuis
+     la camera de la piece visee. C'est le rendu 224x224 d'ALI_IOS, avec sa
+     vraie texture — les normales, pas une couleur. */
+  Scene3D.prototype.drawInset = function (box, eye, target, only) {
+    var gl = this.gl, w = this.canvas.width, h = this.canvas.height;
+    var x = Math.round(box.x * w), y = Math.round(box.y * h);
+    var sw = Math.round(box.w * w), sh = Math.round(box.h * h);
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(x, y, sw, sh);
+    gl.viewport(x, y, sw, sh);
+    gl.clearColor(0.06, 0.07, 0.09, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.disable(gl.BLEND);
+
+    /* fov 90, znear 0.01, zfar 10 : FoVPerspectiveCameras de render.py */
+    var view = lookAt(eye, target, [0, 1, 0]);
+    var proj = perspective(Math.PI / 2, 1.0, 0.01, 10);
+    var mvp = mul(proj, mul(view, MODEL));
+    gl.useProgram(this.normProg);
+    gl.uniformMatrix4fv(this.nu.uMVP, false, mvp);
+    gl.uniformMatrix4fv(this.nu.uModel, false, MODEL);
+    this.parts.forEach(function (p) {
+      if (!p.visible) { return; }
+      gl.uniform3fv(this.nu.uOffset, p.off);
+      /* Le reseau ne voit pas que la dent visee : il voit tout ce que la
+         camera attrape. On assombrit le reste au lieu de le cacher. */
+      gl.uniform1f(this.nu.uDim, (!only || p.code === only) ? 1.0 : 0.30);
+      gl.bindVertexArray(p.vao);
+      gl.drawElements(gl.TRIANGLES, p.count, gl.UNSIGNED_SHORT, 0);
+    }, this);
+    gl.bindVertexArray(null);
+    gl.disable(gl.SCISSOR_TEST);
+    gl.enable(gl.BLEND);
+    gl.viewport(0, 0, w, h);
   };
 
   Scene3D.prototype.kick = function () {

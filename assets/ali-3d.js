@@ -169,12 +169,150 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Scene IOS : une camera par dent                                      */
+  /* ------------------------------------------------------------------ */
+  var GUM = [196, 150, 148];
+  var TOOTH = [232, 228, 220];
+  var AIM = [120, 200, 255];
+  var POINT = [110, 230, 170];
+
+  function buildIOS(fig) {
+    var data = window.ALI_IOS_SCENE;
+    var stage = el(fig, ".v3d-stage");
+    if (!data || !stage) { return; }
+
+    var txt = strings(fig), statusEl = el(fig, ".v3d-status");
+    var say = function (s) { if (statusEl) { statusEl.textContent = s || ""; } };
+
+    /* Une camera se pose, le reseau segmente, le point tombe. Puis la dent
+       suivante : ALI_IOS boucle par dent, pas par arcade. */
+    var PH = { fly: 460, look: 620, land: 420 };
+    var RADIUS = 0.17;               /* ALI_IOS : `radius`, 0.2 en sphere unite */
+
+    var scene = new window.Scene3D(stage, data, {
+      onFrame: function (dt) { return tick(dt); },
+      onOverlay: function () { overlay(); }
+    });
+    if (!scene.ok) { return; }
+    fig.classList.add("v3d-on");
+
+    scene.parts.forEach(function (p) {
+      var c = p.code === "GUM" ? GUM : TOOTH;
+      p.color = [c[0] / 255, c[1] / 255, c[2] / 255];
+      p.pickable = p.code !== "GUM";
+    });
+
+    var teeth = data.teeth || [];
+    var run = null, placed = {};
+
+    /* La camera vise le centroide de la dent -- c'est le tableau
+       `PredictedID` qui le donne, et rien d'autre. Sans lui, ALI_IOS ne
+       trouve aucune dent et ne place rien. */
+    function eyeFor(code) {
+      var t = scene.up(data.centroids[code] || [0, 0, 0]);
+      var d = [0.28, 1.0, 0.18];
+      var l = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+      return { target: t,
+               eye: [t[0] + d[0] / l * RADIUS,
+                     t[1] + d[1] / l * RADIUS,
+                     t[2] + d[2] / l * RADIUS] };
+    }
+
+    function pointOn(code) {
+      var p = scene.byCode[code];
+      var c = scene.up(p.c);
+      return [c[0], c[1] + (p.e[2] || 0.03) * 0.85, c[2]];
+    }
+
+    function start() {
+      placed = {};
+      run = { i: 0, phase: "fly", t: 0, from: null };
+      fig.classList.add("v3d-sim");
+      scene.dirty = true; scene.kick();
+    }
+
+    function tick(dt) {
+      if (!run) { return false; }
+      run.t += dt;
+      var code = teeth[run.i];
+      if (!code) { run = null; fig.classList.remove("v3d-sim"); say(txt.done || ""); return false; }
+
+      if (run.phase === "fly") {
+        say((txt.camera || "") + " " + code.replace("T", ""));
+        if (run.t >= PH.fly) { run.phase = "look"; run.t = 0; }
+      } else if (run.phase === "look") {
+        say((txt.segment || "") + " " + code.replace("T", ""));
+        if (run.t >= PH.look) { run.phase = "land"; run.t = 0; }
+      } else {
+        if (run.t >= PH.land) {
+          placed[code] = pointOn(code);
+          run.i += 1; run.phase = "fly"; run.t = 0;
+          if (run.i >= teeth.length) {
+            run = null; fig.classList.remove("v3d-sim");
+            say(Object.keys(placed).length + " " + (txt.done || ""));
+          }
+        }
+      }
+      marks();
+      return true;
+    }
+
+    function marks() {
+      var out = [], code = run && teeth[run.i];
+      Object.keys(placed).forEach(function (k) {
+        out.push({ p: placed[k], c: [POINT[0] / 255, POINT[1] / 255, POINT[2] / 255], s: 0.012 });
+      });
+      if (code) {
+        var g = eyeFor(code);
+        out.push({ p: g.eye, c: [AIM[0] / 255, AIM[1] / 255, AIM[2] / 255], s: 0.017 });
+        if (run.phase === "land") {
+          out.push({ p: pointOn(code), c: [POINT[0] / 255, POINT[1] / 255, POINT[2] / 255],
+                     s: 0.010 + 0.012 * Math.min(1, run.t / PH.land) });
+        }
+      }
+      scene.setMarks(out);
+    }
+
+    /* Le medaillon : ce que la camera voit, avec la vraie texture du reseau. */
+    function overlay() {
+      var code = run && teeth[run.i];
+      if (!code) { return; }
+      var g = eyeFor(code);
+      scene.drawInset({ x: 0.685, y: 0.045, w: 0.28, h: 0.28 }, g.eye, g.target, code);
+    }
+
+    var go = el(fig, ".v3d-go");
+    if (go) { go.addEventListener("click", start); }
+
+    scene.onPick = function (code) {
+      if (!code || code === "GUM" || run) { return; }
+      scene.lookAtPart(code, 4.5);
+    };
+
+    if (window.IntersectionObserver) {
+      new IntersectionObserver(function (es) {
+        if (!es[0].isIntersecting || fig._played) { return; }
+        fig._played = true;
+        if (!scene.reduced) { start(); } else { scene.dirty = true; scene.kick(); }
+      }, { rootMargin: "200px" }).observe(fig);
+    }
+    scene.kick();
+  }
+
+  /* ------------------------------------------------------------------ */
   function init() {
-    var figs = document.querySelectorAll("[data-ali-cbct]");
-    for (var i = 0; i < figs.length; i++) {
-      try { buildCBCT(figs[i]); }
+    var a = document.querySelectorAll("[data-ali-cbct]"), i;
+    for (i = 0; i < a.length; i++) {
+      try { buildCBCT(a[i]); }
       catch (err) {
         if (window.console) { console.warn("scene ALI CBCT indisponible :", err); }
+      }
+    }
+    var b = document.querySelectorAll("[data-ali-ios]");
+    for (i = 0; i < b.length; i++) {
+      try { buildIOS(b[i]); }
+      catch (err) {
+        if (window.console) { console.warn("scene ALI IOS indisponible :", err); }
       }
     }
   }
