@@ -306,7 +306,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
 
       <h2 id="recalage">5. The algorithmic core — the registration</h2>
 
-      <figure class="viewer3d" data-areg>
+      <figure class="viewer3d" data-areg="steps">
         <div class="v3d-modes">
           <button type="button" data-region="CB" aria-pressed="true">Cranial base</button>
           <button type="button" data-region="MAND" aria-pressed="false">Mandible</button>
@@ -319,11 +319,24 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
         <div class="v3d-run">
           <button class="v3d-go" type="button">Register again</button>
         </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">1. read the moving T2 as <code>itk.F</code></li>
+          <li data-step="1">2. AMASSS predicts the mask</li>
+          <li data-step="2">3. mask the fixed T1 &mdash; this is all elastix will see</li>
+          <li data-step="3">4. one elastix pass: Mattes MI, 3 pyramid levels, 1500 iterations each</li>
+          <li data-step="4">5. <code>MatrixRetrieval</code> &rarr; <code>Euler3DTransform</code></li>
+          <li data-step="5">6. resample T2 &mdash; on <em>its own</em> grid, not T1's</li>
+        </ol>
         <span class="v3d-i18n" hidden>
-          <i data-k="masking">the registration will only look inside &mdash;</i>
+          <i data-k="read">read the moving T2 as itk.F</i>
+          <i data-k="predict">AMASSS predicts the mask</i>
+          <i data-k="mask">mask the fixed T1 &mdash; this is all elastix will see</i>
+          <i data-k="elastix">one elastix pass: Mattes MI, 3 pyramid levels, 1500 iterations each</i>
+          <i data-k="matrix">MatrixRetrieval &rarr; Euler3DTransform</i>
+          <i data-k="resample">resample T2 &mdash; on its own grid, not T1's</i>
           <i data-k="gap">mean surface gap inside the mask:</i>
         </span>
-        <figcaption>T1 in blue, T2 in orange, and the mask in green. The point is what the mask does: <code>VoxelBasedRegistration</code> masks the fixed T1 first, so <strong>elastix only ever sees what is inside it</strong> &mdash; which is why AMASSS runs upstream, and why there are three registrations rather than one. The matrices are the ones AREG wrote. Their direction was checked rather than assumed: elastix returns the fixed&rarr;moving mapping, so it is the <em>inverse</em> that brings T2 onto T1 &mdash; the mean surface gap inside the mask drops from 3.27&nbsp;mm to 1.24&nbsp;mm with it, and climbs to 6.03 without. Measured offline on the full meshes, not in the browser.</figcaption>
+        <figcaption>The six steps of <code>VoxelBasedRegistration</code>, in the order the code runs them. T1 is blue, T2 orange, the mask green. The step that matters is the third: <code>VoxelBasedRegistration</code> masks the fixed T1 first, so <strong>elastix only ever sees what is inside it</strong> &mdash; which is why AMASSS runs upstream, and why there are three registrations rather than one. The matrices are the ones AREG wrote. Their direction was checked rather than assumed: elastix returns the fixed&rarr;moving mapping, so it is the <em>inverse</em> that brings T2 onto T1 &mdash; the mean surface gap inside the mask drops from 3.27&nbsp;mm to 1.24&nbsp;mm with it, and climbs to 6.03 without. Measured offline on the full meshes, not in the browser. <strong>One caveat on step 4:</strong> elastix writes only its final transform, so the motion you see is the real endpoint reached smoothly &mdash; the optimiser’s intermediate poses across the three pyramid levels are not in the output, and are not invented here.</figcaption>
       </figure>
 
 

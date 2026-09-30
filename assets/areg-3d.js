@@ -16,7 +16,17 @@
   var FIXED = [150, 178, 205];   /* T1, la reference */
   var MOVING = [232, 154, 92];   /* T2, ce qui bouge */
   var MASK = [120, 220, 175];
-  var MASK_MS = 1200, REG_MS = 2400;
+  var MASK_MS = 1200, REG_MS = 2600;
+  /* Les six etapes de VoxelBasedRegistration, dans l'ordre du code. Cote
+     Atlas on les joue toutes ; cote Guide seule la derniere compte. */
+  var STEPS = [
+    { k: "read",    ms:  700 },   /* lire le T2 mobile en itk.F            */
+    { k: "predict", ms: 1800 },   /* AMASSS predit les trois masques       */
+    { k: "mask",    ms: 1300 },   /* masquer le T1 : ce que voit elastix   */
+    { k: "elastix", ms: 2600 },   /* la passe unique                       */
+    { k: "matrix",  ms:  900 },   /* MatrixRetrieval -> Euler3D            */
+    { k: "resample", ms: 1100 }   /* rechantillonne sur la grille DU T2    */
+  ];
 
   function build(fig) {
     var data = window.AREG_SCENE;
@@ -50,6 +60,8 @@
 
     var regions = data.regions || [];
     var run = null, current = ID(), active = null;
+    var full = fig.getAttribute("data-areg") === "steps";
+    var masks = scene.parts.filter(function (p) { return p.code.indexOf("M_") === 0; });
 
     function ID() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
 
@@ -88,41 +100,79 @@
         bs[i].setAttribute("aria-pressed",
           bs[i].getAttribute("data-region") === active.code ? "true" : "false");
       }
-      run = { act: "mask", t: 0 };
+      /* Cote Atlas on part de la premiere etape ; cote Guide on va droit au
+         resultat, c'est ce que le lecteur du Guide veut voir. */
+      run = { i: full ? 0 : 3, t: 0 };
       current = ID();
+      masks.forEach(function (m) { m.gen = 0; m.alpha = 0; });
       fig.classList.add("v3d-sim");
       scene.dirty = true; scene.kick();
     }
 
+    function stepName(k) {
+      var el = fig.querySelector('.v3d-i18n [data-k="' + k + '"]');
+      return el ? el.textContent.trim() : k;
+    }
+
+    function chip(i) {
+      var n = fig.querySelectorAll(".v3d-steps [data-step]");
+      for (var j = 0; j < n.length; j++) {
+        n[j].setAttribute("aria-current", j === i ? "true" : "false");
+      }
+    }
+
     function frame(dt) {
       if (!run || !active) { return false; }
+      var st = STEPS[run.i];
+      if (!st) { run = null; fig.classList.remove("v3d-sim"); chip(-1); return false; }
       run.t += dt;
-      if (run.act === "mask") {
-        var f = Math.min(1, run.t / MASK_MS);
-        say((strings.masking || "") + " " + active.label);
-        paint(f);
-        if (run.t >= MASK_MS + 400) { run.act = "reg"; run.t = 0; }
-        return true;
+      var f = Math.min(1, run.t / st.ms);
+      chip(full ? run.i : -1);
+
+      if (st.k === "read") {
+        say(stepName("read"));
+        paint(0, 1, 1);
+      } else if (st.k === "predict") {
+        /* Les masques sortent du reseau comme dans la scene AMASSS : un
+           balayage, parce que l'inference parcourt le volume. */
+        var mine = "M_" + active.code;
+        masks.forEach(function (m) { m.gen = m.code === mine ? f : 0; m.alpha = m.code === mine ? 0.34 : 0; });
+        say(stepName("predict") + " " + active.label);
+        paint(null, 1, 1);
+      } else if (st.k === "mask") {
+        /* Le T1 est masque : elastix ne verra que l'interieur. On efface le
+           reste plutot que de le decrire. */
+        say(stepName("mask"));
+        paint(0.34, 1 - 0.72 * f, 1 - 0.72 * f);
+      } else if (st.k === "elastix") {
+        var e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+        current = partial(new Float32Array(active.m), e);
+        /* L'ecart interpole entre les deux valeurs MESUREES ; la distance de
+           surface se mesure hors ligne, sur les maillages pleins. */
+        var gap = active.before + (active.after - active.before) * e;
+        say(stepName("elastix") + " — " + gap.toFixed(2) + " mm");
+        paint(0.34, 0.28, 1);
+      } else if (st.k === "matrix") {
+        say(stepName("matrix"));
+        paint(0.20, 0.28 + 0.18 * f, 1);
+      } else {
+        say(stepName("resample"));
+        paint(0.20 * (1 - f), 0.46, 1);
       }
-      var t = Math.min(1, run.t / REG_MS);
-      var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-      current = partial(new Float32Array(active.m), e);
-      /* L'ecart interpole entre les deux valeurs MESUREES, il n'est pas
-         recalcule dans le navigateur : la distance de surface se mesure hors
-         ligne, sur les maillages pleins, pas sur ceux qu'on a decimes. */
-      var gap = active.before + (active.after - active.before) * e;
-      say((strings.gap || "") + " " + gap.toFixed(2) + " mm");
-      paint(1);
-      if (t >= 1 && run.t > REG_MS + 900) { run = null; fig.classList.remove("v3d-sim"); return false; }
+
+      if (run.t >= st.ms + 350) { run.i += 1; run.t = 0; }
       return true;
     }
 
-    function paint(maskAlpha) {
+    function paint(maskAlpha, a1, a2) {
       if (t2) { t2.xform = current; }
-      scene.parts.forEach(function (p) {
-        if (p.code.indexOf("M_") !== 0) { return; }
-        var on = active && p.code === "M_" + active.code;
-        p.alpha = on ? 0.30 * maskAlpha : 0;
+      if (t1 && a1 != null) { t1.alpha = 0.46 * a1; }
+      if (t2 && a2 != null) { t2.alpha = 0.52 * a2; }
+      if (maskAlpha == null) { return; }
+      masks.forEach(function (m) {
+        var on = active && m.code === "M_" + active.code;
+        m.alpha = on ? maskAlpha : 0;
+        if (on && m.gen < 1) { m.gen = 1; }
       });
     }
 
