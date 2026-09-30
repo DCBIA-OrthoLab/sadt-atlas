@@ -27,7 +27,7 @@ LANG_NAMES = {"en": "English", "fr": "Français", "pt": "Português", "ko": "한
 #      THEME = "carnet"      papier millimétré, encre, sérif, vermillon
 #      THEME = "signal"      contemporain : grande typo, formes pleines, aéré
 # ─────────────────────────────────────────────────────────────
-THEME = None
+THEME = "labo"
 
 THEMES = ("ardoise", "papier", "clinique", "labo", "carnet", "signal")
 
