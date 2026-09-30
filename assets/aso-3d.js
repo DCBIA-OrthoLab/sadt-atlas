@@ -304,7 +304,147 @@
     scene.kick();
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Le Guide : deux entrees, une bascule                                 */
+  /* ------------------------------------------------------------------ */
+  /* « It handles both a CBCT (a volume) and an intraoral scan (a surface),
+     with two different engines behind a single window » -- la page le dit,
+     la figure le montre. Un seul mouvement de chaque cote : le Guide donne
+     le resultat, l'Atlas decompose. */
+  function buildGuide(fig) {
+    var scenes = {}, mode = null, run = null, current = {};
+    var strings = {}, pot = fig.querySelectorAll(".v3d-i18n [data-k]");
+    for (var i = 0; i < pot.length; i++) {
+      strings[pot[i].getAttribute("data-k")] = pot[i].textContent.trim();
+    }
+    /* Chaque scene a son bandeau : celui du CBCT disparait avec sa scene
+       quand on bascule sur l'IOS. On ecrit dans tous. */
+    var statusEls = fig.querySelectorAll(".v3d-status");
+    function say(t) {
+      for (var k = 0; k < statusEls.length; k++) { statusEls[k].textContent = t || ""; }
+    }
+    var MS = 2300;
+
+    function setup(name, payload, tint) {
+      var st = fig.querySelector('[data-scene="' + name + '"]');
+      if (!payload || !st) { return null; }
+      var sc = new window.Scene3D(st, payload, {
+        onFrame: function (dt) { return mode === name ? frame(dt) : false; }
+      });
+      if (!sc.ok) { return null; }
+      sc.parts.forEach(function (p) {
+        var c = tint(p.code);
+        p.color = [c[0] / 255, c[1] / 255, c[2] / 255];
+        p.alpha = c[3];
+        p.pickable = false;
+      });
+      current[name] = ID;
+      return sc;
+    }
+
+    scenes.cbct = setup("cbct", window.ASO_SCENE, function (code) {
+      return code === "CB" ? [BASE[0], BASE[1], BASE[2], 0.72] : [SKULL[0], SKULL[1], SKULL[2], 0.5];
+    });
+    scenes.ios = setup("ios", window.ASO_IOS_SCENE, function (code) {
+      return code === "GOLD" ? [GOLD[0], GOLD[1], GOLD[2], 0.26] : [230, 225, 218, 1];
+    });
+    if (!scenes.cbct && !scenes.ios) { return; }
+    fig.classList.add("v3d-on");
+
+    function target(name) {
+      if (name === "ios") { return new Float32Array(window.ASO_IOS_SCENE.matrix || ID); }
+      var d = window.ASO_SCENE, m = ID;
+      (d.stages || []).forEach(function (st) { m = mul(new Float32Array(st.m), m); });
+      return m;
+    }
+
+    function start(name) {
+      mode = name;
+      var bs = fig.querySelectorAll("[data-mode]"), i;
+      for (i = 0; i < bs.length; i++) {
+        bs[i].setAttribute("aria-pressed", bs[i].getAttribute("data-mode") === name ? "true" : "false");
+      }
+      fig.setAttribute("data-active", name);
+      run = { t: 0, m: target(name) };
+      current[name] = ID;
+      fig.classList.add("v3d-sim");
+      var sc = scenes[name];
+      if (sc) { sc.dirty = true; sc.kick(); }
+    }
+
+    function frame(dt) {
+      var sc = scenes[mode];
+      if (!run || !sc) { return false; }
+      run.t += dt;
+      var t = Math.min(1, run.t / MS);
+      var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      current[mode] = partial(run.m, e);
+      paint();
+      if (t >= 1 && run.t > MS + 900) { run = null; fig.classList.remove("v3d-sim"); return false; }
+      return true;
+    }
+
+    function paint() {
+      var sc = scenes[mode], m = current[mode] || ID;
+      if (!sc) { return; }
+      var marks = [];
+      if (mode === "ios") {
+        var d = window.ASO_IOS_SCENE;
+        if (sc.byCode.ARCH) { sc.byCode.ARCH.xform = m; }
+        var sum = 0;
+        (d.shared || []).forEach(function (k) {
+          var a = apply(m, d.patient[k]), g = d.gold[k];
+          marks.push({ p: g, c: [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255], s: 0.010 });
+          marks.push({ p: a, c: [PATIENT[0] / 255, PATIENT[1] / 255, PATIENT[2] / 255], s: 0.008 });
+          var v = [a[0] - g[0], a[1] - g[1], a[2] - g[2]];
+          sum += Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        });
+        /* L'ecart n'est affiche que du cote IOS : la, le gold est une arcade
+           et les reperes portent les memes etiquettes dent par dent. Sur le
+           CBCT c'est un autre patient, le chiffre ne voudrait rien dire. */
+        var r = (d.shared || []).length ? sum / d.shared.length * (d.span || 1) : null;
+        say(r == null ? "" : (strings.gap || "") + " " + r.toFixed(2) + " mm");
+      } else {
+        var c = window.ASO_SCENE;
+        sc.parts.forEach(function (p) { p.xform = m; });
+        (c.gold || []).forEach(function (g) {
+          marks.push({ p: g.p, c: [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255], s: 0.017 });
+        });
+        Object.keys(c.patient || {}).forEach(function (k) {
+          marks.push({ p: apply(m, c.patient[k]),
+                       c: [PATIENT[0] / 255, PATIENT[1] / 255, PATIENT[2] / 255], s: 0.013 });
+        });
+        say((strings.rotated || "") + " " + (c.totalDeg || 0).toFixed(2) + "\u00b0");
+      }
+      sc.setMarks(marks);
+    }
+
+    fig.addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("[data-mode]") : null;
+      if (b) { e.preventDefault(); start(b.getAttribute("data-mode")); return; }
+      if (e.target.closest && e.target.closest(".v3d-go")) { start(mode || "cbct"); }
+    });
+
+    var fired = false;
+    function once() { if (!fired) { fired = true; start("cbct"); } }
+    if (window.IntersectionObserver) {
+      new IntersectionObserver(function (es) {
+        if (es[0].isIntersecting) { once(); }
+      }, { rootMargin: "200px" }).observe(fig);
+    }
+    var bb = fig.getBoundingClientRect();
+    if (bb.top < (window.innerHeight || 0) + 200 && bb.bottom > -200) { once(); }
+    else if (!window.IntersectionObserver) { once(); }
+  }
+
   function init() {
+    var gd = document.querySelectorAll("[data-aso-guide]");
+    for (var q = 0; q < gd.length; q++) {
+      try { buildGuide(gd[q]); }
+      catch (err) {
+        if (window.console) { console.warn("scene ASO (guide) indisponible :", err); }
+      }
+    }
     var ios = document.querySelectorAll("[data-aso-ios]");
     for (var k = 0; k < ios.length; k++) {
       try { buildIOS(ios[k]); }
