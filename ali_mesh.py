@@ -87,14 +87,19 @@ def build_cbct():
             legs.append({"scale": leg["scale"],
                          "mm": round(sp[0], 3),
                          "path": [to_scene(p, sp) for p in leg["idx"]]})
+        # steps == -1 : l'agent n'a pas trouve. Budget de temps depasse, ou
+        # sorti du volume trois fois. On le garde dans les donnees mais on le
+        # marque : le masquer ferait croire que le module trouve toujours.
+        ok = lm["steps"] is not None and lm["steps"] > 0
         agents[name] = {
             "legs": legs,
             "steps": lm["steps"],
+            "ok": ok,
             "final": to_scene(lm["final_idx"], lm["legs"][-1]["spacing"]),
         }
-        print("  agent %-3s : %d pas, %s"
-              % (name, lm["steps"], " + ".join("%d @%smm" % (len(l["path"]), l["mm"])
-                                               for l in legs)))
+        print("  agent %-5s : %s, %s"
+              % (name, ("%d pas" % lm["steps"]) if ok else "NON TROUVE",
+                 " + ".join("%d @%smm" % (len(l["path"]), l["mm"]) for l in legs)))
 
     payload = webmesh.encode(meshes, focus_on=["CB"], extra={
         "agents": agents,

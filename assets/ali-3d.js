@@ -25,6 +25,27 @@
   var TRAIL = [120, 190, 235];
   var TARGET = [110, 230, 170];
 
+  /* Jouer une fois, quand la figure arrive a l'ecran. L'IntersectionObserver
+     seul ne suffit pas : s'il observe un element DEJA visible au chargement,
+     il ne se declenche pas toujours. On teste donc aussi la position de
+     depart. */
+  function whenVisible(fig, fn) {
+    var fired = false;
+    function go() {
+      if (fired) { return; }
+      fired = true;
+      fn();
+    }
+    if (window.IntersectionObserver) {
+      new IntersectionObserver(function (es) {
+        if (es[0].isIntersecting) { go(); }
+      }, { rootMargin: "200px" }).observe(fig);
+    }
+    var r = fig.getBoundingClientRect();
+    if (r.top < (window.innerHeight || 0) + 200 && r.bottom > -200) { go(); }
+    else if (!window.IntersectionObserver) { go(); }
+  }
+
   function el(fig, sel) { return fig.querySelector(sel); }
 
   function strings(fig) {
@@ -155,16 +176,11 @@
 
     /* On joue une fois a l'arrivee a l'ecran : personne ne clique un bouton
        pour comprendre de quoi on parle. */
-    if (window.IntersectionObserver) {
-      new IntersectionObserver(function (es) {
-        if (!es[0].isIntersecting || fig._played) { return; }
-        fig._played = true;
-        if (!scene.reduced) {
-          var rs = rows();
-          if (rs.length) { start(rs[0].getAttribute("data-lm")); }
-        } else { scene.dirty = true; scene.kick(); }
-      }, { rootMargin: "200px" }).observe(fig);
-    }
+    whenVisible(fig, function () {
+      if (scene.reduced) { scene.dirty = true; scene.kick(); return; }
+      var rs = rows();
+      if (rs.length) { start(rs[0].getAttribute("data-lm")); }
+    });
     scene.kick();
   }
 
@@ -289,14 +305,123 @@
       scene.lookAtPart(code, 4.5);
     };
 
-    if (window.IntersectionObserver) {
-      new IntersectionObserver(function (es) {
-        if (!es[0].isIntersecting || fig._played) { return; }
-        fig._played = true;
-        if (!scene.reduced) { start(); } else { scene.dirty = true; scene.kick(); }
-      }, { rootMargin: "200px" }).observe(fig);
-    }
+    whenVisible(fig, function () {
+      if (scene.reduced) { scene.dirty = true; scene.kick(); } else { start(); }
+    });
     scene.kick();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Scene du Guide : ce qu'ALI PRODUIT, pas comment il s'y prend         */
+  /* ------------------------------------------------------------------ */
+  /* Le lecteur du Guide ne lit pas de code. Ce qui l'interesse tient en une
+     phrase de sa propre page : « ALI drops anatomical landmarks onto your
+     scans for you. It works just as well on a CBCT as on an intraoral scan ».
+     Donc : une entree, des points nommes, et une bascule entre les deux
+     types de donnees -- « two engines, one window ». Pas de marche d'agent :
+     c'est l'affaire de l'Atlas. */
+  function buildGuide(fig) {
+    var scenes = {}, mode = null, run = null;
+    var txt = strings(fig), statusEl = el(fig, ".v3d-status");
+    var say = function (s) { if (statusEl) { statusEl.textContent = s || ""; } };
+    var DROP = 190;                 /* un point toutes les 190 ms */
+
+    function setup(name, payload, stage, tint) {
+      if (!payload || !stage) { return null; }
+      var sc = new window.Scene3D(stage, payload, {
+        onFrame: function (dt) { return mode === name ? tick(dt) : false; }
+      });
+      if (!sc.ok) { return null; }
+      sc.parts.forEach(function (p) {
+        var c = tint(p.code);
+        p.color = [c[0] / 255, c[1] / 255, c[2] / 255];
+        p.alpha = c[3] != null ? c[3] : 1;
+        p.pickable = false;
+      });
+      return sc;
+    }
+
+    scenes.cbct = setup("cbct", window.ALI_CBCT_SCENE,
+      el(fig, '[data-scene="cbct"]'),
+      function (code) {
+        /* Assez dense pour se lire comme un scan, assez translucide pour
+           que Sella, qui est au fond du crane, reste visible. */
+        return code === "CB" ? [128, 174, 128, 0.72] : [205, 201, 193, 0.5];
+      });
+    scenes.ios = setup("ios", window.ALI_IOS_SCENE,
+      el(fig, '[data-scene="ios"]'),
+      function (code) { return code === "GUM" ? [196, 150, 148, 1] : [232, 228, 220, 1]; });
+
+    if (!scenes.cbct && !scenes.ios) { return; }
+    fig.classList.add("v3d-on");
+
+    /* Les points du CBCT sont REELS : releves par ali_trace.py. Ceux qui
+       n'ont pas ete trouves ne sont pas inventes -- ils ne tombent pas. */
+    function targets(name) {
+      if (name === "cbct") {
+        var ag = (window.ALI_CBCT_SCENE || {}).agents || {}, out = [];
+        Object.keys(ag).forEach(function (k) {
+          if (ag[k].ok !== false) { out.push({ k: k, p: ag[k].final }); }
+        });
+        return out;
+      }
+      var sc = scenes.ios, d = window.ALI_IOS_SCENE || {};
+      return (d.teeth || []).map(function (c) {
+        var p = sc.byCode[c], u = sc.up(p.c);
+        return { k: c, p: [u[0], u[1] + (p.e[2] || 0.03) * 0.85, u[2]] };
+      });
+    }
+
+    function chips() { return fig.querySelectorAll('[data-lm]'); }
+
+    function start(name) {
+      mode = name;
+      var bs = fig.querySelectorAll("[data-mode]"), i;
+      for (i = 0; i < bs.length; i++) {
+        bs[i].setAttribute("aria-pressed", bs[i].getAttribute("data-mode") === name ? "true" : "false");
+      }
+      fig.setAttribute("data-active", name);
+      var cs = chips();
+      for (i = 0; i < cs.length; i++) { cs[i].setAttribute("aria-current", "false"); }
+      run = { list: targets(name), i: 0, t: 0 };
+      fig.classList.add("v3d-sim");
+      say("");
+      var sc = scenes[name];
+      if (sc) { sc.setMarks([]); sc.dirty = true; sc.kick(); }
+    }
+
+    function tick(dt) {
+      var sc = scenes[mode];
+      if (!run || !sc) { return false; }
+      run.t += dt;
+      while (run.t >= DROP && run.i < run.list.length) {
+        run.t -= DROP;
+        var hit = run.list[run.i];
+        var chip = fig.querySelector('[data-lm="' + hit.k + '"]');
+        if (chip) { chip.setAttribute("aria-current", "true"); }
+        run.i += 1;
+      }
+      sc.setMarks(run.list.slice(0, run.i).map(function (m, i) {
+        var fresh = i === run.i - 1 && run.t < 140;
+        return { p: m.p, c: [POINT[0] / 255, POINT[1] / 255, POINT[2] / 255],
+                 s: fresh ? 0.026 : 0.014 };
+      }));
+      if (run.i >= run.list.length) {
+        say(run.list.length + " " + (txt.placed || ""));
+        run = null;
+        fig.classList.remove("v3d-sim");
+        return false;
+      }
+      return true;
+    }
+
+    fig.addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("[data-mode]") : null;
+      if (b) { e.preventDefault(); start(b.getAttribute("data-mode")); return; }
+      if (e.target.closest && e.target.closest(".v3d-go")) { start(mode || "cbct"); }
+    });
+
+    whenVisible(fig, function () { start("cbct"); });
   }
 
   /* ------------------------------------------------------------------ */
@@ -313,6 +438,13 @@
       try { buildIOS(b[i]); }
       catch (err) {
         if (window.console) { console.warn("scene ALI IOS indisponible :", err); }
+      }
+    }
+    var c = document.querySelectorAll("[data-ali-guide]");
+    for (i = 0; i < c.length; i++) {
+      try { buildGuide(c[i]); }
+      catch (err) {
+        if (window.console) { console.warn("scene ALI (guide) indisponible :", err); }
       }
     }
   }
