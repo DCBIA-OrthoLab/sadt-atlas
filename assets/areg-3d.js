@@ -18,6 +18,30 @@
   var MOVING = [232, 154, 92];   /* T2, ce qui bouge */
   var MASK = [120, 220, 175];
   var MASK_MS = 1200, REG_MS = 2600;
+
+  /* Partages par les deux scenes de ce fichier : elles etaient definies
+     dans build() et buildIOS() ne pouvait pas les voir. */
+  function ID() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
+  function partial(m, t) {
+    /* axe et angle : interpoler les seize coefficients donnerait une
+       matrice qui n'est plus une rotation en cours de route */
+    var r = [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]];
+    var c = Math.max(-1, Math.min(1, (r[0] + r[4] + r[8] - 1) / 2));
+    var ang = Math.acos(c) * t;
+    var ax = [r[5] - r[7], r[6] - r[2], r[1] - r[3]];
+    var n = Math.sqrt(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
+    var out = ID();
+    if (n > 1e-9) {
+      ax = [ax[0] / n, ax[1] / n, ax[2] / n];
+      var s = Math.sin(ang), k = 1 - Math.cos(ang), x = ax[0], y = ax[1], z = ax[2];
+      out[0] = 1 + k * (x * x - 1);  out[4] = -z * s + k * x * y; out[8] = y * s + k * x * z;
+      out[1] = z * s + k * x * y;    out[5] = 1 + k * (y * y - 1); out[9] = -x * s + k * y * z;
+      out[2] = -y * s + k * x * z;   out[6] = x * s + k * y * z;  out[10] = 1 + k * (z * z - 1);
+    }
+    out[12] = m[12] * t; out[13] = m[13] * t; out[14] = m[14] * t;
+    return out;
+  }
+
   /* Les six etapes de VoxelBasedRegistration, dans l'ordre du code. Cote
      Atlas on les joue toutes ; cote Guide seule la derniere compte. */
   var STEPS = [
@@ -65,27 +89,7 @@
     var full = fig.getAttribute("data-areg") === "steps";
     var masks = scene.parts.filter(function (p) { return p.code.indexOf("M_") === 0; });
 
-    function ID() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
 
-    function partial(m, t) {
-      /* axe et angle : interpoler les seize coefficients donnerait une
-         matrice qui n'est plus une rotation en cours de route */
-      var r = [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]];
-      var c = Math.max(-1, Math.min(1, (r[0] + r[4] + r[8] - 1) / 2));
-      var ang = Math.acos(c) * t;
-      var ax = [r[5] - r[7], r[6] - r[2], r[1] - r[3]];
-      var n = Math.sqrt(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
-      var out = ID();
-      if (n > 1e-9) {
-        ax = [ax[0] / n, ax[1] / n, ax[2] / n];
-        var s = Math.sin(ang), k = 1 - Math.cos(ang), x = ax[0], y = ax[1], z = ax[2];
-        out[0] = 1 + k * (x * x - 1);  out[4] = -z * s + k * x * y; out[8] = y * s + k * x * z;
-        out[1] = z * s + k * x * y;    out[5] = 1 + k * (y * y - 1); out[9] = -x * s + k * y * z;
-        out[2] = -y * s + k * x * z;   out[6] = x * s + k * y * z;  out[10] = 1 + k * (z * z - 1);
-      }
-      out[12] = m[12] * t; out[13] = m[13] * t; out[14] = m[14] * t;
-      return out;
-    }
 
     function region(code) {
       for (var i = 0; i < regions.length; i++) {
@@ -244,7 +248,138 @@
     scene.kick();
   }
 
+  /* ------------------------------------------------------------------ */
+  /* AREG_IOS : deux temps d'une arcade, recales sur un patch             */
+  /* ------------------------------------------------------------------ */
+  var PATCH = [120, 220, 175];
+  var IOS_STEPS = [
+    { k: "pair",  ms: 1200 },   /* les deux temps, decales               */
+    { k: "patch", ms: 1600 },   /* le papillon palatin predit            */
+    { k: "icp",   ms: 2600 },   /* l'ICP, sur le patch SEUL              */
+    { k: "done",  ms: 1000 }
+  ];
+
+  function buildIOS(fig) {
+    var data = window.AREG_IOS_SCENE;
+    var stage = fig.querySelector(".v3d-stage");
+    if (!data || !stage) { return; }
+
+    var scene = new window.Scene3D(stage, data, {
+      onFrame: function (dt) { return frame(dt); }
+    });
+    if (!scene.ok) { return; }
+    fig.classList.add("v3d-on");
+
+    var strings = {}, pot = fig.querySelectorAll(".v3d-i18n [data-k]");
+    for (var i = 0; i < pot.length; i++) {
+      strings[pot[i].getAttribute("data-k")] = pot[i].textContent.trim();
+    }
+    var statusEls = fig.querySelectorAll(".v3d-status");
+    function say(t) {
+      for (var k = 0; k < statusEls.length; k++) { statusEls[k].textContent = t || ""; }
+    }
+
+    var t1 = scene.byCode.T1, t2 = scene.byCode.T2;
+    var p1 = scene.byCode.P1, p2 = scene.byCode.P2;
+    scene.parts.forEach(function (p) { p.pickable = false; });
+    if (t1) { t1.color = [FIXED[0]/255, FIXED[1]/255, FIXED[2]/255]; t1.alpha = 0.5; }
+    if (t2) { t2.color = [MOVING[0]/255, MOVING[1]/255, MOVING[2]/255]; t2.alpha = 0.55; }
+    [p1, p2].forEach(function (p) {
+      if (!p) { return; }
+      p.color = [PATCH[0]/255, PATCH[1]/255, PATCH[2]/255];
+      p.alpha = 0;
+    });
+
+    var M = new Float32Array(data.matrix || ID());
+    var run = null, current = ID(), fired = false;
+
+    function moving() { return [t2, p2].filter(Boolean); }
+
+    function start() {
+      run = { i: 0, t: 0 };
+      current = ID();
+      fig.classList.add("v3d-sim");
+      scene.dirty = true; scene.kick();
+    }
+    function seek(i) {
+      if (i == null || i < 0 || i >= IOS_STEPS.length) { return; }
+      fired = true;
+      run = { i: i, t: 0 };
+      current = i >= 3 ? new Float32Array(M) : ID();
+      fig.classList.add("v3d-sim");
+      scene.dirty = true; scene.kick();
+    }
+    function chip(i) {
+      var n = fig.querySelectorAll(".v3d-steps [data-step]");
+      for (var j = 0; j < n.length; j++) {
+        n[j].setAttribute("aria-current", j === i ? "true" : "false");
+      }
+    }
+
+    function frame(dt) {
+      if (!run) { return false; }
+      var st = IOS_STEPS[run.i];
+      if (!st) { run = null; fig.classList.remove("v3d-sim"); chip(-1); return false; }
+      run.t += dt;
+      var f = Math.min(1, run.t / st.ms);
+      chip(run.i);
+
+      if (st.k === "pair") {
+        say(strings.pair || "");
+        if (p1) { p1.alpha = 0; }
+        if (p2) { p2.alpha = 0; }
+      } else if (st.k === "patch") {
+        /* Le patch sort du reseau : on le fait emerger par balayage, comme
+           les masques d'AMASSS. C'est le vrai tableau `Butterfly`, pas une
+           zone dessinee. */
+        say((strings.patch || "") + " " + data.patchPts + " / " + data.totalPts);
+        if (p1) { p1.alpha = 0.85; p1.gen = f; }
+        if (p2) { p2.alpha = 0.85; p2.gen = f; }
+        if (t1) { t1.alpha = 0.5 - 0.26 * f; }
+        if (t2) { t2.alpha = 0.55 - 0.28 * f; }
+      } else if (st.k === "icp") {
+        var e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+        current = partial(M, e);
+        var g = data.before + (data.after - data.before) * e;
+        say((strings.icp || "") + " — " + g.toFixed(2) + " mm");
+      } else {
+        say((strings.done || "") + " " + data.after.toFixed(2) + " mm");
+        if (t1) { t1.alpha = 0.24 + 0.26 * f; }
+        if (t2) { t2.alpha = 0.27 + 0.28 * f; }
+        if (p1) { p1.alpha = 0.85 * (1 - 0.5 * f); }
+        if (p2) { p2.alpha = 0.85 * (1 - 0.5 * f); }
+      }
+
+      moving().forEach(function (p) { p.xform = current; });
+      if (run.t >= st.ms + 350) { run.i += 1; run.t = 0; }
+      return true;
+    }
+
+    fig.addEventListener("click", function (e) {
+      if (e.target.closest && e.target.closest(".v3d-go")) { start(); }
+    });
+    window.Scene3D.attachControls(fig, scene, seek);
+
+    function once() { if (!fired) { fired = true; start(); } }
+    if (window.IntersectionObserver) {
+      new IntersectionObserver(function (es) {
+        if (es[0].isIntersecting) { once(); }
+      }, { rootMargin: "200px" }).observe(fig);
+    }
+    var bb = fig.getBoundingClientRect();
+    if (bb.top < (window.innerHeight || 0) + 200 && bb.bottom > -200) { once(); }
+    else if (!window.IntersectionObserver) { once(); }
+    scene.kick();
+  }
+
   function init() {
+    var ios = document.querySelectorAll("[data-areg-ios]");
+    for (var q = 0; q < ios.length; q++) {
+      try { buildIOS(ios[q]); }
+      catch (err) {
+        if (window.console) { console.warn("scene AREG_IOS indisponible :", err); }
+      }
+    }
     var figs = document.querySelectorAll("[data-areg]");
     for (var i = 0; i < figs.length; i++) {
       try { build(figs[i]); }
