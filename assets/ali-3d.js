@@ -189,6 +189,8 @@
   /* ------------------------------------------------------------------ */
   var GUM = [196, 150, 148];
   var TOOTH = [232, 228, 220];
+  var UNSEG = [206, 202, 196];   /* avant etiquetage : rien ne distingue les dents */
+  var SEG_MS = 1900;
   var AIM = [120, 200, 255];
   var POINT = [110, 230, 170];
 
@@ -212,13 +214,14 @@
     if (!scene.ok) { return; }
     fig.classList.add("v3d-on");
 
+    var teeth = data.teeth || [];
     scene.parts.forEach(function (p) {
-      var c = p.code === "GUM" ? GUM : TOOTH;
-      p.color = [c[0] / 255, c[1] / 255, c[2] / 255];
+      p.color = [UNSEG[0] / 255, UNSEG[1] / 255, UNSEG[2] / 255];
       p.pickable = p.code !== "GUM";
+      var k = teeth.indexOf(p.code);
+      p.seg = p.code === "GUM" ? GUM : (k < 0 ? TOOTH : window.Scene3D.hue(k, teeth.length));
     });
 
-    var teeth = data.teeth || [];
     var run = null, placed = {};
 
     /* La camera vise le centroide de la dent -- c'est le tableau
@@ -251,16 +254,39 @@
       return [p.c[0], p.c[1], p.c[2] + (p.e[2] || 0.03) * 0.85];
     }
 
+    /* Le tableau d'etiquettes conditionne TOUT : c'est lui qui donne le
+       centroide de chaque dent, donc la position de la camera. Sans lui,
+       ALI_IOS ne trouve aucune dent et ne place rien. La segmentation est
+       donc le premier acte, pas un detail de preparation. */
     function start() {
       placed = {};
-      run = { i: 0, phase: "fly", t: 0, from: null };
+      run = { phase: teeth.length ? "seg" : "fly", i: 0, t: 0, lit: 0 };
       fig.classList.add("v3d-sim");
       scene.dirty = true; scene.kick();
+    }
+
+    function tint() {
+      var seg = run && run.phase === "seg";
+      scene.parts.forEach(function (p) {
+        var k = teeth.indexOf(p.code);
+        var lit = seg ? (k >= 0 && k < run.lit) : true;
+        var c = lit ? p.seg : UNSEG;
+        p.color = [c[0] / 255, c[1] / 255, c[2] / 255];
+      });
     }
 
     function tick(dt) {
       if (!run) { return false; }
       run.t += dt;
+      if (run.phase === "seg") {
+        run.lit = Math.min(teeth.length,
+                           Math.floor(run.t / (SEG_MS / teeth.length)) + 1);
+        say((txt.seg || "") + " " + run.lit + "/" + teeth.length);
+        tint();
+        marks();
+        if (run.t >= SEG_MS + 350) { run.phase = "fly"; run.t = 0; run.i = 0; tint(); }
+        return true;
+      }
       var code = teeth[run.i];
       if (!code) { run = null; fig.classList.remove("v3d-sim"); say(txt.done || ""); return false; }
 
@@ -285,6 +311,7 @@
     }
 
     function marks() {
+      if (run && run.phase === "seg") { scene.setMarks([]); return; }
       var out = [], code = run && teeth[run.i];
       Object.keys(placed).forEach(function (k) {
         out.push({ p: placed[k], c: [POINT[0] / 255, POINT[1] / 255, POINT[2] / 255], s: 0.012 });
@@ -302,6 +329,7 @@
 
     /* Le medaillon : ce que la camera voit, avec la vraie texture du reseau. */
     function overlay() {
+      if (run && run.phase === "seg") { return; }
       var code = run && teeth[run.i];
       if (!code) { return; }
       var g = eyeFor(code);

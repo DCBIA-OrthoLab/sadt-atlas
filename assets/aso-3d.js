@@ -63,14 +63,8 @@
   var GREY = [206, 202, 196];
   var SEG_MS = 1900, CENT_MS = 1100;
 
-  /* Une teinte par dent : avant la segmentation elles sont indistinctes,
-     apres elles portent un numero. C'est tout ce que `dentalmodelseg`
-     apporte, et c'est ce dont l'orientation a besoin. */
-  function hue(k, n) {
-    var h = (k / Math.max(1, n)) * 320, c = 0.42, x = c * (1 - Math.abs((h / 60) % 2 - 1));
-    var r = [[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][Math.floor(h / 60) % 6];
-    return [(r[0] + 0.52) * 255, (r[1] + 0.52) * 255, (r[2] + 0.52) * 255];
-  }
+  var hue = window.Scene3D.hue;
+
   var WALK_MS = 2600;
 
   /* Le mode Fully-Automated n'est que « the semi mode preceded by generating

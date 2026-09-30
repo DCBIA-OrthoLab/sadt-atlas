@@ -605,5 +605,15 @@
     });
   };
 
+  /* Une teinte par element d'une serie. Sert aux scenes qui montrent une
+     segmentation : avant, les pieces sont indistinctes ; apres, chacune
+     porte un numero. Ici parce que deux scenes s'en servent. */
+  Scene3D.hue = function (k, n) {
+    var h = (k / Math.max(1, n)) * 320;
+    var c = 0.42, x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    var r = [[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][Math.floor(h / 60) % 6];
+    return [(r[0] + 0.52) * 255, (r[1] + 0.52) * 255, (r[2] + 0.52) * 255];
+  };
+
   global.Scene3D = Scene3D;
 })(window);

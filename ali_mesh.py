@@ -154,6 +154,11 @@ def build_ios():
                                    "PredictedID")
         thr.SetLowerThreshold(lab - 0.5)
         thr.SetUpperThreshold(lab + 0.5)
+        # « Au moins un point » et non « tous » : sinon chaque cellule a
+        # cheval sur une frontiere dent/gencive est ecartee des DEUX cotes,
+        # et l'arcade se retrouve criblee de trous. Les pieces se chevauchent
+        # legerement, ce qui ne se voit pas ; les trous, si.
+        thr.AllScalarsOff()
         thr.Update()
         surf = vtk.vtkGeometryFilter()
         surf.SetInputConnection(thr.GetOutputPort())
@@ -161,7 +166,7 @@ def build_ios():
         poly = surf.GetOutput()
         if poly.GetNumberOfPolys() < 40:
             continue
-        budget = 11000 if lab == gum else 1600
+        budget = 15000 if lab == gum else 2200
         code = "GUM" if lab == gum else "T%d" % lab
         meshes[code] = webmesh.smooth_decimate(poly, budget, iterations=12)
         b = meshes[code].GetBounds()
