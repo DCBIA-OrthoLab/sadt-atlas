@@ -33,14 +33,16 @@
     CV:   [111, 184, 210]
   };
   var TRANSLUCENT = { UAW: 0.55 };   /* l'air se regarde à travers */
+  var RAW_COLOR = [196, 190, 180];   /* le scan brut seuillé : sans nom, sans couleur */
+  var EXPLODE = 0.16;                /* de combien les autres pièces s'écartent */
 
   var VERT = [
     "#version 300 es",
     "in vec3 aPos; in vec3 aNrm;",
-    "uniform mat4 uMVP; uniform mat4 uModel;",
+    "uniform mat4 uMVP; uniform mat4 uModel; uniform vec3 uOffset;",
     "out vec3 vNrm; out vec3 vPos;",
     "void main(){",
-    "  vec3 p = aPos - 0.5;",              /* uint16 normalisé -> centré */
+    "  vec3 p = aPos - 0.5 + uOffset;",              /* uint16 normalisé -> centré */
     "  vNrm = mat3(uModel) * aNrm;",
     "  vPos = p;",
     "  gl_Position = uMVP * vec4(p, 1.0);",
@@ -52,10 +54,15 @@
     "precision highp float;",
     "in vec3 vNrm; in vec3 vPos;",
     "uniform vec3 uColor; uniform float uAlpha;",
+    "uniform float uSweep;",
     "uniform float uDim;",                 /* 1 = en avant, 0 = estompé */
     "uniform vec3 uSky; uniform vec3 uGround;",
     "out vec4 o;",
     "void main(){",
+    /* Balayage : la structure n'existe qu'en dessous du plan. C'est la
+       fenetre glissante de nnU-Net rendue visible — l'inference ne produit
+       pas un volume d'un coup, elle parcourt le scan. */
+    "  if (vPos.z > uSweep) { discard; }",
     "  vec3 n = normalize(vNrm);",
     "  vec3 L = normalize(vec3(0.4, 0.75, 0.6));",
     "  float lam = max(dot(n, L), 0.0);",
@@ -65,6 +72,9 @@
     /* liseré pour décoller la silhouette du fond */
     "  float rim = pow(1.0 - max(dot(n, normalize(-vPos)), 0.0), 3.0);",
     "  vec3 c = uColor * (amb + lam * 0.72) + rim * 0.18;",
+    /* Bande lumineuse au front du balayage : ce qui vient d'etre produit. */
+    "  float band = smoothstep(0.075, 0.0, uSweep - vPos.z);",
+    "  c += band * 0.9;",
     "  c = mix(vec3(dot(c, vec3(0.299,0.587,0.114))) * 0.68, c, uDim);",
     "  o = vec4(c, uAlpha * mix(0.30, 1.0, uDim));",
     "}"
@@ -155,12 +165,15 @@
       color: gl.getUniformLocation(prog, "uColor"),
       alpha: gl.getUniformLocation(prog, "uAlpha"),
       dim: gl.getUniformLocation(prog, "uDim"),
+      offset: gl.getUniformLocation(prog, "uOffset"),
       sky: gl.getUniformLocation(prog, "uSky"),
+      sweep: gl.getUniformLocation(prog, "uSweep"),
       ground: gl.getUniformLocation(prog, "uGround")
     };
     var pu = {
       mvp: gl.getUniformLocation(pick, "uMVP"),
       model: gl.getUniformLocation(pick, "uModel"),
+      offset: gl.getUniformLocation(pick, "uOffset"),
       id: gl.getUniformLocation(pick, "uId")
     };
 
@@ -188,11 +201,19 @@
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, b64(p.idx), gl.STATIC_DRAW);
       gl.bindVertexArray(null);
 
-      var c = COLORS[code] || [180, 180, 180];
+      var c = COLORS[code] || RAW_COLOR;
       parts.push({
         code: code, vao: vao, count: p.tris * 3, id: i + 1,
         color: [c[0] / 255, c[1] / 255, c[2] / 255],
         alpha: TRANSLUCENT[code] || 1.0,
+        /* centre et rayon viennent du generateur, deja normalises : le
+           navigateur n'a pas a reparcourir des milliers de sommets. */
+        c: p.c || [0, 0, 0], r: p.r || 0.5,
+        isRaw: code === "RAW",
+        /* gen : 0 = pas encore produite par le reseau, 1 = produite.
+           Vaut 1 au repos — la simulation est un supplement, pas un prealable. */
+        gen: 1, on: true,
+        off: [0, 0, 0], offGoal: [0, 0, 0],
         row: list.querySelector('[data-part="' + code + '"]')
       });
     });
@@ -217,8 +238,20 @@
     }
 
     /* ---- caméra ---- */
-    var cam = { yaw: -0.5, pitch: 0.12, dist: 1.50, tx: 0, ty: 0, tz: 0 };
-    var goal = null, selected = null, dirty = true;
+    /* Le cadrage au repos vise l'anatomie seule : le scan brut la déborde
+       largement, et s'y cadrer rendrait les structures minuscules. */
+    var focus = data.focus || { c: [0, 0, 0], r: 0.42 };
+    /* r est un rayon (demi-étendue), pas une dimension pleine : le facteur
+       cadre la pièce avec un peu d'air autour, rien de plus. */
+    var HOME = { c: [focus.c[0], focus.c[2], -focus.c[1]],
+                 dist: Math.max(0.75, focus.r * 2.9) };
+    var cam = { yaw: -0.5, pitch: 0.12, dist: HOME.dist,
+                tx: HOME.c[0], ty: HOME.c[1], tz: HOME.c[2] };
+    var goal = null, selected = null, hovered = null, dirty = true;
+    /* 0 = scan brut seul, 1 = structures seules. L'animation entre les deux
+       est le propos : AMASSS ne fait pas apparaître de la matière, il la
+       nomme et la sépare. */
+    var reveal = 1, revealGoal = 1, played = false, revealT0 = 0, lastT = 0;
 
     /* Le NIfTI sort en LPS : Z monte, Y va vers l'arrière. On redresse le
        crâne une fois pour toutes plutôt que de tourner la caméra. */
@@ -233,47 +266,138 @@
       0, 0,  0, 1
     ]);
 
-    function centroidOf(part) {
-      /* approximation suffisante pour viser : le centre de la boîte de la
-         pièce, recalculé une fois depuis ses positions quantifiées */
-      if (part.centre) { return part.centre; }
-      var p = data.parts[part.code], raw = b64(p.pos);
-      var v = new Uint16Array(raw.buffer, raw.byteOffset, raw.length / 2);
-      var lo = [65535, 65535, 65535], hi = [0, 0, 0], i, k;
-      for (i = 0; i < v.length; i += 3) {
-        for (k = 0; k < 3; k++) {
-          if (v[i + k] < lo[k]) { lo[k] = v[i + k]; }
-          if (v[i + k] > hi[k]) { hi[k] = v[i + k]; }
-        }
-      }
-      var c = [];
-      for (k = 0; k < 3; k++) { c[k] = (lo[k] + hi[k]) / 2 / 65535 - 0.5; }
-      /* le même redressement que MODEL */
-      part.centre = [c[0], c[2], -c[1]];
-      part.radius = Math.max(
-        (hi[0] - lo[0]), (hi[1] - lo[1]), (hi[2] - lo[2])) / 65535;
-      return part.centre;
-    }
-
     var reduced = window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    function select(code, fromList) {
+    function byCode(code) {
+      return parts.filter(function (p) { return p.code === code; })[0];
+    }
+
+    function select(code) {
       selected = code;
       parts.forEach(function (p) {
         if (p.row) { p.row.setAttribute("aria-current", p.code === code ? "true" : "false"); }
       });
       fig.classList.toggle("v3d-has-sel", !!code);
-      if (code) {
-        var part = parts.filter(function (p) { return p.code === code; })[0];
-        var c = centroidOf(part);
-        goal = { tx: c[0], ty: c[1], tz: c[2], dist: Math.max(0.55, part.radius * 2.4) };
+
+      var part = code ? byCode(code) : null;
+      if (part) {
+        /* La caméra vise dans le repère redressé ; les décalages, eux, sont
+           appliqués AVANT la rotation, dans le shader. Deux repères, pas un. */
+        goal = { tx: part.c[0], ty: part.c[2], tz: -part.c[1],
+                 dist: Math.max(0.42, part.r * 3.1) };
       } else {
-        goal = { tx: 0, ty: 0, tz: 0, dist: 1.50 };
+        goal = { tx: HOME.c[0], ty: HOME.c[1], tz: HOME.c[2], dist: HOME.dist };
       }
-      if (reduced) { cam.tx = goal.tx; cam.ty = goal.ty; cam.tz = goal.tz; cam.dist = goal.dist; goal = null; }
-      if (fromList && part) { /* rien : la liste garde le focus */ }
+
+      /* Vue éclatée : les autres pièces s'écartent en s'éloignant du centre
+         de la sélection, ce qui dégage ce qu'on regarde sans le déplacer. */
+      parts.forEach(function (p) {
+        if (!part || p === part || p.isRaw) { p.offGoal = [0, 0, 0]; return; }
+        var d = [p.c[0] - part.c[0], p.c[1] - part.c[1], p.c[2] - part.c[2]];
+        var l = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        if (l < 1e-4) { p.offGoal = [0, EXPLODE, 0]; return; }
+        p.offGoal = [d[0] / l * EXPLODE, d[1] / l * EXPLODE, d[2] / l * EXPLODE];
+      });
+
+      if (reduced) {
+        cam.tx = goal.tx; cam.ty = goal.ty; cam.tz = goal.tz; cam.dist = goal.dist;
+        goal = null;
+        parts.forEach(function (p) { p.off = p.offGoal.slice(); });
+      }
       dirty = true; tick();
+    }
+
+    function setHover(code) {
+      if (code === hovered) { return; }
+      hovered = code;
+      canvas.style.cursor = code ? "pointer" : "";
+      parts.forEach(function (p) {
+        if (p.row) { p.row.classList.toggle("v3d-hover", p.code === hovered); }
+      });
+      dirty = true; tick();
+    }
+
+    /* ---- Simulation d'une passe AMASSS -------------------------------
+       Fidèle à ce que la fiche Atlas décrit : un réseau binaire PAR
+       structure, chargé puis appliqué, en boucle. Décocher une structure ne
+       produit rien — c'est exactement ce que fait le module. */
+    var SIM = { intro: 800, load: 430, sweep: 1000, gap: 170, outro: 650 };
+    var sim = null;
+    var statusEl = fig.querySelector(".v3d-status");
+    var strings = {};
+    var pot = fig.querySelectorAll(".v3d-i18n [data-k]");
+    for (var si = 0; si < pot.length; si++) {
+      strings[pot[si].getAttribute("data-k")] = pot[si].textContent.trim();
+    }
+    function say(txt) { if (statusEl) { statusEl.textContent = txt || ""; } }
+    function nameOf(code) {
+      var p = byCode(code), el = p && p.row && p.row.querySelector(".v3d-name");
+      return el ? el.textContent.trim() : code;
+    }
+
+    function runSim() {
+      var codes = [];
+      parts.forEach(function (p) {
+        if (p.isRaw) { return; }
+        var chk = p.row && p.row.querySelector(".v3d-chk");
+        p.on = chk ? chk.checked : true;
+        p.gen = 0;
+        if (p.on) { codes.push(p.code); }
+      });
+      if (!codes.length) {
+        /* Rien de coché : le module ne produirait rien non plus. */
+        parts.forEach(function (p) { p.gen = 1; p.on = true; });
+        say(strings.empty || "");
+        dirty = true; tick();
+        return;
+      }
+      select(null);
+      reveal = 1; revealGoal = 1; revealT0 = 0;
+      sim = { codes: codes, i: -1, phase: "intro", t: 0, rawA: 0.92 };
+      fig.classList.add("v3d-sim");
+      say(strings.reading || "");
+      dirty = true; tick();
+    }
+
+    function simStep(dt) {
+      sim.t += dt;
+      if (sim.phase === "intro") {
+        sim.rawA = 0.92 - 0.60 * Math.min(1, sim.t / SIM.intro);
+        if (sim.t >= SIM.intro) {
+          sim.i = 0; sim.phase = "load"; sim.t = 0;
+          say((strings.loading || "") + " " + nameOf(sim.codes[0]));
+        }
+        return;
+      }
+      if (sim.phase === "load") {
+        if (sim.t >= SIM.load) {
+          sim.phase = "sweep"; sim.t = 0;
+          say((strings.infer || "") + " " + nameOf(sim.codes[sim.i]));
+        }
+        return;
+      }
+      if (sim.phase === "sweep") {
+        var part = byCode(sim.codes[sim.i]);
+        part.gen = Math.min(1, sim.t / SIM.sweep);
+        if (sim.t >= SIM.sweep + SIM.gap) {
+          part.gen = 1; sim.i += 1; sim.t = 0;
+          if (sim.i >= sim.codes.length) {
+            sim.phase = "outro";
+            say(sim.codes.length + " " + (strings.finished || ""));
+          } else {
+            sim.phase = "load";
+            say((strings.loading || "") + " " + nameOf(sim.codes[sim.i]));
+          }
+        }
+        return;
+      }
+      /* outro : le scan d'entrée s'efface, il ne reste que ce qui a été produit */
+      sim.rawA = 0.32 * (1 - Math.min(1, sim.t / SIM.outro));
+      if (sim.t >= SIM.outro) {
+        sim = null;
+        fig.classList.remove("v3d-sim");
+      }
     }
 
     /* ---- interactions ---- */
@@ -282,11 +406,29 @@
       drag = { x: e.clientX, y: e.clientY, moved: 0 };
       canvas.setPointerCapture(e.pointerId);
     });
+    var hoverAt = null, hoverQueued = false;
+    canvas.addEventListener("pointerleave", function () { setHover(null); });
     canvas.addEventListener("pointermove", function (e) {
-      if (!drag) { return; }
+      if (!drag) {
+        /* Le picking relit un pixel du GPU : ca bloque le pipeline. Une passe
+           par image au maximum, et jamais pendant l'animation de revelation. */
+        if (reveal < 0.999 || sim) { return; }
+        hoverAt = { clientX: e.clientX, clientY: e.clientY };
+        if (!hoverQueued) {
+          hoverQueued = true;
+          requestAnimationFrame(function () {
+            hoverQueued = false;
+            if (hoverAt) { setHover(pickAt(hoverAt)); }
+          });
+        }
+        return;
+      }
       var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       drag.moved += Math.abs(dx) + Math.abs(dy);
-      cam.yaw += dx * 0.008;
+      /* Le modèle suit la souris : on tire vers la droite, le crâne tourne
+         vers la droite — donc la caméra orbite vers la GAUCHE, et le lacet
+         décroît. L'inverse donnait la sensation d'une souris inversée. */
+      cam.yaw -= dx * 0.008;
       cam.pitch = Math.max(-1.45, Math.min(1.45, cam.pitch + dy * 0.008));
       drag.x = e.clientX; drag.y = e.clientY;
       goal = null; dirty = true; tick();
@@ -294,7 +436,10 @@
     canvas.addEventListener("pointerup", function (e) {
       var wasClick = drag && drag.moved < 6;
       drag = null;
-      if (wasClick) { select(pickAt(e), false); }
+      if (wasClick) {
+        var hit = pickAt(e);
+        select(hit === selected ? null : hit);
+      }
     });
     canvas.addEventListener("wheel", function (e) {
       e.preventDefault();
@@ -303,21 +448,31 @@
     }, { passive: false });
 
     list.addEventListener("click", function (e) {
+      /* La case à cocher choisit un modèle ; le reste de la ligne sélectionne
+         une pièce. Deux gestes distincts sur la même ligne. */
+      if (e.target.classList && e.target.classList.contains("v3d-chk")) { return; }
       var row = e.target.closest ? e.target.closest("[data-part]") : null;
       if (!row) { return; }
       e.preventDefault();
-      select(row.getAttribute("data-part") === selected ? null : row.getAttribute("data-part"), true);
+      select(row.getAttribute("data-part") === selected ? null : row.getAttribute("data-part"));
     });
     list.addEventListener("keydown", function (e) {
       if (e.key !== "Enter" && e.key !== " ") { return; }
       var row = e.target.closest ? e.target.closest("[data-part]") : null;
       if (!row) { return; }
       e.preventDefault();
-      select(row.getAttribute("data-part") === selected ? null : row.getAttribute("data-part"), true);
+      select(row.getAttribute("data-part") === selected ? null : row.getAttribute("data-part"));
+    });
+
+    var go = fig.querySelector(".v3d-go");
+    if (go) { go.addEventListener("click", function () { runSim(); }); }
+    /* Cocher ou décocher ne relance pas : on choisit, puis on lance. */
+    list.addEventListener("change", function (e) {
+      if (e.target.classList.contains("v3d-chk")) { say(""); }
     });
 
     var reset = fig.querySelector(".v3d-reset");
-    if (reset) { reset.addEventListener("click", function () { select(null, false); }); }
+    if (reset) { reset.addEventListener("click", function () { select(null); }); }
 
     function pickAt(e) {
       var r = canvas.getBoundingClientRect();
@@ -334,7 +489,11 @@
       gl.uniformMatrix4fv(pu.mvp, false, mvp);
       gl.uniformMatrix4fv(pu.model, false, MODEL);
       parts.forEach(function (p) {
+        /* Ni le scan d'entrée, ni une structure que le réseau n'a pas
+           encore produite : on ne clique que ce qui existe. */
+        if (p.isRaw || p.gen <= 0 || !p.on) { return; }
         gl.uniform1f(pu.id, p.id);
+        gl.uniform3fv(pu.offset, p.off);
         gl.bindVertexArray(p.vao);
         gl.drawElements(gl.TRIANGLES, p.count, gl.UNSIGNED_SHORT, 0);
       });
@@ -388,12 +547,24 @@
       gl.uniformMatrix4fv(u.mvp, false, matrices());
       gl.uniformMatrix4fv(u.model, false, MODEL);
 
-      /* opaques d'abord, translucides ensuite : sinon l'air masque l'os */
-      var order = parts.slice().sort(function (a, b) { return b.alpha - a.alpha; });
+      /* Opaques d'abord, translucides ensuite, et le scan brut en dernier :
+         il enveloppe tout le reste, donc il doit se fondre par-dessus. */
+      var order = parts.slice().sort(function (a, b) {
+        if (a.isRaw !== b.isRaw) { return a.isRaw ? 1 : -1; }
+        return b.alpha - a.alpha;
+      });
       order.forEach(function (p) {
+        var rawA = sim ? sim.rawA : 0.92 * (1 - reveal);
+        var a = p.isRaw ? rawA : p.alpha * reveal * (p.on ? 1 : 0);
+        if (a < 0.004 || (!p.isRaw && p.gen <= 0)) { return; }
+        /* Hors balayage, on pousse le plan au-dela du modele : rien n'est coupe. */
+        gl.uniform1f(u.sweep, p.gen >= 1 ? 9.0 : -0.62 + 1.30 * p.gen);         /* invisible : ne pas le peindre */
+        var dim = (!selected || selected === p.code) ? 1.0 : 0.0;
+        if (!p.isRaw && p.code === hovered && dim === 1.0) { dim = 1.22; }
         gl.uniform3fv(u.color, p.color);
-        gl.uniform1f(u.alpha, p.alpha);
-        gl.uniform1f(u.dim, (!selected || selected === p.code) ? 1.0 : 0.0);
+        gl.uniform1f(u.alpha, a);
+        gl.uniform1f(u.dim, dim);
+        gl.uniform3fv(u.offset, p.off);
         gl.bindVertexArray(p.vao);
         gl.drawElements(gl.TRIANGLES, p.count, gl.UNSIGNED_SHORT, 0);
       });
@@ -404,18 +575,53 @@
     function tick() {
       if (running) { return; }
       running = true;
-      requestAnimationFrame(function step() {
+      requestAnimationFrame(function step(now) {
+        var busy = false;
+        /* Tout est calé sur le temps écoulé, pas sur le nombre d'images :
+           sinon l'animation dure deux secondes sur une bonne carte et quinze
+           sur un rendu logiciel. dt est borné pour survivre à un onglet
+           réveillé après une minute en arrière-plan. */
+        var dt = lastT ? (now - lastT) : 16.7;
+        /* Une horloge qui n'avance pas — onglet suspendu, rendu instrumenté —
+           ne doit pas figer l'animation : on compte alors une image nominale. */
+        if (!(dt > 0)) { dt = 16.7; }
+        if (dt > 64) { dt = 64; }
+        lastT = now;
+        var ease = function (base) { return 1 - Math.pow(1 - base, dt / 16.7); };
+
         if (goal) {
-          var k = 0.16, done = true;
+          var k = ease(0.16), done = true;
           ["tx", "ty", "tz", "dist"].forEach(function (f) {
             var d = goal[f] - cam[f];
             if (Math.abs(d) > 0.0008) { done = false; }
             cam[f] += d * k;
           });
-          if (done) { goal = null; } else { dirty = true; }
+          if (done) { goal = null; } else { busy = true; }
         }
+        var ko = ease(0.16);
+        parts.forEach(function (p) {
+          for (var i = 0; i < 3; i++) {
+            var d = p.offGoal[i] - p.off[i];
+            if (Math.abs(d) > 0.0004) { busy = true; }
+            p.off[i] += d * ko;
+          }
+        });
+        if (sim) { simStep(dt); busy = true; }
+        if (reveal !== revealGoal) {
+          /* On cumule les deltas au lieu de soustraire deux horodatages :
+             l'animation ne dépend plus que du temps écoulé, jamais d'une
+             origine absolue. */
+          revealT0 += dt;
+          var t = Math.min(1, revealT0 / REVEAL_MS);
+          /* départ et arrivée adoucis : on veut voir la bascule, pas un fondu */
+          var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          reveal = revealGoal ? e : 1 - e;
+          if (t >= 1) { reveal = revealGoal; revealT0 = 0; } else { busy = true; }
+        }
+        fig.classList.toggle("v3d-raw", reveal < 0.5);
+        if (busy) { dirty = true; }
         if (dirty) { draw(); dirty = false; }
-        if (goal) { requestAnimationFrame(step); } else { running = false; }
+        if (busy) { requestAnimationFrame(step); } else { running = false; lastT = 0; }
       });
     }
 
@@ -428,7 +634,17 @@
     /* Ne peindre que quand c'est à l'écran : une fiche Atlas est longue. */
     if (window.IntersectionObserver) {
       new IntersectionObserver(function (es) {
-        if (es[0].isIntersecting) { dirty = true; tick(); }
+        if (!es[0].isIntersecting) { return; }
+        dirty = true;
+        /* La demonstration se joue une fois, quand la figure arrive a l'ecran :
+           personne ne clique un bouton pour comprendre de quoi on parle. */
+        if (!played) {
+          played = true;
+          /* On joue la passe complete une fois, a l'arrivee a l'ecran :
+             personne ne clique un bouton pour comprendre de quoi on parle. */
+          if (!reduced) { runSim(); }
+        }
+        tick();
       }, { rootMargin: "200px" }).observe(fig);
     } else { tick(); }
     tick();

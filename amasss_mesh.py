@@ -27,9 +27,19 @@ except ImportError:
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
-SRC = os.path.expanduser(
-    "~/Documents/SlicerDownloads/AMASSS/Test_Files/MG_test_scan/"
-    "MG_test_scan_Pred_MERGED.nii.gz")
+BASE = os.path.expanduser(
+    "~/Documents/SlicerDownloads/AMASSS/Test_Files/MG_test_scan/")
+SRC = os.path.join(BASE, "MG_test_scan_Pred_MERGED.nii.gz")
+
+#: Le scan AVANT segmentation, pour l'animation « brut -> segmenté ». C'est le
+#: même volume, même grille, même repère : les deux surfaces se superposent
+#: sans recalage. Un simple seuil osseux — ce que n'importe qui obtient sans
+#: réseau — donne un bloc unique et anonyme. Tout l'intérêt de la comparaison
+#: est là : AMASSS ne fait pas apparaître de la matière, il la NOMME et la
+#: sépare.
+RAW = os.path.join(BASE, "MG_test_scan.nii.gz")
+RAW_THRESHOLD = 500.0      # unités du scan ; l'os émerge vers 400-700
+RAW_TARGET = 30000
 
 # label -> (code, nombre de triangles visé)
 # SKIN (6) est écarté : c'est la surface du visage, biométrique, et sans
@@ -107,6 +117,59 @@ def extract(reader, label, target_tris):
     return out, raw, out.GetNumberOfPolys(), dropped
 
 
+def extract_raw(reader, target_tris):
+    """Isosurface continue du scan brut : le « avant ». Marching cubes
+    classique et non discret — on seuille des niveaux de gris, pas des
+    étiquettes."""
+    mc = vtk.vtkMarchingCubes()
+    mc.SetInputConnection(reader.GetOutputPort())
+    mc.SetValue(0, RAW_THRESHOLD)
+    mc.ComputeNormalsOff()
+    mc.ComputeGradientsOff()
+    mc.Update()
+    raw = mc.GetOutput().GetNumberOfPolys()
+
+    # Un CBCT seuillé est constellé de mouchetures d'air et de bruit. Le seuil
+    # est plus sévère qu'ailleurs : on ne garde que les gros blocs.
+    cc = vtk.vtkPolyDataConnectivityFilter()
+    cc.SetInputConnection(mc.GetOutputPort())
+    cc.SetExtractionModeToAllRegions()
+    cc.Update()
+    sizes = cc.GetRegionSizes()
+    biggest = max(sizes.GetValue(i) for i in range(sizes.GetNumberOfTuples()))
+    keep = [i for i in range(sizes.GetNumberOfTuples())
+            if sizes.GetValue(i) >= biggest * 0.01]
+    cc.SetExtractionModeToSpecifiedRegions()
+    cc.InitializeSpecifiedRegionList()
+    for i in keep:
+        cc.AddSpecifiedRegion(i)
+    cc.Update()
+    dropped = sizes.GetNumberOfTuples() - len(keep)
+
+    sm = vtk.vtkWindowedSincPolyDataFilter()
+    sm.SetInputConnection(cc.GetOutputPort())
+    sm.SetNumberOfIterations(18)
+    sm.SetPassBand(.06)
+    sm.NonManifoldSmoothingOn()
+    sm.NormalizeCoordinatesOn()
+    sm.Update()
+
+    kept_in = sm.GetOutput().GetNumberOfPolys() or raw
+    de = vtk.vtkQuadricDecimation()
+    de.SetInputConnection(sm.GetOutputPort())
+    de.SetTargetReduction(max(0.0, min(0.999, 1.0 - target_tris / float(kept_in))))
+    de.Update()
+
+    nr = vtk.vtkPolyDataNormals()
+    nr.SetInputConnection(de.GetOutputPort())
+    nr.SplittingOff(); nr.ConsistencyOn(); nr.ComputePointNormalsOn()
+    nr.Update()
+    tri = vtk.vtkTriangleFilter()
+    tri.SetInputConnection(nr.GetOutputPort())
+    tri.Update()
+    return tri.GetOutput(), raw, tri.GetOutput().GetNumberOfPolys(), dropped
+
+
 def main():
     if not os.path.exists(SRC):
         sys.exit("Segmentation source introuvable :\n  %s\n"
@@ -128,6 +191,19 @@ def main():
 
     if not meshes:
         sys.exit("Aucune structure extraite.")
+
+    anatomy = list(meshes.keys())      # avant d'ajouter le brut
+
+    if os.path.exists(RAW):
+        rr = vtk.vtkNIFTIImageReader()
+        rr.SetFileName(RAW)
+        rr.Update()
+        poly, raw, kept, dropped = extract_raw(rr, RAW_TARGET)
+        meshes["RAW"] = poly
+        print("  %-5s %8d triangles bruts -> %6d  (%d eclats ecartes)"
+              % ("RAW", raw, kept, dropped))
+    else:
+        print("  scan brut absent : l'animation « brut -> segmente » sera inactive")
 
     # Boîte englobante COMMUNE : quantifier chaque pièce sur la sienne les
     # désalignerait. On calcule l'union, puis tout le monde s'y rapporte.
@@ -175,16 +251,59 @@ def main():
                 idx += int(ids.GetId(k)).to_bytes(2, "little")
             ntri += 1
 
+        # Centre et rayon dans le repère du shader ([-0.5, 0.5] après le
+        # « aPos - 0.5 »). Calculés ici plutôt que redécodés en JS : le
+        # navigateur n'a pas à reparcourir 7 000 sommets pour viser une pièce.
+        b = poly.GetBounds()
+        cen = [((b[k * 2] + b[k * 2 + 1]) / 2.0 - centre[k]) / span
+               for k in range(3)]
+        # DEMI-étendues, par axe. Émettre une dimension pleine et la consommer
+        # comme un rayon plaçait la caméra deux fois trop loin ; n'en garder
+        # qu'une pour les trois axes gonflait le cadrage d'ensemble.
+        ext = [(b[k * 2 + 1] - b[k * 2]) / 2.0 / span for k in range(3)]
+        rad = max(ext)
+
         parts[code] = {
             "pos": base64.b64encode(bytes(pos)).decode(),
             "nrm": base64.b64encode(bytes(nor)).decode(),
             "idx": base64.b64encode(bytes(idx)).decode(),
             "verts": n, "tris": ntri,
+            "c": [round(v, 5) for v in cen],
+            "e": [round(v, 5) for v in ext],
+            "r": round(rad, 5),
         }
         print("  %-5s %5d sommets, %5d triangles, %6.0f Ko encodés"
               % (code, n, ntri, (len(pos) + len(nor) + len(idx)) * 4 / 3 / 1024))
 
-    payload = {"span": span, "parts": parts}
+    # Le scan brut déborde largement l'anatomie segmentée : si la caméra se
+    # cadrait sur l'union, les structures seraient minuscules. On transmet donc
+    # le cadrage de l'anatomie seule, et le visualiseur s'en sert au repos.
+    flo = [1e30] * 3
+    fhi = [-1e30] * 3
+    for code in anatomy:
+        c, e = parts[code]["c"], parts[code]["e"]
+        for k in range(3):
+            flo[k] = min(flo[k], c[k] - e[k])
+            fhi[k] = max(fhi[k], c[k] + e[k])
+    focus = {"c": [round((flo[k] + fhi[k]) / 2, 5) for k in range(3)],
+             "r": round(max(fhi[k] - flo[k] for k in range(3)) / 2.0, 5)}
+
+    # --vtk <dossier> : écrire aussi les surfaces telles quelles, pour les
+    # ouvrir dans Slicer et vérifier à la main ce que le site affiche. Ce ne
+    # sont pas les fichiers du site — le site ne lit que le .js — mais
+    # exactement la même géométrie, avant quantification.
+    if "--vtk" in sys.argv:
+        dest = sys.argv[sys.argv.index("--vtk") + 1]
+        os.makedirs(dest, exist_ok=True)
+        for code, poly in meshes.items():
+            w = vtk.vtkPolyDataWriter()
+            w.SetFileName(os.path.join(dest, "MG_test_scan_%s.vtk" % code))
+            w.SetInputData(poly)
+            w.SetFileTypeToBinary()
+            w.Write()
+        print("\nsurfaces ecrites dans %s" % dest)
+
+    payload = {"span": span, "focus": focus, "anatomy": anatomy, "parts": parts}
     out = os.path.join(ROOT, "assets", "amasss-mesh.js")
     with open(out, "w", encoding="utf-8") as fh:
         fh.write("/* Généré par amasss_mesh.py — ne pas éditer à la main.\n"

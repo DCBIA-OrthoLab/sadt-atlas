@@ -131,6 +131,17 @@ donnée patient** : la géométrie part dans un dépôt distant, et une surface
 crânienne est potentiellement ré-identifiante. `SKIN` est écarté — c'est le
 visage. Ne remplace jamais cette source par une sortie de cohorte clinique.
 
+**La simulation d'une passe.** Cocher des structures puis « Run » rejoue ce que
+fait le module : un réseau binaire PAR structure, chargé puis appliqué, en
+boucle (`AMASSS_CLI.py` — « 1 binary network per structure », « checkpoint
+loaded S times »). Le balayage qui révèle chaque pièce est la fenêtre glissante
+de nnU-Net rendue visible. Décocher tout ne produit rien, et le dit : c'est le
+comportement réel, pas un message d'erreur.
+
+Les libellés de la simulation sont du **texte dans la page**
+(`<span class="v3d-i18n" hidden>`), relus par le script. Aucune chaîne
+traduisible ne vit dans le JS — sinon `i18n.py` ne la verrait jamais.
+
 Pièges de ce coin-là :
 
 - `MODEL` dans le JS et `centroidOf()` appliquent le **même** redressement
@@ -141,6 +152,14 @@ Pièges de ce coin-là :
   affiché en gris-bleu, et la légende le dit.
 - Le taux de décimation se calcule **après** le retrait des composantes
   connexes, sinon le budget de triangles annoncé n'est pas celui obtenu.
+- `r` et `e` dans le payload sont des **demi-étendues**, pas des dimensions
+  pleines. Émettre une dimension et la consommer comme un rayon plaçait la
+  caméra deux fois trop loin, et gonflait le cadrage d'ensemble au-delà de 1.
+- Les animations se calent sur le **temps écoulé cumulé**, jamais sur le nombre
+  d'images ni sur deux horodatages absolus : sinon elles durent deux secondes
+  sur une bonne carte et quinze sur un rendu logiciel.
+- Le picking ignore le scan d'entrée et toute structure non encore produite :
+  on ne clique que ce qui existe.
 - On garde toutes les composantes au-dessus d'un seuil, jamais « la plus
   grosse » : les vertèbres cervicales sont plusieurs pièces séparées.
 
