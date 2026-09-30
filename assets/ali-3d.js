@@ -224,20 +224,31 @@
     /* La camera vise le centroide de la dent -- c'est le tableau
        `PredictedID` qui le donne, et rien d'autre. Sans lui, ALI_IOS ne
        trouve aucune dent et ne place rien. */
+    /* DEUX REPERES, et il ne faut pas les confondre.
+       Le shader applique MODEL a tout ce qu'il dessine, marqueurs compris :
+       une position de marqueur se donne donc dans le repere BRUT des
+       donnees. La camera de drawInset, elle, agit APRES MODEL : elle se
+       donne dans le repere redresse. Melanger les deux applique la rotation
+       deux fois et decale les points de 90 degres. */
+    var OCCLUSAL = [0.28, -0.18, 1.0];   /* vers les couronnes, repere brut */
+
     function eyeFor(code) {
-      var t = scene.up(data.centroids[code] || [0, 0, 0]);
-      var d = [0.28, 1.0, 0.18];
+      var t = data.centroids[code] || [0, 0, 0];
+      var d = OCCLUSAL;
       var l = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-      return { target: t,
-               eye: [t[0] + d[0] / l * RADIUS,
-                     t[1] + d[1] / l * RADIUS,
-                     t[2] + d[2] / l * RADIUS] };
+      var eye = [t[0] + d[0] / l * RADIUS,
+                 t[1] + d[1] / l * RADIUS,
+                 t[2] + d[2] / l * RADIUS];
+      /* `eye`/`target` pour les marqueurs, `*Up` pour la camera du medaillon. */
+      return { target: t, eye: eye,
+               targetUp: scene.up(t), eyeUp: scene.up(eye) };
     }
 
     function pointOn(code) {
       var p = scene.byCode[code];
-      var c = scene.up(p.c);
-      return [c[0], c[1] + (p.e[2] || 0.03) * 0.85, c[2]];
+      /* Sur la couronne : on remonte d'une demi-hauteur le long de l'axe
+         occlusal du repere brut, qui est z. */
+      return [p.c[0], p.c[1], p.c[2] + (p.e[2] || 0.03) * 0.85];
     }
 
     function start() {
@@ -294,7 +305,7 @@
       var code = run && teeth[run.i];
       if (!code) { return; }
       var g = eyeFor(code);
-      scene.drawInset({ x: 0.685, y: 0.045, w: 0.28, h: 0.28 }, g.eye, g.target, code);
+      scene.drawInset({ x: 0.685, y: 0.045, w: 0.28, h: 0.28 }, g.eyeUp, g.targetUp, code);
     }
 
     var go = el(fig, ".v3d-go");
@@ -366,9 +377,11 @@
         return out;
       }
       var sc = scenes.ios, d = window.ALI_IOS_SCENE || {};
+      /* Repere brut : le shader redresse lui-meme. Le faire ici aussi
+         tournerait les points une seconde fois. */
       return (d.teeth || []).map(function (c) {
-        var p = sc.byCode[c], u = sc.up(p.c);
-        return { k: c, p: [u[0], u[1] + (p.e[2] || 0.03) * 0.85, u[2]] };
+        var p = sc.byCode[c];
+        return { k: c, p: [p.c[0], p.c[1], p.c[2] + (p.e[2] || 0.03) * 0.85] };
       });
     }
 
