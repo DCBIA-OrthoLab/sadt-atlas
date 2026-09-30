@@ -139,7 +139,13 @@ def smooth_decimate(poly, target_tris, iterations=24, pass_band=.05):
     return tri.GetOutput()
 
 
-def encode(meshes, extra=None, focus_on=None):
+def encode(meshes, extra=None, focus_on=None, scalars=None):
+    """`scalars` : {code: (valeurs par sommet, vmin, vmax)}.
+
+    Les valeurs partent en uint8 normalise sur [vmin, vmax] et le shader les
+    remappe en couleur. C'est ce qui permet de peindre une carte -- une
+    asymetrie, un ecart de recalage -- au lieu d'une teinte uniforme.
+    """
     """{code: vtkPolyData} -> dict prêt à sérialiser.
 
     `focus_on` : les codes sur lesquels la caméra se cadre au repos. Sans lui,
@@ -190,6 +196,17 @@ def encode(meshes, extra=None, focus_on=None):
         cen = [((b[k * 2] + b[k * 2 + 1]) / 2.0 - centre[k]) / span for k in range(3)]
         ext = [(b[k * 2 + 1] - b[k * 2]) / 2.0 / span for k in range(3)]
 
+        entry_scalar = None
+        if scalars and code in scalars:
+            vals, vmin, vmax = scalars[code]
+            rng = (vmax - vmin) or 1.0
+            buf = bytearray()
+            for i in range(n):
+                q = int(round((vals[i] - vmin) / rng * 255.0))
+                buf.append(0 if q < 0 else (255 if q > 255 else q))
+            entry_scalar = (base64.b64encode(bytes(buf)).decode(),
+                            round(float(vmin), 4), round(float(vmax), 4))
+
         parts[code] = {
             "pos": base64.b64encode(bytes(pos)).decode(),
             "nrm": base64.b64encode(bytes(nor)).decode(),
@@ -199,6 +216,10 @@ def encode(meshes, extra=None, focus_on=None):
             "e": [round(v, 5) for v in ext],
             "r": round(max(ext), 5),
         }
+        if entry_scalar:
+            parts[code]["val"] = entry_scalar[0]
+            parts[code]["vmin"] = entry_scalar[1]
+            parts[code]["vmax"] = entry_scalar[2]
         print("  %-16s %5d sommets, %6d triangles, %6.0f Ko"
               % (code, n, ntri, (len(pos) + len(nor) + len(idx)) * 4 / 3 / 1024))
 

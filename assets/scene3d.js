@@ -22,14 +22,15 @@
 
   var VERT = [
     "#version 300 es",
-    "in vec3 aPos; in vec3 aNrm;",
+    "in vec3 aPos; in vec3 aNrm; in float aVal;",
     "uniform mat4 uMVP; uniform mat4 uModel; uniform vec3 uOffset;",
     /* Transformation propre a la piece, appliquee AVANT le redressement.
        C'est par la que passent les etapes d'une orientation ASO : la scene
        fournit la matrice, le socle ne sait pas ce qu'elle represente. */
     "uniform mat4 uXform;",
-    "out vec3 vNrm; out vec3 vPos;",
+    "out vec3 vNrm; out vec3 vPos; out float vVal;",
     "void main(){",
+    "  vVal = aVal;",
     "  vec3 p = (uXform * vec4(aPos - 0.5, 1.0)).xyz + uOffset;",
     "  vNrm = mat3(uModel) * mat3(uXform) * aNrm;",
     "  vPos = p;",
@@ -40,8 +41,9 @@
   var FRAG = [
     "#version 300 es",
     "precision highp float;",
-    "in vec3 vNrm; in vec3 vPos;",
+    "in vec3 vNrm; in vec3 vPos; in float vVal;",
     "uniform vec3 uColor; uniform float uAlpha; uniform float uDim;",
+    "uniform float uRamp;",
     "uniform float uSweep; uniform vec3 uSky; uniform vec3 uGround;",
     "out vec4 o;",
     "void main(){",
@@ -52,7 +54,15 @@
     "  float hemi = n.y * 0.5 + 0.5;",
     "  vec3 amb = mix(uGround, uSky, hemi);",
     "  float rim = pow(1.0 - max(dot(n, normalize(-vPos)), 0.0), 3.0);",
-    "  vec3 c = uColor * (amb + lam * 0.72) + rim * 0.18;",
+    /* uRamp > 0 : la couleur vient de la valeur par sommet et non de
+       uColor. Bleu -> vert -> jaune -> rouge, un degrade dont la luminosite
+       croit de bout en bout, donc lisible aussi en niveaux de gris. */
+    "  vec3 base = uColor;",
+    "  if (uRamp > 0.5) {",
+    "    float v = clamp(vVal, 0.0, 1.0);",
+    "    base = clamp(vec3(1.6 * v - 0.4, 1.2 - abs(2.2 * v - 1.1), 1.3 - 2.0 * v), 0.0, 1.0);",
+    "  }",
+    "  vec3 c = base * (amb + lam * 0.72) + rim * 0.18;",
     "  float band = smoothstep(0.075, 0.0, uSweep - vPos.z);",
     "  c += band * 0.9;",
     "  c = mix(vec3(dot(c, vec3(0.299,0.587,0.114))) * 0.68, c, uDim);",
@@ -155,6 +165,11 @@
     var p = gl.createProgram();
     gl.attachShader(p, shader(gl, gl.VERTEX_SHADER, vs));
     gl.attachShader(p, shader(gl, gl.FRAGMENT_SHADER, fs));
+    /* Les trois programmes partagent le meme vertex shader : on fixe les
+       emplacements pour qu'un seul VAO les serve tous. */
+    gl.bindAttribLocation(p, 0, "aPos");
+    gl.bindAttribLocation(p, 1, "aNrm");
+    gl.bindAttribLocation(p, 2, "aVal");
     gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { throw new Error(gl.getProgramInfoLog(p)); }
     return p;
@@ -194,7 +209,7 @@
     }, this);
     var u = {};
     ["uMVP", "uModel", "uColor", "uAlpha", "uDim", "uOffset", "uSweep", "uSky",
-     "uGround", "uXform"]
+     "uGround", "uXform", "uRamp"]
       .forEach(function (n) { u[n] = gl.getUniformLocation(prog, n); });
     var pu = {};
     ["uMVP", "uModel", "uOffset", "uId", "uXform"]
@@ -222,14 +237,30 @@
       gl.enableVertexAttribArray(1);
       gl.vertexAttribPointer(1, 3, gl.BYTE, true, 0, 0);
       var ib = gl.createBuffer();
+      /* Le tampon de valeurs existe toujours, meme vide : une scene peut
+         changer de champ en cours de route (`setScalars`) et on ne veut pas
+         reconstruire le VAO pour ca. */
+      var vb = gl.createBuffer();
+      if (p.val) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+        gl.bufferData(gl.ARRAY_BUFFER, b64(p.val), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(2);
+        gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, true, 0, 0);
+      } else {
+        /* Sans valeur par sommet l'attribut doit quand meme avoir une
+           valeur : un attribut actif non alimente rend la piece noire. */
+        gl.disableVertexAttribArray(2);
+        gl.vertexAttrib1f(2, 0.0);
+      }
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, b64(p.idx), gl.STATIC_DRAW);
       gl.bindVertexArray(null);
       var part = {
-        code: code, vao: vao, count: p.tris * 3, id: i + 1,
+        code: code, vao: vao, vb: vb, count: p.tris * 3, id: i + 1,
         c: p.c || [0, 0, 0], e: p.e || [0.5, 0.5, 0.5], r: p.r || 0.5,
         color: [.7, .7, .7], alpha: 1, dim: 1, off: [0, 0, 0],
-        xform: IDENTITY, gen: 1, visible: true, pickable: true
+        xform: IDENTITY, gen: 1, visible: true, pickable: true,
+        ramp: false, vmin: p.vmin, vmax: p.vmax
       };
       self.parts.push(part);
       self.byCode[code] = part;
@@ -287,6 +318,24 @@
   Scene3D.prototype.up = function (c) { return [c[0], c[2], -c[1]]; };
 
   Scene3D.prototype.setMarks = function (list) { this.marks = list; this.dirty = true; };
+
+  /* Remplacer le champ scalaire d'une piece. Une scene qui compare plusieurs
+     mesures sur la MEME surface -- l'asymetrie de VFACE selon la structure de
+     superposition, par exemple -- envoie un tableau par mesure plutot que
+     plusieurs copies du maillage. */
+  Scene3D.prototype.setScalars = function (code, data, vmin, vmax) {
+    var p = this.byCode[code], gl = this.gl;
+    if (!p || !p.vb) { return; }
+    gl.bindVertexArray(p.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, p.vb);
+    gl.bufferData(gl.ARRAY_BUFFER, b64(data), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, true, 0, 0);
+    gl.bindVertexArray(null);
+    if (vmin != null) { p.vmin = vmin; }
+    if (vmax != null) { p.vmax = vmax; }
+    this.dirty = true;
+  };
 
   Scene3D.prototype.lookAtPart = function (code, pad) {
     var p = this.byCode[code];
@@ -509,6 +558,7 @@
       gl.uniform1f(u.uDim, p.dim);
       gl.uniform3fv(u.uOffset, p.off);
       gl.uniformMatrix4fv(u.uXform, false, p.xform || IDENTITY);
+      gl.uniform1f(u.uRamp, p.ramp ? 1.0 : 0.0);
       gl.uniform1f(u.uSweep, p.gen >= 1 ? 9.0 : -0.62 + 1.30 * p.gen);
       gl.bindVertexArray(p.vao);
       gl.drawElements(gl.TRIANGLES, p.count, gl.UNSIGNED_SHORT, 0);

@@ -7,6 +7,10 @@
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/labo.css">
 <script src="../../assets/site.js"></script>
+<script src="../../assets/vface-mesh.js"></script>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/vface-3d.js"></script>
+
 </head>
 <body data-cat="analyse">
 <div class="layout">
@@ -338,6 +342,75 @@
       <code>sitk.ResampleImageFilter</code> and to <code>.mrk.json</code> files via
       <code>transform.GetInverse().TransformPoint</code>
       (<code>Automatrix_CLI.py:171</code>).</p>
+
+      <figure class="viewer3d" data-vface="steps">
+        <div class="v3d-modes">
+          <button type="button" data-vregion="CB" aria-pressed="true">Cranial base</button>
+          <button type="button" data-vregion="MAX" aria-pressed="false">Maxilla</button>
+          <button type="button" data-vregion="MAND" aria-pressed="false">Mandible</button>
+        </div>
+        <div class="v3d-stage">
+          <span class="v3d-hint">Drag to rotate &middot; pinch or scroll to zoom</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Mirror again</button>
+        </div>
+        <div class="v3d-ramp" aria-hidden="true">
+          <span>0&nbsp;mm</span><i></i><span>8&nbsp;mm+</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. <strong>upstream</strong> &mdash; ALI + <code>semi_aso_cbct</code>: the mid-sagittal plane onto x = 0</li>
+          <li data-step="1">1. <code>t1_masks</code> &mdash; AMASSS segments cranial base, maxilla, mandible</li>
+          <li data-step="2">2. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, a reflection about x = 0</li>
+          <li data-step="3">3. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; on <em>one</em> structure</li>
+          <li data-step="4">4. <code>bone_surfaces</code> &mdash; the asymmetry map</li>
+        </ol>
+        <span class="v3d-i18n" hidden>
+          <i data-k="orient">upstream &mdash; ALI and SEMI_ASO put the mid-sagittal plane on x = 0</i>
+          <i data-k="masks">AMASSS segments the bone into cranial base, maxilla, mandible</i>
+          <i data-k="mirror">reflect across x = 0</i>
+          <i data-k="plane">the plane the whole upstream chain exists to establish</i>
+          <i data-k="register">register the reflection &mdash; on this structure only</i>
+          <i data-k="map">asymmetry, vertex by vertex</i>
+          <i data-k="median">median</i>
+        </span>
+        <figcaption>The mirror principle, and the thing that decides what it means.
+        <strong>Left panel of the animation</strong>: <code>Matrix_mirror.tfm</code> is
+        <code>diag(-1, 1, 1)</code> with zero translation &mdash; a pure reflection about
+        <strong>x&nbsp;=&nbsp;0</strong>, a plane of the <em>world</em>. Nothing in that matrix knows
+        anything about the patient, which is exactly why the whole upstream chain
+        (resampling, ALI&rsquo;s landmarks, <code>semi_aso_cbct</code> orienting on the maxilla and
+        then the cranial base) exists: to bring the patient&rsquo;s mid-sagittal plane
+        <em>onto</em> that plane. The reflection is animated through its degenerate state
+        &mdash; <code>diag(0, 1, 1)</code>, the mesh flattened onto x&nbsp;=&nbsp;0 &mdash; because a
+        reflection cannot be interpolated by rotations (the determinant would have to pass
+        from &minus;1 to +1 without ever being zero). The upside is that the plane draws
+        itself at mid-flip.
+        <strong>Then the part that matters</strong>: the reflection is not read as it lands.
+        <code>review_steps.py</code> lists three registrations &mdash;
+        <code>registration_cb</code>, <code>registration_max</code>, <code>registration_mand</code>
+        &mdash; so <strong>the asymmetry you measure depends on the structure you superimpose
+        on</strong>. Superimpose on the maxilla and the maxilla is symmetric by construction;
+        whatever asymmetry the patient has is pushed out onto everything else. Switch
+        regions above and watch the same skull tell three different stories: median
+        1.36&nbsp;mm on the cranial base, 1.44&nbsp;mm on the mandible, 2.84&nbsp;mm on the maxilla.
+        <strong>What is VFACE&rsquo;s and what is this page&rsquo;s.</strong> The mirror matrix and the
+        three-region split are VFACE&rsquo;s. The scan is the published AREG_CBCT test set
+        (<code>C_0001_T1_Or</code>, already oriented) with its three AMASSS masks, so the
+        segmentation is real. The <em>three registrations are recomputed here</em> by rigid ICP
+        on each region&rsquo;s surface, because AREG&rsquo;s elastix pass does not run in a browser
+        &mdash; so read the residual in the status line, not just the colours: the cranial
+        base closes from 2.11 to 1.43&nbsp;mm and the mandible from 1.32 to 0.79&nbsp;mm, both
+        tight, while the maxilla only goes from 2.54 to 2.32&nbsp;mm for 10.2&deg; of rotation.
+        That last one is a genuine ICP minimum, stable across iteration counts and
+        convergence settings &mdash; not a tuning artefact &mdash; and it is the honest
+        warning that a shallow, near-symmetric region constrains a superimposition poorly.
+        A colour map read off a loose registration is worth less than one read off a tight
+        one. Distances are point-to-nearest-vertex on the decimated meshes, measured
+        offline, saturating at 8&nbsp;mm.</figcaption>
+      </figure>
+
 
       <p><strong>Coordinate system</strong>: everything is in <strong>LPS</strong>. ALI writes
       <code>"coordinateSystem": "LPS"</code> (<code>io.py:36</code>),
