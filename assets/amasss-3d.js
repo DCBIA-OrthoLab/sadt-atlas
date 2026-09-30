@@ -209,6 +209,7 @@
     });
     var go = fig.querySelector(".v3d-go");
     if (go) { go.addEventListener("click", run); }
+    window.Scene3D.attachControls(fig, scene, null);
     var reset = fig.querySelector(".v3d-reset");
     if (reset) { reset.addEventListener("click", function () { select(null); }); }
 

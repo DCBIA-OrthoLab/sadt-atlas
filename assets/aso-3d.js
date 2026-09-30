@@ -240,7 +240,22 @@
     var go = fig.querySelector(".v3d-go");
     if (go) { go.addEventListener("click", start); }
 
+    /* Reprendre a une transformation donnee : on compose celles qui la
+       precedent et on relance a partir de la. */
     var fired = false;
+
+    function seek(i) {
+      if (i == null || i < 0 || i >= stages.length) { return; }
+      /* Voir la note dans areg-3d.js : l'intention de l'utilisateur prime
+         sur l'autoplay encore en attente. */
+      fired = true;
+      run = { act: "orient", i: i, t: 0, holding: false };
+      current = cumulative(i);
+      fig.classList.add("v3d-sim");
+      scene.dirty = true; scene.kick();
+    }
+    window.Scene3D.attachControls(fig, scene, stepwise ? seek : null);
+
     function once() {
       if (fired) { return; }
       fired = true;
@@ -379,6 +394,7 @@
 
     var go = fig.querySelector(".v3d-go");
     if (go) { go.addEventListener("click", start); }
+    window.Scene3D.attachControls(fig, scene, null);
 
     var fired = false;
     function once() {
@@ -573,6 +589,24 @@
       if (b) { e.preventDefault(); start(b.getAttribute("data-mode")); return; }
       if (e.target.closest && e.target.closest(".v3d-go")) { start(mode || "cbct"); }
     });
+
+    /* Deux scenes derriere une seule bascule : la vitesse doit piloter les
+       deux, sinon elle ne s'appliquerait qu'a celle qui etait active au
+       moment du reglage. */
+    var both = { speed: 1, dirty: false, kick: function () {},
+                 canvas: null };
+    Object.defineProperty(both, "speed", {
+      set: function (v) {
+        Object.keys(scenes).forEach(function (k) { if (scenes[k]) { scenes[k].speed = v; } });
+      },
+      get: function () { return (scenes.cbct || scenes.ios || {}).speed || 1; }
+    });
+    both.kick = function () {
+      Object.keys(scenes).forEach(function (k) {
+        if (scenes[k]) { scenes[k].dirty = true; scenes[k].kick(); }
+      });
+    };
+    window.Scene3D.attachControls(fig, both, null);
 
     var fired = false;
     function once() { if (!fired) { fired = true; start("cbct"); } }

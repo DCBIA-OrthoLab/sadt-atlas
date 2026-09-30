@@ -173,6 +173,7 @@
         start(current || (rs.length ? rs[0].getAttribute("data-lm") : null));
       });
     }
+    window.Scene3D.attachControls(fig, scene, null);
 
     /* On joue une fois a l'arrivee a l'ecran : personne ne clique un bouton
        pour comprendre de quoi on parle. */
@@ -338,6 +339,7 @@
 
     var go = el(fig, ".v3d-go");
     if (go) { go.addEventListener("click", start); }
+    window.Scene3D.attachControls(fig, scene, null);
 
     scene.onPick = function (code) {
       if (!code || code === "GUM" || run) { return; }
@@ -461,6 +463,21 @@
       if (b) { e.preventDefault(); start(b.getAttribute("data-mode")); return; }
       if (e.target.closest && e.target.closest(".v3d-go")) { start(mode || "cbct"); }
     });
+
+    /* Deux scenes, une seule commande de vitesse. */
+    var both = {};
+    Object.defineProperty(both, "speed", {
+      set: function (v) {
+        Object.keys(scenes).forEach(function (k) { if (scenes[k]) { scenes[k].speed = v; } });
+      },
+      get: function () { return (scenes.cbct || scenes.ios || {}).speed || 1; }
+    });
+    both.kick = function () {
+      Object.keys(scenes).forEach(function (k) {
+        if (scenes[k]) { scenes[k].dirty = true; scenes[k].kick(); }
+      });
+    };
+    window.Scene3D.attachControls(fig, both, null);
 
     whenVisible(fig, function () { start("cbct"); });
   }

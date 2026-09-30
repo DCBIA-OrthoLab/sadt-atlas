@@ -205,7 +205,29 @@
       }
     });
 
+    /* Sauter a une etape : on remet l'etat du monde tel qu'il doit etre a
+       l'entree de cette etape-la, sinon on verrait un masque deja sorti ou
+       un T2 deja recale selon d'ou on vient. */
     var fired = false;
+
+    function seek(i) {
+      if (!active) { active = regions[0]; }
+      if (!active || i == null || i < 0 || i >= STEPS.length) { return; }
+      /* Choisir une etape est une intention : l'autoplay en attente ne doit
+         pas venir la remplacer une seconde plus tard. */
+      fired = true;
+      run = { i: i, t: 0 };
+      current = i >= 5 ? new Float32Array(active.m) : ID();
+      masks.forEach(function (m) {
+        var mine = m.code === "M_" + active.code;
+        m.gen = (mine && i >= 3) ? 1 : (mine && i === 2 ? 0 : 1);
+        m.alpha = 0;
+      });
+      fig.classList.add("v3d-sim");
+      scene.dirty = true; scene.kick();
+    }
+    window.Scene3D.attachControls(fig, scene, full ? seek : null);
+
     function once() {
       if (fired) { return; }
       fired = true;

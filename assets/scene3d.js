@@ -271,6 +271,10 @@
     this.pickDepth = gl.createRenderbuffer();
     this.pickW = this.pickH = 0;
 
+    /* Multiplicateur de temps. Il s'applique APRES le bornage de dt, donc
+       a x10 une image avance de 640 ms d'animation. La camera suit le meme
+       facteur : sinon le recadrage et la scene se desynchronisent. */
+    this.speed = 1;
     this.onFrame = opts.onFrame || null;
     this.onOverlay = opts.onOverlay || null;
     this.onPick = opts.onPick || null;
@@ -586,6 +590,7 @@
       if (!(dt > 0)) { dt = 16.7; }
       if (dt > 64) { dt = 64; }
       self.lastT = now;
+      dt *= self.speed;
       var busy = false;
 
       if (self.goal) {
@@ -613,6 +618,63 @@
     var c = 0.42, x = c * (1 - Math.abs((h / 60) % 2 - 1));
     var r = [[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][Math.floor(h / 60) % 6];
     return [(r[0] + 0.52) * 255, (r[1] + 0.52) * 255, (r[2] + 0.52) * 255];
+  };
+
+  /* Commandes communes a toutes les scenes : la vitesse, et le saut a une
+     etape. Le socle cable l'interface ; c'est la scene qui sait ce que
+     « aller a l'etape i » veut dire, et le dit par `onSeek`. */
+  var SPEEDS = [0.25, 0.5, 1, 2, 5, 10];
+
+  Scene3D.attachControls = function (fig, scene, onSeek) {
+    var host = fig.querySelector(".v3d-run") || fig;
+    var box = document.createElement("div");
+    box.className = "v3d-speed";
+    var lbl = document.createElement("span");
+    lbl.className = "v3d-speed-label";
+    lbl.setAttribute("aria-hidden", "true");
+    lbl.textContent = "\u00d7";          /* un signe, pas un mot : rien a traduire */
+    box.appendChild(lbl);
+    SPEEDS.forEach(function (v) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("data-speed", v);
+      b.setAttribute("aria-pressed", v === 1 ? "true" : "false");
+      b.textContent = v === 1 ? "1" : String(v);
+      box.appendChild(b);
+    });
+    host.appendChild(box);
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("[data-speed]");
+      if (!b) { return; }
+      scene.speed = parseFloat(b.getAttribute("data-speed"));
+      var all = box.querySelectorAll("[data-speed]");
+      for (var i = 0; i < all.length; i++) {
+        all[i].setAttribute("aria-pressed", all[i] === b ? "true" : "false");
+      }
+      scene.dirty = true; scene.kick();
+    });
+
+    if (!onSeek) { return; }
+    var lists = fig.querySelectorAll(".v3d-steps, .v3d-stages");
+    for (var k = 0; k < lists.length; k++) {
+      lists[k].classList.add("v3d-seekable");
+      var items = lists[k].querySelectorAll("[data-step], [data-stage]");
+      for (var j = 0; j < items.length; j++) {
+        items[j].setAttribute("tabindex", "0");
+        items[j].setAttribute("role", "button");
+      }
+      lists[k].addEventListener("click", jump);
+      lists[k].addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { jump(e); }
+      });
+    }
+    function jump(e) {
+      var li = e.target.closest && e.target.closest("[data-step], [data-stage]");
+      if (!li) { return; }
+      e.preventDefault();
+      var i = li.getAttribute("data-step");
+      onSeek(parseInt(i === null ? li.getAttribute("data-stage") : i, 10));
+    }
   };
 
   global.Scene3D = Scene3D;
