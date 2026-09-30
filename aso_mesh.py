@@ -34,7 +34,13 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 MESHES = os.path.expanduser("~/Documents/sadt-atlas-meshes")
 ASO = os.path.expanduser("~/Documents/SlicerDownloads/ASO/ASO_CBCT/")
 TFM = ASO + "Test_Files/Fully-AutomatedOr/MG_test_Or_transform.tfm"
-GOLD = ASO + "Reference/Frankfurt Horizontal and Midsagittal Plane/MAMP_0002_T1.mrk.json"
+# LE BON GOLD. Il y en a deux, et « le meme code produit deux orientations
+# differentes ». Les reperes qu'ASO a ecrits pour ce scan s'appellent ANS,
+# IF, PNS, UL6O -- c'est donc le plan occlusal qui a servi, pas Francfort.
+# Comparer a l'autre faisait AUGMENTER l'ecart de 14 a 17 mm.
+GOLD = ASO + "Reference/Occlusal and Midsagittal Plane/UP01_Or.mrk.json"
+#: Les reperes du patient tels qu'ASO les a ecrits APRES orientation.
+ORIENTED = ASO + "Test_Files/Fully-AutomatedOr/MG_test_lm_Or.mrk.json"
 
 PARTS = {"RAW": 40000, "CB": 14000}
 
@@ -103,7 +109,13 @@ def main():
             sys.exit("Fichier ASO introuvable :\n  %s\n"
                      "C'est ce que telecharge le bouton « Test Files » d'ASO." % p)
 
-    qform = np.array([[-1, 0, 0, 84.48], [0, -1, 0, 84.48],
+    # ATTENTION au repere. La QForm du NIfTI est en RAS ; l'appliquer telle
+    # quelle inverse x et y par rapport au LPS dans lequel vivent le gold et
+    # les sorties d'ALI. Verifie sur Ba : ALI donne [-4.7, 53.2, -0.4], la
+    # QForm donnait [+4.7, -53.1, -0.5], et le residu montait a 116 mm.
+    # Ce qu'il faut est la seule translation : le centre du volume vers
+    # l'origine, ce que fait PRE_ASO_CBCT.
+    qform = np.array([[1, 0, 0, -84.48], [0, 1, 0, -84.48],
                       [0, 0, 1, -60.06], [0, 0, 0, 1]], dtype=float)
 
     meshes = {}
@@ -130,6 +142,8 @@ def main():
     span = max(hi[k] - lo[k] for k in range(3)) or 1.0
     centre = np.array([(hi[k] + lo[k]) / 2.0 for k in range(3)])
 
+    stages_raw = read_stages(TFM)
+
     def to_scene_matrix(M):
         """Une transformation LPS -> la meme, dans le repere normalise.
 
@@ -144,7 +158,6 @@ def main():
         out[:3, 3] = tt
         return [round(float(x), 7) for x in out.T.reshape(16)]   # colonnes, pour WebGL
 
-    stages_raw = read_stages(TFM)
     stages = []
     for i, M in enumerate(stages_raw):
         ang = np.degrees(np.arccos(max(-1, min(1, (np.trace(M[:3, :3]) - 1) / 2))))
@@ -163,6 +176,22 @@ def main():
     tot_ang = np.degrees(np.arccos(max(-1, min(1, (np.trace(total[:3, :3]) - 1) / 2))))
     print("  ---- total : %.2f deg" % tot_ang)
 
+    # Les reperes du patient, tels qu'ASO les a ecrits APRES orientation.
+    # On remonte a leur position de DEPART par la transformation inverse :
+    # ils sont alors exacts aux deux bouts, et l'animation les emmene de
+    # l'un a l'autre sans rien approximer.
+    total = np.eye(4)
+    for M in stages_raw:
+        total = M @ total
+    inv = np.linalg.inv(total)
+    mine = {}
+    if os.path.exists(ORIENTED):
+        od = json.load(open(ORIENTED, encoding="utf-8"))["markups"][0]
+        for cp in od["controlPoints"]:
+            q = inv @ np.append(np.array(cp["position"], dtype=float), 1.0)
+            mine[cp["label"]] = [round(float((q[k] - centre[k]) / span), 5) for k in range(3)]
+        print("  patient : %d reperes d'ASO, ramenes au depart" % len(mine))
+
     gold = json.load(open(GOLD, encoding="utf-8"))["markups"][0]
     golds = [{"label": p["label"],
               "p": [round(float((p["position"][k] - centre[k]) / span), 5) for k in range(3)]}
@@ -173,6 +202,10 @@ def main():
         "stages": stages,
         "totalDeg": round(float(tot_ang), 2),
         "gold": golds,
+        "patient": mine,
+        # Les noms presents des deux cotes : ce sont eux qui doivent se
+        # rejoindre, et c'est la seule mesure honnete du resultat.
+        "shared": sorted(set(mine) & {g["label"] for g in golds}),
     })
     webmesh.write(os.path.join(ROOT, "assets", "aso-mesh.js"), "ASO_SCENE", payload,
                   "Genere par aso_mesh.py. Crane du scan de test publie, et la "

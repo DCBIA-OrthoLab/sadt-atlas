@@ -24,10 +24,14 @@
     "#version 300 es",
     "in vec3 aPos; in vec3 aNrm;",
     "uniform mat4 uMVP; uniform mat4 uModel; uniform vec3 uOffset;",
+    /* Transformation propre a la piece, appliquee AVANT le redressement.
+       C'est par la que passent les etapes d'une orientation ASO : la scene
+       fournit la matrice, le socle ne sait pas ce qu'elle represente. */
+    "uniform mat4 uXform;",
     "out vec3 vNrm; out vec3 vPos;",
     "void main(){",
-    "  vec3 p = aPos - 0.5 + uOffset;",
-    "  vNrm = mat3(uModel) * aNrm;",
+    "  vec3 p = (uXform * vec4(aPos - 0.5, 1.0)).xyz + uOffset;",
+    "  vNrm = mat3(uModel) * mat3(uXform) * aNrm;",
     "  vPos = p;",
     "  gl_Position = uMVP * vec4(p, 1.0);",
     "}"
@@ -162,6 +166,8 @@
      autre. `Scene3D.up()` est la pour ca — ne le refais pas a la main. */
   var MODEL = new Float32Array([1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1]);
 
+  var IDENTITY = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+
   function Scene3D(stage, data, opts) {
     opts = opts || {};
     var canvas = document.createElement("canvas");
@@ -183,14 +189,15 @@
     var nrm = program(gl, VERT, NORMAL_FRAG);
     this.prog = prog; this.markProg = mark; this.normProg = nrm;
     this.nu = {};
-    ["uMVP", "uModel", "uOffset", "uDim"].forEach(function (n) {
+    ["uMVP", "uModel", "uOffset", "uDim", "uXform"].forEach(function (n) {
       this.nu[n] = gl.getUniformLocation(nrm, n);
     }, this);
     var u = {};
-    ["uMVP", "uModel", "uColor", "uAlpha", "uDim", "uOffset", "uSweep", "uSky", "uGround"]
+    ["uMVP", "uModel", "uColor", "uAlpha", "uDim", "uOffset", "uSweep", "uSky",
+     "uGround", "uXform"]
       .forEach(function (n) { u[n] = gl.getUniformLocation(prog, n); });
     var pu = {};
-    ["uMVP", "uModel", "uOffset", "uId"]
+    ["uMVP", "uModel", "uOffset", "uId", "uXform"]
       .forEach(function (n) { pu[n] = gl.getUniformLocation(pick, n); });
     var mu = {};
     ["uMVP", "uModel", "uAspect", "uFade"]
@@ -222,7 +229,7 @@
         code: code, vao: vao, count: p.tris * 3, id: i + 1,
         c: p.c || [0, 0, 0], e: p.e || [0.5, 0.5, 0.5], r: p.r || 0.5,
         color: [.7, .7, .7], alpha: 1, dim: 1, off: [0, 0, 0],
-        gen: 1, visible: true, pickable: true
+        xform: IDENTITY, gen: 1, visible: true, pickable: true
       };
       self.parts.push(part);
       self.byCode[code] = part;
@@ -450,6 +457,7 @@
       if (!p.visible || !p.pickable || p.gen <= 0) { return; }
       gl.uniform1f(this.pu.uId, p.id);
       gl.uniform3fv(this.pu.uOffset, p.off);
+      gl.uniformMatrix4fv(this.pu.uXform, false, p.xform || IDENTITY);
       gl.bindVertexArray(p.vao);
       gl.drawElements(gl.TRIANGLES, p.count, gl.UNSIGNED_SHORT, 0);
     }, this);
@@ -496,6 +504,7 @@
       gl.uniform1f(u.uAlpha, p.alpha);
       gl.uniform1f(u.uDim, p.dim);
       gl.uniform3fv(u.uOffset, p.off);
+      gl.uniformMatrix4fv(u.uXform, false, p.xform || IDENTITY);
       gl.uniform1f(u.uSweep, p.gen >= 1 ? 9.0 : -0.62 + 1.30 * p.gen);
       gl.bindVertexArray(p.vao);
       gl.drawElements(gl.TRIANGLES, p.count, gl.UNSIGNED_SHORT, 0);
@@ -553,6 +562,7 @@
     this.parts.forEach(function (p) {
       if (!p.visible) { return; }
       gl.uniform3fv(this.nu.uOffset, p.off);
+      gl.uniformMatrix4fv(this.nu.uXform, false, p.xform || IDENTITY);
       /* Le reseau ne voit pas que la dent visee : il voit tout ce que la
          camera attrape. On assombrit le reste au lieu de le cacher. */
       gl.uniform1f(this.nu.uDim, (!only || p.code === only) ? 1.0 : 0.30);
