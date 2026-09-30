@@ -53,6 +53,59 @@ def clean(poly, keep_ratio=0.02):
     return out, n - len(keep)
 
 
+def iso_surface(reader, threshold, sigma=1.5):
+    """Isosurface d'un volume en niveaux de gris, debruitee AVANT extraction.
+
+    Un CBCT seuille brut est constelle de mouchetures : a 500 HU sans
+    lissage, MG_test_scan donne 6,9 M de triangles repartis en 9 938 ilots.
+    Presque tout est du bruit, et la decimation qui suit depense son budget
+    a le reproduire fidelement au lieu de garder l'os. Un flou gaussien d'un
+    voxel et demi avant le marching cubes ramene a 3,9 M en 273 ilots : le
+    budget va alors a l'anatomie, et la surface cesse d'avoir l'air dechiree.
+
+    Ce n'est pas un maquillage : les trous restants sont reels -- os fin sous
+    le seuil, et bords du champ de vue.
+    """
+    src = reader.GetOutputPort()
+    if sigma:
+        g = vtk.vtkImageGaussianSmooth()
+        g.SetInputConnection(reader.GetOutputPort())
+        g.SetStandardDeviations(sigma, sigma, sigma)
+        g.SetRadiusFactors(2, 2, 2)
+        g.Update()
+        src = g.GetOutputPort()
+    mc = vtk.vtkMarchingCubes()
+    mc.SetInputConnection(src)
+    mc.SetValue(0, threshold)
+    mc.ComputeNormalsOff()
+    mc.ComputeGradientsOff()
+    mc.Update()
+    out = vtk.vtkPolyData()
+    out.DeepCopy(mc.GetOutput())
+    return out
+
+
+def fill_small_holes(poly, size):
+    """Bouche les petits trous, laisse les grands.
+
+    Les trous de quelques voxels viennent du bruit ; les grands sont le champ
+    de vue ou une vraie lacune anatomique. Les boucher tous inventerait de la
+    matiere -- sur un site qui dit ce que fait le code, ce serait mentir.
+    """
+    f = vtk.vtkFillHolesFilter()
+    f.SetInputData(poly)
+    f.SetHoleSize(size)
+    f.Update()
+    nr = vtk.vtkPolyDataNormals()
+    nr.SetInputConnection(f.GetOutputPort())
+    nr.SplittingOff()
+    nr.ConsistencyOn()
+    nr.Update()
+    out = vtk.vtkPolyData()
+    out.DeepCopy(nr.GetOutput())
+    return out
+
+
 def smooth_decimate(poly, target_tris, iterations=24, pass_band=.05):
     """Lisse puis décime vers un budget de triangles.
 

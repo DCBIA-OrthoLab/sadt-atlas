@@ -20,6 +20,10 @@ normales en int8, indices en uint16.
 """
 import base64, json, os, sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import webmesh
+
 try:
     import vtk
 except ImportError:
@@ -38,8 +42,9 @@ SRC = os.path.join(BASE, "MG_test_scan_Pred_MERGED.nii.gz")
 #: est là : AMASSS ne fait pas apparaître de la matière, il la NOMME et la
 #: sépare.
 RAW = os.path.join(BASE, "MG_test_scan.nii.gz")
-RAW_THRESHOLD = 500.0      # unités du scan ; l'os émerge vers 400-700
-RAW_TARGET = 30000
+RAW_THRESHOLD = 600.0      # unités du scan ; l'os émerge vers 400-700
+RAW_SIGMA = 1.5            # voxels ; débruite AVANT le marching cubes
+RAW_TARGET = 46000         # le budget sert enfin à l'os, plus au bruit
 
 # label -> (code, nombre de triangles visé)
 # SKIN (6) est écarté : c'est la surface du visage, biométrique, et sans
@@ -121,13 +126,10 @@ def extract_raw(reader, target_tris):
     """Isosurface continue du scan brut : le « avant ». Marching cubes
     classique et non discret — on seuille des niveaux de gris, pas des
     étiquettes."""
-    mc = vtk.vtkMarchingCubes()
-    mc.SetInputConnection(reader.GetOutputPort())
-    mc.SetValue(0, RAW_THRESHOLD)
-    mc.ComputeNormalsOff()
-    mc.ComputeGradientsOff()
-    mc.Update()
-    raw = mc.GetOutput().GetNumberOfPolys()
+    iso = webmesh.iso_surface(reader, RAW_THRESHOLD, RAW_SIGMA)
+    mc = vtk.vtkTrivialProducer()
+    mc.SetOutput(iso)
+    raw = iso.GetNumberOfPolys()
 
     # Un CBCT seuillé est constellé de mouchetures d'air et de bruit. Le seuil
     # est plus sévère qu'ailleurs : on ne garde que les gros blocs.

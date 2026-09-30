@@ -30,7 +30,9 @@ ARCH = os.path.expanduser(
 
 # Le crane sert de contexte : on le veut leger et translucide, l'agent marche
 # DEDANS. Pas la peine d'y remettre les cinq structures d'AMASSS.
-CBCT_PARTS = {"RAW": 22000, "CB": 9000}
+# Proche du budget deja applique en amont : redecimer un maillage deja
+# reduit cumule deux pertes et donne cet aspect dechire.
+CBCT_PARTS = {"RAW": 42000, "CB": 15000}
 
 
 def read_vtk(path):
@@ -61,7 +63,12 @@ def build_cbct():
         if not os.path.exists(f):
             sys.exit("Maillage absent : %s\nLance d'abord amasss_mesh.py --vtk %s"
                      % (f, MESHES))
-        meshes[code] = webmesh.smooth_decimate(read_vtk(f), budget, iterations=14)
+        poly = read_vtk(f)
+        # Deja lisse et decime par amasss_mesh.py : on ne relisse pas, on
+        # ajuste seulement si le budget demande est plus bas.
+        if poly.GetNumberOfPolys() > budget * 1.08:
+            poly = webmesh.smooth_decimate(poly, budget, iterations=6)
+        meshes[code] = poly
 
     centre, span = bounds_of(meshes)
 
