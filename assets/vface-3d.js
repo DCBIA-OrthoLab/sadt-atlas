@@ -4,11 +4,11 @@
 
    1. Le miroir de VFACE est `diag(-1, 1, 1)` : une reflexion par rapport au
       plan x = 0, celui du MONDE. Rien dans cette matrice ne connait le
-      patient. Tout ce que VFACE empile en amont -- reperes d'ALI, orientation
-      SEMI_ASO sur le maxillaire puis sur la base du crane -- ne sert qu'a
-      amener le plan sagittal median du patient SUR ce plan-la. L'animation le
-      montre en aplatissant le miroir sur x = 0 a mi-course : le plan se
-      dessine tout seul, on n'a pas a le decrire.
+      patient. Tout ce que VFACE empile en amont -- les deux passes de reperes
+      d'ALI, les deux orientations SEMI_ASO -- ne sert qu'a amener le plan
+      sagittal median du patient SUR ce plan-la. L'animation le montre en
+      aplatissant le miroir sur x = 0 a mi-course : le plan se dessine tout
+      seul, on n'a pas a le decrire.
 
    2. Le miroir n'est pas lu tel quel. `review_steps.py` liste trois
       recalages -- base du crane, maxillaire, mandibule -- et c'est le fond du
@@ -20,23 +20,39 @@
    Le residu de chaque recalage est affiche, parce qu'il n'est pas le meme :
    la base du crane et la mandibule se recalent serre, le maxillaire non. Une
    carte lue sur un recalage lache ne vaut pas celle d'un recalage serre, et
-   c'est au lecteur de le voir. */
+   c'est au lecteur de le voir.
+
+   DEUX CHOSES QU'ON NE MONTRE PAS, ET POURQUOI.
+   - Le set de reperes maxillaire (`ANS IF PNS UL6O UR1O UR6O`,
+     createlistprocess.py:288) n'est pas dans le jeu publie. L'etape est
+     nommee, et rien n'est dessine : six points inventes seraient six
+     mensonges.
+   - Les deux rotations d'orientation. Le scan publie est DEJA oriente ; la
+     pose d'avant n'existe nulle part. On montre donc la condition atteinte
+     -- le plan x = 0 -- et pas un chemin reconstitue. */
 (function () {
   "use strict";
 
   var BONE = [212, 205, 193];      /* le crane, neutre : la couleur est la carte */
-  var MIRROR = [150, 178, 205];    /* le miroir, franchement autre chose         */
+  var MIR = [150, 178, 205];       /* le miroir, franchement autre chose         */
   var REGION = [120, 220, 175];    /* la region de superposition                 */
+  var LM = [255, 176, 84];         /* les reperes d'ALI                          */
+  var PLANE = [186, 170, 220];     /* le plan sagittal median                    */
 
   /* Les etapes d'un run « Asymmetry Assesment » en pipeline complet, dans
-     l'ordre de VFACE_utils/review_steps.ORDER. */
+     l'ordre exact de VFACE_utils/review_steps.ORDER. `mirror_masks` manque :
+     il n'existe qu'en mode CMFReg. */
   var STEPS = [
-    { k: "orient",   ms: 1600 },   /* AMONT : ALI + SEMI_ASO -> le plan sur x=0 */
-    { k: "masks",    ms: 1700 },   /* t1_masks : AMASSS segmente l'os           */
-    { k: "mirror",   ms: 2200 },   /* mirror_scans : la reflexion               */
-    { k: "register", ms: 2400 },   /* registration_cb / _max / _mand            */
-    { k: "map",      ms: 1600 }    /* bone_surfaces : la carte d'asymetrie      */
+    { k: "lmMax",    ms: 1100 },   /* t1_landmarks_orientation_max */
+    { k: "orMax",    ms: 1100 },   /* t1_oriented_max              */
+    { k: "lmCB",     ms: 1900 },   /* t1_landmarks_orientation_cb  */
+    { k: "orCB",     ms: 1500 },   /* t1_oriented_cb               */
+    { k: "masks",    ms: 1700 },   /* t1_masks                     */
+    { k: "mirror",   ms: 2200 },   /* mirror_scans                 */
+    { k: "register", ms: 2400 },   /* registration_cb/_max/_mand   */
+    { k: "map",      ms: 1600 }    /* bone_surfaces                */
   ];
+  var S_MIRROR = 5, S_REGISTER = 6, S_MAP = 7;
 
   function ID() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
 
@@ -91,9 +107,16 @@
       return el ? el.textContent.trim() : k;
     }
 
-    var face = scene.byCode.FACE, mir = scene.byCode.MIRROR;
+    var face = scene.byCode.FACE, mir = scene.byCode.MIRROR, plane = scene.byCode.PLANE;
     var regions = data.regions || [];
     var clip = data.clip || 8;
+
+    /* Les reperes du set « base du crane » dans l'ordre de la liste de VFACE,
+       separes en ceux qu'ALI a trouves et ceux qui manquent. On affiche les
+       deux : un set incomplet est une information, pas un defaut a cacher. */
+    var setCB = data.setCB || [];
+    var lmCB = setCB.filter(function (k) { return (data.landmarks || {})[k]; });
+    var lostCB = setCB.filter(function (k) { return !(data.landmarks || {})[k]; });
 
     scene.parts.forEach(function (p) { p.pickable = false; });
     if (face) {
@@ -101,8 +124,12 @@
       face.alpha = 1; face.ramp = false;
     }
     if (mir) {
-      mir.color = [MIRROR[0] / 255, MIRROR[1] / 255, MIRROR[2] / 255];
+      mir.color = [MIR[0] / 255, MIR[1] / 255, MIR[2] / 255];
       mir.alpha = 0;
+    }
+    if (plane) {
+      plane.color = [PLANE[0] / 255, PLANE[1] / 255, PLANE[2] / 255];
+      plane.alpha = 0;
     }
     var regParts = scene.parts.filter(function (p) { return p.code.indexOf("R_") === 0; });
     regParts.forEach(function (p) {
@@ -125,6 +152,14 @@
       for (var j = 0; j < n.length; j++) {
         n[j].setAttribute("aria-current", j === i ? "true" : "false");
       }
+    }
+
+    function showPlane(a) { if (plane) { plane.alpha = 0.22 * a; } }
+
+    function marksAll() {
+      scene.setMarks(lmCB.map(function (k) {
+        return { p: data.landmarks[k], c: [LM[0] / 255, LM[1] / 255, LM[2] / 255], s: 0.018 };
+      }));
     }
 
     /* Peindre la carte de CETTE region. Un seul maillage, un tableau de
@@ -150,9 +185,7 @@
         bs[i].setAttribute("aria-pressed",
           bs[i].getAttribute("data-vregion") === active.code ? "true" : "false");
       }
-      /* Cote Atlas on joue tout ; cote Guide on va droit a la carte, c'est ce
-         que le lecteur du Guide vient voir. */
-      seek(full ? 0 : 3);
+      seek(0);
     }
 
     function frame(dt) {
@@ -161,23 +194,40 @@
       if (!st) { run = null; fig.classList.remove("v3d-sim"); chip(-1); return false; }
       run.t += dt;
       var f = Math.min(1, run.t / st.ms);
-      chip(full ? run.i : -1);
+      chip(run.i);
       var mine = "R_" + active.code;
 
-      if (st.k === "orient") {
-        /* Pas d'animation d'orientation ici : les reperes et les matrices de
-           SEMI_ASO sont le sujet des fiches ALI et ASO. Ce qu'il faut retenir
-           tient en une phrase, et la suite la demontre. */
-        say(word("orient"));
-        if (mir) { mir.alpha = 0; }
-        regParts.forEach(function (p) { p.alpha = 0; p.gen = 0; });
-        paintMap(false);
+      if (st.k === "lmMax") {
+        /* Le set maxillaire est nomme et rien n'est dessine : il n'est pas
+           dans le jeu publie, et six points inventes seraient six mensonges. */
+        say(word("lmMax") + " — " + (data.setMAX || []).join(", "));
+        scene.setMarks([]);
+        showPlane(0);
+      } else if (st.k === "orMax") {
+        /* Aucune rotation a animer : le scan publie est deja oriente. */
+        say(word("orMax"));
+      } else if (st.k === "lmCB") {
+        /* Les points que ALI_CBCT a REELLEMENT ecrits pour ce scan. */
+        var n = Math.max(1, Math.round(lmCB.length * f));
+        scene.setMarks(lmCB.slice(0, n).map(function (k) {
+          return { p: data.landmarks[k], c: [LM[0] / 255, LM[1] / 255, LM[2] / 255], s: 0.018 };
+        }));
+        say(word("lmCB") + " " + n + "/" + setCB.length
+            + (lostCB.length ? " — " + lostCB.join(", ") + " " + word("notfound") : ""));
+      } else if (st.k === "orCB") {
+        /* Le plan x = 0 arrive. La rotation qui l'y amene n'existe nulle part
+           dans ce jeu : on montre la condition atteinte, pas un chemin
+           reconstitue. */
+        say(word("orCB"));
+        marksAll();
+        showPlane(f);
       } else if (st.k === "masks") {
         /* Les trois masques d'AMASSS sortent en balayage, comme dans la scene
            AMASSS : l'inference parcourt le volume. */
         regParts.forEach(function (p) { p.gen = f; p.alpha = 0.55; });
         say(word("masks"));
-        if (face) { face.alpha = 1 - 0.55 * f; }
+        scene.setMarks([]);
+        if (face) { face.alpha = 1 - 0.45 * f; }
       } else if (st.k === "mirror") {
         /* La reflexion. A mi-course tout est plaque sur x = 0 et le plan
            apparait de lui-meme. */
@@ -201,10 +251,11 @@
         regParts.forEach(function (p) { p.alpha = p.code === mine ? 0.5 : 0; });
         paintMap(false);
       } else {
-        /* La carte. Le miroir et les masques s'effacent : sinon le bleu
-           couvre la couleur qu'on est venu lire. */
+        /* La carte. Le miroir, les masques et le plan s'effacent : sinon ils
+           couvrent la couleur qu'on est venu lire. */
         if (mir) { mir.xform = new Float32Array(active.m); mir.alpha = 0.5 * (1 - f); }
         regParts.forEach(function (p) { p.alpha = 0; });
+        showPlane(1 - f);
         if (face) { face.alpha = 0.55 + 0.45 * f; }
         paintMap(true);
         say(word("map") + " — " + word("median") + " " + active.median.toFixed(2)
@@ -216,8 +267,8 @@
     }
 
     /* Sauter a une etape : remettre le monde tel qu'il doit etre A L'ENTREE
-       de celle-la, sinon on verrait un miroir deja recale ou une carte deja
-       peinte selon l'etape d'ou l'on vient. */
+       de celle-la, sinon on verrait un miroir deja recale, des reperes deja
+       poses ou une carte deja peinte selon l'etape d'ou l'on vient. */
     var fired = false;
 
     function seek(i) {
@@ -227,17 +278,20 @@
          pas venir la remplacer une seconde plus tard. */
       fired = true;
       run = { i: i, t: 0 };
+      if (i >= 3 && i <= 4) { marksAll(); } else { scene.setMarks([]); }
+      showPlane(i >= 3 && i < S_MAP ? 1 : 0);
       if (mir) {
-        mir.alpha = i >= 2 ? 0.5 : 0;
+        mir.alpha = i >= S_MIRROR ? 0.5 : 0;
         /* flip(0) = la matrice miroir elle-meme, qui ramene la piece sur
-           l'original ; flip(1) = l'identite, donc la position reflechie. */
-        mir.xform = i >= 4 ? new Float32Array(active.m) : (i === 3 ? ID() : flip(0));
+           l'original ; ID() = la position reflechie, pas encore recalee. */
+        mir.xform = i >= S_MAP ? new Float32Array(active.m)
+                               : (i === S_REGISTER ? ID() : flip(0));
       }
       regParts.forEach(function (p) {
-        p.gen = i >= 2 ? 1 : 0;
-        p.alpha = i === 1 ? 0 : (i >= 2 && p.code === "R_" + active.code ? 0.5 : 0);
+        p.gen = i >= S_MIRROR ? 1 : 0;
+        p.alpha = (i >= S_MIRROR && p.code === "R_" + active.code) ? 0.5 : 0;
       });
-      if (face) { face.alpha = i === 0 ? 1 : 0.55; }
+      if (face) { face.alpha = i <= 3 ? 1 : 0.55; }
       paintMap(false);
       fig.classList.add("v3d-sim");
       scene.dirty = true; scene.kick();
@@ -251,7 +305,7 @@
       }
     });
 
-    window.Scene3D.attachControls(fig, scene, full ? seek : null);
+    window.Scene3D.attachControls(fig, scene, seek);
 
     function once() {
       if (fired) { return; }
