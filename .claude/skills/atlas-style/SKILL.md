@@ -103,6 +103,47 @@ Avant d'en inventer un, vérifie qu'il n'existe pas : `.callout` (+ `.warn`,
   cet empilement de `z-index` : mbar 70, thème 75, tiroir 65, voile 60,
   recherche 60, page-bar 40, filtres 20.
 
+## Le visualiseur 3D (AMASSS)
+
+`assets/amasss-3d.js` — WebGL2 écrit à la main, sans dépendance. Présent sur
+`en/AMASSS/AMASSS.html` et `en/guide/AMASSS.html`.
+
+**La liste est le contenu, le canvas est un supplément.** Les structures sont
+un `<ol class="v3d-parts">` en HTML : traduit par `i18n.py`, indexé par la
+recherche, imprimable. Sans WebGL2 le canvas ne s'affiche jamais (`.v3d-stage`
+est en `display:none` jusqu'à ce que le script ajoute `.v3d-on`) et la page
+reste entière. N'inverse jamais ce rapport en déplaçant du texte dans le JS.
+
+**Pourquoi pas three.js** : son `GLTFLoader` passe par `fetch()`, bloqué en
+`file://`. Il faudrait lui passer les buffers à la main de toute façon, et il
+resterait 600 Ko de bibliothèque pour une orbite et un picking.
+
+**La géométrie** vient de `assets/amasss-mesh.js`, régénéré à la main :
+
+```bash
+/opt/SlicerProd/Slicer-*/bin/PythonSlicer amasss_mesh.py
+```
+
+Elle est chargée par `<script>` et non par `fetch()`, pour la même raison —
+même parti pris que `search-index-*.js`. Source : la prédiction AMASSS sur le
+scan de test **publié** (`MG_test_scan`, release AMASSS_CBCT v1.0.1). **Aucune
+donnée patient** : la géométrie part dans un dépôt distant, et une surface
+crânienne est potentiellement ré-identifiante. `SKIN` est écarté — c'est le
+visage. Ne remplace jamais cette source par une sortie de cohorte clinique.
+
+Pièges de ce coin-là :
+
+- `MODEL` dans le JS et `centroidOf()` appliquent le **même** redressement
+  (x,y,z) → (x, z, −y). S'ils divergent, la caméra vise une pièce et le crâne
+  en montre une autre.
+- Les couleurs sont `LABEL_COLORS` d'`AMASSS_CLI.py`, pas des couleurs
+  décoratives : c'est l'intérêt de les montrer. `UAW` y vaut `(0,0,0)` —
+  affiché en gris-bleu, et la légende le dit.
+- Le taux de décimation se calcule **après** le retrait des composantes
+  connexes, sinon le budget de triangles annoncé n'est pas celui obtenu.
+- On garde toutes les composantes au-dessus d'un seuil, jamais « la plus
+  grosse » : les vertèbres cervicales sont plusieurs pièces séparées.
+
 ## Après modification
 
 ```bash
