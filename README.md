@@ -94,6 +94,9 @@ THEME = None          # feuille de base seule
 THEME = "ardoise"     # technique, sombre, chasse fixe, angles vifs
 THEME = "papier"      # éditorial, sérif, filets plutôt que cadres
 THEME = "clinique"    # applicatif, bleuté, cartes ombrées, coins ronds
+THEME = "labo"        # négatoscope : fond noir froid, accents lumineux, halos
+THEME = "carnet"      # papier millimétré, encre, sérif, vermillon
+THEME = "signal"      # contemporain : grande typo, formes pleines, beaucoup d'air
 ```
 
 puis `python3 build.py`, qui pose ou retire le lien dans les 141 pages.

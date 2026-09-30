@@ -23,10 +23,13 @@ LANG_NAMES = {"en": "English", "fr": "Français", "pt": "Português", "ko": "한
 #      THEME = "ardoise"     technique, sombre, chasse fixe, angles vifs
 #      THEME = "papier"      éditorial, sérif, filets plutôt que cadres
 #      THEME = "clinique"    applicatif, bleuté, cartes ombrées, coins ronds
+#      THEME = "labo"        négatoscope : fond noir froid, accents lumineux
+#      THEME = "carnet"      papier millimétré, encre, sérif, vermillon
+#      THEME = "signal"      contemporain : grande typo, formes pleines, aéré
 # ─────────────────────────────────────────────────────────────
 THEME = None
 
-THEMES = ("ardoise", "papier", "clinique")
+THEMES = ("ardoise", "papier", "clinique", "labo", "carnet", "signal")
 
 
 

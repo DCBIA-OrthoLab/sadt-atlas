@@ -18,9 +18,23 @@ Site statique, sans build CSS, sans dépendance. Une seule feuille :
 2. **Cinq langues** : en, fr, pt, ko, th. Le coréen et le thaï cassent les
    règles de césure latines (voir `:lang(ko)` en fin de feuille). Toute règle
    de `word-break` / `overflow-wrap` doit être vérifiée sur `ko/` et `th/`.
-3. **Trois thèmes** (`papier`, `clinique`, `ardoise`) chargés APRÈS la base. Un
-   thème doit pouvoir tout changer en ne touchant que des tokens : ne code
-   jamais une couleur en dur dans une règle de composant, passe par une variable.
+3. **Six thèmes** chargés APRÈS la base. Un thème doit pouvoir tout changer en
+   ne touchant que des tokens : ne code jamais une couleur en dur dans une
+   règle de composant, passe par une variable.
+
+   | Thème | Registre |
+   |---|---|
+   | `papier` | éditorial, sérif chaud, filets plutôt que cadres |
+   | `clinique` | applicatif, bleuté, cartes ombrées, coins ronds |
+   | `ardoise` | technique, sombre, chasse fixe, angles vifs, **plat** (ombres neutralisées) |
+   | `labo` | négatoscope : noir froid, accents lumineux, halos colorés par catégorie |
+   | `carnet` | papier millimétré tracé en CSS, encre, sérif Charter, vermillon |
+   | `signal` | contemporain : grande échelle typo, formes pleines, pilules, beaucoup d'air |
+
+   Un thème s'active par `THEME` dans `nav.py` puis `python3 build.py`, ou le
+   temps d'un essai par `python3 build.py --theme <nom>` (`--theme none` revient
+   au défaut). Ajouter un thème = créer le `.css`, l'ajouter à `THEMES` dans
+   `nav.py`, et le documenter dans le README.
 4. **Le HTML est généré.** La sidebar, la barre de page et le sélecteur de
    langue viennent de `nav.py` — ne les édite jamais dans un `.html`, ils seront
    écrasés au prochain `python3 build.py`.
@@ -32,6 +46,12 @@ fois** : `@media (prefers-color-scheme: dark)` sous
 `:root:not([data-theme="light"])`, puis `:root[data-theme="dark"]`. Un token
 ajouté doit l'être dans les trois blocs, sinon il disparaît dans un des modes.
 
+Les blocs sombres de la base ont une spécificité de `0,1,1` — un thème qui ne
+redéfinit ses couleurs que sur `:root` (`0,0,1`) se fera battre en mode sombre.
+C'est pourquoi chaque thème **répète la même structure de blocs**, et pourquoi
+un thème sombre par défaut (`ardoise`, `labo`) ajoute en plus un bloc
+`:root[data-theme="light"]` pour sa variante claire.
+
 | Famille | Tokens |
 |---|---|
 | Surfaces | `--bg`, `--bg-elev`, `--bg-sunken` |
@@ -41,6 +61,10 @@ ajouté doit l'être dans les trois blocs, sinon il disparaît dans un des modes
 | Sémantique | `--warn-*`, `--bug-*`, `--ok-*`, `--info-*` (chacun `-bg`, `-br`, `-tx`) |
 | Mesure | `--measure` (76ch, 68ch dans le Guide), `--sidebar-w`, `--toc-w`, `--mbar-h` |
 | Profondeur | `--shadow-sm`, `--shadow-md` |
+
+Les ombres sont des tokens comme les autres : un thème sombre doit les
+redéfinir (une ombre noire ne se voit pas sur du noir — `labo` y met un halo
+coloré), et un thème plat peut les mettre à `none` (`ardoise`).
 
 `--accent` est **réassigné par catégorie** via `body[data-cat="…"]`. Un composant
 qui utilise `var(--accent)` prend donc automatiquement la couleur de sa famille
