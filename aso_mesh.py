@@ -279,13 +279,68 @@ def build_ios():
             print("  donnee IOS absente (%s) — scene ignoree" % os.path.basename(f))
             return
 
-    def load(path, budget):
+    def read(path):
         r = vtk.vtkPolyDataReader()
         r.SetFileName(path)
+        r.ReadAllScalarsOn()
         r.Update()
-        return webmesh.smooth_decimate(r.GetOutput(), budget, iterations=8)
+        return r.GetOutput()
 
-    meshes = {"ARCH": load(IOS_PATIENT, 26000), "GOLD": load(IOS_GOLD, 22000)}
+    def load(path, budget):
+        return webmesh.smooth_decimate(read(path), budget, iterations=8)
+
+    # L'arcade du patient est decoupee DENT PAR DENT : le mode automatique
+    # segmente avant d'orienter, et l'orientation ne travaille pas sur la
+    # surface mais sur une poignee de centroides de couronnes.
+    arch = read(IOS_PATIENT)
+    labels = arch.GetPointData().GetArray("PredictedID")
+    meshes = {"GOLD": load(IOS_GOLD, 20000)}
+    centroids, teeth = {}, []
+    if labels is not None:
+        present = sorted({int(labels.GetTuple1(k))
+                          for k in range(arch.GetNumberOfPoints())})
+        toothnums = [v for v in present if 17 <= v <= 32]
+        others = [v for v in present if v not in toothnums]
+        gum = max(others, key=lambda v: sum(
+            1 for k in range(arch.GetNumberOfPoints())
+            if int(labels.GetTuple1(k)) == v)) if others else None
+        for lab in ([gum] if gum is not None else []) + toothnums:
+            thr = vtk.vtkThreshold()
+            thr.SetInputData(arch)
+            thr.SetInputArrayToProcess(0, 0, 0,
+                                       vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
+                                       "PredictedID")
+            thr.SetLowerThreshold(lab - 0.5)
+            thr.SetUpperThreshold(lab + 0.5)
+            # « Au moins un point » et non « tous » : sinon chaque cellule a
+            # cheval sur une frontiere dent/gencive est ecartee des DEUX
+            # cotes, et l'arcade se retrouve criblee de trous le long de
+            # chaque dent. Les pieces se chevauchent legerement, ce qui ne se
+            # voit pas ; les trous, si.
+            thr.AllScalarsOff()
+            thr.Update()
+            g = vtk.vtkGeometryFilter()
+            g.SetInputConnection(thr.GetOutputPort())
+            g.Update()
+            poly = g.GetOutput()
+            if poly.GetNumberOfPolys() < 60:
+                continue
+            code = "GUM" if lab == gum else "T%d" % lab
+            meshes[code] = webmesh.smooth_decimate(poly, 15000 if lab == gum else 2200,
+                                                   iterations=8)
+            if lab != gum:
+                # vtkMeanTeeth : le centroide est la MOYENNE DES SOMMETS
+                # portant l'etiquette, pas le centre de la boite englobante.
+                acc = np.zeros(3)
+                cnt = 0
+                for k in range(arch.GetNumberOfPoints()):
+                    if int(labels.GetTuple1(k)) == lab:
+                        acc += np.array(arch.GetPoint(k))
+                        cnt += 1
+                centroids[code] = acc / max(cnt, 1)
+                teeth.append(code)
+    else:
+        meshes["ARCH"] = load(IOS_PATIENT, 26000)
 
     lo = [1e30] * 3
     hi = [-1e30] * 3
@@ -297,6 +352,7 @@ def build_ios():
     span = max(hi[k] - lo[k] for k in range(3)) or 1.0
     centre = np.array([(hi[k] + lo[k]) / 2.0 for k in range(3)])
 
+    print("  IOS : %d dents decoupees" % len(teeth))
     M = np.load(IOS_MATRIX)
     R, t = M[:3, :3], M[:3, 3]
     scene_m = np.eye(4)
@@ -323,6 +379,8 @@ def build_ios():
         "matrix": [round(float(x), 7) for x in scene_m.T.reshape(16)],
         "deg": round(ang, 2), "mm": round(float(np.linalg.norm(t)), 2),
         "before": round(before, 2), "after": round(after, 2),
+        "teeth": teeth,
+        "centroids": {k: to_scene(centroids[k]) for k in centroids},
         "patient": {k: to_scene(pat[k]) for k in shared},
         "gold": {k: to_scene(gld[k]) for k in shared},
         "shared": shared,

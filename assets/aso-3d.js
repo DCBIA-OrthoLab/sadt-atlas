@@ -60,6 +60,17 @@
   }
   var ID = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
   var TRAIL = [120, 190, 235];
+  var GREY = [206, 202, 196];
+  var SEG_MS = 1900, CENT_MS = 1100;
+
+  /* Une teinte par dent : avant la segmentation elles sont indistinctes,
+     apres elles portent un numero. C'est tout ce que `dentalmodelseg`
+     apporte, et c'est ce dont l'orientation a besoin. */
+  function hue(k, n) {
+    var h = (k / Math.max(1, n)) * 320, c = 0.42, x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    var r = [[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][Math.floor(h / 60) % 6];
+    return [(r[0] + 0.52) * 255, (r[1] + 0.52) * 255, (r[2] + 0.52) * 255];
+  }
   var WALK_MS = 2600;
 
   /* Le mode Fully-Automated n'est que « the semi mode preceded by generating
@@ -274,15 +285,20 @@
     var statusEl = fig.querySelector(".v3d-status");
     function say(t) { if (statusEl) { statusEl.textContent = t || ""; } }
 
-    var arch = scene.byCode.ARCH, gold = scene.byCode.GOLD;
+    var gold = scene.byCode.GOLD;
     if (gold) {
       gold.color = [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255];
       gold.alpha = 0.26; gold.pickable = false;
     }
-    if (arch) {
-      arch.color = [0.90, 0.88, 0.85];
-      arch.alpha = 1; arch.pickable = false;
-    }
+    /* Tout ce qui n'est pas le gold appartient au patient et bouge ensemble. */
+    var moving = scene.parts.filter(function (p) { return p.code !== "GOLD"; });
+    var teeth = data.teeth || [];
+    moving.forEach(function (p) {
+      p.color = [GREY[0] / 255, GREY[1] / 255, GREY[2] / 255];
+      p.alpha = 1; p.pickable = false;
+      var k = teeth.indexOf(p.code);
+      p.seg = k < 0 ? null : hue(k, teeth.length);
+    });
 
     var M = new Float32Array(data.matrix || ID);
     var span = data.span || 1;
@@ -305,11 +321,33 @@
       return sum / shared.length * span;
     }
 
-    function start() { run = { t: 0 }; current = ID; fig.classList.add("v3d-sim"); scene.dirty = true; scene.kick(); }
+    /* Le pipeline, dans l'ordre du code : segmenter, prendre les centroides
+       de couronnes, puis orienter sur ces centroides. */
+    function start() {
+      run = { act: teeth.length ? "seg" : "orient", t: 0, lit: 0 };
+      current = ID;
+      moving.forEach(function (p) { p.on = false; });
+      fig.classList.add("v3d-sim");
+      scene.dirty = true; scene.kick();
+    }
 
     function frame(dt) {
       if (!run) { return false; }
       run.t += dt;
+      if (run.act === "seg") {
+        var k = Math.min(teeth.length, Math.floor(run.t / (SEG_MS / teeth.length)) + 1);
+        run.lit = k;
+        say((strings.seg || "") + " " + k + "/" + teeth.length);
+        paint();
+        if (run.t >= SEG_MS + 350) { run.act = "cent"; run.t = 0; }
+        return true;
+      }
+      if (run.act === "cent") {
+        say(strings.centroids || "");
+        paint();
+        if (run.t >= CENT_MS + 350) { run.act = "orient"; run.t = 0; }
+        return true;
+      }
       var t = Math.min(1, run.t / MS);
       var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
       current = partial(M, e);
@@ -319,16 +357,30 @@
     }
 
     function paint() {
-      if (arch) { arch.xform = current; }
-      var marks = [];
-      shared.forEach(function (k) {
-        marks.push({ p: data.gold[k], c: [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255], s: 0.010 });
-        marks.push({ p: apply(current, data.patient[k]),
-                     c: [PATIENT[0] / 255, PATIENT[1] / 255, PATIENT[2] / 255], s: 0.008 });
+      var act = run ? run.act : "done";
+      moving.forEach(function (p) {
+        p.xform = current;
+        p.on = true;
+        var k = teeth.indexOf(p.code);
+        var lit = act === "seg" ? (k >= 0 && k < run.lit) : true;
+        var c = (lit && p.seg) ? p.seg : GREY;
+        p.color = [c[0] / 255, c[1] / 255, c[2] / 255];
       });
+      var marks = [];
+      if (act === "seg") { scene.setMarks([]); return; }
+      /* Les centroides : c'est la-dessus que l'orientation travaille. */
+      Object.keys(data.centroids || {}).forEach(function (k) {
+        marks.push({ p: apply(current, data.centroids[k]),
+                     c: [PATIENT[0] / 255, PATIENT[1] / 255, PATIENT[2] / 255], s: 0.014 });
+      });
+      if (act === "orient" || act === "done") {
+        shared.forEach(function (k) {
+          marks.push({ p: data.gold[k], c: [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255], s: 0.009 });
+        });
+        var r = residual(current);
+        if (r != null) { say((strings.gap || "") + " " + r.toFixed(2) + " mm"); }
+      }
       scene.setMarks(marks);
-      var r = residual(current);
-      say(r == null ? "" : (strings.gap || "") + " " + r.toFixed(2) + " mm");
     }
 
     var go = fig.querySelector(".v3d-go");
@@ -394,8 +446,16 @@
       return code === "CB" ? [BASE[0], BASE[1], BASE[2], 0.72] : [SKULL[0], SKULL[1], SKULL[2], 0.5];
     });
     scenes.ios = setup("ios", window.ASO_IOS_SCENE, function (code) {
-      return code === "GOLD" ? [GOLD[0], GOLD[1], GOLD[2], 0.26] : [230, 225, 218, 1];
+      return code === "GOLD" ? [GOLD[0], GOLD[1], GOLD[2], 0.26] : [GREY[0], GREY[1], GREY[2], 1];
     });
+    /* Une teinte par dent, prete pour l'acte de segmentation. */
+    if (scenes.ios) {
+      var tl = (window.ASO_IOS_SCENE || {}).teeth || [];
+      scenes.ios.parts.forEach(function (p) {
+        var k = tl.indexOf(p.code);
+        p.seg = k < 0 ? null : hue(k, tl.length);
+      });
+    }
     if (!scenes.cbct && !scenes.ios) { return; }
     fig.classList.add("v3d-on");
 
@@ -417,7 +477,9 @@
          oriente. Cote IOS ce sont les dents segmentees qui jouent ce role,
          et elles sont deja la. */
       var ags = name === "cbct" ? ((window.ASO_SCENE || {}).agents || {}) : {};
-      run = { t: 0, m: target(name), act: Object.keys(ags).length ? "ali" : "orient", ags: ags };
+      var tl = name === "ios" ? ((window.ASO_IOS_SCENE || {}).teeth || []) : [];
+      var first = Object.keys(ags).length ? "ali" : (tl.length ? "seg" : "orient");
+      run = { t: 0, m: target(name), act: first, ags: ags, teeth: tl, lit: 0 };
       current[name] = ID;
       fig.classList.add("v3d-sim");
       var sc = scenes[name];
@@ -438,6 +500,20 @@
         if (run.t >= WALK_MS + 500) { run.act = "orient"; run.t = 0; }
         return true;
       }
+      if (run.act === "seg") {
+        run.lit = Math.min(run.teeth.length,
+                           Math.floor(run.t / (SEG_MS / run.teeth.length)) + 1);
+        say((strings.seg || "") + " " + run.lit + "/" + run.teeth.length);
+        paint();
+        if (run.t >= SEG_MS + 350) { run.act = "cent"; run.t = 0; }
+        return true;
+      }
+      if (run.act === "cent") {
+        say(strings.centroids || "");
+        paint();
+        if (run.t >= CENT_MS + 350) { run.act = "orient"; run.t = 0; }
+        return true;
+      }
       var t = Math.min(1, run.t / MS);
       var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
       current[mode] = partial(run.m, e);
@@ -452,7 +528,24 @@
       var marks = [];
       if (mode === "ios") {
         var d = window.ASO_IOS_SCENE;
-        if (sc.byCode.ARCH) { sc.byCode.ARCH.xform = m; }
+        var act = run ? run.act : "done";
+        /* Tout ce qui n'est pas le gold appartient au patient et bouge
+           ensemble. L'ancienne piece unique « ARCH » n'existe plus depuis
+           que l'arcade est decoupee dent par dent. */
+        sc.parts.forEach(function (pp) {
+          if (pp.code === "GOLD") { return; }
+          pp.xform = m;
+          var kk = (d.teeth || []).indexOf(pp.code);
+          var lit = act === "seg" ? (kk >= 0 && kk < run.lit) : true;
+          var cc = (lit && pp.seg) ? pp.seg : GREY;
+          pp.color = [cc[0] / 255, cc[1] / 255, cc[2] / 255];
+        });
+        if (act === "seg") { sc.setMarks([]); return; }
+        Object.keys(d.centroids || {}).forEach(function (kk) {
+          marks.push({ p: apply(m, d.centroids[kk]),
+                       c: [PATIENT[0] / 255, PATIENT[1] / 255, PATIENT[2] / 255], s: 0.013 });
+        });
+        if (act === "cent") { sc.setMarks(marks); return; }
         var sum = 0;
         (d.shared || []).forEach(function (k) {
           var a = apply(m, d.patient[k]), g = d.gold[k];
