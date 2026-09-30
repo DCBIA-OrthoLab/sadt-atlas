@@ -213,5 +213,87 @@ def main():
                   "Aucune donnee patient.")
 
 
+# ---------------------------------------------------------------------------
+#  ASO_IOS — l'autre moteur
+# ---------------------------------------------------------------------------
+IOS = os.path.expanduser("~/Documents/SlicerDownloads/ASO/ASO_IOS/")
+IOS_PATIENT = IOS + "Test_Files/Semi-Automated/Lower_new_9.vtk"
+IOS_GOLD = IOS + "Reference/Gold_Files/Lower_gold.vtk"
+IOS_MATRIX = IOS + "Test_Files/Semi-AutomatedOr/matrix_new_9.npy"
+IOS_LM = IOS + "Test_Files/Semi-Automated/Lower_new_9_Lower_O_Pred.json"
+IOS_LM_GOLD = IOS + "Reference/Gold_Files/Lower_gold.json"
+
+
+def build_ios():
+    """L'arcade du patient rejoint celle de reference.
+
+    Contrairement au CBCT, l'ecart aux reperes VEUT dire quelque chose ici :
+    le gold est une arcade et les reperes portent les memes etiquettes dent
+    par dent (LL1O, LL1MB...). Mesure faite sur les 41 reperes communs :
+    16,14 mm avant, 2,95 mm apres. Et la matrice appliquee aux reperes de
+    depart reproduit EXACTEMENT ceux qu'ASO a ecrits -- ecart 0,000 mm.
+    """
+    for f in (IOS_PATIENT, IOS_GOLD, IOS_MATRIX, IOS_LM, IOS_LM_GOLD):
+        if not os.path.exists(f):
+            print("  donnee IOS absente (%s) — scene ignoree" % os.path.basename(f))
+            return
+
+    def load(path, budget):
+        r = vtk.vtkPolyDataReader()
+        r.SetFileName(path)
+        r.Update()
+        return webmesh.smooth_decimate(r.GetOutput(), budget, iterations=8)
+
+    meshes = {"ARCH": load(IOS_PATIENT, 26000), "GOLD": load(IOS_GOLD, 22000)}
+
+    lo = [1e30] * 3
+    hi = [-1e30] * 3
+    for poly in meshes.values():
+        b = poly.GetBounds()
+        for k in range(3):
+            lo[k] = min(lo[k], b[k * 2])
+            hi[k] = max(hi[k], b[k * 2 + 1])
+    span = max(hi[k] - lo[k] for k in range(3)) or 1.0
+    centre = np.array([(hi[k] + lo[k]) / 2.0 for k in range(3)])
+
+    M = np.load(IOS_MATRIX)
+    R, t = M[:3, :3], M[:3, 3]
+    scene_m = np.eye(4)
+    scene_m[:3, :3] = R
+    scene_m[:3, 3] = (R @ centre + t - centre) / span
+    ang = np.degrees(np.arccos(max(-1, min(1, (np.trace(R) - 1) / 2))))
+
+    def lms(path):
+        d = json.load(open(path, encoding="utf-8"))["markups"][0]
+        return {c["label"]: np.array(c["position"], dtype=float)
+                for c in d["controlPoints"]}
+
+    pat, gld = lms(IOS_LM), lms(IOS_LM_GOLD)
+    shared = sorted(set(pat) & set(gld))
+    to_scene = lambda v: [round(float((v[k] - centre[k]) / span), 5) for k in range(3)]
+    before = float(np.mean([np.linalg.norm(pat[k] - gld[k]) for k in shared]))
+    after = float(np.mean([np.linalg.norm((M @ np.append(pat[k], 1.0))[:3] - gld[k])
+                           for k in shared]))
+    print("  IOS : %d reperes apparies, %.2f mm -> %.2f mm, rotation %.2f deg, "
+          "translation %.2f mm" % (len(shared), before, after, ang,
+                                   float(np.linalg.norm(t))))
+
+    payload = webmesh.encode(meshes, focus_on=["GOLD"], extra={
+        "matrix": [round(float(x), 7) for x in scene_m.T.reshape(16)],
+        "deg": round(ang, 2), "mm": round(float(np.linalg.norm(t)), 2),
+        "before": round(before, 2), "after": round(after, 2),
+        "patient": {k: to_scene(pat[k]) for k in shared},
+        "gold": {k: to_scene(gld[k]) for k in shared},
+        "shared": shared,
+    })
+    webmesh.write(os.path.join(ROOT, "assets", "aso-ios-mesh.js"), "ASO_IOS_SCENE",
+                  payload,
+                  "Genere par aso_mesh.py. Arcade de test et arcade de reference "
+                  "publiees, et la matrice qu'ASO a reellement produite. "
+                  "Aucune donnee patient.")
+
+
 if __name__ == "__main__":
     main()
+    print("\n— scene IOS —")
+    build_ios()

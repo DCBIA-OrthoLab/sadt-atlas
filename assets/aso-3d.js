@@ -205,7 +205,113 @@
     scene.kick();
   }
 
+  /* ------------------------------------------------------------------ */
+  /* ASO_IOS : l'autre moteur, et le seul ou l'ecart veut dire quelque chose */
+  /* ------------------------------------------------------------------ */
+  function buildIOS(fig) {
+    var data = window.ASO_IOS_SCENE;
+    var stage = fig.querySelector(".v3d-stage");
+    if (!data || !stage) { return; }
+
+    var scene = new window.Scene3D(stage, data, {
+      onFrame: function (dt) { return frame(dt); }
+    });
+    if (!scene.ok) { return; }
+    fig.classList.add("v3d-on");
+
+    var strings = {}, pot = fig.querySelectorAll(".v3d-i18n [data-k]");
+    for (var i = 0; i < pot.length; i++) {
+      strings[pot[i].getAttribute("data-k")] = pot[i].textContent.trim();
+    }
+    var statusEl = fig.querySelector(".v3d-status");
+    function say(t) { if (statusEl) { statusEl.textContent = t || ""; } }
+
+    var arch = scene.byCode.ARCH, gold = scene.byCode.GOLD;
+    if (gold) {
+      gold.color = [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255];
+      gold.alpha = 0.26; gold.pickable = false;
+    }
+    if (arch) {
+      arch.color = [0.90, 0.88, 0.85];
+      arch.alpha = 1; arch.pickable = false;
+    }
+
+    var M = new Float32Array(data.matrix || ID);
+    var span = data.span || 1;
+    var shared = data.shared || [];
+    var run = null, current = ID;
+    var MS = 2400;
+
+    /* Ici la mesure est legitime : le gold est une arcade, et les reperes
+       portent les MEMES etiquettes dent par dent. Sur le CBCT le gold est un
+       autre patient et ce chiffre n'aurait aucun sens -- c'est pourquoi il
+       n'y est pas. */
+    function residual(m) {
+      if (!shared.length) { return null; }
+      var sum = 0;
+      shared.forEach(function (k) {
+        var a = apply(m, data.patient[k]), g = data.gold[k];
+        var d = [a[0] - g[0], a[1] - g[1], a[2] - g[2]];
+        sum += Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+      });
+      return sum / shared.length * span;
+    }
+
+    function start() { run = { t: 0 }; current = ID; fig.classList.add("v3d-sim"); scene.dirty = true; scene.kick(); }
+
+    function frame(dt) {
+      if (!run) { return false; }
+      run.t += dt;
+      var t = Math.min(1, run.t / MS);
+      var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      current = partial(M, e);
+      paint();
+      if (t >= 1 && run.t > MS + 900) { run = null; fig.classList.remove("v3d-sim"); return false; }
+      return true;
+    }
+
+    function paint() {
+      if (arch) { arch.xform = current; }
+      var marks = [];
+      shared.forEach(function (k) {
+        marks.push({ p: data.gold[k], c: [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255], s: 0.010 });
+        marks.push({ p: apply(current, data.patient[k]),
+                     c: [PATIENT[0] / 255, PATIENT[1] / 255, PATIENT[2] / 255], s: 0.008 });
+      });
+      scene.setMarks(marks);
+      var r = residual(current);
+      say(r == null ? "" : (strings.gap || "") + " " + r.toFixed(2) + " mm");
+    }
+
+    var go = fig.querySelector(".v3d-go");
+    if (go) { go.addEventListener("click", start); }
+
+    var fired = false;
+    function once() {
+      if (fired) { return; }
+      fired = true;
+      if (scene.reduced) { paint(); scene.dirty = true; scene.kick(); } else { start(); }
+    }
+    if (window.IntersectionObserver) {
+      new IntersectionObserver(function (es) {
+        if (es[0].isIntersecting) { once(); }
+      }, { rootMargin: "200px" }).observe(fig);
+    }
+    var bb = fig.getBoundingClientRect();
+    if (bb.top < (window.innerHeight || 0) + 200 && bb.bottom > -200) { once(); }
+    else if (!window.IntersectionObserver) { once(); }
+    paint();
+    scene.kick();
+  }
+
   function init() {
+    var ios = document.querySelectorAll("[data-aso-ios]");
+    for (var k = 0; k < ios.length; k++) {
+      try { buildIOS(ios[k]); }
+      catch (err) {
+        if (window.console) { console.warn("scene ASO_IOS indisponible :", err); }
+      }
+    }
     var figs = document.querySelectorAll("[data-aso]");
     for (var i = 0; i < figs.length; i++) {
       try { build(figs[i]); }
