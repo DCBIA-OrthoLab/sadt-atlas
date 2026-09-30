@@ -59,6 +59,40 @@
             m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]];
   }
   var ID = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+  var TRAIL = [120, 190, 235];
+  var WALK_MS = 2600;
+
+  /* Le mode Fully-Automated n'est que « the semi mode preceded by generating
+     the missing landmarks » : le pipeline complet commence donc par ALI. Ces
+     trajectoires sont celles que les agents ont REELLEMENT parcourues sur ce
+     scan, relevees dans `position_mem`, et elles finissent a 0,28 mm des
+     reperes qu'ASO a ensuite utilises. */
+  function flatPath(agent) {
+    var out = [];
+    (agent.legs || []).forEach(function (l) {
+      (l.path || []).forEach(function (pt) { out.push(pt); });
+    });
+    return out;
+  }
+
+  function walkMarks(agents, f) {
+    var marks = [];
+    Object.keys(agents || {}).forEach(function (k) {
+      var pts = agents[k]._flat || (agents[k]._flat = flatPath(agents[k]));
+      if (!pts.length) { return; }
+      var n = Math.max(1, Math.round(pts.length * f));
+      for (var i = Math.max(0, n - 34); i < n - 1; i++) {
+        var a = (i - Math.max(0, n - 34)) / 34;
+        marks.push({ p: pts[i], c: [TRAIL[0] / 255 * (0.3 + a * 0.7),
+                                    TRAIL[1] / 255 * (0.3 + a * 0.7),
+                                    TRAIL[2] / 255 * (0.3 + a * 0.7)], s: 0.005 + a * 0.003 });
+      }
+      marks.push({ p: pts[n - 1],
+                   c: [PATIENT[0] / 255, PATIENT[1] / 255, PATIENT[2] / 255],
+                   s: f >= 1 ? 0.013 : 0.017 });
+    });
+    return marks;
+  }
 
   function build(fig) {
     var data = window.ASO_SCENE;
@@ -98,8 +132,11 @@
        depart, 19,99 mm a l'arrivee. Afficher ce chiffre laisserait croire
        que l'orientation echoue, alors qu'il mesure autre chose qu'elle. */
 
+    var agents = data.agents || {};
+    var hasAli = Object.keys(agents).length > 0;
+
     function start() {
-      run = { i: 0, t: 0, done: [], holding: false };
+      run = { act: hasAli ? "ali" : "orient", i: 0, t: 0, holding: false };
       current = ID;
       fig.classList.add("v3d-sim");
       scene.dirty = true; scene.kick();
@@ -114,6 +151,14 @@
     function frame(dt) {
       if (!run) { return false; }
       run.t += dt;
+      if (run.act === "ali") {
+        var f = Math.min(1, run.t / WALK_MS);
+        scene.setMarks(walkMarks(agents, f).concat(goldMarks()));
+        say(strings.placing || "");
+        chip(-1);
+        if (run.t >= WALK_MS + 500) { run.act = "orient"; run.t = 0; }
+        return true;
+      }
       var base = cumulative(run.i);
       if (run.i >= stages.length) {
         current = base;
@@ -139,12 +184,15 @@
       return true;
     }
 
+    function goldMarks() {
+      return (data.gold || []).map(function (g) {
+        return { p: g.p, c: [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255], s: 0.017 };
+      });
+    }
+
     function paint() {
       scene.parts.forEach(function (p) { p.xform = current; });
-      var marks = [];
-      data.gold.forEach(function (g) {
-        marks.push({ p: g.p, c: [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255], s: 0.017 });
-      });
+      var marks = goldMarks();
       Object.keys(data.patient || {}).forEach(function (k) {
         marks.push({ p: apply(current, data.patient[k]),
                      c: [PATIENT[0] / 255, PATIENT[1] / 255, PATIENT[2] / 255], s: 0.013 });
@@ -365,7 +413,11 @@
         bs[i].setAttribute("aria-pressed", bs[i].getAttribute("data-mode") === name ? "true" : "false");
       }
       fig.setAttribute("data-active", name);
-      run = { t: 0, m: target(name) };
+      /* Cote CBCT, le pipeline complet : ALI place les reperes, puis ASO
+         oriente. Cote IOS ce sont les dents segmentees qui jouent ce role,
+         et elles sont deja la. */
+      var ags = name === "cbct" ? ((window.ASO_SCENE || {}).agents || {}) : {};
+      run = { t: 0, m: target(name), act: Object.keys(ags).length ? "ali" : "orient", ags: ags };
       current[name] = ID;
       fig.classList.add("v3d-sim");
       var sc = scenes[name];
@@ -376,6 +428,16 @@
       var sc = scenes[mode];
       if (!run || !sc) { return false; }
       run.t += dt;
+      if (run.act === "ali") {
+        var f = Math.min(1, run.t / WALK_MS);
+        var gm = ((window.ASO_SCENE || {}).gold || []).map(function (g) {
+          return { p: g.p, c: [GOLD[0] / 255, GOLD[1] / 255, GOLD[2] / 255], s: 0.017 };
+        });
+        sc.setMarks(walkMarks(run.ags, f).concat(gm));
+        say(strings.placing || "");
+        if (run.t >= WALK_MS + 500) { run.act = "orient"; run.t = 0; }
+        return true;
+      }
       var t = Math.min(1, run.t / MS);
       var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
       current[mode] = partial(run.m, e);

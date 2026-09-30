@@ -44,9 +44,14 @@ ORIENTED = ASO + "Test_Files/Fully-AutomatedOr/MG_test_lm_Or.mrk.json"
 
 PARTS = {"RAW": 40000, "CB": 14000}
 
-#: Libelles des quatre etapes, dans l'ordre du fichier.
-STAGE_NAMES = ["recentring", "first hand-built rotation",
-               "second hand-built rotation", "ICP refinement"]
+#: LES ETAPES NE SONT PAS NOMMEES, et c'est delibere. Le fichier stocke les
+#: quatre transformations composees PUIS inversees : la sequence qui oriente
+#: vraiment est inv(f1.f2.f3.f4), donc chaque bloc inverse et la liste prise
+#: a l'envers. Verifie a 0,000 mm sur les reperes qu'ASO a ecrits.
+#: Savoir lequel est « l'ICP » et lesquels sont les rotations construites a
+#: la main demanderait d'instrumenter ASO lui-meme. Tant que ce n'est pas
+#: fait, on donne les magnitudes -- mesurees -- et pas des noms devines.
+STAGE_LABEL = "transform %d of %d"
 
 
 def read_stages(path):
@@ -142,7 +147,10 @@ def main():
     span = max(hi[k] - lo[k] for k in range(3)) or 1.0
     centre = np.array([(hi[k] + lo[k]) / 2.0 for k in range(3)])
 
-    stages_raw = read_stages(TFM)
+    blocks = read_stages(TFM)
+    # Le fichier va de l'ORIENTE vers l'ORIGINAL. Pour animer l'orientation
+    # il faut l'inverse : chaque bloc inverse, et la liste a l'envers.
+    stages_raw = [np.linalg.inv(M) for M in reversed(blocks)]
 
     def to_scene_matrix(M):
         """Une transformation LPS -> la meme, dans le repere normalise.
@@ -162,13 +170,13 @@ def main():
     for i, M in enumerate(stages_raw):
         ang = np.degrees(np.arccos(max(-1, min(1, (np.trace(M[:3, :3]) - 1) / 2))))
         stages.append({
-            "name": STAGE_NAMES[i] if i < len(STAGE_NAMES) else "stage %d" % (i + 1),
+            "name": STAGE_LABEL % (i + 1, len(stages_raw)),
             "m": to_scene_matrix(M),
             "deg": round(float(ang), 2),
             "mm": round(float(np.linalg.norm(M[:3, 3])), 3),
         })
-        print("  etape %d : %-30s %5.2f deg, %5.2f mm"
-              % (i + 1, stages[-1]["name"], ang, np.linalg.norm(M[:3, 3])))
+        print("  etape %d/%d : %5.2f deg, %6.3f mm"
+              % (i + 1, len(stages_raw), ang, np.linalg.norm(M[:3, 3])))
 
     total = np.eye(4)
     for M in stages_raw:
@@ -176,21 +184,53 @@ def main():
     tot_ang = np.degrees(np.arccos(max(-1, min(1, (np.trace(total[:3, :3]) - 1) / 2))))
     print("  ---- total : %.2f deg" % tot_ang)
 
-    # Les reperes du patient, tels qu'ASO les a ecrits APRES orientation.
-    # On remonte a leur position de DEPART par la transformation inverse :
-    # ils sont alors exacts aux deux bouts, et l'animation les emmene de
-    # l'un a l'autre sans rien approximer.
-    total = np.eye(4)
-    for M in stages_raw:
-        total = M @ total
-    inv = np.linalg.inv(total)
+    # La position de DEPART des reperes. Le fichier va deja dans ce sens-la,
+    # on l'applique donc tel quel. Controle independant : mes propres agents
+    # ALI, traces sur le meme scan, finissent a 0,16 mm de ces points.
+    fwd = np.eye(4)
+    for M in blocks:
+        fwd = M @ fwd
     mine = {}
     if os.path.exists(ORIENTED):
         od = json.load(open(ORIENTED, encoding="utf-8"))["markups"][0]
         for cp in od["controlPoints"]:
-            q = inv @ np.append(np.array(cp["position"], dtype=float), 1.0)
+            q = fwd @ np.append(np.array(cp["position"], dtype=float), 1.0)
             mine[cp["label"]] = [round(float((q[k] - centre[k]) / span), 5) for k in range(3)]
         print("  patient : %d reperes d'ASO, ramenes au depart" % len(mine))
+
+    # Les marches d'agents d'ALI pour CES reperes-la : le mode Fully-Automated
+    # n'est que « the semi mode preceded by generating the missing landmarks ».
+    # L'animation peut donc montrer le pipeline entier, et pas seulement sa
+    # derniere etape.
+    agents = {}
+    tp = os.path.join(ROOT, "assets", "aso-trace.json")
+    if os.path.exists(tp):
+        tr = json.load(open(tp, encoding="utf-8"))
+        for name, lm in tr["landmarks"].items():
+            if lm.get("steps", -1) <= 0:
+                continue
+            legs = []
+            for leg in lm["legs"]:
+                sp = leg["spacing"]
+                pts = []
+                for ix in leg["idx"]:
+                    v = qform @ np.array([ix[2] * sp[2], ix[1] * sp[1], ix[0] * sp[0], 1.0])
+                    pts.append([round(float((v[k] - centre[k]) / span), 5) for k in range(3)])
+                legs.append({"scale": leg["scale"], "mm": round(sp[0], 3), "path": pts})
+            agents[name] = {"legs": legs, "steps": lm["steps"]}
+        # Verification : ASO a lance ALI en interne, donc mes trajectoires
+        # doivent retomber sur les reperes qu'il a ensuite utilises.
+        if mine and agents:
+            gaps = []
+            for k in agents:
+                if k in mine:
+                    end = agents[k]["legs"][-1]["path"][-1]
+                    gaps.append(np.linalg.norm(
+                        (np.array(end) - np.array(mine[k])) * span))
+            if gaps:
+                print("  controle : mes agents finissent a %.2f mm en moyenne des "
+                      "reperes qu'ASO a utilises (max %.2f)"
+                      % (float(np.mean(gaps)), float(np.max(gaps))))
 
     gold = json.load(open(GOLD, encoding="utf-8"))["markups"][0]
     golds = [{"label": p["label"],
@@ -203,6 +243,7 @@ def main():
         "totalDeg": round(float(tot_ang), 2),
         "gold": golds,
         "patient": mine,
+        "agents": agents,
         # Les noms presents des deux cotes : ce sont eux qui doivent se
         # rejoindre, et c'est la seule mesure honnete du resultat.
         "shared": sorted(set(mine) & {g["label"] for g in golds}),
