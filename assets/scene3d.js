@@ -306,11 +306,53 @@
 
   Scene3D.prototype.bindInput = function () {
     var self = this, canvas = this.canvas, drag = null;
+
+    /* Pincement a deux doigts. Sur un telephone il n'y a pas de molette :
+       sans ca le zoom n'existe tout simplement pas. On garde les pointeurs
+       actifs et on lit l'ecart entre les deux premiers. */
+    var touches = {}, count = 0, pinch = null;
+
+    function spread() {
+      var ids = Object.keys(touches);
+      if (ids.length < 2) { return 0; }
+      var a = touches[ids[0]], b = touches[ids[1]];
+      return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+    }
+
     canvas.addEventListener("pointerdown", function (e) {
+      touches[e.pointerId] = { x: e.clientX, y: e.clientY };
+      count += 1;
+      if (count >= 2) {
+        /* Le deuxieme doigt arrete l'orbite : on ne veut pas faire tourner
+           la scene pendant qu'on zoome. */
+        drag = null;
+        pinch = { d0: spread() || 1, dist0: self.cam.dist };
+        return;
+      }
       drag = { x: e.clientX, y: e.clientY, moved: 0 };
-      canvas.setPointerCapture(e.pointerId);
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignorer */ }
     });
+
+    function release(e) {
+      if (touches[e.pointerId]) { delete touches[e.pointerId]; count -= 1; }
+      if (count < 2) { pinch = null; }
+      if (count < 1) { count = 0; }
+    }
+    canvas.addEventListener("pointercancel", function (e) { release(e); drag = null; });
+
     canvas.addEventListener("pointermove", function (e) {
+      if (touches[e.pointerId]) {
+        touches[e.pointerId].x = e.clientX;
+        touches[e.pointerId].y = e.clientY;
+      }
+      if (pinch) {
+        var d = spread();
+        if (d > 0) {
+          self.cam.dist = Math.max(0.2, Math.min(4, pinch.dist0 * pinch.d0 / d));
+          self.goal = null; self.dirty = true; self.kick();
+        }
+        return;
+      }
       if (!drag) {
         if (!self.onHover) { return; }
         self.hoverAt = { clientX: e.clientX, clientY: e.clientY };
@@ -333,7 +375,8 @@
       self.goal = null; self.dirty = true; self.kick();
     });
     canvas.addEventListener("pointerup", function (e) {
-      var click = drag && drag.moved < 6;
+      var click = drag && drag.moved < 6 && count <= 1;
+      release(e);
       drag = null;
       if (click && self.onPick) { self.onPick(self.pickAt(e)); }
     });
@@ -345,6 +388,12 @@
       self.cam.dist = Math.max(0.2, Math.min(4, self.cam.dist * (1 + Math.sign(e.deltaY) * 0.12)));
       self.goal = null; self.dirty = true; self.kick();
     }, { passive: false });
+
+    /* Sans molette ni clavier, il faut un moyen de revenir : double-tape. */
+    canvas.addEventListener("dblclick", function (e) {
+      e.preventDefault();
+      self.lookHome();
+    });
 
     if (window.ResizeObserver) {
       new ResizeObserver(function () { self.dirty = true; self.kick(); }).observe(this.stage);
