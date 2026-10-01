@@ -101,8 +101,21 @@ def main():
         print("\n  (essai a blanc — relance avec --go pour copier vers %s)" % dest)
         return
 
-    free = shutil.disk_usage(os.path.dirname(dest) if os.path.isdir(
-        os.path.dirname(dest)) else "/").free
+    # GARDE-FOU. Si le disque ne s'est pas monte, son point de montage est un
+    # simple dossier vide sur la racine -- et la racine est a 88 %. Sans ce
+    # controle, --go y deverserait 5,7 Go et remplirait le systeme. On compare
+    # donc le peripherique de la destination a celui de « / » : s'ils sont
+    # identiques, le disque n'est pas la.
+    parent = dest
+    while parent != "/" and not os.path.isdir(parent):
+        parent = os.path.dirname(parent)
+    if os.stat(parent).st_dev == os.stat("/").st_dev and not dest.startswith(
+            os.path.expanduser("~")):
+        sys.exit("%s est sur le MEME peripherique que « / » : le disque n'est pas "
+                 "monte. Copier ici remplirait le systeme de fichiers racine.\n"
+                 "Monte le disque (il est dans /etc/fstab) puis relance." % parent)
+
+    free = shutil.disk_usage(parent).free
     print("\n  destination %s — %.1f Go libres" % (dest, free / 1e9))
     if free < total * 1.1:
         sys.exit("Pas assez de place : il faut %.1f Go, il en reste %.1f."

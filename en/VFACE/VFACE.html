@@ -188,23 +188,75 @@
 
       <h3 id="arbre-appels">The call tree, in "Full pipeline" + "Asymmetry Assessment" + "Quantitative + Visualization" mode</h3>
 
-      <pre class="ascii">T1 (raw CBCT)
- ├─ resample 0.3mm iso, centered          -&gt; T1 Resample/CBCT
- ├─ PRE_ASO x2 (MAX, CB)                  -&gt; Centered T1 Scans/{MAX,CB} (+ .tfm)
- ├─ ALI (6 lm MAX) ─ SEMI_ASO(occlusal+midsag) -&gt; Oriented T1 Scans/MAX
- ├─ ALI (7 lm CB)  ─ SEMI_ASO(Frankfort+midsag) -&gt; Oriented T1 Scans/CB
- ├─ AMASSS CBMASK,MANDMASK (on CB) and MAXMASK (on MAX) -&gt; T1 Masks
- ├─ AutoMatrix(Matrix_mirror.tfm) on the oriented scans -&gt; T2_Scan/{CB,MAX}
- ├─ AREG x3 (CB, MAX, MAND)               -&gt; Registered Scan/&lt;region&gt;/&lt;pat&gt;_OutReg/
- ├─ ALI (all landmarks, on CB)            -&gt; T1 Landmarks/CB
- ├─ derive_landmarks (CB -&gt; MAX, rigid)   -&gt; T1 Landmarks/MAX
- ├─ AutoMatrix mirror on the landmarks    -&gt; Mirrored Landmarks/{CB,MAX}
- ├─ AutoMatrix AREG matrices x3           -&gt; Mirrored &amp; Registered Landmarks/{CB,MAND,MAX}
- ├─ AQ3DC x3 (CB, MAND, MAX)              -&gt; Measurements/Measurements_*.xlsx
- ├─ postprocess                           -&gt; Measurements/PostProcess_Measurements.xlsx
- ├─ VFACE_CLI (LightGBM)                  -&gt; Classification/Classification.xlsx
- ├─ BDS x5 (nnU-Net)                      -&gt; VTK Files/{T1 CB,T1 MAX,T2 CB,T2 MAND,T2 MAX}
- └─ ModelToModel Distance x3              -&gt; Heatmaps/</pre>
+      <div class="pipe">
+        <p class="pipe-seed"><code>T1</code> &mdash; one raw CBCT, nothing else</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>Preparation</h4>
+          <ol>
+            <li><span class="pipe-act">resample to 0.3&nbsp;mm isotropic, centred</span>
+                <span class="pipe-out"><code>T1 Resample/CBCT</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html">PRE_ASO</a> &times;2, for the maxilla and the cranial base</span>
+                <span class="pipe-out"><code>Centered T1 Scans/{MAX,CB}</code> + <code>.tfm</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html">ALI</a> places 6 maxillary landmarks, then <a class="pipe-mod" href="../ASO/ASO.html">SEMI_ASO</a> orients on occlusal + mid-sagittal</span>
+                <span class="pipe-out"><code>Oriented T1 Scans/MAX</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html">ALI</a> places 7 cranial-base landmarks, then <a class="pipe-mod" href="../ASO/ASO.html">SEMI_ASO</a> orients on Frankfort + mid-sagittal</span>
+                <span class="pipe-out"><code>Oriented T1 Scans/CB</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html">AMASSS</a> segments <code>CBMASK</code> and <code>MANDMASK</code> on the CB scan, <code>MAXMASK</code> on the MAX scan</span>
+                <span class="pipe-out"><code>T1 Masks</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="mirror">
+          <h4>Mirroring</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a> applies <code>Matrix_mirror.tfm</code> to the oriented scans &mdash; <strong>this is where the &ldquo;T2&rdquo; comes from</strong></span>
+                <span class="pipe-out"><code>T2_Scan/{CB,MAX}</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="reg">
+          <h4>Registration</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AREG_CBCT/AREG_CBCT.html">AREG</a> &times;3, once per region &mdash; cranial base, maxilla, mandible</span>
+                <span class="pipe-out"><code>Registered Scan/&lt;region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>Measurements</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html">ALI</a> places every measurement landmark, on the CB scan</span>
+                <span class="pipe-out"><code>T1 Landmarks/CB</code></span></li>
+            <li><span class="pipe-act"><code>derive_landmarks</code> carries them CB&nbsp;&rarr;&nbsp;MAX by a rigid fit</span>
+                <span class="pipe-out"><code>T1 Landmarks/MAX</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a> mirrors the landmarks</span>
+                <span class="pipe-out"><code>Mirrored Landmarks/{CB,MAX}</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a> applies the three AREG matrices to them</span>
+                <span class="pipe-out"><code>Mirrored &amp; Registered Landmarks/{CB,MAND,MAX}</code></span></li>
+            <li><span class="pipe-act"><code>AQ3DC</code> &times;3 measures distances and angles</span>
+                <span class="pipe-out"><code>Measurements/Measurements_*.xlsx</code></span></li>
+            <li><span class="pipe-act">post-processing assembles the feature row</span>
+                <span class="pipe-out"><code>Measurements/PostProcess_Measurements.xlsx</code></span></li>
+            <li><span class="pipe-act"><code>VFACE_CLI</code> runs the three <a class="gterm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> models</span>
+                <span class="pipe-out"><code>Classification/Classification.xlsx</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="viz">
+          <h4>Visualization</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a> &times;5 builds the bone surfaces</span>
+                <span class="pipe-out"><code>VTK Files/{T1 CB,T1 MAX,T2 CB,T2 MAND,T2 MAX}</code></span></li>
+            <li><span class="pipe-act"><code>ModelToModel Distance</code> &times;3 writes the asymmetry maps</span>
+                <span class="pipe-out"><code>Heatmaps/</code></span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">Phase names are the module&rsquo;s own, from
+        <code>VFACE_utils/review_steps.py</code>; <code>mirror_masks</code> is left out
+        because it only exists in <code>CMFReg</code> mode.</p>
+      </div>
 
       <p>The PDF <code>Janson module.pdf</code> is the diagram
       of this pipeline (extractable with <code>pdftotext</code>), useful for reading the code.</p>
