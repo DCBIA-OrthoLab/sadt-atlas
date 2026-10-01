@@ -87,18 +87,7 @@
         end. The modules the code actually calls are listed in the rest of this page — they do not match this diagram exactly.
         <span class="src">Lab diagram &mdash;
         <a href="../../assets/data/VFACE/vface_workflow-full.png" download>high-resolution PNG, 1.9&nbsp;MB</a> ·
-        <a href="../../assets/data/VFACE/vface_workflow.pptx" download>PowerPoint source, 2.0&nbsp;MB</a></span> <strong>Two things the animation deliberately leaves
-        empty.</strong> Step&nbsp;0 names ALI&rsquo;s maxilla set and draws nothing: those six
-        points are not in this published test set, and six invented landmarks would be six
-        lies. Steps&nbsp;1 and&nbsp;3 state their orientation but animate no rotation: the scan
-        arrives already oriented, so the pose it came from does not exist anywhere &mdash;
-        what is shown is the condition reached (the plane at x&nbsp;=&nbsp;0), not a
-        reconstructed path. The six landmarks that <em>do</em> appear at step&nbsp;2 are the
-        ones ALI_CBCT really wrote for this scan: six of the set&rsquo;s seven, with
-        <code>N</code> missing because the agent did not find it. Their frame was checked
-        rather than assumed &mdash; LPS beats the LPS/RAS confusion by 5.62&nbsp;mm against
-        10.64&nbsp;mm mean distance to the nearest bone vertex, and the generator refuses to
-        write the file if that ordering ever flips.</figcaption>
+        <a href="../../assets/data/VFACE/vface_workflow.pptx" download>PowerPoint source, 2.0&nbsp;MB</a></span></figcaption>
       </figure>
 
 
@@ -389,51 +378,59 @@
           <i data-k="absmed">median |d|</i>
         </span>
         <figcaption>
-        A real VFACE run, not a reconstruction. Everything here comes out of         the
-        tool on its own published test set: the three AREG matrices, the mirrored scan,
-        ALI&rsquo;s 26 predicted landmarks, and the three <code>ModelDistance</code> maps.
-        <strong>The mirror</strong> is <code>Matrix_mirror.tfm</code> =
-        <code>diag(-1, 1, 1)</code>, zero translation &mdash; a pure reflection about
-        <strong>x&nbsp;=&nbsp;0</strong>, a plane of the <em>world</em>. Nothing in it knows
-        anything about the patient, which is exactly why the upstream chain exists: to bring
-        the patient&rsquo;s mid-sagittal plane onto that plane. The reflection is animated
-        through its degenerate state, <code>diag(0, 1, 1)</code>, because a reflection
-        cannot         be interpolated by rotations &mdash; the determinant would have to
-        pass from         &minus;1 to +1 without ever being zero. The plane draws itself at
-        mid-flip.         <strong>Then the point.</strong> <code>createlistprocess.py</code>
-        calls         ModelToModel Distance three times, once per registration, and the
-        three maps do not         say the same thing. Superimposed on the <strong>cranial
-        base</strong>, the whole face         is laterally displaced: median |d|
-        7.0&nbsp;mm, 46% of vertices past 8&nbsp;mm, range         &minus;25 to +32.
-        Superimposed on the <strong>maxilla</strong>, the upper skull meets         its own
-        mirror to 1.0&nbsp;mm. On the <strong>mandible</strong>, to 0.45&nbsp;mm.
-        Superimposing <em>on</em> a structure makes that structure symmetric by construction
-        &mdash; that is not a flaw in the measurement, that <em>is</em> the measurement.
-        <strong>Three different surfaces, three different scales.</strong> These are the
-        files VFACE writes: the cranial-base map covers the whole skull, the maxilla map the
-        upper skull alone, the mandible map the mandible alone &mdash; so when a map covers
-        only one structure the rest of the skull stays neutral grey behind it. Their ranges
-        run from &plusmn;2.6&nbsp;mm to &plusmn;32, so each map carries its own scale, shown
-        in the bar; compare them on the numbers in the status line, not on the hue. Blue is
+        A real VFACE run, not a reconstruction. Everything here comes out of the tool on its
+        own published test set: the three AREG matrices, the mirrored scan, ALI&rsquo;s 26
+        predicted landmarks, and the three <code>ModelDistance</code> maps. <strong>The
+        mirror</strong> is <code>Matrix_mirror.tfm</code> = <code>diag(-1, 1, 1)</code>,
+        zero translation &mdash; a pure reflection about <strong>x&nbsp;=&nbsp;0</strong>, a
+        plane of the <em>world</em>. Nothing in it knows anything about the patient, which
+        is exactly why the upstream chain exists: to bring the patient&rsquo;s mid-sagittal
+        plane onto that plane. The reflection is animated through its degenerate state,
+        <code>diag(0, 1, 1)</code>, because a reflection cannot be interpolated by rotations
+        &mdash; the determinant would have to pass from &minus;1 to +1 without ever being
+        zero. The plane draws itself at mid-flip. <strong>Then the point.</strong>
+        <code>createlistprocess.py</code> calls ModelToModel Distance three times, once per
+        registration, and the three maps do not say the same thing. Superimposed on the
+        <strong>cranial base</strong>, the whole face is laterally displaced: median |d|
+        7.0&nbsp;mm, 46% of vertices past 8&nbsp;mm, range &minus;25 to +32. Superimposed on
+        the <strong>maxilla</strong>, the upper skull meets its own mirror to 1.0&nbsp;mm.
+        On the <strong>mandible</strong>, to 0.45&nbsp;mm. Superimposing <em>on</em> a
+        structure makes that structure symmetric by construction &mdash; that is not a flaw
+        in the measurement, that <em>is</em> the measurement. <strong>The direction of those
+        matrices was measured, not assumed.</strong> elastix writes the fixed&rarr;moving
+        mapping, so it is the <em>inverse</em> that carries the mirror onto T1: the mean
+        surface gap falls from 2.88&nbsp;mm to 1.73&nbsp;mm with the inverse, and climbs to
+        4.57 with the matrix as written &mdash; worse than leaving the mirror alone. The
+        generator now tries both directions against T1 on every run, keeps the better one,
+        and refuses to write the file if neither beats doing nothing. <strong>Three
+        different surfaces, three different scales.</strong> These are the files VFACE
+        writes: the cranial-base map covers the whole skull, the maxilla map the upper skull
+        alone, the mandible map the mandible alone &mdash; so when a map covers only one
+        structure the rest of the skull stays neutral grey behind it. Their ranges run from
+        &plusmn;2.6&nbsp;mm to &plusmn;32, so each map carries its own scale, shown in the
+        bar; compare them on the numbers in the status line, not on the hue. Blue is
         negative, red positive, pale grey is zero &mdash; the distance is signed, as VFACE
-        writes it. <strong>What is not shown, and why.</strong> The two orientation
-        steps animate no rotation: this scan arrives already oriented, so the pose it came
-        from does not exist anywhere, and what you see is the condition reached rather than
-        a         reconstructed path. The frame of the maxilla map was checked rather than
-        assumed         &mdash; it lives in the maxilla-oriented frame, not the cranial-base
-        one, and of the         five candidate compositions <code>inv(CB)&middot;MAX</code>
-        brings it onto the others         to 0.23&nbsp;mm against 3.38 for the identity, so
-        guessing would have left it a         degree or two out with nothing visibly broken.
-        The surfaces are decimated to about         26&nbsp;000 triangles for the browser,
-        and each vertex keeps the distance read from         the nearest vertex of the full-
-        resolution surface rather than a quadric-interpolated         one, which was
-        overshooting the measured range by 6&nbsp;mm.         <strong>One correction worth
-        recording:</strong> an earlier version of this figure         registered the mirror
-        with an ICP written for the page, because this output had not         been found
-        yet. That ICP slid on the maxilla &mdash; 10.2&deg; of rotation where
+        writes it. <strong>What is not shown, and why.</strong> The two orientation steps
+        animate no rotation: this scan arrives already oriented, so the pose it came from
+        does not exist anywhere, and what you see is the condition reached rather than a
+        reconstructed path. The frame of the maxilla map was checked rather than assumed
+        &mdash; it lives in the maxilla-oriented frame, not the cranial-base one, and of the
+        five candidate compositions <code>inv(CB)&middot;MAX</code> brings it onto the
+        others to 0.23&nbsp;mm against 3.38 for the identity, so guessing would have left it
+        a degree or two out with nothing visibly broken. The surfaces are decimated to about
+        26&nbsp;000 triangles for the browser, and each vertex keeps the distance read from
+        the nearest vertex of the full- resolution surface rather than a quadric-
+        interpolated one, which was overshooting the measured range by 6&nbsp;mm.
+        <strong>Two corrections worth recording.</strong> An earlier version of this figure
+        registered the mirror with an ICP written for the page, because this output had not
+        been found yet. That ICP slid on the maxilla &mdash; 10.2&deg; of rotation where
         AREG&rsquo;s real matrix turns 4.4&deg; &mdash; and its unsigned distance on a
-        coarser         mesh reported a median of 1.36&nbsp;mm, which made this patient look
-        very nearly         symmetric. He is not.
+        coarser mesh reported a median of 1.36&nbsp;mm, which made this patient look very
+        nearly symmetric. He is not. The version after that applied AREG&rsquo;s matrices in
+        the wrong direction, so the mirror turned the wrong way on its path to the
+        registered pose &mdash; a reader saw it on the page before the generator did, which
+        is why the direction is now measured on every build instead of resting on a
+        convention.
         </figcaption>
       </figure>
 

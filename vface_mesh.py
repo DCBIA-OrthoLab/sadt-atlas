@@ -281,13 +281,38 @@ def main():
     if np.linalg.det(M[:3, :3]) >= 0:
         sys.exit("Cette matrice n'est pas une reflexion.")
 
-    print("\n— les trois matrices qu'AREG a ecrites —")
+    # Les surfaces d'entree d'abord : le sens des matrices se mesure contre
+    # elles, il ne se deduit pas de la convention annoncee.
+    raw = surface_from_volume(ORIENTED_SCAN, BONE, SIGMA, MIRROR_TRIS)
+    mirror = surface_from_volume(MIRROR_SCAN, BONE, SIGMA, MIRROR_TRIS)
+
+    print("\n— les trois matrices qu'AREG a ecrites, ET DANS QUEL SENS —")
+    # elastix ecrit la transformation du FIXE vers le MOBILE : c'est son
+    # INVERSE qui amene le mobile sur le fixe. Le premier jet de cette scene
+    # appliquait la matrice telle quelle, et le miroir tournait a l'envers --
+    # un lecteur l'a vu avant moi. On ne fait donc plus confiance a la
+    # convention : on essaie les deux sens contre le T1 et on garde le
+    # meilleur, en l'imprimant. Le scan miroir du dossier T2_Scan n'est PAS
+    # encore recale, c'est bien lui qu'il faut deplacer.
+    base = mean_surface_gap(mirror, raw, 4000)
+    print("  miroir brut <-> T1 : %.2f mm (ce qu'il faut battre)" % base)
     for r in REGIONS:
         A = read_tfm_euler(OUT + r["matrix"])
-        ang = np.degrees(np.arccos(max(-1.0, min(1.0, (np.trace(A[:3, :3]) - 1) / 2))))
-        print("  %-4s %-13s rotation %5.2f deg, translation %5.2f mm"
-              % (r["code"], r["label"], ang, np.linalg.norm(A[:3, 3])))
-        r["A"] = A
+        gA = mean_surface_gap(apply_matrix(mirror, A), raw, 4000)
+        gI = mean_surface_gap(apply_matrix(mirror, np.linalg.inv(A)), raw, 4000)
+        use_inv = gI < gA
+        App = np.linalg.inv(A) if use_inv else A
+        best = min(gA, gI)
+        print("  %-4s %-13s matrice %5.2f | inverse %5.2f -> %-8s  reste %.2f mm"
+              % (r["code"], r["label"], gA, gI,
+                 "inverse" if use_inv else "directe", best))
+        if best >= base:
+            sys.exit("%s : aucun des deux sens ne rapproche le miroir du T1 "
+                     "(%.2f et %.2f contre %.2f a vide). La scene montrerait un "
+                     "recalage qui degrade." % (r["code"], gA, gI, base))
+        r["A"] = App
+        r["gap_before"] = round(float(base), 2)
+        r["gap_after"] = round(float(best), 2)
 
     # ---- les cartes, et le repere de celle du maxillaire ----
     print("\n— les trois cartes ModelDistance —")
@@ -346,11 +371,12 @@ def main():
 
     # Le scan tel qu'il entre : sans lui, la surface osseuse d'AMASSS serait
     # a l'ecran avant l'etape qui la produit, ce qui laisserait croire que la
-    # segmentation a deja tourne.
-    meshes["RAW"] = surface_from_volume(ORIENTED_SCAN, BONE, SIGMA, MIRROR_TRIS)
-    print("  scan oriente (entree) : %d triangles" % meshes["RAW"].GetNumberOfPolys())
-    meshes["MIRROR"] = surface_from_volume(MIRROR_SCAN, BONE, SIGMA, MIRROR_TRIS)
-    print("  miroir reel de VFACE : %d triangles" % meshes["MIRROR"].GetNumberOfPolys())
+    # segmentation a deja tourne. Les deux surfaces ont deja servi au controle
+    # de sens plus haut.
+    meshes["RAW"] = raw
+    meshes["MIRROR"] = mirror
+    print("  scan oriente (entree) : %d triangles" % raw.GetNumberOfPolys())
+    print("  miroir reel de VFACE : %d triangles" % mirror.GetNumberOfPolys())
     meshes["PLANE"] = plane_at_x0(meshes["H_CB"].GetBounds())
 
     # ---- les reperes qu'ALI a predits ----
@@ -399,6 +425,7 @@ def main():
                 max(-1.0, min(1.0, (np.trace(r["A"][:3, :3]) - 1) / 2))))), 2),
             "trans": round(float(np.linalg.norm(r["A"][:3, 3])), 2),
             "dmin": r["dmin"], "dmax": r["dmax"], "limit": r["limit"],
+            "gapBefore": r["gap_before"], "gapAfter": r["gap_after"],
             "median": r["median"], "absmed": r["absmed"], "p98": r["p98"],
         })
 

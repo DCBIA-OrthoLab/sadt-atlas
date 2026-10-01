@@ -257,12 +257,19 @@
         bone(0.5);
         say(word("mirror") + (e < 0.92 ? "" : " — " + word("plane")));
       } else if (st.k === "register") {
-        /* La matrice qu'AREG a ecrite pour CETTE region, et rien d'autre. */
+        /* La matrice qu'AREG a ecrite pour CETTE region, et rien d'autre.
+           Son SENS a ete mesure et non suppose : elastix ecrit la
+           transformation du FIXE vers le MOBILE, donc c'est son INVERSE qui
+           amene le miroir sur le T1. Le premier jet appliquait la matrice
+           telle quelle et le miroir tournait a l'envers -- un lecteur l'a vu
+           avant moi. L'ecart affiche interpole entre les deux valeurs
+           MESUREES hors ligne sur les maillages pleins. */
         var g = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
         if (mir) { mir.xform = partial(new Float32Array(active.m), g); mir.alpha = 0.5; }
         bone(0.5);
+        var gap = active.gapBefore + (active.gapAfter - active.gapBefore) * g;
         say(word("register") + " — " + active.label + " — "
-            + active.rot.toFixed(2) + "°, " + active.trans.toFixed(2) + " mm");
+            + gap.toFixed(2) + " mm");
       } else {
         /* La carte de VFACE. Le miroir s'efface : sinon le bleu couvre la
            couleur qu'on est venu lire. */
