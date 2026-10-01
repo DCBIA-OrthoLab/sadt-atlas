@@ -360,15 +360,15 @@
           <span class="v3d-ramp-lo">&minus;35&nbsp;mm</span><i></i><span class="v3d-ramp-hi">+35&nbsp;mm</span>
         </div>
         <ol class="v3d-chips v3d-steps">
-          <li data-step="0">0. <strong>upstream</strong> &mdash; ALI + <code>semi_aso_cbct</code>: the mid-sagittal plane onto x = 0</li>
+          <li data-step="0">0. <code>t1_oriented_cb</code> &mdash; <code>semi_aso_cbct</code> turns the patient 2.67&deg; onto the plane x = 0</li>
           <li data-step="1">1. <code>t1_landmarks</code> &mdash; the 26 points ALI predicted here</li>
           <li data-step="2">2. <code>t1_masks</code> &mdash; AMASSS: the bone surfaces the maps are measured on</li>
           <li data-step="3">3. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, a reflection about x = 0</li>
-          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; on <em>one</em> structure</li>
+          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; on <em>one</em> structure, landmarks converging</li>
           <li data-step="5">5. <code>bone_surfaces</code> &mdash; VFACE&rsquo;s own <code>ModelDistance</code> map</li>
         </ol>
         <span class="v3d-i18n" hidden>
-          <i data-k="orient">oriented: the mid-sagittal plane now lies on x = 0</i>
+          <i data-k="orient">semi_aso_cbct rotates the patient until the mid-sagittal plane lies on x = 0</i>
           <i data-k="lm">ALI&rsquo;s predicted landmarks</i>
           <i data-k="masks">AMASSS segments the bone the maps will be measured on</i>
           <i data-k="mirror">reflect across x = 0</i>
@@ -376,6 +376,8 @@
           <i data-k="register">AREG&rsquo;s own matrix &mdash; this structure only</i>
           <i data-k="map">ModelDistance, VFACE&rsquo;s own map</i>
           <i data-k="absmed">median |d|</i>
+          <i data-k="pairs">contralateral pairs</i>
+          <i data-k="median">median</i>
         </span>
         <figcaption>
         A real VFACE run, not a reconstruction. Everything here comes out of the tool on its
@@ -440,7 +442,34 @@
         AREG&rsquo;s matrices in the wrong direction, so the mirror turned the wrong way on
         its path to the registered pose &mdash; a reader saw it on the page before the
         generator did, which is why the direction is now measured on every build instead of
-        resting on a convention.
+        resting on a convention. <strong>The plane, and how it is computed: it is
+        not.</strong> x&nbsp;=&nbsp;0 is a plane of the world, fixed by
+        <code>Matrix_mirror.tfm</code> being <code>diag(-1, 1, 1)</code> with zero
+        translation and zero fixed parameters. Nothing fits a plane to this patient. What is
+        computed is the <em>orientation</em> that brings the patient onto it: ALI places the
+        landmarks, then <code>semi_aso_cbct</code> does a 3-landmark initialisation followed
+        by a rigid ICP onto a gold standard, and here that comes to a 2.67&deg; rotation.
+        Step&nbsp;0 plays it for real &mdash; an earlier version of this caption claimed the
+        pre-orientation pose &ldquo;does not exist anywhere&rdquo;, which was simply wrong:
+        it is in <code>Centered T1 Scans</code>, and the transform VFACE wrote maps between
+        the two. Its direction was measured, not assumed. <strong>At step&nbsp;4 the
+        landmarks stay on screen</strong> so you can watch whether the registration actually
+        pulls them together. Because the mirror swaps left and right, each mirrored point is
+        paired with its <em>contralateral</em> counterpart &mdash; RGo against LGo &mdash;
+        which the measurement section already explains; pairing each label with itself gives
+        51&nbsp;mm of nonsense, the contralateral pairing gives 4.70&nbsp;mm before
+        registration. Median distance after it: 1.57&nbsp;mm on the cranial base, 2.16 on
+        the mandible, and <strong>12.84 on the maxilla, against 12.79 before &mdash; that
+        one does not converge at all</strong>, which is the same weakness its loose surface
+        fit already showed. Both endpoints are measured; only the path between them is
+        interpolated. <strong>One defect found in the published output.</strong> These
+        registered positions are recomputed here from the verified matrix rather than read
+        from <code>Mirrored &amp; Registered Landmarks</code>, because that folder agrees
+        with the matrix to 0.04&nbsp;mm for the maxilla and 0.13 for the mandible but
+        differs by 20.02&nbsp;mm for the cranial base &mdash; its points are shifted as a
+        rigid block by about 23&nbsp;mm in x and move <em>away</em> from the target. The
+        agreement on the other two is also the strongest evidence that the inverse is the
+        right direction.
         </figcaption>
       </figure>
 

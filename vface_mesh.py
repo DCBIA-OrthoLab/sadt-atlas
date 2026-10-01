@@ -62,6 +62,16 @@ HEAT = OUT + "Heatmaps/C_0001_%s_ModelDistance.vtk"
 OR_TFM = {"CB":  OUT + "Oriented T1 Scans/CB/C_0001_T1_CB_Or_transform.tfm",
           "MAX": OUT + "Oriented T1 Scans/MAX/C_0001_T1_MAX_Or_transform.tfm"}
 ORIENTED_SCAN = OUT + "Oriented T1 Scans/CB/C_0001_T1_CB_Or.nii.gz"
+#: La transformation que SEMI_ASO a reellement ecrite. J'avais ecrit dans la
+#: legende que la pose d'avant orientation « n'existe nulle part » : c'etait
+#: faux, elle est dans « Centered T1 Scans » et cette matrice y ramene. C'est
+#: elle qui permet d'animer le vrai moment ou le plan sagittal median du
+#: patient arrive sur x = 0.
+ORIENT_TFM = OUT + "Oriented T1 Scans/CB/C_0001_T1_CB_Or_transform.tfm"
+CENTERED_SCAN = OUT + "Centered T1 Scans/CB/C_0001_T1.nii.gz"
+#: Les reperes miroites, et les memes apres recalage, ecrits par AutoMatrix.
+LM_MIR_DIR = OUT + "Mirrored Landmarks/%s/"
+LM_REG_DIR = OUT + "Mirrored & Registered Landmarks/%s/"
 MIRROR_SCAN = OUT + "T2_Scan/CB/C_0001_T1_CB_Or_mir.nii.gz"
 MIRROR_TFM = webmesh.data("SlicerDownloads/Mirror_matrix/Mirror/Matrix_mirror.tfm")
 #: Les reperes qu'ALI a predits, dans le repere oriente sur la base du crane.
@@ -281,8 +291,42 @@ def plane_at_x0(bounds, pad=1.06):
 
 # --------------------------------------------------------------------- main
 
+def read_landmarks(path):
+    """{etiquette: position LPS} tel qu'ALI ou AutoMatrix l'a ecrit."""
+    d = json.load(open(path, encoding="utf-8"))["markups"][0]
+    if d.get("coordinateSystem") not in (None, "LPS"):
+        sys.exit("Reperes en %s, LPS attendu : %s" % (d.get("coordinateSystem"), path))
+    return {cp["label"]: np.array(cp["position"], dtype=float)
+            for cp in d["controlPoints"]}
+
+
+def read_lm_dir(d):
+    """Tous les reperes d'un dossier, fusionnes."""
+    out = {}
+    for f in sorted(os.listdir(d)):
+        if f.endswith(".mrk.json"):
+            out.update(read_landmarks(d + f))
+    return out
+
+
+def counterpart(label):
+    """L'homologue controlateral d'un repere.
+
+    Le miroir echange gauche et droite : un point lateral miroite se compare a
+    son homologue de l'autre cote, pas a lui-meme. La fiche le dit deja pour
+    les mesures d'AQ3DC (RGo contre LGo). Verifie numeriquement : avec cet
+    appariement la mandibule converge de 4,70 a 2,16 mm de mediane ; en
+    appariant chaque etiquette avec elle-meme on obtient 51 mm, soit rien.
+    """
+    if label.startswith("L"):
+        return "R" + label[1:]
+    if label.startswith("R"):
+        return "L" + label[1:]
+    return label
+
+
 def main():
-    need = [ORIENTED_SCAN, MIRROR_SCAN, MIRROR_TFM] + [HEAT % r["zone"] for r in REGIONS] \
+    need = [ORIENTED_SCAN, MIRROR_SCAN, MIRROR_TFM, ORIENT_TFM] + [HEAT % r["zone"] for r in REGIONS] \
          + [OUT + r["matrix"] for r in REGIONS] + list(OR_TFM.values()) \
          + [LM_DIR + f for f in LM_FILES.values()]
     for f in need:
@@ -400,17 +444,73 @@ def main():
     print("  miroir reel de VFACE : %d triangles" % mirror.GetNumberOfPolys())
     meshes["PLANE"] = plane_at_x0(meshes["H_CB"].GetBounds())
 
+    # ---- l'orientation, et son sens mesure ----
+    print("\n— l'orientation de SEMI_ASO —")
+    Or = affine_of(ORIENT_TFM)
+    or_deg = float(np.degrees(np.arccos(
+        max(-1.0, min(1.0, (np.trace(Or[:3, :3]) - 1) / 2)))))
+    pre = None
+    if os.path.exists(CENTERED_SCAN):
+        cen = surface_from_volume(CENTERED_SCAN, BONE, SIGMA, MIRROR_TRIS)
+        g0 = mean_surface_gap(cen, raw, 3000)
+        gO = mean_surface_gap(apply_matrix(cen, Or), raw, 3000)
+        gI = mean_surface_gap(apply_matrix(cen, np.linalg.inv(Or)), raw, 3000)
+        print("  rotation %.2f deg, translation %.2f mm" % (or_deg, np.linalg.norm(Or[:3, 3])))
+        print("  centre -> oriente : a vide %.2f | Or %.2f | inv(Or) %.2f mm" % (g0, gO, gI))
+        if gI < gO and gI < g0:
+            # Or ramene donc l'ORIENTE vers le CENTRE : c'est la pose d'avant.
+            pre = Or
+            print("  -> inv(Or) oriente, donc Or rend la pose d'AVANT orientation")
+        else:
+            print("  -> sens indecidable, l'etape d'orientation restera declarative")
+    else:
+        print("  scan centre absent, l'etape d'orientation restera declarative")
+
     # ---- les reperes qu'ALI a predits ----
     print("\n— les reperes predits par ALI —")
     lms = {}
     for key, fn in LM_FILES.items():
-        d = json.load(open(LM_DIR + fn, encoding="utf-8"))["markups"][0]
-        if d.get("coordinateSystem") not in (None, "LPS"):
-            sys.exit("Reperes en %s, LPS attendu." % d.get("coordinateSystem"))
-        got = {cp["label"]: np.array(cp["position"], dtype=float)
-               for cp in d["controlPoints"]}
+        got = read_landmarks(LM_DIR + fn)
         lms[key] = got
         print("  %-3s %2d points : %s" % (key, len(got), ", ".join(sorted(got))))
+    flat_t1 = {}
+    for d in lms.values():
+        flat_t1.update(d)
+
+    # ---- les reperes miroites, et leur convergence par recalage ----
+    print("\n— les reperes miroites, et ce que le recalage leur fait —")
+    mir_lm = read_lm_dir(LM_MIR_DIR % "CB")
+    for r in REGIONS:
+        src = read_lm_dir(LM_MIR_DIR % ("MAX" if r["code"] == "MAX" else "CB"))
+        A = r["A"]            # deja inversee et verifiee plus haut
+        keys = [k for k in src if counterpart(k) in flat_t1]
+        moved = {k: A[:3, :3] @ src[k] + A[:3, 3] for k in keys}
+        d0 = np.array([np.linalg.norm(src[k] - flat_t1[counterpart(k)]) for k in keys])
+        d1 = np.array([np.linalg.norm(moved[k] - flat_t1[counterpart(k)]) for k in keys])
+
+        # On recalcule au lieu de lire « Mirrored & Registered Landmarks » :
+        # ce dossier coincide avec la matrice verifiee a 0,04 mm (maxillaire)
+        # et 0,13 mm (mandibule), mais son sous-dossier CB en differe de
+        # 20,02 mm -- ses reperes y sont decales en bloc d'environ 23 mm en x,
+        # et s'ELOIGNENT de la cible (mediane 18,33 au lieu de 1,57). On garde
+        # donc la matrice, qui est reproduite par VFACE lui-meme la ou sa
+        # sortie est saine.
+        agree = None
+        rdir = LM_REG_DIR % r["code"]
+        if os.path.isdir(rdir):
+            got = read_lm_dir(rdir)
+            both = [k for k in keys if k in got]
+            if both:
+                agree = float(np.mean([np.linalg.norm(moved[k] - got[k]) for k in both]))
+        r["lm"] = moved
+        r["lmBefore"] = round(float(np.median(d0)), 2)
+        r["lmAfter"] = round(float(np.median(d1)), 2)
+        r["lmPairs"] = len(keys)
+        print("  %-4s %2d paires controlaterales : mediane %5.2f -> %5.2f mm"
+              % (r["code"], len(keys), np.median(d0), np.median(d1)))
+        if agree is not None:
+            flag = "" if agree < 1.0 else "   <-- ECART, on garde la matrice"
+            print("       sortie de VFACE pour comparaison : %6.2f mm%s" % (agree, flag))
 
     # ---- le repere commun, puis l'encodage ----
     lo, hi = [1e30] * 3, [-1e30] * 3
@@ -447,6 +547,9 @@ def main():
             "trans": round(float(np.linalg.norm(r["A"][:3, 3])), 2),
             "dmin": r["dmin"], "dmax": r["dmax"], "limit": r["limit"],
             "gapBefore": r["gap_before"], "gapAfter": r["gap_after"],
+            "lmBefore": r["lmBefore"], "lmAfter": r["lmAfter"],
+            "lmPairs": r["lmPairs"],
+            "lm": dict((lab, pt(v)) for lab, v in r["lm"].items()),
             "median": r["median"], "absmed": r["absmed"], "p98": r["p98"],
         })
 
@@ -459,6 +562,13 @@ def main():
             "planeX": round(float(plane_x), 6),
             "landmarks": dict((k, dict((lab, pt(v)) for lab, v in d.items()))
                               for k, d in lms.items()),
+            # La pose d'AVANT orientation, pour animer le vrai moment ou le
+            # plan sagittal median arrive sur x = 0.
+            "preOrient": to_scene(pre) if pre is not None else None,
+            "orientDeg": round(or_deg, 2),
+            "lmMirror": dict((lab, pt(v)) for lab, v in mir_lm.items()),
+            "pairs": dict((k, counterpart(k)) for k in mir_lm
+                          if counterpart(k) in flat_t1),
             "regions": regions,
         })
     # Les cartes partent signees, chacune sur SON echelle : le shader divergent

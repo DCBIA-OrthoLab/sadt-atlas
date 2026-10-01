@@ -37,6 +37,8 @@
   var PLANE = [186, 170, 220];     /* le plan sagittal median                      */
   /* Un ton par jeu de reperes d'ALI, parce que VFACE en predit trois. */
   var LMC = { CB: [255, 176, 84], U: [120, 220, 175], L: [232, 154, 92] };
+  var LM_T = [255, 214, 140];   /* la cible : les reperes du T1, immobiles  */
+  var LM_M = [120, 190, 255];   /* le miroir : ceux qui se rapprochent      */
 
   /* Les etapes, dans l'ordre de VFACE_utils/review_steps.ORDER. Les quatre
      etapes de preparation y sont fondues en une : le scan publie arrive deja
@@ -114,14 +116,44 @@
     regions.forEach(function (r) { maps[r.code] = scene.byCode[r.part]; });
 
     /* Les reperes d'ALI, a plat et dans un ordre stable, avec leur jeu. */
-    var marks = [];
+    var marks = [], t1flat = {};
     Object.keys(data.landmarks || {}).forEach(function (set) {
       var c = LMC[set] || LMC.CB;
       Object.keys(data.landmarks[set]).sort().forEach(function (lab) {
+        t1flat[lab] = data.landmarks[set][lab];
         marks.push({ p: data.landmarks[set][lab],
                      c: [c[0] / 255, c[1] / 255, c[2] / 255], s: 0.017 });
       });
     });
+
+    /* Les paires que le recalage doit rapprocher. Le miroir echange gauche et
+       droite, donc un point lateral se compare a son homologue de l'autre
+       cote -- c'est `data.pairs`, calcule et verifie hors ligne. */
+    var pairKeys = Object.keys(data.pairs || {}).sort();
+    function lerp(a, b, t) {
+      return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t,
+              a[2] + (b[2] - a[2]) * t];
+    }
+    /* Les reperes pendant le recalage : la cible fixe, et le miroir qui s'en
+       approche. Les deux extremites sont MESUREES ; seul le chemin entre elles
+       est interpole. */
+    function convergence(t) {
+      var out = [], i, k, tgt, a, b;
+      for (i = 0; i < pairKeys.length; i++) {
+        k = pairKeys[i];
+        tgt = t1flat[data.pairs[k]];
+        if (tgt) {
+          out.push({ p: tgt, c: [LM_T[0] / 255, LM_T[1] / 255, LM_T[2] / 255], s: 0.015 });
+        }
+        a = (data.lmMirror || {})[k];
+        b = active ? (active.lm || {})[k] : null;
+        if (a && b) {
+          out.push({ p: lerp(a, b, t),
+                     c: [LM_M[0] / 255, LM_M[1] / 255, LM_M[2] / 255], s: 0.018 });
+        }
+      }
+      return out;
+    }
 
     scene.parts.forEach(function (p) {
       p.pickable = false;
@@ -155,7 +187,12 @@
       }
     }
 
-    function showPlane(a) { if (plane) { plane.alpha = 0.2 * a; } }
+    /* Le plan x = 0. Dans la version precedente il n'apparaissait qu'aux deux
+       premieres etapes, a 20 % d'opacite, et disparaissait precisement pendant
+       la reflexion -- c'est-a-dire au moment ou il explique tout. Il reste
+       maintenant visible de l'orientation jusqu'au recalage, et ne s'efface
+       que pour la carte, qu'il masquerait. */
+    function showPlane(a) { if (plane) { plane.alpha = 0.32 * a; } }
 
     /* Le scan tel qu'il entre, avant qu'AMASSS n'ait rien produit. */
     function rawOnly(a) {
@@ -228,10 +265,20 @@
       if (st.k === "orient") {
         /* Le scan publie arrive deja oriente : aucune rotation a animer, la
            pose d'avant n'existe nulle part. On montre la condition atteinte. */
-        say(word("orient"));
+        /* La VRAIE rotation de SEMI_ASO. J'avais ecrit que la pose d'avant
+           orientation « n'existe nulle part » : c'etait faux, elle est dans
+           « Centered T1 Scans » et la transformation que VFACE a ecrite y
+           ramene. Son sens a ete mesure, pas suppose. */
+        var o = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+        if (raw && data.preOrient) {
+          raw.xform = partial(new Float32Array(data.preOrient), 1 - o);
+        }
+        say(word("orient") + (data.preOrient
+            ? " — " + (data.orientDeg * (1 - o)).toFixed(2) + "°"
+            : ""));
         scene.setMarks([]);
         rawOnly(0.9);
-        showPlane(f);
+        showPlane(o);
       } else if (st.k === "lm") {
         /* Les 26 points que ALI a REELLEMENT predits pour ce scan, dans les
            trois jeux que VFACE lui demande. */
@@ -248,7 +295,7 @@
         scene.setMarks([]);
         bone(0.9, f);
         if (raw) { raw.alpha = 0.5 * (1 - f); }   /* il cede la place */
-        showPlane(1 - f);
+        showPlane(1);
       } else if (st.k === "mirror") {
         /* La reflexion. A mi-course tout est plaque sur x = 0 et le plan
            apparait de lui-meme. */
@@ -260,22 +307,27 @@
         /* La matrice qu'AREG a ecrite pour CETTE region, et rien d'autre.
            Son SENS a ete mesure et non suppose : elastix ecrit la
            transformation du FIXE vers le MOBILE, donc c'est son INVERSE qui
-           amene le miroir sur le T1. Le premier jet appliquait la matrice
-           telle quelle et le miroir tournait a l'envers -- un lecteur l'a vu
-           avant moi. L'ecart affiche interpole entre les deux valeurs
-           MESUREES hors ligne sur les maillages pleins. */
+           amene le miroir sur le T1. Preuve independante : la sortie de VFACE
+           elle-meme (« Mirrored & Registered Landmarks ») coincide avec cet
+           inverse a 0,04 mm sur le maxillaire et 0,13 sur la mandibule. */
         var g = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
         if (mir) { mir.xform = partial(new Float32Array(active.m), g); mir.alpha = 0.5; }
-        bone(0.5);
-        var gap = active.gapBefore + (active.gapAfter - active.gapBefore) * g;
+        bone(0.42);
+        showPlane(0.6);
+        /* Quelques reperes restent a l'ecran : on voit alors si le recalage
+           les rapproche vraiment de leur homologue controlateral -- et sur le
+           maxillaire, on voit qu'il ne les rapproche PAS. */
+        scene.setMarks(convergence(g));
+        var lmd = active.lmBefore + (active.lmAfter - active.lmBefore) * g;
         say(word("register") + " — " + active.label + " — "
-            + gap.toFixed(2) + " mm");
+            + active.lmPairs + " " + word("pairs") + ", "
+            + word("median") + " " + lmd.toFixed(2) + " mm");
       } else {
         /* La carte de VFACE. Le miroir s'efface : sinon le bleu couvre la
            couleur qu'on est venu lire. */
         if (mir) { mir.xform = new Float32Array(active.m); mir.alpha = 0.5 * (1 - f); }
         if (raw) { raw.alpha = 0; }
-        showPlane(0);
+        showPlane(1 - f);
         scene.setMarks([]);
         paintMap(f);
         say(word("map") + " — " + active.label + " — "
@@ -302,7 +354,11 @@
       /* Les reperes n'existent qu'a l'etape « lm », ou frame() les fait
          tomber un par un ; partout ailleurs la liste est vide. */
       scene.setMarks([]);
-      showPlane(i >= 1 && i < S_MASKS ? 1 : 0);
+      /* Le plan accompagne tout le raisonnement : de l'orientation qui l'y
+         amene jusqu'au recalage. Il ne s'efface que pour la carte. */
+      showPlane(i < S_MAP ? (i === 0 ? 0 : 1) : 0);
+      if (raw) { raw.xform = ID(); }
+      if (i === S_REGISTER) { scene.setMarks(convergence(0)); }
       if (i >= S_MAP) {
         paintMap(1);
       } else {
