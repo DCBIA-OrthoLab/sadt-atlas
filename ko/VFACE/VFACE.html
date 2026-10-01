@@ -7,6 +7,9 @@
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/labo.css">
 <script src="../../assets/site.js"></script>
+<script src="../../assets/vface-mesh.js"></script>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/vface-3d.js"></script>
 </head>
 <body data-cat="analyse">
 <div class="layout">
@@ -335,6 +338,96 @@
       <code>sitk.ResampleImageFilter</code>로, <code>.mrk.json</code> 파일에는
       <code>transform.GetInverse().TransformPoint</code>로 적용한다
       (<code>Automatrix_CLI.py:171</code>).</p>
+
+      <figure class="viewer3d" data-vface="steps">
+        <div class="v3d-modes">
+          <button type="button" data-vregion="CB" aria-pressed="true">두개저</button>
+          <button type="button" data-vregion="MAX" aria-pressed="false">상악골</button>
+          <button type="button" data-vregion="MAND" aria-pressed="false">하악골</button>
+        </div>
+        <div class="v3d-stage">
+          <span class="v3d-hint">끌어서 회전 &middot; 손가락을 모으거나 스크롤해 확대</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">다시 미러링하기</button>
+        </div>
+        <div class="v3d-ramp v3d-ramp-div" aria-hidden="true">
+          <span class="v3d-ramp-lo">&minus;35&nbsp;mm</span><i></i><span class="v3d-ramp-hi">+35&nbsp;mm</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. <strong>앞 단계</strong> &mdash; ALI + <code>semi_aso_cbct</code>: 정중시상면을 x = 0으로</li>
+          <li data-step="1">1. <code>t1_landmarks</code> &mdash; 여기서 ALI가 예측한 점 26개</li>
+          <li data-step="2">2. <code>t1_masks</code> &mdash; AMASSS: 맵을 계측하는 바탕이 되는 골 표면</li>
+          <li data-step="3">3. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, x = 0에 대한 반사</li>
+          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; 구조 <em>하나</em>에 대해</li>
+          <li data-step="5">5. <code>bone_surfaces</code> &mdash; VFACE 자체의 <code>ModelDistance</code> 맵</li>
+        </ol>
+        <span class="v3d-i18n" hidden>
+          <i data-k="orient">방향 정렬 완료: 정중시상면이 이제 x = 0에 놓인다</i>
+          <i data-k="lm">ALI가 예측한 랜드마크</i>
+          <i data-k="masks">AMASSS가 맵을 계측할 바탕이 되는 뼈를 분할한다</i>
+          <i data-k="mirror">x = 0을 기준으로 반사</i>
+          <i data-k="plane">앞 단계 사슬 전체가 세우려고 존재하는 바로 그 평면</i>
+          <i data-k="register">AREG가 직접 만든 행렬 &mdash; 이 구조에만</i>
+          <i data-k="map">ModelDistance, VFACE 자체의 맵</i>
+          <i data-k="absmed">|d| 중앙값</i>
+        </span>
+        <figcaption>
+        실제 VFACE 실행 결과이며 재구성이 아니다. 여기 있는 모든 것은 도구가 자신의 공개
+        테스트 세트에서 직접 내놓은 것이다. AREG 행렬 세 개, 미러링된 스캔, ALI가 예측한
+        랜드마크 26개, 그리고 <code>ModelDistance</code> 맵 세 개다.
+        <strong>미러</strong>는 <code>Matrix_mirror.tfm</code> = <code>diag(-1, 1, 1)</code>,
+        이동량은 0이다 &mdash; <strong>x&nbsp;=&nbsp;0</strong>에 대한 순수한 반사이며, 이
+        평면은 <em>월드</em>의 평면이다. 거기에는 환자에 관한 정보가 전혀 들어 있지 않고,
+        앞 단계 사슬이 존재하는 이유가 정확히 그것이다. 환자의 정중시상면을 그 평면에
+        가져다 놓기 위한 것이다. 반사는 퇴화 상태인
+        <code>diag(0, 1, 1)</code>를 거쳐 애니메이션된다. 반사는 회전으로 보간할 수 없기
+        때문이다 &mdash; 행렬식이 0을 한 번도 지나지 않고 &minus;1에서 +1로 건너가야 하는
+        셈이 된다. 평면은 뒤집히는 중간에 스스로 그려진다. <strong>그리고 여기가 핵심이다.</strong>
+        <code>createlistprocess.py</code>는 ModelToModel Distance를 정합마다 한 번씩 세 번
+        호출하고, 세 맵은 같은 말을 하지 않는다.
+        <strong>두개저</strong>에 중첩하면 얼굴 전체가 측방으로 벗어나 있다. |d| 중앙값
+        7.0&nbsp;mm, 정점의 46%가 8&nbsp;mm를 넘고, 범위는 &minus;25에서 +32다.
+        <strong>상악골</strong>에 중첩하면 두개골 상부가 자신의 거울상과 1.0&nbsp;mm까지 맞는다.
+        <strong>하악골</strong>에서는 0.45&nbsp;mm다. 어떤 구조<em>에</em> 중첩한다는 것은
+        그 구조를 구성상 대칭으로 만들어 버린다는 뜻이다 &mdash; 계측의 결함이 아니라,
+        그것<em>이</em> 바로 계측이다. <strong>이 행렬들의 방향은 가정한 것이 아니라
+        측정해서 확인했다.</strong> elastix는 고정&rarr;이동 사상을 기록하므로, 거울상을
+        T1 위로 가져오는 것은 그 <em>역행렬</em>이다. 역행렬을 쓰면 평균 표면 간격이
+        2.88&nbsp;mm에서 1.73&nbsp;mm로 떨어지고, 기록된 행렬을 그대로 쓰면
+        4.57로 올라간다 &mdash; 거울상을 그냥 두는 것보다 나쁘다. 생성 스크립트는 이제
+        실행마다 두 방향을 모두 T1에 대해 시험해 더 나은 쪽을 남기고, 어느 쪽도 아무것도
+        하지 않는 것보다 낫지 않으면 파일을 쓰지 않는다. <strong>표면이 셋,
+        척도도 셋이다.</strong> 이것이 VFACE가 실제로 기록하는
+        파일이다. 두개저 맵은 두개골 전체를, 상악골 맵은 두개골 상부만, 하악골 맵은
+        하악골만 덮는다 &mdash; 그래서 맵이 한 구조만 덮을 때는 두개골의 나머지가 그
+        뒤에서 중립 회색으로 남는다. 범위는
+        &plusmn;2.6&nbsp;mm에서 &plusmn;32까지 걸쳐 있어 맵마다 자기 척도를 가지며, 그
+        척도는 색 띠에 표시된다. 맵끼리는 색조가 아니라 상태줄의 숫자로 비교하라. 파랑은
+        음수, 빨강은 양수, 연한 회색은 0이다 &mdash; VFACE가 기록하는 그대로 거리에는
+        부호가 있다. <strong>무엇을 보여 주지 않으며, 왜 그런가.</strong> 방향 정렬 두
+        단계는 회전을 전혀 애니메이션하지 않는다. 이 스캔은 이미 방향이 맞은 상태로
+        도착하므로, 그 전의 자세는 어디에도 존재하지 않는다. 여기서 보이는 것은 재구성한
+        경로가 아니라 도달한 상태다. 상악골 맵의 좌표계는 가정하지 않고 확인했다
+        &mdash; 두개저 좌표계가 아니라 상악골 기준으로 정렬된 좌표계에 있으며, 후보 합성
+        다섯 가지 가운데 <code>inv(CB)&middot;MAX</code>가 이것을 나머지에
+        0.23&nbsp;mm까지 맞춰 준다. 항등 변환은 3.38이다. 짐작으로 넘겼다면 눈에 띄게
+        깨진 데 없이 1~2도쯤 틀어진 채로 남았을 것이다. 표면은 브라우저용으로 삼각형 약
+        26&nbsp;000개로 데시메이션했고, 각 정점은 quadric으로 보간한 값이 아니라 원해상도
+        표면의 가장 가까운 정점에서 읽은 거리를 그대로 지닌다. 보간한 값은 계측된 범위를
+        6&nbsp;mm 넘겨 버렸다.
+        <strong>기록해 둘 만한 수정 두 가지.</strong> 이 그림의 이전 판본은 이 출력을
+        아직 찾아내지 못해서, 페이지용으로 작성한 ICP로 거울상을 정합했다. 그 ICP는
+        상악골에서 미끄러졌다 &mdash; AREG의 실제 행렬이 4.4&deg; 돌리는 자리에서
+        10.2&deg;를 돌렸다 &mdash; 그리고 더 거친 메시에서 부호 없는 거리로 중앙값
+        1.36&nbsp;mm를 보고했고, 그 바람에 이 환자가 거의 대칭인 것처럼 보였다. 그렇지
+        않다. 그다음 판본은 AREG의 행렬을 반대 방향으로 적용해서, 거울상이 정합된 자세로
+        가는 길에 엉뚱한 쪽으로 돌았다 &mdash; 생성 스크립트보다 독자가 페이지에서 먼저
+        그것을 알아보았고, 그래서 이제는 관례에 기대지 않고 빌드마다 방향을 측정한다.
+        </figcaption>
+      </figure>
+
 
       <p><strong>좌표계</strong>: 모든 것이 <strong>LPS</strong>다. ALI는
       <code>"coordinateSystem": "LPS"</code>를 기록하고(<code>io.py:36</code>),

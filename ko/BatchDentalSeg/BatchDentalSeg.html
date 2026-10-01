@@ -356,7 +356,12 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
       상악 치열궁을 돈 뒤 하악 치열궁을 도는 순서), 이어서
       유치 20개(33 → 52), 그다음 <code>Mandible</code> = 53, <code>Maxilla</code> = 54,
       <code>Mandibular canal</code> = 55. "Upper Skull"은 없다: UI 설명이 보여 주는 것,
-      README가 말하는 것과 달리 이 모델은 두개관을 분할하지 않는다.</p>
+      README가 말하는 것과 달리 이 모델은 두개관을 분할하지 않는다. 번호 매김은 임의가
+      아니다. 레이블 하나하나가 그렇다. 값 1&ndash;32는 정확히 <strong>Universal Numbering
+      System</strong>이고(1 = 우측 상악 제3대구치 &hellip; 32 = 우측 하악 제3대구치),
+      33&ndash;52는 유치에 쓰는 그 체계의 문자
+      <code>A</code>&ndash;<code>T</code>다. 따라서 레이블의 <abbr title="F&eacute;d&eacute;ration dentaire internationale">FDI</abbr>
+      대응 번호는 고정되어 있다 &mdash; 아래 그림이 둘을 함께 보여 준다.</p>
 
       <div class="callout warn">
         <div class="callout-title">함정</div>
@@ -366,6 +371,195 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
       <p>값은 각 세그먼트에 <code>LabelValue</code> 태그로 설정되며
       (<code>_segmentLabelValue</code>), 태그가 있으면 <strong>이름보다 우선한다</strong>.</p>
 
+      <figure class="viewer3d" data-bds-3d>
+        <div class="v3d-modes" role="group" aria-label="콤보 박스에서 선택한 모델">
+          <button type="button" data-bds-model="DentalSegmentator" aria-pressed="true">DentalSegmentator</button>
+          <button type="button" data-bds-model="PediatricDentalsegmentator" aria-pressed="false">PediatricDentalsegmentator</button>
+          <button type="button" data-bds-model="NasoMaxillaDentSeg" aria-pressed="false">NasoMaxillaDentSeg</button>
+          <button type="button" data-bds-model="UniversalLabDentalsegmentator" aria-pressed="false">UniversalLabDentalsegmentator</button>
+        </div>
+        <div class="v3d-stage">
+          <button class="v3d-reset" type="button">시점 초기화</button>
+          <span class="v3d-state">입력 CBCT &mdash; 임계값만 적용</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+          <span class="v3d-hint">끌어서 회전 &middot; 손가락을 모으거나 스크롤해 확대 &middot; 구조물을 클릭</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. 볼륨 읽기 &mdash; <code>nnUNet_raw</code>/<code>_preprocessed</code>/<code>_results</code>가 모두 모델 폴더를 가리킨다</li>
+          <li data-step="1">1. <code>nnUNetv2_predict</code> &mdash; 다중 레이블 패스 <strong>한 번</strong>, <code>-f 0</code>, <code>-step_size 0.5</code>, <code>--disable_tta</code></li>
+          <li data-step="2">2. <code>_buildLabelArray</code> &mdash; 내보내기 한 번, 그다음 공식 값으로 LUT 재매핑 한 번</li>
+          <li data-step="3">3. <code>_exportVTKPerLabel</code> &mdash; windowed-sinc, 40&nbsp;% quadric 데시메이션, RAS&rarr;LPS 반전</li>
+        </ol>
+        <ol class="v3d-parts">
+          <li data-part="SKULL" data-label="Upper Skull" style="--sw:#e3dd90" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>두개골 상부</span> <code>SKULL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">두개관이다. 네 모델 중 셋은 이것에 레이블을 붙이지만 UniversalLab은 붙이지 않는다 &mdash; 이 장면에 두개관이 없는 이유가 그것이다. 여기서 보여 주는 것이 UniversalLab 패스이기 때문이다.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAXI" data-label="Maxilla" style="--sw:#b8860b" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>상악골</span> <code>MAXI</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">위턱뼈가 독립된 레이블로 나오며, 여기서는 값 54다. 계측값 129&nbsp;166&nbsp;mm&sup3;로 이 패스에서 가장 큰 구조이고, DentalSegmentator라면 두개골 상부에 합쳐 버렸을 구조다.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAND" data-label="Mandible" style="--sw:#d2691e" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>하악골</span> <code>MAND</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">아래턱뼈이며 두개골에서 유일하게 움직이는 뼈다. 네 레이블 표에 모두 들어 있지만 값은 세 가지로 갈린다(2, 2, 2, 53). 계측값은 33&nbsp;795&nbsp;mm&sup3;다.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="UPT" data-label="Upper Teeth" style="--sw:#dc9565" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>상악 치아</span> <code>UPT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">상악궁 전체에 레이블 하나 &mdash; 네 모델 중 셋에서 그렇다. UniversalLab에는 그런 레이블이 없다. 이 스캔에서 상악궁은 번호가 따로 매겨진 치아 15개로 나왔다. 치아 도표를 보라.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="LOT" data-label="Lower Teeth" style="--sw:#ebdfb4" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>하악 치아</span> <code>LOT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">하악궁도 마찬가지로, 여기서는 번호가 매겨진 치아 14개로 나왔다. 두 모델 계열의 차이는 이것뿐이며, 코드의 차이가 아니라 레이블 표의 차이다.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="CANAL" data-label="Mandibular canal" style="--sw:#a0522d" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>하악관</span> <code>CANAL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">좌우 하치조신경관이다. 하악골 안을 지나는 양측의 가느다란 관이며, 이 패스에서 가장 작은 구조다(805&nbsp;mm&sup3;, 상악골은 129&nbsp;166).</span>
+            <span class="v3d-tag"></span>
+          </li>
+        </ol>
+        <div class="v3d-chart" hidden>
+          <div class="v3d-arch">
+            <span class="v3d-arch-label">영구치, 상악궁 &mdash; 환자 기준 오른쪽부터</span>
+            <button type="button" data-tooth="1" data-arch="UPT" aria-pressed="false" style="--sw:#ff0000" title="우측 상악 제3대구치 &mdash; Universal 1, FDI 18">1<small>18</small></button>
+            <button type="button" data-tooth="2" data-arch="UPT" aria-pressed="false" style="--sw:#00ff00" title="우측 상악 제2대구치 &mdash; Universal 2, FDI 17">2<small>17</small></button>
+            <button type="button" data-tooth="3" data-arch="UPT" aria-pressed="false" style="--sw:#0000ff" title="우측 상악 제1대구치 &mdash; Universal 3, FDI 16">3<small>16</small></button>
+            <button type="button" data-tooth="4" data-arch="UPT" aria-pressed="false" style="--sw:#ffff00" title="우측 상악 제2소구치 &mdash; Universal 4, FDI 15">4<small>15</small></button>
+            <button type="button" data-tooth="5" data-arch="UPT" aria-pressed="false" style="--sw:#ff00ff" title="우측 상악 제1소구치 &mdash; Universal 5, FDI 14">5<small>14</small></button>
+            <button type="button" data-tooth="6" data-arch="UPT" aria-pressed="false" style="--sw:#00ffff" title="우측 상악 견치 &mdash; Universal 6, FDI 13">6<small>13</small></button>
+            <button type="button" data-tooth="7" data-arch="UPT" aria-pressed="false" style="--sw:#800000" title="우측 상악 측절치 &mdash; Universal 7, FDI 12">7<small>12</small></button>
+            <button type="button" data-tooth="8" data-arch="UPT" aria-pressed="false" style="--sw:#008000" title="우측 상악 중절치 &mdash; Universal 8, FDI 11">8<small>11</small></button>
+            <button type="button" data-tooth="9" data-arch="UPT" aria-pressed="false" style="--sw:#000080" title="좌측 상악 중절치 &mdash; Universal 9, FDI 21">9<small>21</small></button>
+            <button type="button" data-tooth="10" data-arch="UPT" aria-pressed="false" style="--sw:#808000" title="좌측 상악 측절치 &mdash; Universal 10, FDI 22">10<small>22</small></button>
+            <button type="button" data-tooth="11" data-arch="UPT" aria-pressed="false" style="--sw:#800080" title="좌측 상악 견치 &mdash; Universal 11, FDI 23">11<small>23</small></button>
+            <button type="button" data-tooth="12" data-arch="UPT" aria-pressed="false" style="--sw:#008080" title="좌측 상악 제1소구치 &mdash; Universal 12, FDI 24">12<small>24</small></button>
+            <button type="button" data-tooth="13" data-arch="UPT" aria-pressed="false" style="--sw:#c0c0c0" title="좌측 상악 제2소구치 &mdash; Universal 13, FDI 25">13<small>25</small></button>
+            <button type="button" data-tooth="14" data-arch="UPT" aria-pressed="false" style="--sw:#808080" title="좌측 상악 제1대구치 &mdash; Universal 14, FDI 26">14<small>26</small></button>
+            <button type="button" data-tooth="15" data-arch="UPT" aria-pressed="false" style="--sw:#ffa500" title="좌측 상악 제2대구치 &mdash; Universal 15, FDI 27">15<small>27</small></button>
+            <button type="button" data-tooth="16" data-arch="UPT" aria-pressed="false" style="--sw:#f0e68c" title="좌측 상악 제3대구치 &mdash; Universal 16, FDI 28">16<small>28</small></button>
+          </div>
+          <div class="v3d-arch is-baby">
+            <span class="v3d-arch-label">유치, 상악궁</span>
+            <button type="button" data-tooth="33" data-arch="UPT" aria-pressed="false" style="--sw:#ffdab9" title="우측 상악 제2유대구치 &mdash; Universal A, FDI 55">33<small>55</small></button>
+            <button type="button" data-tooth="34" data-arch="UPT" aria-pressed="false" style="--sw:#cd5c5c" title="우측 상악 제1유대구치 &mdash; Universal B, FDI 54">34<small>54</small></button>
+            <button type="button" data-tooth="35" data-arch="UPT" aria-pressed="false" style="--sw:#f08080" title="우측 상악 유견치 &mdash; Universal C, FDI 53">35<small>53</small></button>
+            <button type="button" data-tooth="36" data-arch="UPT" aria-pressed="false" style="--sw:#e9967a" title="우측 상악 유측절치 &mdash; Universal D, FDI 52">36<small>52</small></button>
+            <button type="button" data-tooth="37" data-arch="UPT" aria-pressed="false" style="--sw:#fa8072" title="우측 상악 유중절치 &mdash; Universal E, FDI 51">37<small>51</small></button>
+            <button type="button" data-tooth="38" data-arch="UPT" aria-pressed="false" style="--sw:#ff7f50" title="좌측 상악 유중절치 &mdash; Universal F, FDI 61">38<small>61</small></button>
+            <button type="button" data-tooth="39" data-arch="UPT" aria-pressed="false" style="--sw:#ff6347" title="좌측 상악 유측절치 &mdash; Universal G, FDI 62">39<small>62</small></button>
+            <button type="button" data-tooth="40" data-arch="UPT" aria-pressed="false" style="--sw:#00fa9a" title="좌측 상악 유견치 &mdash; Universal H, FDI 63">40<small>63</small></button>
+            <button type="button" data-tooth="41" data-arch="UPT" aria-pressed="false" style="--sw:#00ff7f" title="좌측 상악 제1유대구치 &mdash; Universal I, FDI 64">41<small>64</small></button>
+            <button type="button" data-tooth="42" data-arch="UPT" aria-pressed="false" style="--sw:#4682b4" title="좌측 상악 제2유대구치 &mdash; Universal J, FDI 65">42<small>65</small></button>
+          </div>
+          <div class="v3d-arch is-baby">
+            <span class="v3d-arch-label">유치, 하악궁</span>
+            <button type="button" data-tooth="52" data-arch="LOT" aria-pressed="false" style="--sw:#cd853f" title="우측 하악 제2유대구치 &mdash; Universal T, FDI 85">52<small>85</small></button>
+            <button type="button" data-tooth="51" data-arch="LOT" aria-pressed="false" style="--sw:#ff69b4" title="우측 하악 제1유대구치 &mdash; Universal S, FDI 84">51<small>84</small></button>
+            <button type="button" data-tooth="50" data-arch="LOT" aria-pressed="false" style="--sw:#adff2f" title="우측 하악 유견치 &mdash; Universal R, FDI 83">50<small>83</small></button>
+            <button type="button" data-tooth="49" data-arch="LOT" aria-pressed="false" style="--sw:#008080" title="우측 하악 유측절치 &mdash; Universal Q, FDI 82">49<small>82</small></button>
+            <button type="button" data-tooth="48" data-arch="LOT" aria-pressed="false" style="--sw:#b0c4de" title="우측 하악 유중절치 &mdash; Universal P, FDI 81">48<small>81</small></button>
+            <button type="button" data-tooth="47" data-arch="LOT" aria-pressed="false" style="--sw:#6495ed" title="좌측 하악 유중절치 &mdash; Universal O, FDI 71">47<small>71</small></button>
+            <button type="button" data-tooth="46" data-arch="LOT" aria-pressed="false" style="--sw:#4169e1" title="좌측 하악 유측절치 &mdash; Universal N, FDI 72">46<small>72</small></button>
+            <button type="button" data-tooth="45" data-arch="LOT" aria-pressed="false" style="--sw:#7b68ee" title="좌측 하악 유견치 &mdash; Universal M, FDI 73">45<small>73</small></button>
+            <button type="button" data-tooth="44" data-arch="LOT" aria-pressed="false" style="--sw:#6a5acd" title="좌측 하악 제1유대구치 &mdash; Universal L, FDI 74">44<small>74</small></button>
+            <button type="button" data-tooth="43" data-arch="LOT" aria-pressed="false" style="--sw:#87ceeb" title="좌측 하악 제2유대구치 &mdash; Universal K, FDI 75">43<small>75</small></button>
+          </div>
+          <div class="v3d-arch">
+            <span class="v3d-arch-label">영구치, 하악궁</span>
+            <button type="button" data-tooth="32" data-arch="LOT" aria-pressed="false" style="--sw:#ffe4e1" title="우측 하악 제3대구치 &mdash; Universal 32, FDI 48">32<small>48</small></button>
+            <button type="button" data-tooth="31" data-arch="LOT" aria-pressed="false" style="--sw:#db7093" title="우측 하악 제2대구치 &mdash; Universal 31, FDI 47">31<small>47</small></button>
+            <button type="button" data-tooth="30" data-arch="LOT" aria-pressed="false" style="--sw:#afeeee" title="우측 하악 제1대구치 &mdash; Universal 30, FDI 46">30<small>46</small></button>
+            <button type="button" data-tooth="29" data-arch="LOT" aria-pressed="false" style="--sw:#98fb98" title="우측 하악 제2소구치 &mdash; Universal 29, FDI 45">29<small>45</small></button>
+            <button type="button" data-tooth="28" data-arch="LOT" aria-pressed="false" style="--sw:#eee8aa" title="우측 하악 제1소구치 &mdash; Universal 28, FDI 44">28<small>44</small></button>
+            <button type="button" data-tooth="27" data-arch="LOT" aria-pressed="false" style="--sw:#da70d6" title="우측 하악 견치 &mdash; Universal 27, FDI 43">27<small>43</small></button>
+            <button type="button" data-tooth="26" data-arch="LOT" aria-pressed="false" style="--sw:#ff4500" title="우측 하악 측절치 &mdash; Universal 26, FDI 42">26<small>42</small></button>
+            <button type="button" data-tooth="25" data-arch="LOT" aria-pressed="false" style="--sw:#1e90ff" title="우측 하악 중절치 &mdash; Universal 25, FDI 41">25<small>41</small></button>
+            <button type="button" data-tooth="24" data-arch="LOT" aria-pressed="false" style="--sw:#7fff00" title="좌측 하악 중절치 &mdash; Universal 24, FDI 31">24<small>31</small></button>
+            <button type="button" data-tooth="23" data-arch="LOT" aria-pressed="false" style="--sw:#ff1493" title="좌측 하악 측절치 &mdash; Universal 23, FDI 32">23<small>32</small></button>
+            <button type="button" data-tooth="22" data-arch="LOT" aria-pressed="false" style="--sw:#9400d3" title="좌측 하악 견치 &mdash; Universal 22, FDI 33">22<small>33</small></button>
+            <button type="button" data-tooth="21" data-arch="LOT" aria-pressed="false" style="--sw:#00ced1" title="좌측 하악 제1소구치 &mdash; Universal 21, FDI 34">21<small>34</small></button>
+            <button type="button" data-tooth="20" data-arch="LOT" aria-pressed="false" style="--sw:#2f4f4f" title="좌측 하악 제2소구치 &mdash; Universal 20, FDI 35">20<small>35</small></button>
+            <button type="button" data-tooth="19" data-arch="LOT" aria-pressed="false" style="--sw:#483d8b" title="좌측 하악 제1대구치 &mdash; Universal 19, FDI 36">19<small>36</small></button>
+            <button type="button" data-tooth="18" data-arch="LOT" aria-pressed="false" style="--sw:#8fbc8f" title="좌측 하악 제2대구치 &mdash; Universal 18, FDI 37">18<small>37</small></button>
+            <button type="button" data-tooth="17" data-arch="LOT" aria-pressed="false" style="--sw:#b22222" title="좌측 하악 제3대구치 &mdash; Universal 17, FDI 38">17<small>38</small></button>
+          </div>
+            <p class="v3d-chart-note">레이블 값은 출력 NIfTI가 담고 있는 값이고, 아래의 작은 숫자는 <abbr title="F&eacute;d&eacute;ration dentaire internationale">FDI</abbr> 대응 번호다. 색은 모듈의 <code>UNIVERSAL_COLORS</code>이며, 그 안에서 <code>#008080</code>이 레이블 12와 49에 두 번 쓰인다는 점을 알아 두자. 흐리게 그려진 칸은 이 스캔에서 패스가 만들어 내지 <strong>않은</strong> 레이블이다. 그 칸을 클릭하면 없는 치아를 보여 주는 대신 상태줄이 그렇다고 알려 준다.</p>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">패스 실행</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="read">스캔 읽는 중 &mdash; 임계값만 적용, 아직 신경망 없음</i>
+          <i data-k="predict"><code>nnUNetv2_predict</code> &mdash; 볼륨 전체를 훑는 슬라이딩 윈도 한 번</i>
+          <i data-k="labelmap">레이블 맵 재구성 &mdash;</i>
+          <i data-k="export">표면 기록, 모듈의 3D 불투명도 적용</i>
+          <i data-k="values">개 레이블 값 기록</i>
+          <i data-k="done">개 레이블 생성</i>
+          <i data-k="teeth">그중 치아</i>
+          <i data-k="scans">개 스캔 처리</i>
+          <i data-k="label">레이블</i>
+          <i data-k="fdi">FDI</i>
+          <i data-k="absent">이 모델은 이것을 만들지 않는다.</i>
+          <i data-k="split">이 모델은 대신 치아마다 번호를 매긴다 &mdash; 치아 도표를 보라.</i>
+          <i data-k="nogeom">이 모델의 표에는 있지만, 여기 보여 주는 패스에서는 나오지 않았다.</i>
+          <i data-k="other">화면의 패스가 아니다 &mdash; 이 모델의 레이블 표만 목록에 적용한 것이다.</i>
+          <i data-k="notinscan">이 스캔에서는 나오지 않음</i>
+        </span>
+        <figcaption>신경망 하나, 목록 네 가지 &mdash; 그리고 하나씩 세어 본 치아 29개.
+        <strong>무엇이 실제인가.</strong> 화면에 있는 모든 것은 이 페이지를 위해 돌린
+        <code>UniversalLabDentalsegmentator</code> 패스이고, 대상은
+        <code>PreDentalSurgery</code>다. <code>CBCTDentalSurgery</code> 예제이며
+        <em>Slicer 자체</em>가 공개하는 파일이고 &mdash; 모듈의
+        <em>Test Files</em> 버튼이 내려받는 바로 그 파일로, md5로 바이트까지 같음을
+        확인했다. 그러니 이 그림과 함께 환자 데이터가 나가는 일은 없다. 스캔 한 개,
+        <code>cuda</code>, <strong>238.7&nbsp;s</strong>, 큐는 성공 1 / 실패 0으로 끝났다.
+        패스는 자기 표에 있는 55개 가운데 <strong>레이블 32개</strong>를 기록했다. 개별
+        치아 29개에 하악골(53), 상악골(54), 하악관(55)이 더해진다. 빠진 23개는 페이지가
+        아니라 <em>입</em>에서 빠진 것이다. 제3대구치 셋(16, 17, 32)과 유치열
+        전체(33&ndash;52)이며, 성인에게는 없는 치아다. 색은 모듈의
+        <code>UNIVERSAL_COLORS</code>, 불투명도는 모듈 자체의 3D 값이고, 상태줄의 모든
+        부피는 레이블 맵에서 복셀 수로 <em>계측한</em> 값이다.
+        <strong>하나만 기억한다면 이것이다.</strong> 구조마다 이진 신경망 하나를 불러
+        차례로 만들어 내는 <a href="../AMASSS/AMASSS.html">AMASSS</a>와 달리, 이것은
+        <em>하나뿐인</em> 다중 레이블 패스다. 32개 레이블 전부가 같은 한 번의 훑기에서
+        함께 나온다. 위에서 모델을 바꾸면 레이블 <em>표</em>가 바뀌고 코드는 바뀌지
+        않는다. <code>onApplyClickedForVolume()</code>의 네 분기가 하는 일이 그 전부다.
+        그러면 목록이 구조별로, 선택한 모델이라면 그것을 무엇이라 불렀을지 알려 주고,
+        아예 만들어 내지 않았을 것에는 표시를 남긴다.
+        <strong>치아 하나를 믿기 전에 이것을 읽자.</strong> 레이블 1, 우측 상악
+        제3대구치는 <strong>4&nbsp;253&nbsp;mm&sup3;</strong>로 나온다 &mdash; 그다음으로
+        큰 치아(1&nbsp;028&nbsp;mm&sup3;)의 네 배이고, 어떤 대구치보다도 크다. 이 스캔에서
+        그 레이블은 치아 범위를 훨씬 넘어서는 물질을 끌어모았다. 모델이 만들어 낸 그대로
+        보여 준다. 코드가 무엇을 하는지 다루는 페이지가 코드의 출력을 슬쩍 고쳐 놓는다면
+        아무 가치가 없기 때문이다.
+        <strong>무엇이 연출이며, 그렇다고 밝히는 부분.</strong> 훑어 가는 움직임은
+        슬라이딩 윈도 하나를 눈에 보이게 만든 것이다. nnU-Net은 아래에서 위로가 아니라
+        세 방향으로 볼륨에 타일을 깐다. 2단계에서 중립적인 계기 색에서 공식 색으로
+        바뀌는 것은 <code>_buildLabelArray</code>의 LUT 재매핑을 극적으로 보여 준
+        것이다. 신경망 자체의 클래스 순서는 출력 파일에서 관찰할 수 없다.
+        &ldquo;이전&rdquo; 표면은 605에서 단순 임계값을 준 것이며, 이 값은 이 페이지를
+        위해 계산한 조직과 뼈 사이의 Otsu 분기점이다(이 CBCT는 HU 보정이 되어 있지
+        않으므로 교과서의 뼈 값은 적용되지 않는다). 그리고 표면은 <em>이 페이지를
+        위해</em> <code>batchdentalseg_mesh.py</code>가 돌린 마칭 큐브 + windowed-sinc +
+        quadric 데시메이션이다 &mdash; 치아당 삼각형 1&nbsp;200개, 하악골
+        16&nbsp;000개, 상악골 14&nbsp;000개 &mdash; 모듈이 함께 기록한 자기
+        <code>.vtk</code> 내보내기가 아니다.
+        <strong>알아 둘 것</strong>: 29개 레이블 중 두 개는 이 스캔에서 깨져 나왔고,
+        둘 다 손대지 않은 채로 보여 준다. 레이블&nbsp;1(우측 상악 제3대구치)은
+        4&nbsp;253&nbsp;mm&sup3;로 다른 어느 치아보다 네 배 크다. 레이블&nbsp;2
+        (우측 상악 제2대구치)는 부피가 완전히 평범하다. 1&nbsp;019&nbsp;mm&sup3;로
+        중앙값에 딱 걸친다. 그런데 그 물질이 94&nbsp;mm에 걸쳐 여러 덩어리로 흩어져
+        악궁 반대편까지 닿는다. 레이블&nbsp;1도 같은 식으로 124&nbsp;mm에 걸쳐 조각나
+        있다. 다른 치아는 모두 지름 7&ndash;22&nbsp;mm의 한 덩어리다. 부피만 봤다면
+        레이블&nbsp;2는 통과했을 것이고, 그래서 경계 상자도 함께 확인한다. 또 그 두
+        레이블을 클릭하면 치아가 아니라 두개골 대부분이 화면에 잡히는 이유도 그것이다.
+        레이블 탓이지 뷰어 탓이 아니다.
+        </figcaption>
+      </figure>
       <h2 id="coeur">5. 학습되지 않은 핵심부</h2>
 
       <figure class="diagram">
@@ -800,5 +994,8 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/batchdentalseg-mesh.js"></script>
+<script src="../../assets/batchdentalseg-3d.js"></script>
 </body>
 </html>

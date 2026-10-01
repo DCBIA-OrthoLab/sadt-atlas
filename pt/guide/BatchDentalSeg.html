@@ -142,6 +142,106 @@
         este modelo esperando uma segmentação craniana.</p>
       </div>
 
+      <figure class="viewer3d" data-bds-3d>
+        <div class="v3d-modes" role="group" aria-label="Modelo selecionado na combo box">
+          <button type="button" data-bds-model="DentalSegmentator" aria-pressed="true">DentalSegmentator</button>
+          <button type="button" data-bds-model="PediatricDentalsegmentator" aria-pressed="false">PediatricDentalsegmentator</button>
+          <button type="button" data-bds-model="NasoMaxillaDentSeg" aria-pressed="false">NasoMaxillaDentSeg</button>
+          <button type="button" data-bds-model="UniversalLabDentalsegmentator" aria-pressed="false">UniversalLabDentalsegmentator</button>
+        </div>
+        <div class="v3d-stage">
+          <button class="v3d-reset" type="button">Redefinir a vista</button>
+          <span class="v3d-state">CBCT de entrada &mdash; apenas limiar</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+          <span class="v3d-hint">Arraste para girar &middot; pince ou role para aproximar &middot; clique em uma estrutura</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. ler o volume &mdash; <code>nnUNet_raw</code>/<code>_preprocessed</code>/<code>_results</code> apontam todos para a pasta do modelo</li>
+          <li data-step="1">1. <code>nnUNetv2_predict</code> &mdash; <strong>uma única</strong> passagem multirrótulo, <code>-f 0</code>, <code>-step_size 0.5</code>, <code>--disable_tta</code></li>
+          <li data-step="2">2. <code>_buildLabelArray</code> &mdash; uma única exportação, depois um remapeamento LUT para os valores oficiais</li>
+          <li data-step="3">3. <code>_exportVTKPerLabel</code> &mdash; windowed-sinc, decimação quádrica de 40&nbsp;%, inversão RAS&rarr;LPS</li>
+        </ol>
+        <ol class="v3d-parts">
+          <li data-part="SKULL" data-label="Upper Skull" style="--sw:#e3dd90" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Crânio superior</span> <code>SKULL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">A calota craniana. Três dos quatro modelos a rotulam; o UniversalLab não &mdash; e é por isso que não há calota nesta cena, já que o que ela mostra é uma passagem do UniversalLab.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAXI" data-label="Maxilla" style="--sw:#b8860b" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Maxila</span> <code>MAXI</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">O maxilar superior como rótulo próprio, valor 54 aqui. A maior estrutura da passagem, com 129&nbsp;166&nbsp;mm&sup3; medidos &mdash; e a que o DentalSegmentator teria embutido no crânio superior.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAND" data-label="Mandible" style="--sw:#d2691e" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Mandíbula</span> <code>MAND</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">O maxilar inferior, o único osso do crânio que se move. Presente nas quatro tabelas, com três valores diferentes (2, 2, 2, 53). 33&nbsp;795&nbsp;mm&sup3; medidos.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="UPT" data-label="Upper Teeth" style="--sw:#dc9565" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Dentes superiores</span> <code>UPT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">Um único rótulo para toda a arcada superior &mdash; em três dos modelos. O UniversalLab não tem esse rótulo: neste exame a arcada superior saiu como 15 dentes numerados separadamente. Use o quadro.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="LOT" data-label="Lower Teeth" style="--sw:#ebdfb4" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Dentes inferiores</span> <code>LOT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">O mesmo para a arcada inferior, que aqui saiu como 14 dentes numerados. É nisso que está toda a diferença entre as duas famílias de modelo, e é uma diferença de tabela de rótulos, não de código.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="CANAL" data-label="Mandibular canal" style="--sw:#a0522d" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Canal mandibular</span> <code>CANAL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">O canal alveolar inferior, à direita e à esquerda: um tubo fino bilateral dentro da mandíbula, e a menor estrutura da passagem (805&nbsp;mm&sup3; contra 129&nbsp;166 da maxila).</span>
+            <span class="v3d-tag"></span>
+          </li>
+        </ol>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Executar a passagem</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="read">Lendo o exame &mdash; apenas limiar, nenhuma rede ainda</i>
+          <i data-k="predict"><code>nnUNetv2_predict</code> &mdash; uma única janela deslizante sobre todo o volume</i>
+          <i data-k="labelmap">Mapa de rótulos reconstruído &mdash;</i>
+          <i data-k="export">Superfícies gravadas, as opacidades 3D do módulo aplicadas</i>
+          <i data-k="values">valores de rótulo gravados</i>
+          <i data-k="done">rótulos produzidos</i>
+          <i data-k="teeth">deles dentes</i>
+          <i data-k="scans">exame na fila</i>
+          <i data-k="label">rótulo</i>
+          <i data-k="fdi">FDI</i>
+          <i data-k="absent">Não produzido por este modelo.</i>
+          <i data-k="split">Este modelo numera cada dente, em vez disso &mdash; veja o quadro.</i>
+          <i data-k="nogeom">Está na tabela deste modelo, mas não foi produzido pela passagem mostrada aqui.</i>
+          <i data-k="other">Não é a passagem na tela &mdash; apenas a tabela de rótulos deste modelo, aplicada à lista.</i>
+          <i data-k="notinscan">não produzido neste exame</i>
+        </span>
+        <figcaption>O que uma passagem produz de verdade. <strong>Real</strong>: uma
+        execução do <code>UniversalLabDentalsegmentator</code> sobre
+        <code>PreDentalSurgery</code>, a CBCT de exemplo que o Slicer publica e que o
+        botão <em>Test Files</em> do módulo baixa &mdash; um exame, <code>cuda</code>,
+        238,7&nbsp;s, 32 rótulos gravados, dos quais <strong>29 dentes numerados
+        separadamente</strong> mais a mandíbula, a maxila e o canal mandibular. Os 23
+        rótulos que não foram gravados são dentes que este adulto não tem: três terceiros
+        molares e toda a dentição decídua. Clique em qualquer dente do quadro.
+        O ponto: uma única rede <em>multirrótulo</em>, de modo que todos os rótulos saem
+        da <strong>mesma passagem única</strong> &mdash; e não uma rede por estrutura como
+        no <a href="AMASSS.html">AMASSS</a>. Trocar o modelo acima troca a tabela de
+        rótulos, não o código.
+        <strong>Vale saber</strong>: dois dos 29 rótulos saíram defeituosos neste exame, e
+        os dois são mostrados sem retoque. O rótulo&nbsp;1 (terceiro molar superior
+        direito) mede 4&nbsp;253&nbsp;mm&sup3;, quatro vezes qualquer outro dente. O
+        rótulo&nbsp;2 (segundo molar superior direito) tem um volume perfeitamente comum
+        &mdash; 1&nbsp;019&nbsp;mm&sup3;, exatamente na mediana &mdash; mas o seu material
+        está espalhado em aglomerados separados ao longo de 94&nbsp;mm, chegando ao outro
+        lado da arcada; o rótulo&nbsp;1 está fragmentado ao longo de 124&nbsp;mm da mesma
+        forma. Todos os outros dentes são uma única peça compacta de 7 a 22&nbsp;mm.
+        O volume por si só teria aprovado o rótulo&nbsp;2, e é por isso que a caixa
+        envolvente também é verificada &mdash; e por isso que clicar em um desses dois
+        enquadra quase todo o crânio em vez de um dente.
+        Isso é o rótulo, não o visualizador.
+        <strong>Encenado</strong>: a varredura (o nnU-Net percorre em tiles nas três
+        dimensões, não de baixo para cima) e a mudança de cor neutra&rarr;oficial, que faz
+        as vezes do remapeamento LUT. As malhas são decimadas para o navegador,
+        1&nbsp;200 triângulos por dente.</figcaption>
+      </figure>
       <h2 id="besoin">O que você precisa, o que você obtém</h2>
       <div class="io-grid">
         <div class="io-card">
@@ -258,5 +358,8 @@
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/batchdentalseg-mesh.js"></script>
+<script src="../../assets/batchdentalseg-3d.js"></script>
 </body>
 </html>

@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNE — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/themes/labo.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="texte">
+<div class="layout">
+
+<!--SIDEBAR-->
+
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <img class="tool-icon" src="../../assets/screens/CNE/icon.png" alt="" width="160" height="160">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › ข้อความและภาษา</div>
+        <h1>CNE</h1>
+        <p class="lede">โมดูลการอนุมานด้วยโมเดลภาษา (LLM) ที่อ่านบันทึกทางคลินิกแบบข้อความอิสระ แล้วสกัดคู่คีย์–ค่าออกมาจากบันทึกนั้น — ไม่ใช่เครื่องมือด้านเรขาคณิต และไม่ใช่เครื่องมือประมวลผลภาพ แม้จะอยู่ในชุดเครื่องมือทางทันตกรรม</p>
+        <div class="meta-row">
+          <a class="badge nopaper" href="SOURCES.html" title="ยังไม่ตีพิมพ์ — รีโพสิทอรีบน Hugging Face ไม่มี model card และไม่มีเอกสารอ้างอิง">ยังไม่ตีพิมพ์</a>
+          <span class="badge cli">CNE_CLI</span>
+          <span class="badge neutral">ไม่มี conda — Python ของ Slicer</span>
+          <a class="badge neutral" href="SOURCES.html">บรรณานุกรม</a>
+        </div>
+      </header>
+
+      <p><strong>คำเตือนเรื่องขอบเขต</strong> CNE ไม่เหมือน <a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a> และ <a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a>:
+      มันไม่ใช่เครื่องมือเสริมด้านเรขาคณิต ไม่แตะวอลุ่ม ไม่แตะเมช ไม่แตะ
+      พิกัดใดเลย มันเป็น<strong>โมดูลการอนุมานด้วย LLM</strong> ที่อ่านบันทึกทางคลินิก
+      แบบข้อความอิสระ แล้วเขียนออกมาเป็นคู่คีย์–ค่า แกนกลางของโมดูลคือโมเดล
+      <a class="gterm" href="../glossary.html#g-gguf" title="ดูอภิธานศัพท์">GGUF</a> แบบ quantise ที่โหลดด้วย <code>llama-cpp-python</code> ภายใน Python ของ Slicer</p>
+
+      <h2 id="acronyme">0. ตัวย่อ</h2>
+
+      <p>รีโพสิทอรีไม่เคยขยายตัวย่อนี้ไว้ในเอกสารใดเลย: README ไม่มีหัวข้อ CNE
+      (ยังคงอธิบาย <a href="../MedX/MedX.html">MedX</a> ซึ่ง CNE เข้ามาแทน ดู
+      <code>CMakeLists.txt:42</code> "Replaced by CNE") ข้อความช่วยเหลือของโมดูล
+      (<code>CNE.py:147</code>) บอกเพียงว่า "This tool helps to create
+      summaries of clinical notes"</p>
+
+      <p>มีบรรทัด log เพียงสองบรรทัด และมีเพียงสองบรรทัดนั้น ที่บอกคำเต็มของตัวย่อ:
+      <code>logger.info("CNE (Clinical Notes Extraction)")</code>
+      (<code>CNE.py:329</code> และ <code>CNE.py:606</code>) และ CLI
+      ประกาศชื่อเดียวกันนี้ต่อตัวควบคุมของ Slicer:
+      <code>&lt;filter-name&gt;Clinical Notes Extraction&lt;/filter-name&gt;</code>
+      (<code>CNE_CLI.py:91</code>) <strong>CNE = Clinical Notes Extraction</strong>
+      ยืนยันได้จากโค้ด และไม่มีที่อื่นยืนยัน</p>
+
+      <h2 id="situation">1. ตำแหน่งใน pipeline</h2>
+
+      <p>โมดูลปลายทาง ไม่มีสิ่งใดเรียกใช้มัน และมันไม่เรียกโมดูลอื่นในรีโพสิทอรี
+      ประกาศไว้ใน <code>CMakeLists.txt:51</code></p>
+
+      <p>มัน<strong>เข้ามาแทนครึ่งที่ทำ "Summarization" ของ <a href="../MedX/MedX.html">MedX</a></strong> โฟลเดอร์ MedX/ และ MedX_CLI/ ยังอยู่
+      ในต้นไม้ซอร์ส แต่ถูกปิดจากการ build
+      (<code>CMakeLists.txt:42-44</code>) ส่วนครึ่งที่ทำ "Dashboard" ของ MedX
+      (<code>dashboard.png</code> + <code>patient_data.csv</code>) <strong>ไม่มี</strong>สิ่งเทียบเท่าใน CNE จึง
+      หายไปจากส่วนขยายที่คอมไพล์แล้ว</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 900 130" role="img" aria-label="สายงานเต็ม: บันทึกทางคลินิกดิบ การสกัดและทำความสะอาดข้อความ โมเดล GGUF ที่ llama.cpp ให้บริการและทำนาย ไฟล์ผลการสกัดเป็นเอาต์พุต">
+          <rect class="d-box" x="10" y="35" width="170" height="60" rx="6"/>
+          <text class="d-label" x="95" y="60" text-anchor="middle">บันทึกทางคลินิก</text>
+          <text class="d-label-s" x="95" y="78" text-anchor="middle">.txt · .pdf · .docx</text>
+
+          <path class="d-arrow" d="M180 65 H213"/>
+          <path class="d-arrow-head" d="M213 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="220" y="35" width="190" height="60" rx="6"/>
+          <text class="d-label" x="315" y="60" text-anchor="middle">การสกัดข้อความ</text>
+          <text class="d-label-s" x="315" y="78" text-anchor="middle">+ clean_text()</text>
+
+          <path class="d-arrow" d="M410 65 H448"/>
+          <path class="d-arrow-head" d="M448 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="450" y="25" width="220" height="80" rx="6"/>
+          <text class="d-label" x="560" y="55" text-anchor="middle">โมเดล GGUF</text>
+          <text class="d-label-s" x="560" y="72" text-anchor="middle">llama.cpp · Q4_K_M</text>
+          <text class="d-label-s" x="560" y="88" text-anchor="middle">— ทำนาย</text>
+
+          <path class="d-arrow" d="M670 65 H708"/>
+          <path class="d-arrow-head" d="M708 65 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="710" y="35" width="180" height="60" rx="6"/>
+          <text class="d-label" x="800" y="60" text-anchor="middle">Extraction_&lt;note&gt;.txt</text>
+          <text class="d-label-s" x="800" y="78" text-anchor="middle">key : value</text>
+        </svg>
+        <figcaption>จากบันทึกทางคลินิกดิบไปจนถึงไฟล์ผลการสกัด: ผ่านโมเดล GGUF ที่ <a class="gterm" href="../glossary.html#g-llamacpp" title="ดูอภิธานศัพท์">llama.cpp</a> ให้บริการในเครื่อง เพียงรอบเดียว โดยไม่แบ่งข้อความเป็นช่วง</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ความต่างจาก MedX Summarize</th><th>MedX</th><th>CNE</th></tr></thead>
+          <tbody>
+            <tr><td>เอนจิน</td><td><code>transformers</code> + <code>torch</code></td><td><code>llama_cpp</code> (llama.cpp)</td></tr>
+            <tr><td>โมเดล</td><td><a class="gterm" href="../glossary.html#g-bart" title="ดูอภิธานศัพท์">BART</a> seq2seq, <code>.safetensors</code>, GitHub release <code>MedX/BART.zip</code></td><td>GGUF แบบ quantise ของ Llama-3.1-8B หรือ Qwen-2.5-7B, Hugging Face</td></tr>
+            <tr><td>การแบ่งบันทึกเป็นช่วง</td><td><code>create_chunks_from_paragraphs(max_chunk_size=3500)</code> แล้วต่อบทสรุปเข้าด้วยกัน</td><td><strong>ไม่มี</strong>: ส่งบันทึกทั้งฉบับในข้อความเดียว</td></tr>
+            <tr><td>การถอดรหัส</td><td>beam search 4, <code>no_repeat_ngram_size=3</code>, <code>repetition_penalty=2.0</code>, <code>temperature=0.6</code>, <code>top_p=0.95</code></td><td><code>temperature=0.1</code>, <code>max_tokens=500</code></td></tr>
+            <tr><td>การรวมผลรายผู้ป่วย</td><td>มี, <code>patient_id = file_name.split("_")[0]</code></td><td>ไม่มี, หนึ่งไฟล์ให้หนึ่งเอาต์พุต</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>คำสั่งระบบคัดลอกมาจาก MedX ทุกตัวอักษร:
+      <code>"Using the following note, extract structured key-value pairs about the patient's symptoms and diagnoses:"</code>
+      (<code>CNE_CLI.py:22</code> เทียบกับ
+      <code>MedX_Summarize.py:50</code>)</p>
+
+      <h2 id="fichiers">2. ไฟล์ที่เกี่ยวข้อง</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ไฟล์</th><th>บทบาท</th><th>รันที่ไหน</th></tr></thead>
+          <tbody>
+            <tr><td><code>CNE.py</code></td><td>widget: ไลบรารีที่ต้องใช้ การดาวน์โหลดโมเดล การสั่งรัน CLI</td><td>Python ของ Slicer</td></tr>
+            <tr><td><code>CNE_CLI.py</code></td><td>การสกัดข้อความ + การอนุมานด้วย llama.cpp</td><td>Python ของ Slicer (<code>SlicerMacroBuildScriptedCLI</code>)</td></tr>
+            <tr><td><code>CNE.ui</code></td><td>widget <code>ctkPathLineEdit</code> สองตัวในโหมด <code>Dirs</code> และ radio button <a class="gterm" href="../glossary.html#g-tmj" title="ดูอภิธานศัพท์">TMJ</a>/Ortho สองปุ่ม</td><td>—</td></tr>
+            <tr><td><code>Resources/testfiles/</code></td><td>บันทึกตัวอย่าง 4 ฉบับ (TMJ 2, Ortho 2) เก็บไว้แบบไม่ปิดบังในรีโพสิทอรี</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>ไม่มี conda CLI นี้เป็น <em>scripted CLI</em> จึงถูกสั่งรันด้วย <code>slicer.cli.run</code> ใน
+      Python ของ Slicer — และอยู่ในอินเทอร์พรีเตอร์ตัวเดียวกันนั้นที่ <code>llama-cpp-python</code>
+      ถูกติดตั้ง และโมเดลถูกโหลดเข้าหน่วยความจำ</p>
+
+      <h2 id="dependances">3. ไลบรารีที่ต้องใช้ ติดตั้งเมื่อต้องการ</h2>
+
+      <p><code>check_dependencies()</code> (<code>CNE.py:83</code>) ถูกเรียก<strong>เมื่อกด
+      Apply</strong> ไม่ใช่เมื่อโหลดโมดูล มันทดสอบการ import สามรายการ และถ้าขาดรายการใด
+      จะขอการยืนยันก่อนเรียก <code>slicer.util.pip_install</code>:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>import ที่ทดสอบ</th><th>แพ็กเกจที่ติดตั้ง</th><th>ใช้ทำอะไร</th></tr></thead>
+          <tbody>
+            <tr><td><code>llama_cpp</code></td><td><code>llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu</code></td><td>การอนุมาน</td></tr>
+            <tr><td><code>fitz</code></td><td><code>pymupdf</code></td><td>การสกัดข้อความจาก PDF</td></tr>
+            <tr><td><code>docx</code></td><td><code>python-docx</code></td><td>การสกัดข้อความจาก Word</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>มีสองจุดที่ควรรู้:</p>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p><code>install_function</code> (<code>CNE.py:44</code>) บังคับ <code>CC=gcc</code> และ <code>CXX=g++</code>
+        ระหว่างการติดตั้ง แล้วคืนค่าเดิมภายหลัง — ไว้สำหรับกรณีที่
+        pip ต้องคอมไพล์ <code>llama-cpp-python</code> จากซอร์ส บน Windows ค่าเหล่านี้
+        ใช้ไม่ได้</p>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p>extra index ชี้ไปที่ <strong>wheel สำหรับ CPU</strong> อย่างชัดเจน แต่ CLI ยังขอ
+        <code>n_gpu_layers=-1</code> พร้อมคอมเมนต์ "Use GPU if available"
+        (<code>CNE_CLI.py:162</code>): เมื่อ build เป็นแบบ CPU เท่านั้น พารามิเตอร์นี้
+        ไม่มีผลใด ๆ ในทางปฏิบัติการอนุมานรันบน CPU และโมเดลขนาด
+        7–8 B ที่ quantise แบบ Q4 กินเวลาหลายสิบวินาทีต่อบันทึกหนึ่งฉบับบน CPU</p>
+      </div>
+
+      <p>CLI ทดสอบการ import ทั้งสามรายการอีกครั้งเมื่อเริ่มทำงาน และเรียก <code>sys.exit(1)</code> หากขาด
+      รายการใด (<code>CNE_CLI.py:99-115</code>) — ซ้ำซ้อน แต่ไม่เป็นโทษ
+      เพราะ CLI ใช้อินเทอร์พรีเตอร์ร่วมกับ widget</p>
+
+      <h2 id="modeles">4. โมเดล</h2>
+
+      <p>รีโพสิทอรีไม่ได้แนบน้ำหนักมาเลย <code>getModelPath()</code>
+      (<code>CNE.py:478</code>) ดาวน์โหลดไฟล์ GGUF เมื่อต้องการ ผ่าน
+      <code>urllib.request.urlretrieve</code> พร้อม <code>QProgressDialog</code> ไปไว้ที่
+      <code>&lt;Documents&gt;/SlicerDownloads/CNE/model/</code></p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>โหมดใน UI</th><th><code>repo_id</code></th><th>ไฟล์ที่ขอ</th><th>ชื่อไฟล์ในเครื่อง</th><th><code>n_ctx</code></th></tr></thead>
+          <tbody>
+            <tr><td>TMJ</td><td><code>dcbia/Qwen-2.5-7B-Instruct-TMJ</code></td><td><code>qwen-ft-q4_k_m.gguf</code></td><td><code>Qwen-2.5-7B-TMJ.gguf</code></td><td><strong>6144</strong></td></tr>
+            <tr><td>Ortho</td><td><code>dcbia/Meta-Llama-3.1-8B-Instruct-Ortho</code></td><td><code>model-q4_0.gguf</code></td><td><code>Meta-Llama-3.1-8B-Ortho.gguf</code></td><td><strong>2048</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>URL ที่ประกอบขึ้น: <code>https://huggingface.co/{repo_id}/resolve/main/{fileName}</code></p>
+
+      <div class="callout bug">
+        <div class="callout-title">บั๊กที่ยืนยันแล้ว</div>
+        <p><strong>การดาวน์โหลดของโหมด Ortho เสีย</strong> ตรวจสอบแล้วผ่าน Hugging Face API: รีโพสิทอรี
+        <code>dcbia/Meta-Llama-3.1-8B-Instruct-Ortho</code> มีเพียง <code>.gitattributes</code> และ
+        <code>model-q4_k_m.gguf</code> ไฟล์ <code>model-q4_0.gguf</code> ที่โค้ดขอนั้นไม่มี
+        อยู่จริง — URL คืนค่า <strong>HTTP 404</strong> ขณะที่ URL ของ <code>q4_k_m</code> คืนค่า 200 <code>urlretrieve</code>
+        โยนข้อผิดพลาด ไฟล์ที่ดาวน์โหลดไม่ครบถูกลบ และผู้ใช้เห็นข้อความ "Download failed or
+        was cancelled" ส่วนโหมด TMJ นั้นถูกต้อง (<code>qwen-ft-q4_k_m.gguf</code> → 200)
+        วิธีแก้: <code>model-q4_0.gguf</code> → <code>model-q4_k_m.gguf</code></p>
+      </div>
+
+      <p>รีโพสิทอรีทั้งสองบน Hugging Face <strong>ไม่มี model card</strong>: ไม่มีสัญญาอนุญาต ไม่มี
+      ชุดข้อมูลฝึก ไม่มีการเผยแพร่วิธีการปรับละเอียด สถาปัตยกรรมพื้นฐานระบุได้
+      จาก tag (Llama-3.1-8B-Instruct และ Qwen2 7B) โดยใช้
+      <a class="gterm" href="../glossary.html#g-quantification" title="ดูอภิธานศัพท์">quantisation</a>
+      แบบ Q4_K_M ทั้งสองกรณี สิ่งที่ทำให้โมเดลที่ปรับละเอียดสองตัวนี้ต่างกัน — คลังข้อมูล
+      ที่กำกับไว้ สคีมาเอาต์พุตที่เรียนรู้มา และระเบียบวิธี — <strong>ระบุไม่ได้
+      จากรีโพสิทอรีหรือจาก Hugging Face</strong></p>
+
+      <h2 id="entrees">5. อินพุตและการเตรียมข้อมูล</h2>
+
+      <p><code>SUPPORTED_EXTENSIONS = (".txt", ".pdf", ".docx")</code> การสแกนโฟลเดอร์
+      <strong>ไม่ไล่ลงโฟลเดอร์ย่อย</strong>: <code>glob.glob(os.path.join(notesFolder_input, f"*{ext}"))</code>
+      (<code>CNE_CLI.py:133</code>) — ต่างจากโมดูลอื่นทุกตัว
+      ในรีโพสิทอรี ที่ใช้ <code>iglob(**, recursive=True)</code> โฟลเดอร์ที่จัดเป็น
+      โฟลเดอร์ย่อยรายผู้ป่วยจะไม่ได้ผลลัพธ์ใดเลย</p>
+
+      <p>การสกัดข้อความ (<code>CNE_CLI.py:73</code>):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>รูปแบบ</th><th>ตัวสกัด</th><th>รายละเอียด</th></tr></thead>
+          <tbody>
+            <tr><td><code>.pdf</code></td><td><code>fitz.open</code> แล้ว <code>"\n".join(page.get_text() for page in doc)</code></td><td>ไม่มี OCR: PDF ที่เป็นภาพสแกนจะได้ข้อความว่าง</td></tr>
+            <tr><td><code>.docx</code></td><td><code>docx.Document</code>, <code>paragraph.text</code></td><td><strong>ตารางหายไป</strong> (<code>doc.paragraphs</code> ไม่ไล่ผ่านตาราง)</td></tr>
+            <tr><td><code>.txt</code></td><td><code>open(..., encoding="utf-8")</code></td><td>ไฟล์ที่เป็น <code>cp1252</code> จะเกิด <code>UnicodeDecodeError</code> ซึ่งลูปจับไว้และนับเป็นความล้มเหลว</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>clean_text()</code> (<code>CNE_CLI.py:40</code>) เป็นขั้นตอน
+      การเตรียมข้อมูลเพียงขั้นเดียว และเหตุผลระบุไว้ในโค้ด: ปรับให้เป็นมาตรฐานเดียวกัน
+      สำหรับสิ่งที่ต่างกันระหว่างการส่งออกจาก PDF/Word แต่ไม่เคยปรากฏใน
+      บันทึกข้อความธรรมดาที่ใช้ฝึกโมเดล — เครื่องหมายวรรคตอนแบบโค้ง
+      ทั้ง apostrophe และ quote เป็น ASCII, en dash และ em dash เป็น <code>-</code>,
+      non-breaking space เป็นช่องว่างปกติ แล้วรวมบรรทัดว่างที่ติดกัน
+      ให้เหลือบรรทัดเดียว เป้าหมายที่ระบุไว้ชัด: โมเดลควรเห็นข้อความเดียวกัน
+      ไม่ว่าต้นฉบับจะเป็นรูปแบบใด</p>
+
+      <p>ไม่มีการลบข้อมูลระบุตัวตน ไม่มีการกรอง PHI บันทึกทดสอบในรีโพสิทอรีถูก
+      แทนชื่อด้วยมือ (<code>B_001</code>, <code>[DOCTOR]</code>, <code>Dr. XXX</code>) แต่ไม่มีสิ่งใดในโค้ด
+      รับประกันเรื่องนี้กับข้อมูลของผู้ใช้เอง โมดูล
+      Medical_Data_Anonymizer_Module มีอยู่
+      แยกต่างหาก และไม่ได้ต่อเข้ากับ CNE</p>
+
+      <h2 id="inference">6. การอนุมาน</h2>
+
+      <p>ประมวลผลรอบเดียวต่อไฟล์ ไม่มีการแบ่งเป็นช่วง
+      (<code>CNE_CLI.py:192</code>):</p>
+
+      <pre><code>messages = []
+if notesType.upper() == "TMJ":
+    messages.append({"role": "system", "content": INSTRUCTION_TMJ})
+messages.append({"role": "user", "content": clinical_text})
+
+output = llm.create_chat_completion(messages=messages, max_tokens=500, temperature=0.1)</code></pre>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 900 230" role="img" aria-label="การแยกสาย TMJ กับ Ortho: มีหรือไม่มีคำสั่งระบบ ขนาดบริบทต่างกัน แล้วมาเรียก create_chat_completion ร่วมกัน">
+          <rect class="d-box" x="10" y="20" width="180" height="55" rx="6"/>
+          <text class="d-label" x="100" y="43" text-anchor="middle">โหมด TMJ</text>
+          <text class="d-label-s" x="100" y="60" text-anchor="middle">คำสั่งระบบ + บันทึก</text>
+
+          <path class="d-arrow" d="M190 47 H213"/>
+          <path class="d-arrow-head" d="M213 47 l-7 -4 v8 z"/>
+
+          <rect class="d-box-n" x="220" y="12" width="230" height="70" rx="6"/>
+          <text class="d-label" x="335" y="40" text-anchor="middle">Qwen-2.5-7B-TMJ.gguf</text>
+          <text class="d-label-s" x="335" y="58" text-anchor="middle">n_ctx 6144 — ทำนาย</text>
+
+          <rect class="d-box" x="10" y="150" width="180" height="55" rx="6"/>
+          <text class="d-label" x="100" y="173" text-anchor="middle">โหมด Ortho</text>
+          <text class="d-label-s" x="100" y="190" text-anchor="middle">บันทึกเพียงลำพัง ไม่มีคำสั่ง</text>
+
+          <path class="d-arrow" d="M190 177 H213"/>
+          <path class="d-arrow-head" d="M213 177 l-7 -4 v8 z"/>
+
+          <rect class="d-box-a" x="220" y="142" width="230" height="70" rx="6"/>
+          <text class="d-label" x="335" y="167" text-anchor="middle">Llama-3.1-8B-Ortho.gguf</text>
+          <text class="d-label-s" x="335" y="184" text-anchor="middle">n_ctx 2048 — ทำนาย</text>
+          <text class="d-label-s" x="335" y="200" text-anchor="middle">ดาวน์โหลด: 404</text>
+
+          <path class="d-arrow" d="M450 47 L500 100"/>
+          <path class="d-arrow" d="M450 177 L500 120"/>
+          <path class="d-arrow-head" d="M500 110 l-8 -3 l2 8 z"/>
+
+          <rect class="d-box" x="510" y="85" width="210" height="50" rx="6"/>
+          <text class="d-label" x="615" y="106" text-anchor="middle">create_chat_completion()</text>
+          <text class="d-label-s" x="615" y="123" text-anchor="middle">max_tokens 500 · temperature 0.1</text>
+
+          <path class="d-arrow" d="M720 110 H758"/>
+          <path class="d-arrow-head" d="M758 110 l-7 -4 v8 z"/>
+
+          <rect class="d-box" x="760" y="85" width="130" height="50" rx="6"/>
+          <text class="d-label" x="825" y="106" text-anchor="middle">คำตอบดิบ</text>
+          <text class="d-label-s" x="825" y="123" text-anchor="middle">คาดว่าเป็น JSON</text>
+        </svg>
+        <figcaption>สองโหมดแยกทางกันก่อนจะเรียกโมเดล (คำสั่งระบบ ขนาดบริบท) แล้วมาบรรจบกันที่การเรียก llama.cpp เดียวกัน เส้นทาง Ortho ถูกเน้นไว้: เป็นเส้นทางที่การดาวน์โหลดล้มเหลว (§4)</figcaption>
+      </figure>
+
+      <p>ข้อสังเกต:</p>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p><strong>โหมด Ortho ไม่ส่งคำสั่งใดเลย</strong> มีเพียงบันทึกดิบที่ถูกส่งออกไปเป็น
+        ข้อความของผู้ใช้ และเป็นการปรับละเอียดของโมเดล Llama-Ortho เองที่ควรจะ
+        แบกงานนี้ไว้ ส่วนโหมด TMJ ยังคงเก็บคำสั่งที่สืบทอดมาจาก MedX</p>
+      </div>
+
+      <ul>
+        <li><code>create_chat_completion</code> ใช้ <em>chat template</em> ที่ฝังอยู่ในไฟล์ GGUF
+        โมเดลทั้งสองติด tag <code>conversational</code> บน Hugging Face แสดงว่า
+        template มีอยู่จริง แต่มองไม่เห็นและควบคุมไม่ได้จากรีโพสิทอรี</li>
+        <li><code>temperature=0.1</code> และไม่มี <code>seed</code>: เอาต์พุตเกือบจะเป็นค่าเดิมทุกครั้ง แต่
+        ทำซ้ำให้เหมือนเดิมทุกตัวอักษรไม่ได้</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p><strong>ไม่มีการป้องกันเรื่องความยาว</strong> <code>n_ctx</code> เท่ากับ 6144 (TMJ) หรือ 2048 (Ortho) และ
+        <code>max_tokens=500</code> ถูกหักออกจากงบนั้น บันทึกที่เกินงบจะทำให้
+        llama.cpp โยนข้อผิดพลาด ข้อยกเว้นถูกจับเป็นรายไฟล์ บันทึกลง log และไฟล์นั้น
+        ถูกเพิ่มเข้า <code>failed_files</code> งบของ Ortho คับแคบเป็นพิเศษ:
+        เหลือบันทึกที่ใช้ได้ราว 1,500 token บันทึกทดสอบ
+        <code>TMJ_note1.txt</code> ยาวราว
+        4,400 ตัวอักษร ซึ่งผ่านได้ในโหมด TMJ</p>
+      </div>
+
+      <ul>
+        <li>การโหลดโมเดลถูกห่อด้วยการเปลี่ยนทาง <code>stderr</code> ไปที่
+        <code>/dev/null</code> ด้วย <code>os.dup2</code> (<code>CNE_CLI.py:155</code>) เพื่อ
+        กลบข้อความรบกวนของ llama.cpp ซึ่งไม่เช่นนั้นจะไปปนในช่องสัญญาณข้อผิดพลาดที่
+        Slicer ตีความว่า CLI ล้มเหลว</li>
+      </ul>
+
+      <h2 id="post-traitement">7. การประมวลผลคำตอบภายหลัง</h2>
+
+      <p>คาดหวังว่าโมเดลจะตอบเป็น JSON แต่โค้ดไม่ได้บังคับ (ไม่มี
+      <code>response_format</code> ไม่มีไวยากรณ์ GBNF) และเพียง<strong>คุ้ยหา</strong> JSON
+      ออกจากข้อความ (<code>CNE_CLI.py:207</code>):</p>
+
+      <pre><code>start_idx = ai_response.find('{')
+end_idx   = ai_response.rfind('}') + 1
+data = json.loads(ai_response[start_idx:end_idx])
+if "extraction" in data:
+    data = data["extraction"]
+for key, value in data.items():
+    formatted_response += f"{key} : {value}\n"</code></pre>
+
+      <p>กล่าวคือ: จากปีกกาเปิดอันแรกถึงปีกกาปิดอันสุดท้าย แกะชั้น
+      <code>extraction</code> ออกถ้ามี แล้วแบนให้เป็นบรรทัด <code>key : value</code> หาก
+      การแปลงล้มเหลว<strong>หรือ</strong>ไม่มีปีกกาเลย คำตอบดิบของโมเดลจะถูกเขียนลงไป
+      ตามที่เป็น ไฟล์เอาต์พุตไม่บอกว่าเกิดกรณีใดจากสองกรณีนี้</p>
+
+      <div class="callout warn">
+        <div class="callout-title">ข้อควรระวัง</div>
+        <p>ผลที่ตามมา: การตัดช่วงอย่างง่ายด้วย <code>find('{')</code>…<code>rfind('}')</code> พังทันทีที่
+        คำตอบมีอ็อบเจกต์ JSON มากกว่าหนึ่งชุด และค่าที่ซ้อนกัน (list, dict) จะ
+        ถูกเขียนลงไฟล์ข้อความด้วย <code>repr</code> ของ Python</p>
+      </div>
+
+      <h2 id="sorties">8. เอาต์พุต</h2>
+
+      <p>ไฟล์ข้อความหนึ่งไฟล์ต่อบันทึกอินพุตหนึ่งฉบับ ในโฟลเดอร์เอาต์พุต:</p>
+
+      <pre><code>Extraction_&lt;note name without extension&gt;.txt</code></pre>
+
+      <p>เนื้อหา: บรรทัด <code>key : value</code> หรือคำตอบดิบของโมเดลหากการแปลง
+      ล้มเหลว ไม่มี CSV ไม่มี json ไม่มีการรวมผลรายผู้ป่วย — dashboard ของ <a href="../MedX/MedX.html">MedX</a>
+      ไม่ได้ถูกยกมาด้วย</p>
+
+      <p>โฟลเดอร์เอาต์พุตถูกสร้างด้วย <code>os.makedirs(..., exist_ok=True)</code> ทางฝั่ง
+      widget (<code>CNE.py:578</code>)</p>
+
+      <h2 id="predit-calcule">9. อะไรทำนาย อะไรคำนวณ</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ส่วน</th><th>ลักษณะ</th><th>ที่ไหน</th></tr></thead>
+          <tbody>
+            <tr><td>การสกัดข้อความจาก PDF/Word</td><td><span class="badge calcule">คำนวณ</span> PyMuPDF / python-docx</td><td>CLI</td></tr>
+            <tr><td>การปรับอักขระทางการพิมพ์ให้เป็นมาตรฐาน</td><td><span class="badge calcule">คำนวณ</span> ตารางแทนที่แบบคงที่ 7 รายการ</td><td>CLI</td></tr>
+            <tr><td>การสกัดคู่คีย์–ค่า</td><td><span class="badge predit">ทำนาย</span> LLM, Qwen-2.5-7B-TMJ หรือ Llama-3.1-8B-Ortho, GGUF Q4</td><td>CLI, <code>llama_cpp</code> ในโปรเซสเดียวกัน</td></tr>
+            <tr><td>การจัดรูปแบบ</td><td><span class="badge calcule">คำนวณ</span> <code>find('{')</code> / <code>json.loads</code> / ลูปแบนข้อมูล</td><td>CLI</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>เนื้อหาทางคลินิกทั้งหมดในเอาต์พุตมาจากโมเดล ไม่มีกฎ ไม่มี
+      พจนานุกรมศัพท์ ไม่มีการตรวจสอบสคีมา: อะไรที่โมเดล
+      เขียนออกมา สิ่งนั้นคือสิ่งที่ถูกบันทึกไว้</p>
+
+      <h2 id="environnement">10. สภาพแวดล้อม</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>องค์ประกอบ</th><th>ค่า</th><th>แหล่งที่มา</th></tr></thead>
+          <tbody>
+            <tr><td>อินเทอร์พรีเตอร์</td><td>Python ของ Slicer ไม่มี conda</td><td><code>SlicerMacroBuildScriptedCLI</code>, <code>CMakeLists.txt</code></td></tr>
+            <tr><td>แพ็กเกจที่ติดตั้งระหว่างทาง</td><td><code>llama-cpp-python</code> (index สำหรับ CPU), <code>pymupdf</code>, <code>python-docx</code></td><td><code>CNE.py:93-100</code></td></tr>
+            <tr><td>GPU</td><td>ขอใช้ (<code>n_gpu_layers=-1</code>) แต่การติดตั้งบังคับให้เป็น build สำหรับ CPU</td><td>§3</td></tr>
+            <tr><td>น้ำหนัก</td><td>~4.4 GB (TMJ) / ~4.9 GB (Ortho), <code>&lt;Documents&gt;/SlicerDownloads/CNE/model/</code></td><td><code>CNE.py:500</code></td></tr>
+            <tr><td>RAM</td><td>โค้ดไม่ได้จำกัดไว้ โมเดล 7–8 B แบบ Q4_K_M ต้องใช้หน่วยความจำประจำราว 5–6 GB เพิ่มจากที่ Slicer ใช้</td><td>การอนุมานจากโค้ด</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="pieges">11. ข้อควรระวังและจุดเปราะบาง</h2>
+
+      <ul>
+        <li><strong>โมเดล Ortho ดาวน์โหลดไม่ได้</strong>: ชื่อไฟล์ผิด HTTP 404 (§4)
+        วิธีแก้: <code>model-q4_0.gguf</code> → <code>model-q4_k_m.gguf</code></li>
+        <li><strong>โฟลเดอร์เอาต์พุตของไฟล์ทดสอบไม่มีอยู่จริง</strong>
+        <code>copyTestFiles()</code> (<code>CNE.py:409</code>) คัดลอก <code>input_&lt;type&gt;</code> <strong>และ</strong>
+        <code>output_&lt;type&gt;</code> แต่ <code>Resources/testfiles/</code>
+        มีเพียงโฟลเดอร์ <code>input_</code> สองโฟลเดอร์ การ <code>shutil.copytree</code> ของโฟลเดอร์
+        เอาต์พุตจึงถูกข้ามพร้อมคำเตือน และหน้าจอลงเอยด้วยเส้นทางเอาต์พุต
+        ที่กรอกไว้แต่ยังไม่มีอยู่</li>
+        <li><strong>การสแกนที่ไม่ไล่ลงโฟลเดอร์ย่อย</strong> ของโฟลเดอร์อินพุต (§5)</li>
+        <li><strong>ไม่มีการจำกัดความยาว</strong> ก่อนเรียกโมเดล: บันทึกที่ยาวเกินจะล้มเหลว
+        ทั้งฉบับ แทนที่จะถูกแบ่งเป็นช่วง ขณะที่ <a href="../MedX/MedX.html">MedX</a> แบ่งเป็นช่วง (§6) นี่คือ
+        การถอยหลังในแง่หน้าที่ของสิ่งที่มาแทน</li>
+        <li><strong>โหมด Ortho ไม่ส่งคำสั่งระบบ</strong> (§6): ถ้าโมเดลไม่ใช่ตัวที่
+        คาดไว้ ก็ไม่มีเหตุใดที่เอาต์พุตจะเป็น JSON เลย</li>
+        <li><strong>ไม่มีการบังคับรูปแบบเอาต์พุต</strong>: ไม่มีไวยากรณ์ GBNF และไม่มี
+        <code>response_format</code> ทั้งที่ llama.cpp มีให้ทั้งสองอย่าง การประมวลผลภายหลังจึงเป็น
+        การคุ้ยหาแบบใช้วิธีเดาเอา (§7)</li>
+        <li><strong>radio button ไม่ได้ตั้งเป็น TMJ หรือ Ortho</strong> → <code>notesType = ""</code>
+        (<code>CNE.py:382</code>) → ใน <code>getModelPath</code> ตัวแปร <code>repo_id</code> ไม่เคยถูก
+        กำหนดค่า และ <code>UnboundLocalError</code> ปรากฏเป็นข้อความ "Failed to load model" กรณีนี้
+        ไม่ควรเกิด (มี <code>setExclusive(True)</code> และค่าเริ่มต้นเป็น TMJ) แต่ไม่มีอะไร
+        ขัดไว้</li>
+        <li><strong>การใช้ตัวพิมพ์ไม่สอดคล้องกัน</strong>: <code>notesType == "TMJ"</code> กำหนดค่า <code>n_ctx</code> ขณะที่ <code>notesType.upper() == "TMJ"</code>
+        กำหนดคำสั่ง หาก <code>notesType</code> เป็นตัวพิมพ์เล็ก จะได้คำสั่งของ TMJ
+        พร้อมบริบทขนาด 2048</li>
+        <li><strong>ไม่มีร่องรอยที่มา</strong>: ไฟล์ <code>Extraction_*.txt</code> ไม่ระบุทั้ง
+        โมเดล รุ่นของโมเดล และวันที่ การรันสองครั้งด้วยโมเดลที่ต่างกันจะ
+        ให้ไฟล์ที่แยกจากกันไม่ออก</li>
+        <li><strong>PHI</strong>: ไม่มีอะไรลบข้อมูลระบุตัวตน ไม่มีอะไรเตือน บันทึกถูกอ่านแบบไม่ปิดบัง
+        แล้วส่งผ่านโมเดลในเครื่อง (จึงไม่มีการรั่วออกทางเครือข่าย — นั่นคือ
+        เกราะป้องกันเพียงอย่างเดียว และเป็นผลจากโครงสร้างมากกว่าความตั้งใจ)</li>
+        <li><strong>เมทาดาทาของ CLI ยังเป็นค่าเริ่มต้นจากเทมเพลต</strong>:
+        <code>CNE_CLI.xml</code> ยังเขียนว่า "Apply a Gaussian blur to an
+        image" ระบุผู้เขียนโมดูลว่า "Andras Lasso (PerkLab)" และค่า <code>&lt;index&gt;</code>
+        เป็น 0, 2, 3, 4 — ขาด index 1 ไป</li>
+        <li><strong><code>onCliProgress</code></strong> (<code>CNE.py:594</code>) อ่าน <code>caller.GetProgress()</code>
+        แล้วไม่ทำอะไรกับค่านั้นเลย และยังไม่ได้ถูกเชื่อมกับ observer ใด ๆ ด้วย เป็น
+        โค้ดที่ไม่ถูกใช้งาน ความคืบหน้าจริงส่งผ่าน tag <code>&lt;filter-progress&gt;</code> ของ CLI ซึ่ง
+        <code>qSlicerCLIProgressBar</code> เป็นตัวอ่าน</li>
+      </ul>
+
+      <h2 id="litterature">12. เอกสารอ้างอิง</h2>
+
+      <p>รีโพสิทอรีไม่ได้อ้างงานตีพิมพ์ใดสำหรับ CNE และรีโพสิทอรี
+      <code>dcbia/*</code> ทั้งสองบน Hugging Face ก็เผยแพร่โดยไม่มี model card และไม่มี
+      เอกสารอ้างอิง ระเบียบวิธีการปรับละเอียด คลังข้อมูลที่กำกับไว้สำหรับ TMJ/Ortho และ
+      การประเมินผล <strong>ระบุไม่ได้จากรีโพสิทอรี</strong></p>
+
+      <p>สิ่งที่ตรวจสอบได้:</p>
+
+      <ul>
+        <li>สายสืบทอดจาก <a href="../MedX/MedX.html">MedX</a> → CNE ซึ่งมีเอกสารยืนยันเพียง
+        <code>CMakeLists.txt:42</code> และหัวข้อ MedX ใน
+        <code>README.md:425</code> ซึ่งยังอธิบาย pipeline แบบ BART เดิมและ
+        dashboard ที่หายไปแล้ว</li>
+        <li>โมเดลพื้นฐาน:
+        <a href="https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct">Meta-Llama-3.1-8B-Instruct</a>,
+        <a href="https://huggingface.co/Qwen/Qwen2.5-7B-Instruct">Qwen2.5-7B-Instruct</a></li>
+        <li>รีโพสิทอรีของโมเดลที่ปรับละเอียดแล้ว:
+        <a href="https://huggingface.co/dcbia/Qwen-2.5-7B-Instruct-TMJ">dcbia/Qwen-2.5-7B-Instruct-TMJ</a>,
+        <a href="https://huggingface.co/dcbia/Meta-Llama-3.1-8B-Instruct-Ortho">dcbia/Meta-Llama-3.1-8B-Instruct-Ortho</a></li>
+        <li>เอนจิน: <a href="https://github.com/abetlen/llama-cpp-python">llama-cpp-python</a>,
+        <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a> (รูปแบบ GGUF, quantisation
+        Q4_K_M)</li>
+        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
+      </ul>
+
+      <p>อย่าผูก CNE เข้ากับวรรณกรรมทั่วไปเรื่องการสกัดข้อมูลทางคลินิก
+      ด้วย LLM: ไม่มีสิ่งใดในรีโพสิทอรีบ่งชี้ว่าโมเดลที่ใช้ที่นี่
+      มาจากงานที่ตีพิมพ์แล้ว</p>
+
+      <p>สิ่งที่ค้นหาเพื่อให้ได้ข้อสรุปนี้ และงานที่เกี่ยวข้องซึ่งรวบรวมไว้ตามทาง:
+      <a href="SOURCES.html">SOURCES.md</a></p>
+
+      <footer class="footer">
+        <a href="../index.html">← หน้าทั้งหมด</a> ·
+        <a href="SOURCES.html">บรรณานุกรมของเครื่องมือนี้</a> ·
+        แหล่งที่มา: <code>CNE.md</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>

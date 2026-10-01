@@ -212,6 +212,27 @@
       sucessivas sobre um trio escolhido e depois polida por um ICP que, por sua vez,
       reemparelha os pontos <strong>por vizinho mais próximo</strong>, e não pelo rótulo.</p>
 
+      <figure class="viewer3d" data-aso="stages">
+        <div class="v3d-stage">
+          <span class="v3d-hint">Arraste para girar &middot; pince ou role para aproximar</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <ol class="v3d-chips v3d-stages">
+          <li data-stage="0">transformação 1 <code>7.37&deg;</code></li>
+          <li data-stage="1">transformação 2 <code>2.76&deg;</code></li>
+          <li data-stage="2">transformação 3 <code>1.70&deg;</code></li>
+          <li data-stage="3">transformação 4 <code>0.165 mm</code></li>
+        </ol>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Repetir as quatro etapas</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="placing">o ALI está levando os agentes até os landmarks</i>
+          <i data-k="done">quatro etapas aplicadas &mdash; rotação total</i>
+        </span>
+        <figcaption>As quatro transformações de <code>MG_test_Or_transform.tfm</code>, tocadas uma a uma. O arquivo as guarda <em>compostas e invertidas</em> &mdash; ele leva o exame orientado de volta ao original &mdash; então o que você vê é cada bloco invertido e a lista percorrida ao contrário. Essa sequência reproduz os landmarks que o ASO escreveu com <strong>0,000&nbsp;mm</strong> de diferença, e foi assim que a ordem ficou estabelecida, em vez de suposta. As magnitudes são 7,37&deg;, 2,76&deg;, 1,70&deg; e um deslocamento de 0,165&nbsp;mm, para um total de <strong>6,49&deg;</strong> &mdash; elas se cancelam em parte. <strong>Elas não são nomeadas, de propósito.</strong> Dizer qual é o ICP e quais são as rotações construídas à mão do &sect;4.4 exigiria instrumentar o próprio ASO; até que isso seja feito, as magnitudes são medidas e os nomes seriam adivinhados.</figcaption>
+      </figure>
+
       <h2 id="aso-cbct">4. ASO_CBCT</h2>
 
       <h3 id="modes-cbct">4.1 Os dois modos</h3>
@@ -422,6 +443,83 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <p>As três escritas são protegidas por <code>if not os.path.exists(...)</code>: <strong>rodar de novo
       sobre uma pasta de saída não vazia não reescreve nada</strong> e ainda assim termina em sucesso.</p>
 
+      <h3 id="cbct-maths">4.5 A orientação, escrita por extenso</h3>
+
+      <p>Tudo o que vem acima é prosa sobre código. Aqui está a mesma coisa em forma de
+      aritmética, porque duas das escolhas do ASO só ficam visíveis quando são escritas por
+      extenso. Notação: <math><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math>
+      é o landmark <math><mi>A</mi></math> no exame que está sendo orientado,
+      <math><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math>
+      o mesmo landmark no gold.</p>
+
+<figure class="formula"><figcaption>1. Translação até o primeiro landmark &mdash; calculada, e depois descartada</figcaption><math display="block"><mrow><mover><mi>t</mi><mo>&#x2192;</mo></mover><mo>=</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math></figure>
+
+      <p>A translação move a fonte para que as rotações possam ser calculadas sobre
+      pontos sobrepostos. Em seguida ela é abandonada: <code>TransformMatrix =
+      RotationTransformMatrix</code>, com a translação comentada fora do produto. O volume
+      nunca é transladado &mdash; o <code>PRE_ASO_CBCT</code> já o havia centrado na
+      origem.</p>
+
+<figure class="formula"><figcaption>2. Primeira rotação &mdash; os vetores são primeiro dobrados no octante positivo</figcaption><math display="block"><mrow><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>=</mo><mrow><mo>|</mo><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>B</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>=</mo><mrow><mo>|</mo><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>B</mi></msub><mo>&#x2212;</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow></mrow></math></figure>
+
+      <p><strong>Leia essas barras com atenção.</strong> Elas são um valor absoluto
+      componente por componente, não uma norma. Os dois vetores são dobrados no octante
+      positivo antes de o ângulo ser tomado, de modo que o que vem a seguir é o ângulo
+      entre
+      <math><mrow><mo>|</mo><mover><mi>u</mi><mo>&#x2192;</mo></mover><mo>|</mo></mrow></math>
+      e <math><mrow><mo>|</mo><mover><mi>v</mi><mo>&#x2192;</mo></mover><mo>|</mo></mrow></math>,
+      que <em>não</em> é o ângulo entre
+      <math><mover><mi>u</mi><mo>&#x2192;</mo></mover></math> and
+      <math><mover><mi>v</mi><mo>&#x2192;</mo></mover></math>. Um par de landmarks
+      apontando para um lado e o seu correspondente no gold apontando para o lado oposto
+      dão aqui o mesmo vetor.</p>
+
+<div class="formula"><math display="block"><mrow><msub><mi>&#x3b8;</mi><mn>1</mn></msub><mo>=</mo><mi>arccos</mi><mrow><mo stretchy="true" fence="true">(</mo><mfrac><mrow><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#x22c5;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow><mrow><mrow><mo>&#x2225;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#x2225;</mo></mrow><mrow><mo>&#x2225;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>&#x2225;</mo></mrow></mrow></mfrac><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><msub><mover><mi>a</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>=</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#xd7;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math></div>
+
+      <p>No código, os dois vetores são primeiro divididos pela sua maior componente
+      (<code>v1_u = v1 / np.amax(v1)</code>). Isso é um reescalonamento positivo, portanto
+      se cancela tanto no quociente quanto no produto vetorial: não muda nada.</p>
+
+<figure class="formula"><figcaption>3. Segunda rotação &mdash; um rolamento em torno do eixo que acabou de ser alinhado, com um ângulo tirado de um terceiro landmark</figcaption><math display="block"><mrow><msub><mi>&#x3b8;</mi><mn>2</mn></msub><mo>=</mo><mi>&#x2220;</mi><mrow><mo stretchy="true" fence="true">(</mo><mrow><mo>|</mo><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>C</mi></msub><mo>&#x2212;</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo>,</mo><mrow><mo>|</mo><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>C</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><msub><mover><mi>a</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>=</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math></figure>
+
+      <p>A segunda rotação é a outra surpresa. Seu eixo não é um produto vetorial, mas
+      <math><mrow><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math>
+      em pessoa &mdash; o eixo que a etapa anterior acabou de alinhar. É um rolamento em
+      torno desse eixo, e o seu ângulo vem de um <em>terceiro</em> landmark. Rolar em torno
+      de um eixo já alinhado não pode desfazer esse alinhamento, e é por isso que a ordem
+      importa.</p>
+
+<figure class="formula"><figcaption>4. A matriz de rotação &mdash; a forma em quatérnios de Rodrigues</figcaption><math display="block"><mrow><mi>&#x3b1;</mi><mo>=</mo><mi>cos</mi><mfrac><mi>&#x3b8;</mi><mn>2</mn></mfrac><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mo>,</mo><mi>&#x3b3;</mi><mo>,</mo><mi>&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mo>&#x2212;</mo><mover><mover><mi>a</mi><mo>&#x2192;</mo></mover><mo>&#x302;</mo></mover><mi>sin</mi><mfrac><mi>&#x3b8;</mi><mn>2</mn></mfrac></mrow></math></figure>
+<div class="formula"><math display="block"><mrow><mi>R</mi><mo>=</mo><mrow><mo stretchy="true" fence="true">[</mo><mtable><mtr><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b3;</mi><mo>+</mo><mi>&#x3b1;</mi><mi>&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b4;</mi><mo>&#x2212;</mo><mi>&#x3b1;</mi><mi>&#x3b3;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd></mtr><mtr><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b3;</mi><mo>&#x2212;</mo><mi>&#x3b1;</mi><mi>&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b3;</mi><mi>&#x3b4;</mi><mo>+</mo><mi>&#x3b1;</mi><mi>&#x3b2;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd></mtr><mtr><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b4;</mi><mo>+</mo><mi>&#x3b1;</mi><mi>&#x3b3;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b3;</mi><mi>&#x3b4;</mi><mo>&#x2212;</mo><mi>&#x3b1;</mi><mi>&#x3b2;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup></mrow></mtd></mtr></mtable><mo stretchy="true" fence="true">]</mo></mrow></mrow></math></div>
+
+      <p>Duas inversões de sinal se cancelam aqui: a parte vetorial carrega um sinal
+      negativo, e a matriz é escrita transposta em relação à forma usual em quatérnios. O
+      resultado é a rotação ordinária de Rodrigues de <math><mi>&#x3b8;</mi></math> em
+      torno de
+      <math><mover><mover><mi>a</mi><mo>&#x2192;</mo></mover><mo>&#x302;</mo></mover></math>.
+      A mesma função serve ao FlexReg e ao ASO_IOS.</p>
+
+<figure class="formula"><figcaption>5. Composição &mdash; a translação da etapa 1 nunca entra no produto</figcaption><math display="block"><mrow><mi>M</mi><mo>=</mo><msub><mi>R</mi><mi>icp</mi></msub><msub><mi>R</mi><mn>2</mn></msub><msub><mi>R</mi><mn>1</mn></msub><mo>&#x2003;</mo><mo>&#x2003;</mo><mrow><mo>(</mo><msub><mi>R</mi><mi>icp</mi></msub><mrow><mo>[</mo><mn>0:3</mn><mo>,</mo><mn>3</mn><mo>]</mo></mrow><mo>=</mo><mn>0</mn><mo>)</mo></mrow></mrow></math></figure>
+
+      <p>O ICP contribui apenas com uma rotação: sua coluna de translação é
+      explicitamente zerada (<code>TransformMatrixBis[:3, 3] = [0, 0, 0]</code>). A
+      composição é, portanto, uma rotação pura em torno da origem do mundo.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Por que isto não é um ajuste</div>
+        <p>Com <math><mi>N</mi></math> landmarks emparelhados existe uma rotação em
+        forma fechada que minimiza a soma dos quadrados das distâncias &mdash; Kabsch,
+        pela decomposição em valores singulares da covariância cruzada:</p>
+<figure class="formula"><figcaption>O que um ajuste por mínimos quadrados calcularia &mdash; e o que o ASO <em>não</em> faz</figcaption><math display="block"><mrow><mi>H</mi><mo>=</mo><munder><mo>&#x2211;</mo><mi>k</mi></munder><mrow><mo stretchy="true" fence="true">(</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>k</mi></msub><mo>&#x2212;</mo><mover><mover><mi>p</mi><mo>&#x2192;</mo></mover><mo>&#xaf;</mo></mover><mo stretchy="true" fence="true">)</mo></mrow><msup><mrow><mo stretchy="true" fence="true">(</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>k</mi></msub><mo>&#x2212;</mo><mover><mover><mi>q</mi><mo>&#x2192;</mo></mover><mo>&#xaf;</mo></mover><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x22a4;</mo></msup><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><mi>H</mi><mo>=</mo><mi>U</mi><mi>&#x3a3;</mi><msup><mi>V</mi><mo>&#x22a4;</mo></msup><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><mi>R</mi><mo>=</mo><mi>V</mi><mi>D</mi><msup><mi>U</mi><mo>&#x22a4;</mo></msup></mrow></math></figure>
+        <p>with <math><mrow><mi>D</mi><mo>=</mo><mi>diag</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>1</mn><mo>,</mo><mi>det</mi><mo>(</mo><mi>V</mi><msup><mi>U</mi><mo>&#x22a4;</mo></msup><mo>)</mo><mo>)</mo></mrow></math>
+        protegendo contra uma reflexão. O ASO não calcula nada disso. Ele constrói duas
+        rotações a partir de um trio, guarda o trio que por acaso pontua melhor ao longo
+        de até 2500 sorteios, e entrega o resultado a um ICP que reemparelha os pontos
+        pelo vizinho mais próximo, e não pelo rótulo. É uma busca, não uma solução
+        &mdash; e é exatamente por isso que os números do visualizador acima mostram o ICP
+        girando mais do que a inicialização que ele deveria apenas refinar.</p>
+      </div>
+
       <h2 id="aso-ios">5. ASO_IOS</h2>
 
       <h3 id="mode-auto-ios">5.1 Modo automático — centroides das coroas</h3>
@@ -505,6 +603,22 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       </div>
 
       <p>A matriz final é <code>output_icp["matrix"] @ matrix</code>: o ICP depois do PrePreAso.</p>
+
+      <figure class="viewer3d" data-aso-ios>
+        <div class="v3d-stage">
+          <span class="v3d-hint">Arraste para girar &middot; pince ou role para aproximar</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Orientar a arcada de novo</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="seg">o dentalmodelseg está numerando os dentes &mdash;</i>
+          <i data-k="centroids">centroides das coroas &mdash; a média dos vértices que carregam cada rótulo</i>
+          <i data-k="gap">distância média até os landmarks da referência:</i>
+        </span>
+        <figcaption>Todo o pipeline automático, na ordem em que o código o executa. Primeiro o <code>dentalmodelseg</code> numera os dentes &mdash; antes disso eles são apenas superfície. Depois o <code>vtkMeanTeeth</code> reduz cada um a um único ponto: a <strong>média dos vértices que carregam o seu rótulo</strong>. Só então a orientação roda, e ela roda <em>sobre esses pontos</em>, não sobre as malhas. O movimento é a matriz que o ASO escreveu de fato (<code>matrix_new_9.npy</code>): <strong>3,26&deg;</strong> e <strong>15,71&nbsp;mm</strong>. Ao contrário da cena da CBCT, aqui os milímetros querem dizer algo: o gold <em>é</em> uma arcada, e os landmarks carregam os mesmos rótulos dente a dente, então os 41 pares correspondentes podem ser comparados diretamente. A distância média cai de <strong>16,14&nbsp;mm</strong> para <strong>2,95&nbsp;mm</strong>. Aplicar a matriz aos landmarks de partida reproduz os que o ASO escreveu com 0,000&nbsp;mm de diferença &mdash; entrada, transformação e saída concordam exatamente.</figcaption>
+      </figure>
 
       <h3 id="mode-semi-ios">5.2 Modo semi — landmarks fornecidos <span class="badge calcule">calculado</span></h3>
 
@@ -838,5 +952,9 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/aso-mesh.js"></script>
+<script src="../../assets/aso-ios-mesh.js"></script>
+<script src="../../assets/aso-3d.js"></script>
 </body>
 </html>

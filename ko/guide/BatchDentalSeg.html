@@ -137,6 +137,104 @@
         두개 분할을 기대하고 이 모델을 고르지 마십시오.</p>
       </div>
 
+      <figure class="viewer3d" data-bds-3d>
+        <div class="v3d-modes" role="group" aria-label="콤보 박스에서 선택한 모델">
+          <button type="button" data-bds-model="DentalSegmentator" aria-pressed="true">DentalSegmentator</button>
+          <button type="button" data-bds-model="PediatricDentalsegmentator" aria-pressed="false">PediatricDentalsegmentator</button>
+          <button type="button" data-bds-model="NasoMaxillaDentSeg" aria-pressed="false">NasoMaxillaDentSeg</button>
+          <button type="button" data-bds-model="UniversalLabDentalsegmentator" aria-pressed="false">UniversalLabDentalsegmentator</button>
+        </div>
+        <div class="v3d-stage">
+          <button class="v3d-reset" type="button">시점 초기화</button>
+          <span class="v3d-state">입력 CBCT &mdash; 임계값만 적용</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+          <span class="v3d-hint">끌어서 회전 &middot; 손가락을 모으거나 스크롤해 확대 &middot; 구조물을 클릭</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. 볼륨 읽기 &mdash; <code>nnUNet_raw</code>/<code>_preprocessed</code>/<code>_results</code>가 모두 모델 폴더를 가리킵니다</li>
+          <li data-step="1">1. <code>nnUNetv2_predict</code> &mdash; 다중 레이블 패스 <strong>한 번</strong>, <code>-f 0</code>, <code>-step_size 0.5</code>, <code>--disable_tta</code></li>
+          <li data-step="2">2. <code>_buildLabelArray</code> &mdash; 내보내기 한 번, 그다음 공식 값으로 LUT 재매핑 한 번</li>
+          <li data-step="3">3. <code>_exportVTKPerLabel</code> &mdash; windowed-sinc, 40&nbsp;% quadric 데시메이션, RAS&rarr;LPS 반전</li>
+        </ol>
+        <ol class="v3d-parts">
+          <li data-part="SKULL" data-label="Upper Skull" style="--sw:#e3dd90" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>두개골 상부</span> <code>SKULL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">두개관입니다. 네 모델 중 셋은 이것에 레이블을 붙이지만 UniversalLab은 붙이지 않습니다. 이 장면에 두개관이 없는 이유가 그것입니다. 여기서 보여 주는 것이 UniversalLab 패스이기 때문입니다.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAXI" data-label="Maxilla" style="--sw:#b8860b" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>상악골</span> <code>MAXI</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">위턱뼈가 독립된 레이블로 나오며, 여기서는 값 54입니다. 계측값 129&nbsp;166&nbsp;mm&sup3;로 이 패스에서 가장 큰 구조이고, DentalSegmentator라면 두개골 상부에 합쳐 버렸을 구조입니다.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAND" data-label="Mandible" style="--sw:#d2691e" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>하악골</span> <code>MAND</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">아래턱뼈이며 두개골에서 유일하게 움직이는 뼈입니다. 네 레이블 표에 모두 들어 있지만 값은 세 가지로 갈립니다(2, 2, 2, 53). 계측값은 33&nbsp;795&nbsp;mm&sup3;입니다.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="UPT" data-label="Upper Teeth" style="--sw:#dc9565" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>상악 치아</span> <code>UPT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">상악궁 전체에 레이블 하나 &mdash; 네 모델 중 셋에서 그렇습니다. UniversalLab에는 그런 레이블이 없습니다. 이 스캔에서 상악궁은 번호가 따로 매겨진 치아 15개로 나왔습니다. 치아 도표를 보십시오.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="LOT" data-label="Lower Teeth" style="--sw:#ebdfb4" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>하악 치아</span> <code>LOT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">하악궁도 마찬가지로, 여기서는 번호가 매겨진 치아 14개로 나왔습니다. 두 모델 계열의 차이는 이것뿐이며, 코드의 차이가 아니라 레이블 표의 차이입니다.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="CANAL" data-label="Mandibular canal" style="--sw:#a0522d" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>하악관</span> <code>CANAL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">좌우 하치조신경관입니다. 하악골 안을 지나는 양측의 가느다란 관이며, 이 패스에서 가장 작은 구조입니다(805&nbsp;mm&sup3;, 상악골은 129&nbsp;166).</span>
+            <span class="v3d-tag"></span>
+          </li>
+        </ol>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">패스 실행</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="read">스캔 읽는 중 &mdash; 임계값만 적용, 아직 신경망 없음</i>
+          <i data-k="predict"><code>nnUNetv2_predict</code> &mdash; 볼륨 전체를 훑는 슬라이딩 윈도 한 번</i>
+          <i data-k="labelmap">레이블 맵 재구성 &mdash;</i>
+          <i data-k="export">표면 기록, 모듈의 3D 불투명도 적용</i>
+          <i data-k="values">개 레이블 값 기록</i>
+          <i data-k="done">개 레이블 생성</i>
+          <i data-k="teeth">그중 치아</i>
+          <i data-k="scans">개 스캔 처리</i>
+          <i data-k="label">레이블</i>
+          <i data-k="fdi">FDI</i>
+          <i data-k="absent">이 모델은 이것을 만들지 않습니다.</i>
+          <i data-k="split">이 모델은 대신 치아마다 번호를 매깁니다 &mdash; 치아 도표를 보십시오.</i>
+          <i data-k="nogeom">이 모델의 표에는 있지만, 여기 보여 주는 패스에서는 나오지 않았습니다.</i>
+          <i data-k="other">화면의 패스가 아닙니다 &mdash; 이 모델의 레이블 표만 목록에 적용한 것입니다.</i>
+          <i data-k="notinscan">이 스캔에서는 나오지 않음</i>
+        </span>
+        <figcaption>패스가 실제로 무엇을 내놓는지 보여 줍니다. <strong>실제</strong>:
+        <code>UniversalLabDentalsegmentator</code>를
+        <code>PreDentalSurgery</code>에 돌린 결과입니다. Slicer가 공개한 CBCT 예제이자
+        모듈의 <em>Test Files</em> 버튼이 내려받는 그 스캔으로, 스캔 한 개,
+        <code>cuda</code>, 238.7&nbsp;s, 레이블 32개 기록, 그중
+        <strong>번호가 따로 매겨진 치아 29개</strong>에 하악골, 상악골,
+        하악관이 더해집니다. 기록되지 않은 레이블 23개는 이 성인에게 없는 치아입니다.
+        제3대구치 세 개와 유치열 전체입니다. 도표에서 아무 치아나 클릭해 보십시오.
+        요점은 이것입니다. <em>다중 레이블</em> 신경망 하나이므로 모든 레이블이
+        <strong>같은 한 번의 패스</strong>에서 나옵니다.
+        <a href="AMASSS.html">AMASSS</a>처럼 구조마다 신경망 하나가 아닙니다. 위에서
+        모델을 바꾸면 레이블 표가 바뀌는 것이고, 코드가 바뀌는 것이 아닙니다.
+        <strong>알아 둘 것</strong>: 29개 레이블 중 두 개는 이 스캔에서 깨져 나왔고,
+        둘 다 손대지 않은 채로 보여 줍니다. 레이블&nbsp;1(우측 상악 제3대구치)은
+        4&nbsp;253&nbsp;mm&sup3;로 다른 어느 치아보다 네 배 큽니다. 레이블&nbsp;2
+        (우측 상악 제2대구치)는 부피가 완전히 평범합니다. 1&nbsp;019&nbsp;mm&sup3;로
+        중앙값에 딱 걸칩니다. 그런데 그 물질이 94&nbsp;mm에 걸쳐 여러 덩어리로 흩어져
+        악궁 반대편까지 닿습니다. 레이블&nbsp;1도 같은 식으로 124&nbsp;mm에 걸쳐
+        조각나 있습니다. 다른 치아는 모두 지름 7&ndash;22&nbsp;mm의 한 덩어리입니다.
+        부피만 봤다면 레이블&nbsp;2는 통과했을 것이고, 그래서 경계 상자도 함께
+        확인합니다. 또 그 두 레이블을 클릭하면 치아가 아니라 두개골 대부분이 화면에
+        잡히는 이유도 그것입니다. 레이블 탓이지 뷰어 탓이 아닙니다.
+        <strong>연출</strong>: 훑어 가는 움직임(nnU-Net은 아래에서 위로가 아니라 세
+        방향으로 타일을 처리합니다)과 중립색&rarr;공식 색 전환은 LUT 재매핑을 대신해
+        보여 주는 것입니다. 메시는 브라우저용으로 데시메이션했고, 치아당 삼각형
+        1&nbsp;200개입니다.</figcaption>
+      </figure>
       <h2 id="besoin">필요한 것, 얻는 것</h2>
       <div class="io-grid">
         <div class="io-card">
@@ -246,5 +344,8 @@
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/batchdentalseg-mesh.js"></script>
+<script src="../../assets/batchdentalseg-3d.js"></script>
 </body>
 </html>

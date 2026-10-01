@@ -7,6 +7,9 @@
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/labo.css">
 <script src="../../assets/site.js"></script>
+<script src="../../assets/vface-mesh.js"></script>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/vface-3d.js"></script>
 </head>
 <body class="guide" data-cat="analyse">
 <div class="layout">
@@ -155,6 +158,87 @@
       </ol>
 
       <h2 id="lire">Como ler o resultado</h2>
+      <p>Antes da tabela, a imagem. É desta medida que o classificador se alimenta
+      &mdash; o paciente contra a sua própria imagem espelhada, e a diferença que sobra
+      depois de sobrepor em uma única estrutura.</p>
+
+      <figure class="viewer3d" data-vface="steps">
+        <div class="v3d-modes">
+          <button type="button" data-vregion="CB" aria-pressed="true">Base do crânio</button>
+          <button type="button" data-vregion="MAX" aria-pressed="false">Maxila</button>
+          <button type="button" data-vregion="MAND" aria-pressed="false">Mandíbula</button>
+        </div>
+        <div class="v3d-stage">
+          <span class="v3d-hint">Arraste para girar &middot; pince ou role para aproximar</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Espelhar de novo</button>
+        </div>
+        <div class="v3d-ramp v3d-ramp-div" aria-hidden="true">
+          <span class="v3d-ramp-lo">&minus;35&nbsp;mm</span><i></i><span class="v3d-ramp-hi">+35&nbsp;mm</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. <strong>a montante</strong> &mdash; ALI + <code>semi_aso_cbct</code>: o plano sagital mediano sobre x = 0</li>
+          <li data-step="1">1. <code>t1_landmarks</code> &mdash; os 26 pontos que o ALI prediz aqui</li>
+          <li data-step="2">2. <code>t1_masks</code> &mdash; AMASSS: as superfícies ósseas sobre as quais os mapas são medidos</li>
+          <li data-step="3">3. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, uma reflexão em torno de x = 0</li>
+          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; em <em>uma única</em> estrutura</li>
+          <li data-step="5">5. <code>bone_surfaces</code> &mdash; o mapa <code>ModelDistance</code> do próprio VFACE</li>
+        </ol>
+        <span class="v3d-i18n" hidden>
+          <i data-k="orient">orientado: o plano sagital mediano agora está sobre x = 0</i>
+          <i data-k="lm">os landmarks preditos pelo ALI</i>
+          <i data-k="masks">o AMASSS segmenta o osso sobre o qual os mapas serão medidos</i>
+          <i data-k="mirror">refletir em torno de x = 0</i>
+          <i data-k="plane">o plano que toda a cadeia a montante existe para estabelecer</i>
+          <i data-k="register">a matriz do próprio AREG &mdash; somente esta estrutura</i>
+          <i data-k="map">ModelDistance, o mapa do próprio VFACE</i>
+          <i data-k="absmed">|d| mediano</i>
+        </span>
+        <figcaption>
+        Uma execução real do VFACE, não uma reconstrução. Tudo aqui sai da própria
+        ferramenta, sobre o seu conjunto de teste publicado: as três matrizes do AREG, o
+        exame espelhado, os 26 landmarks preditos pelo ALI e os três mapas
+        <code>ModelDistance</code>.
+        <strong>O espelho</strong> é <code>Matrix_mirror.tfm</code> =
+        <code>diag(-1, 1, 1)</code>, translação zero &mdash; uma reflexão pura em torno de
+        <strong>x&nbsp;=&nbsp;0</strong>, um plano do <em>mundo</em>. Nada nele sabe nada
+        sobre o paciente, e é precisamente por isso que a cadeia a montante existe: para
+        levar o plano sagital mediano do paciente até esse plano. A reflexão é animada
+        passando pelo seu estado degenerado, <code>diag(0, 1, 1)</code>, porque uma
+        reflexão não pode ser interpolada por rotações &mdash; o determinante teria de
+        passar de &minus;1 a +1 sem nunca valer zero. O plano se desenha no meio da
+        inversão. <strong>E agora o essencial.</strong> O <code>createlistprocess.py</code>
+        chama o ModelToModel Distance três vezes, uma por registro, e os três mapas não
+        dizem a mesma coisa. Sobreposto na <strong>base do crânio</strong>, o rosto
+        inteiro está deslocado lateralmente: |d| mediano de 7,0&nbsp;mm, 46% dos vértices
+        acima de 8&nbsp;mm, faixa de &minus;25 a +32. Sobreposto na
+        <strong>maxila</strong>, o crânio superior encontra o seu próprio espelho a
+        1,0&nbsp;mm. Na <strong>mandíbula</strong>, a 0,45&nbsp;mm. Sobrepor <em>sobre</em>
+        uma estrutura torna essa estrutura simétrica por construção &mdash; isso não é um
+        defeito da medida, isso <em>é</em> a medida. <strong>A direção dessas matrizes
+        foi medida, não suposta.</strong> O elastix escreve o mapeamento
+        fixa&rarr;móvel, então é a <em>inversa</em> que leva o espelho até a T1: a
+        distância média entre superfícies cai de 2,88&nbsp;mm para 1,73&nbsp;mm com a
+        inversa, e sobe para 4,57 com a matriz tal como ela é escrita &mdash; pior do que
+        deixar o espelho em paz. O gerador agora testa as duas direções contra a T1 em
+        cada execução, guarda a melhor, e se recusa a escrever o arquivo se nenhuma das
+        duas for melhor que não fazer nada.
+        <strong>Três superfícies diferentes, três escalas diferentes.</strong> São estes os
+        arquivos que o VFACE escreve: o mapa da base do crânio cobre o crânio inteiro, o
+        da maxila apenas o crânio superior, o da mandíbula apenas a mandíbula &mdash;
+        então, quando um mapa cobre uma única estrutura, o resto do crânio permanece em
+        cinza neutro atrás dele. As faixas vão de &plusmn;2,6&nbsp;mm a &plusmn;32,
+        portanto cada mapa carrega a sua própria escala, mostrada na barra; compare-os
+        pelos números da linha de estado, não pela cor. Azul é negativo, vermelho é
+        positivo, cinza-claro é zero &mdash; a distância é sinalizada, tal como o VFACE a
+        escreve. <strong>O controle que importa é a fileira de botões</strong>, e as etapas
+        abaixo são clicáveis se você quiser parar em uma delas. Não há um segundo exame
+        aqui &mdash; o &ldquo;T2&rdquo; é o próprio reflexo do paciente.
+        </figcaption>
+      </figure>
+
       <p>O produto final é uma tabela de classificação, uma linha por paciente, com três
       informações:</p>
       <ul>

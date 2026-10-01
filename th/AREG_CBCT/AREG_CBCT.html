@@ -306,6 +306,42 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
 
       <h2 id="recalage">5. แกนอัลกอริทึม — การลงทะเบียนภาพ</h2>
 
+      <figure class="viewer3d" data-areg="steps">
+        <div class="v3d-modes">
+          <button type="button" data-region="CB" aria-pressed="true">ฐานกะโหลกศีรษะ</button>
+          <button type="button" data-region="MAND" aria-pressed="false">ขากรรไกรล่าง</button>
+          <button type="button" data-region="MAX" aria-pressed="false">ขากรรไกรบน</button>
+        </div>
+        <div class="v3d-stage">
+          <span class="v3d-hint">ลากเพื่อหมุน &middot; หยิกนิ้วหรือเลื่อนล้อเพื่อซูม</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">ลงทะเบียนภาพอีกครั้ง</button>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. <strong>ขั้นต้นน้ำ</strong> &mdash; ALI_CBCT วาง landmark</li>
+          <li data-step="1">1. อ่าน T2 (moving) เป็น <code>itk.F</code></li>
+          <li data-step="2">2. AMASSS ทำนายมาสก์</li>
+          <li data-step="3">3. ใส่มาสก์ให้ T1 (fixed) &mdash; นี่คือทั้งหมดที่ elastix จะได้เห็น</li>
+          <li data-step="4">4. elastix หนึ่งรอบ: Mattes MI, พีระมิด 3 ระดับ, 1500 รอบย่อยในแต่ละระดับ</li>
+          <li data-step="5">5. <code>MatrixRetrieval</code> &rarr; <code>Euler3DTransform</code></li>
+          <li data-step="6">6. resample T2 &mdash; บนกริด<em>ของตัวมันเอง</em> ไม่ใช่กริดของ T1</li>
+        </ol>
+        <span class="v3d-i18n" hidden>
+          <i data-k="ali">ALI_CBCT วาง landmark ที่การจัดแนวต้องใช้ &mdash;</i>
+          <i data-k="read">อ่าน T2 (moving) เป็น itk.F</i>
+          <i data-k="predict">AMASSS ทำนายมาสก์</i>
+          <i data-k="mask">ใส่มาสก์ให้ T1 (fixed) — นี่คือทั้งหมดที่ elastix จะได้เห็น</i>
+          <i data-k="elastix">elastix หนึ่งรอบ: Mattes MI, พีระมิด 3 ระดับ, 1500 รอบย่อยในแต่ละระดับ</i>
+          <i data-k="matrix">MatrixRetrieval &rarr; Euler3DTransform</i>
+          <i data-k="resample">resample T2 — บนกริดของตัวมันเอง ไม่ใช่กริดของ T1</i>
+          <i data-k="gap">ระยะห่างเฉลี่ยระหว่างพื้นผิวภายในมาสก์:</i>
+        </span>
+        <figcaption>ลำดับการทำงานทั้งสาย เรียงตามที่โค้ดรันจริง: ขั้นต้นน้ำหนึ่งขั้น &mdash; ALI_CBCT วาง landmark ที่การจัดแนวต้องใช้ (<code>CBCT.py:756</code> โหมด Orientation ชุด Frankfurt) &mdash; แล้วจึงถึงหกขั้นของ <code>VoxelBasedRegistration</code> landmark หกจุดนั้นคือจุดที่ ALI เขียนออกมาจริงสำหรับภาพสแกนนี้ โดย <code>N</code> ขาดไป เพราะเอเจนต์หาไม่พบ และเราไม่ได้แต่งเติมขึ้นมาที่นี่ ตัวการเดินของเอเจนต์เป็นเรื่องของหน้า ALI ที่นี่จึงเป็นฉบับย่อ T1 เป็นสีน้ำเงิน T2 เป็นสีส้ม และมาสก์เป็นสีเขียว ขั้นที่สำคัญคือขั้นที่สาม: <code>VoxelBasedRegistration</code> ใส่มาสก์ให้ T1 (fixed) ก่อน ดังนั้น <strong>elastix จึงเห็นแต่สิ่งที่อยู่ภายในมาสก์เท่านั้น</strong> &mdash; นั่นคือเหตุผลที่ AMASSS ต้องรันเป็นขั้นต้นน้ำ และเหตุผลที่มีการลงทะเบียนภาพสามครั้งแทนที่จะเป็นครั้งเดียว เมทริกซ์ที่เห็นคือเมทริกซ์ที่ AREG เขียนออกมาจริง ทิศทางของเมทริกซ์ถูกตรวจสอบแล้ว ไม่ใช่เดาเอา: elastix คืนการจับคู่แบบ fixed&rarr;moving ดังนั้นตัวที่นำ T2 ไปวางทับ T1 จึงเป็นเมทริกซ์<em>ผกผัน</em> &mdash; เมื่อใช้ตัวผกผัน ระยะห่างเฉลี่ยระหว่างพื้นผิวภายในมาสก์ลดจาก 3.27&nbsp;mm เหลือ 1.24&nbsp;mm และเพิ่มเป็น 6.03 เมื่อไม่ใช้ ค่าเหล่านี้วัดนอกเบราว์เซอร์บนเมชเต็มความละเอียด <strong>ข้อสงวนหนึ่งข้อเกี่ยวกับขั้นที่ 4:</strong> elastix เขียนออกมาเพียงการแปลงสุดท้ายของมันเท่านั้น การเคลื่อนไหวที่คุณเห็นจึงเป็นปลายทางจริงที่เคลื่อนไปอย่างราบเรียบ &mdash; ท่าทางระหว่างทางของตัวหาค่าเหมาะที่สุดในพีระมิดทั้งสามระดับไม่ได้อยู่ในเอาต์พุต และไม่ได้ถูกแต่งเติมขึ้นมาที่นี่</figcaption>
+      </figure>
+
+
       <p>ทุกอย่างเกิดขึ้นใน <code>VoxelBasedRegistration</code>
       (<code>utils.py:598</code>):</p>
 
@@ -825,5 +861,8 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/areg-mesh.js"></script>
+<script src="../../assets/areg-3d.js"></script>
 </body>
 </html>
