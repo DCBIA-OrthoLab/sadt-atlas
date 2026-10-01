@@ -58,7 +58,17 @@
        uColor. Bleu -> vert -> jaune -> rouge, un degrade dont la luminosite
        croit de bout en bout, donc lisible aussi en niveaux de gris. */
     "  vec3 base = uColor;",
-    "  if (uRamp > 0.5) {",
+    "  if (uRamp > 1.5) {",
+    /* Rampe DIVERGENTE, pour une grandeur signee : le zero doit se lire comme
+       zero. Bleu (negatif) -> gris clair (zero) -> rouge (positif). La valeur
+       arrive normalisee sur [0,1] avec 0.5 au zero, parce que l'attribut est
+       un octet non signe. */
+    "    float t = clamp(vVal, 0.0, 1.0) * 2.0 - 1.0;",
+    "    float m = abs(t);",
+    "    vec3 cold = vec3(0.20, 0.42, 0.95);",
+    "    vec3 hot  = vec3(0.95, 0.26, 0.18);",
+    "    base = mix(vec3(0.86, 0.85, 0.83), t < 0.0 ? cold : hot, m);",
+    "  } else if (uRamp > 0.5) {",
     "    float v = clamp(vVal, 0.0, 1.0);",
     "    base = clamp(vec3(1.6 * v - 0.4, 1.2 - abs(2.2 * v - 1.1), 1.3 - 2.0 * v), 0.0, 1.0);",
     "  }",
@@ -558,7 +568,9 @@
       gl.uniform1f(u.uDim, p.dim);
       gl.uniform3fv(u.uOffset, p.off);
       gl.uniformMatrix4fv(u.uXform, false, p.xform || IDENTITY);
-      gl.uniform1f(u.uRamp, p.ramp ? 1.0 : 0.0);
+      /* `ramp` : 0 couleur unie, 1 rampe sequentielle, 2 rampe divergente.
+         Un booleen `true` vaut encore 1, donc les scenes existantes tiennent. */
+      gl.uniform1f(u.uRamp, p.ramp === true ? 1.0 : (p.ramp ? +p.ramp : 0.0));
       gl.uniform1f(u.uSweep, p.gen >= 1 ? 9.0 : -0.62 + 1.30 * p.gen);
       gl.bindVertexArray(p.vao);
       gl.drawElements(gl.TRIANGLES, p.count, gl.UNSIGNED_SHORT, 0);

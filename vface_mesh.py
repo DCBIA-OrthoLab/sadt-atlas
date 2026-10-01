@@ -1,33 +1,37 @@
 #!/usr/bin/env python3
-"""Fabrique la scene 3D de VFACE : le miroir, et l'asymetrie selon la region.
+"""Fabrique la scene 3D de VFACE a partir de SA PROPRE passe.
 
     /opt/SlicerProd/Slicer-5.13.0-*/bin/PythonSlicer vface_mesh.py
 
-ENTREE  le jeu de test PUBLIE d'AREG_CBCT (release lucanchling/Areg_CBCT) : le
-        T1 deja oriente et ses trois masques AMASSS, tous sur la MEME grille ;
-        et la vraie matrice miroir de VFACE. Aucune donnee clinique.
+ENTREE  le jeu de test PUBLIE de VFACE (`V_FACE/Test_Files/Oriented-Automated/`)
+        et la sortie complete d'une vraie execution : les trois matrices AREG,
+        les scans miroirs, les reperes predits par ALI, et les trois cartes
+        `ModelDistance`. Aucune donnee clinique.
 
-CE QUE LA SCENE DOIT FAIRE COMPRENDRE. La matrice miroir de VFACE est
-`diag(-1, 1, 1)` centree a l'origine : une reflexion pure par rapport au plan
-x = 0 -- le plan du MONDE, pas celui du patient. Tout ce que VFACE empile en
-amont (reechantillonnage, reperes d'ALI, orientation SEMI_ASO sur le
-maxillaire puis sur la base du crane, segmentation AMASSS) ne sert qu'a amener
-le plan sagittal median du patient sur x = 0. Si l'orientation derape, le
-miroir derape avec elle.
+POURQUOI CETTE VERSION REMPLACE LA PRECEDENTE. La premiere version de cette
+scene recalait le miroir par un ICP ecrit pour la page, faute d'avoir trouve
+cette sortie. Deux consequences, toutes deux corrigees ici :
+  - l'ICP du maxillaire glissait (10,2 deg de rotation) alors que la vraie
+    matrice d'AREG n'en tourne que 4,3 ;
+  - la distance non signee sur un maillage decime donnait une mediane de
+    1,36 mm, ce qui faisait passer ce patient pour presque symetrique. La
+    mesure de VFACE sur la surface pleine va de -25 a +32 mm.
+Plus rien n'est recalcule ici : les matrices, les surfaces et les distances
+sortent toutes de l'outil.
 
-MAIS le miroir n'est pas lu tel quel. `review_steps.py` liste trois recalages
--- `registration_cb`, `registration_max`, `registration_mand` -- et c'est la
-que se trouve le fond du sujet : L'ASYMETRIE QU'ON MESURE DEPEND DE LA
-STRUCTURE SUR LAQUELLE ON SE SUPERPOSE. Recaler le miroir sur la base du crane
-donne l'asymetrie totale de la face ; le recaler sur le maxillaire rend le
-maxillaire symetrique par construction et ce qu'il reste se lit sur la
-mandibule. Trois recalages, trois cartes, un seul crane.
+LES TROIS CARTES SONT LES TROIS RECALAGES. createlistprocess.py (l. 1314-1365)
+appelle ModelToModel Distance trois fois, et c'est tout le sujet de la scene :
+  merged      = T1 CB  contre T2 CB   -> superposition sur la BASE DU CRANE
+  Mandible    = T1 CB  contre T2 MAND -> superposition sur la MANDIBULE
+  Upper_Skull = T1 MAX contre T2 MAX  -> superposition sur le MAXILLAIRE
+L'asymetrie qu'on mesure depend de la structure sur laquelle on se superpose.
 
-CE QUI EST A MOI ET CE QUI EST A VFACE. La matrice miroir et le decoupage en
-trois regions sont ceux de VFACE. Les trois recalages sont refaits ici par ICP
-rigide sur la surface de chaque region, parce que la passe elastix d'AREG ne
-tourne pas dans cette page ; les residus mesures sont imprimes et la legende le
-dit.
+UN POINT DE REPERE A NE PAS SUPPOSER. `Upper_Skull` vit dans le repere oriente
+SUR LE MAXILLAIRE, les deux autres dans celui oriente sur la base du crane.
+Les deux transformations d'orientation sont dans la sortie ; le script essaie
+les deux sens de composition et garde celui qui superpose vraiment, en
+l'imprimant. Deviner aurait decale cette carte d'un degre ou deux sans que
+rien ne casse visiblement.
 """
 import json, os, re, sys
 
@@ -39,45 +43,43 @@ import SimpleITK as sitk
 import vtk
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-B = os.path.expanduser("~/Documents/SlicerDownloads/AREG/AREG_CBCT/Test_Files/"
+B = os.path.expanduser("~/Documents/SlicerDownloads/V_FACE/Test_Files/"
                        "Oriented-Automated/")
-T1 = B + "T1Or/C_0001_T1_Or.nii.gz"
-MASKS = {
-    "CB":   ("T1Or/C_0001_T1_Or_seg_CBMASK.nii.gz",   "Cranial base"),
-    "MAX":  ("T1Or/C_0001_T1_Or_seg_MAXMASK.nii.gz",  "Maxilla"),
-    "MAND": ("T1Or/C_0001_T1_Or_seg_MANDMASK.nii.gz", "Mandible"),
-}
-ORDER = ["CB", "MAX", "MAND"]        # l'ordre de review_steps.ORDER
-#: Ce que ALI_CBCT a reellement ecrit pour ce scan, deja dans le repere du T1
-#: oriente. Six points sur les sept du set « base du crane » : `N` manque,
-#: l'agent ne l'a pas trouve, et on ne l'invente pas.
-LANDMARKS = "T1Or/C_0001_T1_lm_Or.mrk.json"
-#: Les deux listes de VFACE_utils/createlistprocess.py, verbatim (l.288 et 369).
-SET_MAX = "ANS IF PNS UL6O UR1O UR6O".split()
-SET_CB = "Ba LPo N RPo S LOr ROr".split()
+OUT = B + "Output/"
+
+#: Les trois cartes, et le recalage dont chacune est la lecture.
+REGIONS = [
+    {"code": "CB",   "label": "Cranial base",
+     "zone": "merged",      "frame": "CB",
+     "matrix": "Registered Scan/Cranial Base/C_0001_OutReg/C_0001_CB_Reg_matrix.tfm"},
+    {"code": "MAX",  "label": "Maxilla",
+     "zone": "Upper_Skull", "frame": "MAX",
+     "matrix": "Registered Scan/Maxilla/C_0001_OutReg/C_0001_MAX_Reg_matrix.tfm"},
+    {"code": "MAND", "label": "Mandible",
+     "zone": "Mandible",    "frame": "CB",
+     "matrix": "Registered Scan/Mandible/C_0001_OutReg/C_0001_MAND_Reg_matrix.tfm"},
+]
+HEAT = OUT + "Heatmaps/C_0001_%s_ModelDistance.vtk"
+OR_TFM = {"CB":  OUT + "Oriented T1 Scans/CB/C_0001_T1_CB_Or_transform.tfm",
+          "MAX": OUT + "Oriented T1 Scans/MAX/C_0001_T1_MAX_Or_transform.tfm"}
+ORIENTED_SCAN = OUT + "Oriented T1 Scans/CB/C_0001_T1_CB_Or.nii.gz"
+MIRROR_SCAN = OUT + "T2_Scan/CB/C_0001_T1_CB_Or_mir.nii.gz"
 MIRROR_TFM = os.path.expanduser("~/Documents/SlicerDownloads/Mirror_matrix/Mirror/"
                                 "Matrix_mirror.tfm")
-BONE, SIGMA, SKULL_TRIS = 500.0, 1.5, 34000
-MASK_TRIS = 9000
-CLIP_MM = 8.0      # au-dela la couleur sature : on lit la carte, pas les extremes
+#: Les reperes qu'ALI a predits, dans le repere oriente sur la base du crane.
+LM_DIR = OUT + "T1 Landmarks/CB/"
+LM_FILES = {"CB": "C_0001_T1_CB_Or_lm_Pred_CB.mrk.json",
+            "U":  "C_0001_T1_CB_Or_lm_Pred_U.mrk.json",
+            "L":  "C_0001_T1_CB_Or_lm_Pred_L.mrk.json"}
+BONE, SIGMA = 500.0, 1.5
+HEAT_TRIS, MIRROR_TRIS = 26000, 30000
 
 
-def read_mirror(path):
-    txt = open(path, encoding="utf-8").read()
-    v = [float(x) for x in re.search(r"Parameters:\s*([-\d\.e ]+)", txt).group(1).split()]
-    M = np.eye(4)
-    M[:3, :3] = np.array(v[:9]).reshape(3, 3)
-    if len(v) >= 12:
-        M[:3, 3] = v[9:12]
-    return M
+# ---------------------------------------------------------------- utilitaires
 
-
-def normals(port_or_data):
+def normals(poly):
     nr = vtk.vtkPolyDataNormals()
-    if hasattr(port_or_data, "GetOutputPort"):
-        nr.SetInputConnection(port_or_data.GetOutputPort())
-    else:
-        nr.SetInputData(port_or_data)
+    nr.SetInputData(poly)
     nr.SplittingOff()
     nr.ConsistencyOn()
     nr.Update()
@@ -86,93 +88,50 @@ def normals(port_or_data):
     return out
 
 
-def surface(path, level, sigma, tris, origin):
-    r = vtk.vtkNIFTIImageReader()
-    r.SetFileName(path)
-    r.Update()
-    iso = webmesh.iso_surface(r, level, sigma)
-    clean, _ = webmesh.clean(iso, 0.02)
-    poly = webmesh.smooth_decimate(clean, tris, iterations=16)
-    t = vtk.vtkTransform()
-    t.Translate(origin[0], origin[1], origin[2])
-    f = vtk.vtkTransformPolyDataFilter()
-    f.SetTransform(t)
-    f.SetInputData(poly)
-    f.Update()
-    return normals(f)
+def affine_of(path):
+    """Le 4x4 d'une transformation ITK, composite comprise.
 
-
-def plane_at_x0(bounds, pad=1.06):
-    """Un quad dans le plan x = 0, aux dimensions du crane.
-
-    Ce n'est pas une donnee mesuree mais une definition : x = 0 est le plan par
-    rapport auquel la matrice miroir de VFACE reflechit. Le dessiner est le
-    contenu meme des etapes d'orientation, dont tout le but est d'y amener le
-    plan sagittal median du patient.
+    On ne lit pas les parametres -- une CompositeTransform en a plusieurs jeux
+    et leur ordre d'application se pretend plus qu'il ne se lit. On evalue la
+    transformation sur l'origine et les trois vecteurs de base : pour une
+    transformation affine, c'est exact.
     """
-    # pad > 1 fait legerement deborder le quad du crane, sinon son bord se
-    # confond avec la silhouette et on ne voit plus qu'il y a un plan.
-    cy, cz = (bounds[2] + bounds[3]) / 2.0, (bounds[4] + bounds[5]) / 2.0
-    hy = (bounds[3] - bounds[2]) / 2.0 * pad
-    hz = (bounds[5] - bounds[4]) / 2.0 * pad
-    src = vtk.vtkPlaneSource()
-    src.SetOrigin(0.0, cy - hy, cz - hz)
-    src.SetPoint1(0.0, cy + hy, cz - hz)
-    src.SetPoint2(0.0, cy - hy, cz + hz)
-    src.SetXResolution(1)
-    src.SetYResolution(1)
-    src.Update()
-    tri = vtk.vtkTriangleFilter()
-    tri.SetInputConnection(src.GetOutputPort())
-    tri.Update()
-    return normals(tri)
+    tf = sitk.ReadTransform(path)
+    o = np.array(tf.TransformPoint((0.0, 0.0, 0.0)))
+    M = np.eye(4)
+    for k in range(3):
+        e = [0.0, 0.0, 0.0]
+        e[k] = 1.0
+        M[:3, k] = np.array(tf.TransformPoint(tuple(e))) - o
+    M[:3, 3] = o
+    return M
 
 
-def read_landmarks(path):
-    """{label: position LPS} tel qu'ALI l'a ecrit."""
-    d = json.load(open(path, encoding="utf-8"))["markups"][0]
-    if d.get("coordinateSystem") not in (None, "LPS"):
-        sys.exit("Reperes en %s : la suite suppose LPS." % d.get("coordinateSystem"))
-    return {cp["label"]: np.array(cp["position"], dtype=float)
-            for cp in d["controlPoints"]}
+def read_tfm_euler(path):
+    """Les six parametres d'un Euler3DTransform -> 4x4. Ce sont les matrices
+    qu'AREG a ecrites ; le centre (FixedParameters) est nul ici."""
+    txt = open(path, encoding="utf-8").read()
+    v = [float(x) for x in re.search(r"Parameters:\s*([-\d\.eE ]+)", txt).group(1).split()]
+    rx, ry, rz, tx, ty, tz = v[:6]
+    cx, cy, cz = np.cos([rx, ry, rz])
+    sx, sy, sz = np.sin([rx, ry, rz])
+    Rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
+    Ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
+    Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
+    M = np.eye(4)
+    M[:3, :3] = Rz @ Ry @ Rx          # l'ordre d'ITK pour Euler3D
+    M[:3, 3] = [tx, ty, tz]
+    return M
 
 
-def check_frame(face, lms):
-    """Le repere des reperes est-il bien celui du maillage ?
-
-    NIfTI stocke sa QForm en RAS, les .mrk.json d'ALI sont en LPS, et une
-    confusion des deux ne casse rien : elle deplace juste les points. On la
-    detecte en comparant la distance moyenne aux sommets du crane pour les
-    quatre combinaisons de signes possibles. Si l'identite ne gagne pas
-    largement, c'est qu'on s'est trompe -- et on refuse plutot que de publier
-    des reperes decales.
-    """
-    loc = vtk.vtkPointLocator()
-    loc.SetDataSet(face)
-    loc.BuildLocator()
-
-    def mean_dist(flip):
-        tot = 0.0
-        for v in lms.values():
-            q = v * np.array(flip, dtype=float)
-            j = loc.FindClosestPoint(q.tolist())
-            tot += np.linalg.norm(np.array(face.GetPoint(j)) - q)
-        return tot / max(1, len(lms))
-
-    # Le crane etant presque symetrique, le seul « x inverse » se discrimine
-    # mal (quelques dixiemes de mm) -- mais ce n'est pas le risque reel. Le
-    # risque, c'est la confusion LPS/RAS, qui inverse x ET y : celle-la se voit
-    # franchement, les orbitales partant a l'arriere du crane.
-    cands = {"identite (LPS)": (1, 1, 1), "x inverse": (-1, 1, 1),
-             "x,y inverses (RAS)": (-1, -1, 1), "y inverse": (1, -1, 1)}
-    scores = {k: mean_dist(v) for k, v in cands.items()}
-    for k in sorted(scores, key=lambda n: scores[n]):
-        print("      %-20s %5.2f mm" % (k, scores[k]))
-    best = min(scores, key=lambda n: scores[n])
-    if best != "identite (LPS)":
-        sys.exit("Les reperes tombent mieux en « %s » qu'en LPS : le repere du "
-                 "maillage et celui d'ALI ne concordent pas." % best)
-    return scores["identite (LPS)"]
+def read_mirror(path):
+    txt = open(path, encoding="utf-8").read()
+    v = [float(x) for x in re.search(r"Parameters:\s*([-\d\.eE ]+)", txt).group(1).split()]
+    M = np.eye(4)
+    M[:3, :3] = np.array(v[:9]).reshape(3, 3)
+    if len(v) >= 12:
+        M[:3, 3] = v[9:12]
+    return M
 
 
 def apply_matrix(poly, M):
@@ -186,135 +145,227 @@ def apply_matrix(poly, M):
     f.SetTransform(t)
     f.SetInputData(poly)
     f.Update()
-    return normals(f)
-
-
-def icp(source, target, iters=80):
-    """Recalage rigide de `source` sur `target`. Renvoie la matrice 4x4."""
-    reg = vtk.vtkIterativeClosestPointTransform()
-    reg.SetSource(source)
-    reg.SetTarget(target)
-    reg.GetLandmarkTransform().SetModeToRigidBody()
-    reg.SetMaximumNumberOfIterations(iters)
-    reg.SetMaximumNumberOfLandmarks(4000)
-    reg.StartByMatchingCentroidsOff()
-    reg.Modified()
-    reg.Update()
-    m = reg.GetMatrix()
-    return np.array([[m.GetElement(i, j) for j in range(4)] for i in range(4)])
-
-
-def distances(src, dst_poly):
-    """Distance de chaque sommet de `src` a la surface `dst_poly`, en mm."""
-    loc = vtk.vtkPointLocator()
-    loc.SetDataSet(dst_poly)
-    loc.BuildLocator()
-    n = src.GetNumberOfPoints()
-    out = np.empty(n)
-    for i in range(n):
-        p = np.array(src.GetPoint(i))
-        j = loc.FindClosestPoint(p.tolist())
-        out[i] = np.linalg.norm(np.array(dst_poly.GetPoint(j)) - p)
+    out = vtk.vtkPolyData()
+    out.DeepCopy(f.GetOutput())
     return out
 
 
-def quantize(vals, vmin, vmax):
-    """Meme quantification que webmesh.encode, pour un champ envoye a part."""
-    rng = (vmax - vmin) or 1.0
+def mean_surface_gap(a, b, sample=6000):
+    """Distance moyenne des sommets de `a` a la surface de `b`."""
+    loc = vtk.vtkPointLocator()
+    loc.SetDataSet(b)
+    loc.BuildLocator()
+    n = a.GetNumberOfPoints()
+    step = max(1, n // sample)
+    tot, cnt = 0.0, 0
+    for i in range(0, n, step):
+        p = np.array(a.GetPoint(i))
+        j = loc.FindClosestPoint(p.tolist())
+        tot += np.linalg.norm(np.array(b.GetPoint(j)) - p)
+        cnt += 1
+    return tot / max(1, cnt)
+
+
+def decimate_keep_scalar(poly, target, name="Distance"):
+    """Decime la GEOMETRIE, puis recopie le scalaire depuis l'original.
+
+    La metrique d'attribut de vtkQuadricDecimation extrapole : sur la carte
+    fusionnee elle sortait -32,1 pour un minimum reel de -25,4. On decime donc
+    sans elle et on relit la valeur au sommet le plus proche de la surface
+    pleine -- aucune valeur inventee, aucune hors de la plage mesuree.
+    """
+    src_vals = poly.GetPointData().GetArray(name)
+    if src_vals is None:
+        sys.exit("La carte n'a pas de tableau « %s »." % name)
+    loc = vtk.vtkPointLocator()
+    loc.SetDataSet(poly)
+    loc.BuildLocator()
+
+    d = vtk.vtkQuadricDecimation()
+    d.SetInputData(poly)
+    ntri = max(1, poly.GetNumberOfPolys())
+    d.SetTargetReduction(max(0.0, min(0.999, 1.0 - float(target) / ntri)))
+    d.Update()
+    sm = vtk.vtkWindowedSincPolyDataFilter()
+    sm.SetInputData(d.GetOutput())
+    sm.SetNumberOfIterations(14)
+    sm.SetPassBand(0.06)
+    sm.NonManifoldSmoothingOn()
+    sm.NormalizeCoordinatesOn()
+    sm.Update()
+    out = vtk.vtkPolyData()
+    out.DeepCopy(sm.GetOutput())
+
+    vals = np.empty(out.GetNumberOfPoints())
+    for i in range(out.GetNumberOfPoints()):
+        j = loc.FindClosestPoint(list(out.GetPoint(i)))
+        vals[i] = src_vals.GetTuple1(j)
+    return normals(out), vals
+
+
+def surface_from_volume(path, level, sigma, tris):
+    im = sitk.ReadImage(path)
+    r = vtk.vtkNIFTIImageReader()
+    r.SetFileName(path)
+    r.Update()
+    iso = webmesh.iso_surface(r, level, sigma)
+    clean, _ = webmesh.clean(iso, 0.02)
+    poly = webmesh.smooth_decimate(clean, tris, iterations=16)
+    o = im.GetOrigin()
+    t = vtk.vtkTransform()
+    t.Translate(o[0], o[1], o[2])
+    f = vtk.vtkTransformPolyDataFilter()
+    f.SetTransform(t)
+    f.SetInputData(poly)
+    f.Update()
+    out = vtk.vtkPolyData()
+    out.DeepCopy(f.GetOutput())
+    return normals(out)
+
+
+def read_heat(zone):
+    r = vtk.vtkPolyDataReader()
+    r.SetFileName(HEAT % zone)
+    r.ReadAllScalarsOn()
+    r.Update()
+    out = vtk.vtkPolyData()
+    out.DeepCopy(r.GetOutput())
+    return out
+
+
+def quantize_signed(vals, lim):
+    """Signee, symetrique : 0 mm tombe sur 128 pour que la rampe divergente
+    lise le zero comme un zero. Sature a +/- `lim`."""
     buf = bytearray()
     for v in vals:
-        q = int(round((v - vmin) / rng * 255.0))
+        q = int(round((v / lim * 0.5 + 0.5) * 255.0))
         buf.append(0 if q < 0 else (255 if q > 255 else q))
     return base64.b64encode(bytes(buf)).decode()
 
 
+def plane_at_x0(bounds, pad=1.06):
+    """Un quad dans le plan x = 0. Ce n'est pas une mesure mais la definition
+    du plan par rapport auquel la matrice miroir reflechit ; pad > 1 le fait
+    legerement deborder pour qu'on voie son bord."""
+    cy, cz = (bounds[2] + bounds[3]) / 2.0, (bounds[4] + bounds[5]) / 2.0
+    hy = (bounds[3] - bounds[2]) / 2.0 * pad
+    hz = (bounds[5] - bounds[4]) / 2.0 * pad
+    src = vtk.vtkPlaneSource()
+    src.SetOrigin(0.0, cy - hy, cz - hz)
+    src.SetPoint1(0.0, cy + hy, cz - hz)
+    src.SetPoint2(0.0, cy - hy, cz + hz)
+    src.Update()
+    tri = vtk.vtkTriangleFilter()
+    tri.SetInputConnection(src.GetOutputPort())
+    tri.Update()
+    out = vtk.vtkPolyData()
+    out.DeepCopy(tri.GetOutput())
+    return normals(out)
+
+
+# --------------------------------------------------------------------- main
+
 def main():
-    need = [T1, MIRROR_TFM, B + LANDMARKS] + [B + rel for rel, _ in MASKS.values()]
+    need = [ORIENTED_SCAN, MIRROR_SCAN, MIRROR_TFM] + [HEAT % r["zone"] for r in REGIONS] \
+         + [OUT + r["matrix"] for r in REGIONS] + list(OR_TFM.values()) \
+         + [LM_DIR + f for f in LM_FILES.values()]
     for f in need:
         if not os.path.exists(f):
             sys.exit("Fichier absent :\n  %s" % f)
 
     M = read_mirror(MIRROR_TFM)
-    det = float(np.linalg.det(M[:3, :3]))
     print("— la matrice miroir de VFACE —")
-    print("  %s" % np.array2string(M[:3, :3], precision=0, suppress_small=True)
-          .replace("\n", "\n  "))
-    print("  determinant %.0f -> %s, translation %.2f mm"
-          % (det, "reflexion" if det < 0 else "rotation", np.linalg.norm(M[:3, 3])))
-    if det >= 0:
-        sys.exit("Cette matrice n'est pas une reflexion : la scene n'aurait pas de sens.")
+    print("  diag %s, translation %.2f mm, determinant %.0f"
+          % ([int(M[k][k]) for k in range(3)], np.linalg.norm(M[:3, 3]),
+             np.linalg.det(M[:3, :3])))
+    if np.linalg.det(M[:3, :3]) >= 0:
+        sys.exit("Cette matrice n'est pas une reflexion.")
 
-    origin = sitk.ReadImage(T1).GetOrigin()
+    print("\n— les trois matrices qu'AREG a ecrites —")
+    for r in REGIONS:
+        A = read_tfm_euler(OUT + r["matrix"])
+        ang = np.degrees(np.arccos(max(-1.0, min(1.0, (np.trace(A[:3, :3]) - 1) / 2))))
+        print("  %-4s %-13s rotation %5.2f deg, translation %5.2f mm"
+              % (r["code"], r["label"], ang, np.linalg.norm(A[:3, 3])))
+        r["A"] = A
 
-    print("\n— surfaces —")
-    face = surface(T1, BONE, SIGMA, SKULL_TRIS, origin)
-    print("  crane          %6d triangles, %5d sommets"
-          % (face.GetNumberOfPolys(), face.GetNumberOfPoints()))
-    mirror = apply_matrix(face, M)
-    plane = plane_at_x0(face.GetBounds())
+    # ---- les cartes, et le repere de celle du maxillaire ----
+    print("\n— les trois cartes ModelDistance —")
+    heat_cb = read_heat("merged")
+    to_cb = {"CB": np.eye(4)}
 
-    print("\n— les reperes d'ALI_CBCT pour ce scan —")
-    lms = read_landmarks(B + LANDMARKS)
-    got = [k for k in SET_CB if k in lms]
-    lost = [k for k in SET_CB if k not in lms]
-    extra = [k for k in lms if k not in SET_CB]
-    print("  set « base du crane » : %d/%d  (%s)" % (len(got), len(SET_CB), ", ".join(got)))
-    if lost:
-        print("  absents : %s — ALI ne les a pas trouves, on ne les invente pas"
-              % ", ".join(lost))
-    if extra:
-        sys.exit("Reperes hors du set attendu : %s" % ", ".join(extra))
-    print("  set « maxillaire » (%s) : absent de ce jeu publie" % " ".join(SET_MAX))
-    print("    verification du repere :")
-    d = check_frame(face, lms)
-    print("      -> LPS confirme, %.2f mm en moyenne du sommet le plus proche" % d)
+    # Le sens de composition se mesure, il ne se suppose pas.
+    Mcb, Mmax = affine_of(OR_TFM["CB"]), affine_of(OR_TFM["MAX"])
+    cands = {
+        "inv(CB) . MAX":      np.linalg.inv(Mcb) @ Mmax,
+        "CB . inv(MAX)":      Mcb @ np.linalg.inv(Mmax),
+        "MAX . inv(CB)":      Mmax @ np.linalg.inv(Mcb),
+        "inv(MAX) . CB":      np.linalg.inv(Mmax) @ Mcb,
+        "identite":           np.eye(4),
+    }
+    probe = read_heat("Upper_Skull")
+    print("    repere de Upper_Skull -> celui de merged :")
+    scores = {}
+    for name, T in cands.items():
+        scores[name] = mean_surface_gap(apply_matrix(probe, T), heat_cb, 2500)
+        print("      %-16s %5.2f mm" % (name, scores[name]))
+    best = min(scores, key=lambda n: scores[n])
+    print("      -> « %s » retenu (%.2f mm)" % (best, scores[best]))
+    to_cb["MAX"] = cands[best]
 
-    regions, fields = [], {}
-    print("\n— les trois recalages, et ce qu'ils laissent voir —")
-    for code in ORDER:
-        rel, label = MASKS[code]
-        reg_poly = surface(B + rel, 0.5, 0.6, MASK_TRIS, origin)
-        reg_mirror = apply_matrix(reg_poly, M)
+    meshes, fields = {}, {}
+    for r in REGIONS:
+        poly = heat_cb if r["zone"] == "merged" else read_heat(r["zone"])
+        full = poly.GetNumberOfPoints()
+        rng = poly.GetPointData().GetArray("Distance").GetRange()
+        if r["frame"] != "CB":
+            poly = apply_matrix(poly, to_cb[r["frame"]])
+        mesh, vals = decimate_keep_scalar(poly, HEAT_TRIS)
+        code = "H_" + r["code"]
+        meshes[code] = mesh
+        fields[code] = vals
+        # Une echelle PAR carte. Les trois ne sont pas comparables au pixel :
+        # elles ne couvrent pas la meme surface (le crane entier, le haut du
+        # crane seul, la mandibule seule) et leurs plages vont de +/-2,6 mm a
+        # +/-32. Une echelle commune rendrait deux cartes sur trois incolores.
+        # La comparaison se fait sur les CHIFFRES, affiches dans la legende et
+        # la ligne d'etat, pas sur la teinte.
+        r["limit"] = float(np.ceil(abs(vals).max() / 5.0) * 5.0) or 5.0
+        r.update(dmin=round(float(vals.min()), 2), dmax=round(float(vals.max()), 2),
+                 median=round(float(np.median(vals)), 2),
+                 absmed=round(float(np.median(np.abs(vals))), 2),
+                 p98=round(float(np.percentile(np.abs(vals), 98)), 2))
+        print("  %-4s %-12s %7d pts -> %5d tris, Distance %6.2f .. %6.2f mm"
+              % (r["code"], r["zone"], full, mesh.GetNumberOfPolys(),
+                 vals.min(), vals.max()))
+        print("       (plage de la surface pleine : %.2f .. %.2f — rien n'est extrapole)"
+              % rng)
 
-        # Le recalage ne regarde que cette region : c'est tout le point.
-        R = icp(reg_mirror, reg_poly)
-        before = distances(reg_mirror, reg_poly)
-        after = distances(apply_matrix(reg_mirror, R), reg_poly)
+    print("\n  echelles divergentes : %s"
+          % ", ".join("%s +/-%.0f mm" % (r["code"], r["limit"]) for r in REGIONS))
 
-        # La carte, elle, se lit sur le crane ENTIER -- sinon on ne verrait pas
-        # ce que le recalage a repousse ailleurs.
-        whole = apply_matrix(mirror, R)
-        vals = distances(face, whole)
+    # Le scan tel qu'il entre : sans lui, la surface osseuse d'AMASSS serait
+    # a l'ecran avant l'etape qui la produit, ce qui laisserait croire que la
+    # segmentation a deja tourne.
+    meshes["RAW"] = surface_from_volume(ORIENTED_SCAN, BONE, SIGMA, MIRROR_TRIS)
+    print("  scan oriente (entree) : %d triangles" % meshes["RAW"].GetNumberOfPolys())
+    meshes["MIRROR"] = surface_from_volume(MIRROR_SCAN, BONE, SIGMA, MIRROR_TRIS)
+    print("  miroir reel de VFACE : %d triangles" % meshes["MIRROR"].GetNumberOfPolys())
+    meshes["PLANE"] = plane_at_x0(meshes["H_CB"].GetBounds())
 
-        ang = np.degrees(np.arccos(
-            max(-1.0, min(1.0, (np.trace(R[:3, :3]) - 1) / 2))))
-        print("  %-4s %-13s ICP %5.2f -> %5.2f mm  (rot %4.1f°, transl %5.2f mm)"
-              % (code, label, before.mean(), after.mean(), ang,
-                 np.linalg.norm(R[:3, 3])))
-        print("       carte sur le crane : mediane %5.2f mm, 95e centile %5.2f, max %5.2f"
-              % (np.median(vals), np.percentile(vals, 95), vals.max()))
+    # ---- les reperes qu'ALI a predits ----
+    print("\n— les reperes predits par ALI —")
+    lms = {}
+    for key, fn in LM_FILES.items():
+        d = json.load(open(LM_DIR + fn, encoding="utf-8"))["markups"][0]
+        if d.get("coordinateSystem") not in (None, "LPS"):
+            sys.exit("Reperes en %s, LPS attendu." % d.get("coordinateSystem"))
+        got = {cp["label"]: np.array(cp["position"], dtype=float)
+               for cp in d["controlPoints"]}
+        lms[key] = got
+        print("  %-3s %2d points : %s" % (key, len(got), ", ".join(sorted(got))))
 
-        regions.append({
-            "code": code, "label": label,
-            "icpBefore": round(float(before.mean()), 2),
-            "icpAfter": round(float(after.mean()), 2),
-            "median": round(float(np.median(vals)), 2),
-            "p95": round(float(np.percentile(vals, 95)), 2),
-            "max": round(float(vals.max()), 2),
-        })
-        fields[code] = {"R": R, "vals": vals, "surface": reg_poly}
-
-    meshes = {"FACE": face, "MIRROR": mirror, "PLANE": plane}
-    for code in ORDER:
-        meshes["R_" + code] = fields[code]["surface"]
-
-    # Le repere de la scene : positions normalisees sur la bbox COMMUNE. Une
-    # matrice envoyee brute agirait en millimetres et enverrait la piece au
-    # loin -- il faut la conjuguer, exactement comme areg_mesh.py.
-    # Cette bbox doit etre EXACTEMENT celle que webmesh.encode recalcule de son
-    # cote, PLAN COMPRIS : c'est elle qui normalise les positions quantifiees,
-    # donc aussi les reperes et les matrices. La faire diverger, ne serait-ce
-    # qu'en excluant une piece, decalerait tout sans rien casser visiblement.
+    # ---- le repere commun, puis l'encodage ----
     lo, hi = [1e30] * 3, [-1e30] * 3
     for poly in meshes.values():
         bb = poly.GetBounds()
@@ -324,6 +375,11 @@ def main():
     span = max(hi[k] - lo[k] for k in range(3)) or 1.0
     centre = np.array([(hi[k] + lo[k]) / 2.0 for k in range(3)])
 
+    plane_x = (0.0 - centre[0]) / span
+    if abs(plane_x) > 0.02:
+        sys.exit("Le plan x = 0 est a %.3f du centre de la bbox : l'animation de "
+                 "reflexion de vface-3d.js suppose x = 0 au centre." % plane_x)
+
     def to_scene(A):
         R, t = A[:3, :3], A[:3, 3]
         out = np.eye(4)
@@ -331,40 +387,45 @@ def main():
         out[:3, 3] = (R @ centre + t - centre) / span
         return [round(float(x), 7) for x in out.T.reshape(16)]
 
-    def to_scene_pt(v):
+    def pt(v):
         return [round(float((v[k] - centre[k]) / span), 5) for k in range(3)]
 
-    for r in regions:
-        r["m"] = to_scene(fields[r["code"]]["R"])
-        r["field"] = quantize(fields[r["code"]]["vals"], 0.0, CLIP_MM)
-
-    # La scene anime la reflexion par `diag(1-2t, 1, 1)`, donc elle miroite par
-    # rapport a x = 0 DANS SON PROPRE REPERE. Ce n'est vrai que si le centre de
-    # la bbox commune tombe sur x = 0 -- ici c'est le cas parce que le crane et
-    # son miroir ont une union symetrique par construction. Un scan qui
-    # arriverait decentre rendrait l'animation fausse sans rien casser, donc on
-    # le refuse ici plutot que de le laisser passer.
-    plane_x = (0.0 - centre[0]) / span
-    if abs(plane_x) > 1e-6:
-        sys.exit("Le plan x = 0 ne tombe pas au centre de la bbox (%.6f en repere "
-                 "scene) : l'animation de reflexion de vface-3d.js serait fausse." % plane_x)
+    regions = []
+    for r in REGIONS:
+        regions.append({
+            "code": r["code"], "label": r["label"], "zone": r["zone"],
+            "part": "H_" + r["code"], "m": to_scene(r["A"]),
+            "rot": round(float(np.degrees(np.arccos(
+                max(-1.0, min(1.0, (np.trace(r["A"][:3, :3]) - 1) / 2))))), 2),
+            "trans": round(float(np.linalg.norm(r["A"][:3, 3])), 2),
+            "dmin": r["dmin"], "dmax": r["dmax"], "limit": r["limit"],
+            "median": r["median"], "absmed": r["absmed"], "p98": r["p98"],
+        })
 
     payload = webmesh.encode(
-        meshes, focus_on=["FACE"],
-        scalars={"FACE": (fields["CB"]["vals"], 0.0, CLIP_MM)},
+        meshes, focus_on=["H_CB"],
+        scalars=dict((c, (fields[c], -r["limit"], r["limit"]))
+                     for r in REGIONS for c in ["H_" + r["code"]]),
         extra={
             "mirror": [round(float(x), 6) for x in np.array(M).T.reshape(16)],
-            "clip": CLIP_MM,
             "planeX": round(float(plane_x), 6),
-            "landmarks": dict((k, to_scene_pt(v)) for k, v in lms.items()),
-            "setCB": SET_CB,
-            "setMAX": SET_MAX,
+            "landmarks": dict((k, dict((lab, pt(v)) for lab, v in d.items()))
+                              for k, d in lms.items()),
             "regions": regions,
         })
+    # Les cartes partent signees, chacune sur SON echelle : le shader divergent
+    # remet le zero au milieu de l'octet.
+    for r in REGIONS:
+        c = "H_" + r["code"]
+        payload["parts"][c]["val"] = quantize_signed(fields[c], r["limit"])
+        payload["parts"][c]["vmin"] = -r["limit"]
+        payload["parts"][c]["vmax"] = r["limit"]
+
     webmesh.write(os.path.join(ROOT, "assets", "vface-mesh.js"), "VFACE_SCENE", payload,
-                  "Genere par vface_mesh.py. Jeu de test publie d'AREG_CBCT (T1 deja "
-                  "oriente + masques AMASSS) et vraie matrice miroir de VFACE. "
-                  "Aucune donnee clinique.")
+                  "Genere par vface_mesh.py depuis la sortie d'une vraie passe de VFACE "
+                  "sur son jeu de test publie : ses trois matrices AREG, son scan miroir, "
+                  "ses reperes ALI et ses trois cartes ModelDistance. Aucune donnee "
+                  "clinique, et aucune mesure recalculee pour la page.")
 
 
 if __name__ == "__main__":

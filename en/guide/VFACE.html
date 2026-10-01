@@ -187,50 +187,59 @@
         <div class="v3d-run">
           <button class="v3d-go" type="button">Mirror again</button>
         </div>
-        <div class="v3d-ramp" aria-hidden="true">
-          <span>0&nbsp;mm</span><i></i><span>8&nbsp;mm+</span>
+        <div class="v3d-ramp v3d-ramp-div" aria-hidden="true">
+          <span class="v3d-ramp-lo">&minus;35&nbsp;mm</span><i></i><span class="v3d-ramp-hi">+35&nbsp;mm</span>
         </div>
         <ol class="v3d-chips v3d-steps">
-          <li data-step="0">0. <code>t1_landmarks_orientation_max</code> &mdash; ALI searches <code>ANS IF PNS UL6O UR1O UR6O</code></li>
-          <li data-step="1">1. <code>t1_oriented_max</code> &mdash; <code>semi_aso_cbct</code> orients on the maxilla</li>
-          <li data-step="2">2. <code>t1_landmarks_orientation_cb</code> &mdash; ALI places <code>Ba LPo N RPo S LOr ROr</code></li>
-          <li data-step="3">3. <code>t1_oriented_cb</code> &mdash; the mid-sagittal plane now lies on x = 0</li>
-          <li data-step="4">4. <code>t1_masks</code> &mdash; AMASSS segments cranial base, maxilla, mandible</li>
-          <li data-step="5">5. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, a reflection about x = 0</li>
-          <li data-step="6">6. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; on <em>one</em> structure</li>
-          <li data-step="7">7. <code>bone_surfaces</code> &mdash; the asymmetry map</li>
+          <li data-step="0">0. <strong>upstream</strong> &mdash; ALI + <code>semi_aso_cbct</code>: the mid-sagittal plane onto x = 0</li>
+          <li data-step="1">1. <code>t1_landmarks</code> &mdash; the 26 points ALI predicted here</li>
+          <li data-step="2">2. <code>t1_masks</code> &mdash; AMASSS: the bone surfaces the maps are measured on</li>
+          <li data-step="3">3. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, a reflection about x = 0</li>
+          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; on <em>one</em> structure</li>
+          <li data-step="5">5. <code>bone_surfaces</code> &mdash; VFACE&rsquo;s own <code>ModelDistance</code> map</li>
         </ol>
         <span class="v3d-i18n" hidden>
-          <i data-k="lmMax">ALI searches the maxilla set &mdash; not in this published test set</i>
-          <i data-k="orMax">semi_aso_cbct orients on the maxilla &mdash; this scan arrives already oriented</i>
-          <i data-k="lmCB">ALI places the cranial base set</i>
-          <i data-k="notfound">not found by the agent</i>
-          <i data-k="orCB">oriented: the mid-sagittal plane now lies on x = 0</i>
-          <i data-k="masks">AMASSS segments the bone into cranial base, maxilla, mandible</i>
+          <i data-k="orient">oriented: the mid-sagittal plane now lies on x = 0</i>
+          <i data-k="lm">ALI&rsquo;s predicted landmarks</i>
+          <i data-k="masks">AMASSS segments the bone the maps will be measured on</i>
           <i data-k="mirror">reflect across x = 0</i>
           <i data-k="plane">the plane the whole upstream chain exists to establish</i>
-          <i data-k="register">register the reflection &mdash; on this structure only</i>
-          <i data-k="map">asymmetry, vertex by vertex</i>
-          <i data-k="median">median</i>
+          <i data-k="register">AREG&rsquo;s own matrix &mdash; this structure only</i>
+          <i data-k="map">ModelDistance, VFACE&rsquo;s own map</i>
+          <i data-k="absmed">median |d|</i>
         </span>
-        <figcaption>What asymmetry assessment actually produces: the patient registered
-        onto their own reflection, and the leftover gap painted on the bone. There is no
-        second scan &mdash; the &ldquo;T2&rdquo; is the mirror. <strong>The control that matters is the
-        row of buttons.</strong> The steps below are clickable if you want to stop on
-        one, and the &times; control sets the speed. The reflection is taken about the
-        world plane x&nbsp;=&nbsp;0,
-        then registered onto the original <em>on one structure at a time</em>, and the
-        structure you pick decides what the colours mean: superimpose on the maxilla and
-        the maxilla comes out symmetric by construction, pushing the asymmetry onto
-        everything else. Same skull, three readings &mdash; median 1.36&nbsp;mm on the cranial
-        base, 1.44&nbsp;mm on the mandible, 2.84&nbsp;mm on the maxilla. The status line shows the
-        registration residual alongside the median, and it is worth a glance: the cranial
-        base and mandible close tightly here (1.43 and 0.79&nbsp;mm), the maxilla does not
-        (2.32&nbsp;mm), and a map read off a loose superimposition should be trusted less.
-        Built from the published AREG_CBCT test scan and its real AMASSS masks, with
-        VFACE&rsquo;s real mirror matrix; the three registrations are recomputed for this page by
-        rigid ICP rather than by AREG&rsquo;s elastix pass, and the distances are measured
-        offline.</figcaption>
+        <figcaption>
+        A real VFACE run, not a reconstruction. Everything here comes out of         the
+        tool on its own published test set: the three AREG matrices, the mirrored scan,
+        ALI&rsquo;s 26 predicted landmarks, and the three <code>ModelDistance</code> maps.
+        <strong>The mirror</strong> is <code>Matrix_mirror.tfm</code> =
+        <code>diag(-1, 1, 1)</code>, zero translation &mdash; a pure reflection about
+        <strong>x&nbsp;=&nbsp;0</strong>, a plane of the <em>world</em>. Nothing in it knows
+        anything about the patient, which is exactly why the upstream chain exists: to bring
+        the patient&rsquo;s mid-sagittal plane onto that plane. The reflection is animated
+        through its degenerate state, <code>diag(0, 1, 1)</code>, because a reflection
+        cannot         be interpolated by rotations &mdash; the determinant would have to
+        pass from         &minus;1 to +1 without ever being zero. The plane draws itself at
+        mid-flip.         <strong>Then the point.</strong> <code>createlistprocess.py</code>
+        calls         ModelToModel Distance three times, once per registration, and the
+        three maps do not         say the same thing. Superimposed on the <strong>cranial
+        base</strong>, the whole face         is laterally displaced: median |d|
+        7.0&nbsp;mm, 46% of vertices past 8&nbsp;mm, range         &minus;25 to +32.
+        Superimposed on the <strong>maxilla</strong>, the upper skull meets         its own
+        mirror to 1.0&nbsp;mm. On the <strong>mandible</strong>, to 0.45&nbsp;mm.
+        Superimposing <em>on</em> a structure makes that structure symmetric by construction
+        &mdash; that is not a flaw in the measurement, that <em>is</em> the measurement.
+        <strong>Three different surfaces, three different scales.</strong> These are the
+        files VFACE writes: the cranial-base map covers the whole skull, the maxilla map the
+        upper skull alone, the mandible map the mandible alone &mdash; so when a map covers
+        only one structure the rest of the skull stays neutral grey behind it. Their ranges
+        run from &plusmn;2.6&nbsp;mm to &plusmn;32, so each map carries its own scale, shown
+        in the bar; compare them on the numbers in the status line, not on the hue. Blue is
+        negative, red positive, pale grey is zero &mdash; the distance is signed, as VFACE
+        writes it. <strong>The control that matters is the row of buttons</strong>, and
+        the steps below are clickable if you want to stop on one. There is no second scan
+        here &mdash; the &ldquo;T2&rdquo; is the patient&rsquo;s own reflection.
+        </figcaption>
       </figure>
 
       <p>The final deliverable is a classification table, one row per patient, with three
