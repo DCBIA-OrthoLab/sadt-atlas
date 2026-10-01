@@ -6,6 +6,12 @@ garantit qu'elle divergera. build.py la réécrit dans chaque page à partir
 d'ici. Ne jamais éditer une sidebar dans un .html, elle sera écrasée.
 """
 
+import os
+
+#: La racine du site, pour verifier qu'une page traduite existe avant de la
+#: proposer dans le selecteur de langue.
+ROOT = os.path.dirname(os.path.abspath(__file__))
+
 # L'anglais est la langue source : les autres arbres en sont des traductions,
 # mises à jour par lots. `python3 i18n.py stale` dit lesquelles sont en retard.
 LANGS = ("en", "fr", "pt", "ko", "th")
@@ -188,8 +194,27 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     up = "../" * (depth - 1)          # vers la racine de la langue
     ui, fl = UI[lang], FILES[lang]
 
+    def rel_of(tool):
+        return f"guide/{tool}.html" if section == "guide" else f"{tool}/{tool}.html"
+
     def href(tool):
-        return f"{up}guide/{tool}.html" if section == "guide" else f"{up}{tool}/{tool}.html"
+        return up + rel_of(tool)
+
+    def link(tool, cur):
+        """L'entree de barre laterale d'un outil, pour CETTE langue.
+
+        Toutes les fiches ne sont pas traduites partout (le thai en a dix de
+        moins). Rendre l'entree inerte couperait l'acces a l'outil depuis cet
+        arbre ; on renvoie donc vers l'anglais en le disant, plutot que de
+        laisser un lien mort ou un cul-de-sac.
+        """
+        r = rel_of(tool)
+        if os.path.exists(os.path.join(ROOT, lang, r)):
+            return f'      <li><a href="{up + r}"{cur}>{tool}</a></li>'
+        return (f'      <li><a class="untranslated" href="{"../" * depth}en/{r}" '
+                f'hreflang="en" title="{tool} &mdash; not translated into '
+                f'{esc(LANG_NAMES[lang])} yet, this opens the English page"'
+                f'{cur}>{tool}</a></li>')
 
     out = ['<nav class="sidebar">']
     out.append(f'    <a class="brand" href="{up}index.html">SADT Atlas'
@@ -201,6 +226,14 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
             bits.append(f'<span class="cur">{other.upper()}</span>')
             continue
         target = same_page(lang, other, rel) if rel else "index.html"
+        # Ne proposer une langue que si CETTE page y existe. Le thai, par
+        # exemple, n'a pas encore toutes les fiches : un lien ferme vaut mieux
+        # qu'un lien mort, et le lecteur voit que la langue existe sans tomber
+        # sur une page absente.
+        if not os.path.exists(os.path.join(ROOT, other, target)):
+            bits.append(f'<span class="none" title="{esc(LANG_NAMES[other])} '
+                        f'&mdash; not translated yet">{other.upper()}</span>')
+            continue
         bits.append(f'<a href="{"../" * depth}{other}/{target}" hreflang="{other}" '
                     f'title="{esc(LANG_NAMES[other])}">{other.upper()}</a>')
     out.append("      " + "".join(bits))
@@ -224,7 +257,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         out.append(f'    <div class="nav-group"><h4>{esc(labels[lang])}</h4><ul>')
         for t in tools:
             cur = ' aria-current="page"' if t == current else ""
-            out.append(f'      <li><a href="{href(t)}"{cur}>{t}</a></li>')
+            out.append(link(t, cur))
         out.append("    </ul></div>")
 
     out.append(f'    <div class="nav-group"><h4>{esc(ui["cross"])}</h4><ul>')
