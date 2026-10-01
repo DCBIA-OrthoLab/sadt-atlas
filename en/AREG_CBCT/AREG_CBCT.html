@@ -235,6 +235,63 @@
       <code>CB</code> / <code>MAND</code> / <code>MAX</code> by <code>TranslateModels</code>. Checking two
       regions launches <strong>two independent registrations</strong>, each with its own output folder.</p>
 
+
+      <h3 id="arbre-appels">The chain of the Orientation &amp; Registration mode, step by step</h3>
+
+      <div class="pipe">
+        <p class="pipe-seed"><code>T1</code> and <code>T2</code> &mdash; two CBCT of the same patient</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>Preparation &mdash; this mode only</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html">PRE_ASO</a> recentres the T1 &mdash; no network, a translation</span>
+                <span class="pipe-out"><code>&lt;T1 folder&gt;Or</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html">ALI_CBCT</a> places the orientation landmarks <span class="badge predit">predicted</span></span>
+                <span class="pipe-out"><code>CBCT.py:756</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html">SEMI_ASO</a> orients the T1 onto the gold standard</span>
+                <span class="pipe-out"><code>&lt;T1 folder&gt;Or</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="reg">
+          <h4>Segmentation &mdash; what the registration will be allowed to see</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html">AMASSS</a> predicts <code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code> on the oriented T1 <span class="badge predit">predicted</span></span>
+                <span class="pipe-out"><code>&lt;base&gt;_seg_&lt;STRUCT&gt;.nii.gz</code>, beside the scans</span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>Registration &mdash; once per checked region</h4>
+          <ol>
+            <li><span class="pipe-act">centre the moving T2</span>
+                <span class="pipe-out"><code>T2_Center</code></span></li>
+            <li><span class="pipe-act">mask the fixed T1 &mdash; <strong>elastix never sees anything outside</strong></span>
+                <span class="pipe-out"><code>fixed_image_masked</code></span></li>
+            <li><span class="pipe-act">one elastix pass: Mattes mutual information, 3 pyramid levels, 1500 iterations each</span>
+                <span class="pipe-out">a rigid transform</span></li>
+            <li><span class="pipe-act"><code>MatrixRetrieval</code> turns it into an <code>Euler3DTransform</code></span>
+                <span class="pipe-out"><code>&lt;pat&gt;_&lt;REG&gt;Reg_matrix.tfm</code></span></li>
+            <li><span class="pipe-act">resample the T2 &mdash; on <em>its own</em> grid, not the T1&rsquo;s</span>
+                <span class="pipe-out"><code>Registered/&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="viz">
+          <h4>Finish</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html">AMASSS</a> runs again for the final segmentations, twice &mdash; on the input folder, then recursively on the output tree &mdash; with <code>genVtk=True</code></span>
+                <span class="pipe-out"><code>&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">Steps 4 to 10 are the tail the three modes share. The other two differ
+        only upstream: <strong>Fully-Automated</strong> skips 1&ndash;3 and lets AMASSS predict the
+        masks on the T1 as supplied; <strong>Semi-Automated</strong> skips 1&ndash;4 entirely and
+        takes the masks from the operator&rsquo;s &ldquo;T1 Masks&rdquo; field. Checking two reference
+        regions launches two independent registrations, each with its own output folder.</p>
+      </div>
+
       <h2 id="entrees">4. Inputs, pairing, preprocessing</h2>
 
       <p><strong>Formats.</strong> <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>. For

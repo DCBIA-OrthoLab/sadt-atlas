@@ -163,20 +163,52 @@
         Semi mode skips steps 1–4 and 6.</figcaption>
       </figure>
 
-      <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>Module</th><th>Input</th><th>Output</th><th>Role</th></tr></thead>
-        <tbody>
-          <tr><td>1</td><td><code>MRI2CBCT_resample_cbct_mri</code></td><td>Raw CBCT</td><td><code>&lt;out&gt;/CBCT Resampled/CBCT</code></td><td>isotropic resampling <code>spacing=[0.3,0.3,0.3]</code>, <code>center=True</code></td></tr>
-          <tr><td>2</td><td><code>PRE_ASO_CBCT</code></td><td>↑</td><td><code>&lt;out&gt;/PRE ASO CBCT</code></td><td>CBCT pre-orientation (<code>PreASO</code> models)</td></tr>
-          <tr><td>3</td><td><code>ALI_CBCT</code></td><td>↑</td><td>same</td><td>orientation landmarks (<code>N S Ba RPo…</code> or <code>IF ANS PNS UR1O UR6O UL6O</code> depending on the reference)</td></tr>
-          <tr><td>4</td><td><code>SEMI_ASO_CBCT</code></td><td>↑</td><td><code>&lt;out&gt;/Oriented CBCT</code></td><td>final orientation onto a gold file, suffix <code>Or</code></td></tr>
-          <tr><td>5</td><td><code>CrownSegmentationcli</code></td><td>Raw IOS</td><td><code>&lt;out&gt;/Seg IOS</code></td><td><code>Universal_ID</code>, <code>model=latest</code>, <code>suffix=Seg</code></td></tr>
-          <tr><td>6</td><td><code>PRE_ASO_IOS</code></td><td>↑</td><td><code>&lt;out&gt;/PRE ASO IOS</code></td><td>IOS orientation onto the gold, teeth <code>UR6,UR4,UL4,UL6</code>, suffix <code>Or</code></td></tr>
-          <tr><td>7</td><td><code>ALI_CBCT</code> (2nd pass)</td><td><code>Oriented CBCT</code></td><td><code>&lt;out&gt;/CBCT Landmarks</code></td><td><strong>the 12 registration landmarks</strong></td></tr>
-          <tr><td>8</td><td><code>ALI_IOS</code></td><td><code>PRE ASO IOS</code></td><td><code>&lt;out&gt;/IOS Landmarks</code></td><td><strong>the same 12 landmarks, IOS side</strong></td></tr>
-          <tr><td>9</td><td><code>AREG_IOSCBCT</code></td><td>everything above</td><td><code>&lt;out&gt;/Registered IOS</code></td><td>landmark transform + ICP</td></tr>
-        </tbody>
-      </table></div>
+      <div class="pipe" data-numbering="manual">
+        <p class="pipe-seed">a raw CBCT <em>and</em> a raw intra-oral scan &mdash; two modalities,
+        prepared apart, brought into contact only at the end</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>CBCT path</h4>
+          <ol>
+            <li data-n="1"><span class="pipe-act"><code>MRI2CBCT_resample_cbct_mri</code> resamples it isotropically &mdash; <code>spacing=[0.3,0.3,0.3]</code>, <code>center=True</code></span>
+                <span class="pipe-out"><code>&lt;out&gt;/CBCT Resampled/CBCT</code></span></li>
+            <li data-n="2"><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html">PRE_ASO_CBCT</a> pre-orients it, with the <code>PreASO</code> models <span class="badge predit">predicted</span></span>
+                <span class="pipe-out"><code>&lt;out&gt;/PRE ASO CBCT</code></span></li>
+            <li data-n="3"><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html">ALI_CBCT</a> places the orientation landmarks &mdash; <code>N S Ba RPo…</code> or <code>IF ANS PNS UR1O UR6O UL6O</code>, depending on the reference <span class="badge predit">predicted</span></span>
+                <span class="pipe-out">same folder</span></li>
+            <li data-n="4"><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html">SEMI_ASO_CBCT</a> orients it onto a gold file, suffix <code>Or</code></span>
+                <span class="pipe-out"><code>&lt;out&gt;/Oriented CBCT</code></span></li>
+            <li data-n="7"><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html">ALI_CBCT</a> runs a second time, for the 12 shared landmarks <span class="badge predit">predicted</span></span>
+                <span class="pipe-out">the occlusal point of each tooth</span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="mirror">
+          <h4>IOS path</h4>
+          <ol>
+            <li data-n="5"><span class="pipe-act"><code>CrownSegmentationcli</code> labels the crowns &mdash; <code>Universal_ID</code>, <code>model=latest</code>, <code>suffix=Seg</code> <span class="badge predit">predicted</span></span>
+                <span class="pipe-out"><code>&lt;out&gt;/Seg IOS</code></span></li>
+            <li data-n="6"><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html">PRE_ASO_IOS</a> pre-orients the mesh onto a gold file</span>
+                <span class="pipe-out">the oriented arch</span></li>
+            <li data-n="8"><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html">ALI_IOS</a> places the same 12 landmarks &mdash; <code>lm_type='O'</code>, <code>image_size=224</code>, <code>blur_radius=0</code>, <code>faces_per_pixel=1</code> <span class="badge predit">predicted</span></span>
+                <span class="pipe-out"><code>IOSCBCT.py:335</code>, <code>:839</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="reg">
+          <h4>Where the two paths meet</h4>
+          <ol>
+            <li data-n="9"><span class="pipe-act"><strong>AREG_IOSCBCT</strong> itself: Procrustes, then ICP, on the 12 matched landmarks &mdash; <span class="badge calcule">computed</span>, no network at all</span>
+                <span class="pipe-out">the arch, in the CBCT&rsquo;s frame</span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">Every box above except the last contains a network; the final CLI
+        contains none &mdash; it is pure geometry. <strong>Semi mode skips steps 1&ndash;4
+        and 6</strong>, taking an already oriented CBCT and an already oriented arch. The
+        numbers are the module&rsquo;s own, which is why they interleave: the two paths run
+        apart, so a continuous count would suggest an order that does not exist.</p>
+      </div>
 
       <p>Semi mode skips 1–4 and 6: it segments the IOS, then runs the two <a href="../ALI/ALI.html">ALI</a> steps directly and the registration. Its
       <code>IOS_folder</code> points to <code>&lt;out&gt;/Seg IOS/liste_csv_file_Seg</code>, the subfolder that
