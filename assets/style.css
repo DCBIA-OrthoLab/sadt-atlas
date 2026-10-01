@@ -992,3 +992,95 @@ math { color: var(--text); }
   background: color-mix(in srgb, var(--ok-br) 20%, transparent);
   color: var(--ok-tx); border-color: var(--ok-br);
 }
+
+/* --- Scene BatchDentalSeg : quatre inventaires, et un schema dentaire ---
+   Le modele choisi ne change pas le code, il change la TABLE D'ETIQUETTES.
+   La liste doit donc pouvoir dire, ligne par ligne, « absente de ce
+   modele », « decoupee en 52 dents » ou « dans la table, mais pas dans la
+   passe dont on a la geometrie ». D'ou trois etats visuels, et un bouton
+   « Run » desactive quand le modele choisi n'a pas tourne ici. */
+.viewer3d .v3d-modes button[data-bds-model][aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent); border-color: var(--accent);
+}
+.viewer3d .v3d-go:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.viewer3d .v3d-lab {
+  font-size: .74rem; font-variant-numeric: tabular-nums;
+  color: var(--text-faint); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0 .3rem; margin-left: .3rem;
+}
+.viewer3d .v3d-tag {
+  display: block; font-size: .76rem; font-style: italic;
+  color: var(--text-faint); margin-top: .15rem;
+}
+.viewer3d .v3d-tag:empty { display: none; }
+/* Une structure que le modele ne produit pas ne se clique pas : on ne
+   designe que ce qui existe, exactement comme le picking de la scene. */
+.viewer3d .v3d-parts > li[data-state="absent"],
+.viewer3d .v3d-parts > li[data-state="nogeom"] {
+  opacity: .5; border-left-color: var(--border);
+}
+.viewer3d.v3d-on .v3d-parts > li[data-state="absent"],
+.viewer3d.v3d-on .v3d-parts > li[data-state="nogeom"] { cursor: default; }
+.viewer3d .v3d-parts > li[data-state="split"] { border-left-style: dashed; }
+
+/* Le schema dentaire. Trente-deux boutons empiles seraient illisibles : la
+   disposition clinique standard -- deux arcades, droite du patient a gauche
+   de la feuille -- se lit d'un coup d'oeil et tient en quatre lignes. Il ne
+   parait que pour un modele par dent (.v3d-teeth). */
+.viewer3d .v3d-chart { margin: .9rem 0 0; overflow-x: auto; }
+.viewer3d .v3d-arch {
+  display: grid; grid-template-columns: repeat(16, 1fr);
+  gap: .2rem; min-width: 32rem;
+}
+.viewer3d .v3d-arch.is-baby > :first-child { grid-column-start: 4; }
+.viewer3d .v3d-arch-label {
+  grid-column: 1 / -1; font-size: .72rem; color: var(--text-faint);
+  text-transform: uppercase; letter-spacing: .05em; margin: .5rem 0 .1rem;
+}
+.viewer3d .v3d-arch button {
+  font: inherit; font-size: .72rem; font-variant-numeric: tabular-nums;
+  cursor: pointer; padding: .3rem .1rem .22rem;
+  background: var(--bg-elev); color: var(--text-soft);
+  border: 1px solid var(--border); border-radius: 4px;
+  border-top: 3px solid var(--sw, var(--border-strong));
+  text-align: center;
+}
+.viewer3d .v3d-arch button:hover { color: var(--text); border-color: var(--border-strong); }
+.viewer3d .v3d-arch button[aria-pressed="true"] {
+  color: var(--text); border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 640;
+}
+.viewer3d .v3d-arch button > small {
+  display: block; font-size: .86em; color: var(--text-faint); font-weight: 400;
+}
+/* La note du schema dit ce que la scene N'A PAS : sans elle, un lecteur
+   croirait cliquer une dent segmentee. */
+.viewer3d .v3d-chart-note {
+  font-size: .78rem; color: var(--text-faint); margin: .6rem 0 0;
+}
+/* La ligne de statut de cette scene porte des phrases, pas des nombres : sans
+   ce garde-fou le `white-space: nowrap` commun la fait deborder de la scene.
+   Regle portee par la figure, pour ne rien changer aux autres scenes. */
+.viewer3d[data-bds-3d] .v3d-status {
+  max-width: min(92%, 44rem); white-space: normal; text-align: center;
+}
+/* Les noms de modeles sont longs et d'un seul tenant
+   (« UniversalLabDentalsegmentator ») : sans borne ils poussent la page en
+   largeur sur un telephone. Un bouton n'est pas un identifiant a recopier,
+   il peut se couper. */
+.viewer3d[data-bds-3d] .v3d-modes button { max-width: 100%; overflow-wrap: anywhere; }
+/* Une dent que la passe n'a pas produite : la cellule reste lisible -- elle
+   fait partie de l'inventaire -- mais elle ne se donne pas des airs de
+   resultat, et elle n'a pas le curseur d'un bouton qui ferait quelque chose. */
+.viewer3d .v3d-arch button[data-state="absent"] {
+  opacity: .42; border-top-color: var(--border); cursor: default;
+}
+.viewer3d .v3d-arch button[data-state="absent"]:hover { border-color: var(--border); }
+/* Survol croise schema <-> scene : les deux moities disent la meme chose. */
+.viewer3d .v3d-arch button.v3d-hover { border-color: var(--sw); color: var(--text); }
+/* Pendant la passe, le schema ne se clique pas -- comme la liste : on
+   regarde le reseau travailler, et un clic a mi-animation laissait la camera
+   sur une dent pendant que le statut parlait encore de l'etape en cours. */
+.viewer3d.v3d-sim .v3d-chart { pointer-events: none; }

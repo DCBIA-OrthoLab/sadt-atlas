@@ -359,7 +359,11 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
       20 primary teeth (33 → 52), then <code>Mandible</code> = 53, <code>Maxilla</code> = 54,
       <code>Mandibular canal</code> = 55. No "Upper Skull": this model does not segment the
       cranial vault, contrary to what its UI description shows and to what
-      the README says.</p>
+      the README says. The numbering is not arbitrary: label by label, values
+      1&ndash;32 are exactly the <strong>Universal Numbering System</strong> (1 = upper right
+      third molar &hellip; 32 = lower right third molar) and 33&ndash;52 are its letters
+      <code>A</code>&ndash;<code>T</code> for the primary teeth, so the <abbr title="F&eacute;d&eacute;ration dentaire internationale">FDI</abbr>
+      equivalent of a label is fixed &mdash; the figure below gives both.</p>
 
       <div class="callout warn">
         <div class="callout-title">Pitfall</div>
@@ -369,6 +373,198 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
       <p>Values are set on each segment via a <code>LabelValue</code> tag
       (<code>_segmentLabelValue</code>), which <strong>takes priority over the name</strong> when present.</p>
 
+      <figure class="viewer3d" data-bds-3d>
+        <div class="v3d-modes" role="group" aria-label="Model selected in the combo box">
+          <button type="button" data-bds-model="DentalSegmentator" aria-pressed="true">DentalSegmentator</button>
+          <button type="button" data-bds-model="PediatricDentalsegmentator" aria-pressed="false">PediatricDentalsegmentator</button>
+          <button type="button" data-bds-model="NasoMaxillaDentSeg" aria-pressed="false">NasoMaxillaDentSeg</button>
+          <button type="button" data-bds-model="UniversalLabDentalsegmentator" aria-pressed="false">UniversalLabDentalsegmentator</button>
+        </div>
+        <div class="v3d-stage">
+          <button class="v3d-reset" type="button">Reset view</button>
+          <span class="v3d-state">Input CBCT &mdash; threshold only</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+          <span class="v3d-hint">Drag to rotate &middot; pinch or scroll to zoom &middot; click a structure</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. read the volume &mdash; <code>nnUNet_raw</code>/<code>_preprocessed</code>/<code>_results</code> all point at the model folder</li>
+          <li data-step="1">1. <code>nnUNetv2_predict</code> &mdash; <strong>one</strong> multi-label pass, <code>-f 0</code>, <code>-step_size 0.5</code>, <code>--disable_tta</code></li>
+          <li data-step="2">2. <code>_buildLabelArray</code> &mdash; a single export, then one LUT remap to the official values</li>
+          <li data-step="3">3. <code>_exportVTKPerLabel</code> &mdash; windowed-sinc, 40&nbsp;% quadric decimation, RAS&rarr;LPS flip</li>
+        </ol>
+        <ol class="v3d-parts">
+          <li data-part="SKULL" data-label="Upper Skull" style="--sw:#e3dd90" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Upper Skull</span> <code>SKULL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">The cranial vault. Three of the four models label it; UniversalLab does not &mdash; which is why there is no vault in this scene, since a UniversalLab pass is what it shows.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAXI" data-label="Maxilla" style="--sw:#b8860b" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Maxilla</span> <code>MAXI</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">The upper jaw as a label of its own, value 54 here. The largest structure of the pass at 129&nbsp;166&nbsp;mm&sup3; measured &mdash; and the one DentalSegmentator would have folded into the Upper Skull.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAND" data-label="Mandible" style="--sw:#d2691e" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Mandible</span> <code>MAND</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">The lower jaw, the only bone of the skull that moves. Present in all four tables, at three different values (2, 2, 2, 53). 33&nbsp;795&nbsp;mm&sup3; measured.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="UPT" data-label="Upper Teeth" style="--sw:#dc9565" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Upper Teeth</span> <code>UPT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">One label for the whole upper arch &mdash; in three of the models. UniversalLab has no such label: on this scan the upper arch came out as 15 separately numbered teeth. Use the chart.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="LOT" data-label="Lower Teeth" style="--sw:#ebdfb4" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Lower Teeth</span> <code>LOT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">Likewise the lower arch, which came out as 14 numbered teeth here. That is the whole difference between the two families of model, and it is a difference of label table, not of code.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="CANAL" data-label="Mandibular canal" style="--sw:#a0522d" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Mandibular canal</span> <code>CANAL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">The inferior alveolar canal, left and right: a thin bilateral tube inside the mandible, and the smallest structure of the pass (805&nbsp;mm&sup3; against 129&nbsp;166 for the maxilla).</span>
+            <span class="v3d-tag"></span>
+          </li>
+        </ol>
+        <div class="v3d-chart" hidden>
+          <div class="v3d-arch">
+            <span class="v3d-arch-label">Permanent, upper arch &mdash; patient&rsquo;s right first</span>
+            <button type="button" data-tooth="1" data-arch="UPT" aria-pressed="false" style="--sw:#ff0000" title="Upper-right third molar &mdash; Universal 1, FDI 18">1<small>18</small></button>
+            <button type="button" data-tooth="2" data-arch="UPT" aria-pressed="false" style="--sw:#00ff00" title="Upper-right second molar &mdash; Universal 2, FDI 17">2<small>17</small></button>
+            <button type="button" data-tooth="3" data-arch="UPT" aria-pressed="false" style="--sw:#0000ff" title="Upper-right first molar &mdash; Universal 3, FDI 16">3<small>16</small></button>
+            <button type="button" data-tooth="4" data-arch="UPT" aria-pressed="false" style="--sw:#ffff00" title="Upper-right second premolar &mdash; Universal 4, FDI 15">4<small>15</small></button>
+            <button type="button" data-tooth="5" data-arch="UPT" aria-pressed="false" style="--sw:#ff00ff" title="Upper-right first premolar &mdash; Universal 5, FDI 14">5<small>14</small></button>
+            <button type="button" data-tooth="6" data-arch="UPT" aria-pressed="false" style="--sw:#00ffff" title="Upper-right canine &mdash; Universal 6, FDI 13">6<small>13</small></button>
+            <button type="button" data-tooth="7" data-arch="UPT" aria-pressed="false" style="--sw:#800000" title="Upper-right lateral incisor &mdash; Universal 7, FDI 12">7<small>12</small></button>
+            <button type="button" data-tooth="8" data-arch="UPT" aria-pressed="false" style="--sw:#008000" title="Upper-right central incisor &mdash; Universal 8, FDI 11">8<small>11</small></button>
+            <button type="button" data-tooth="9" data-arch="UPT" aria-pressed="false" style="--sw:#000080" title="Upper-left central incisor &mdash; Universal 9, FDI 21">9<small>21</small></button>
+            <button type="button" data-tooth="10" data-arch="UPT" aria-pressed="false" style="--sw:#808000" title="Upper-left lateral incisor &mdash; Universal 10, FDI 22">10<small>22</small></button>
+            <button type="button" data-tooth="11" data-arch="UPT" aria-pressed="false" style="--sw:#800080" title="Upper-left canine &mdash; Universal 11, FDI 23">11<small>23</small></button>
+            <button type="button" data-tooth="12" data-arch="UPT" aria-pressed="false" style="--sw:#008080" title="Upper-left first premolar &mdash; Universal 12, FDI 24">12<small>24</small></button>
+            <button type="button" data-tooth="13" data-arch="UPT" aria-pressed="false" style="--sw:#c0c0c0" title="Upper-left second premolar &mdash; Universal 13, FDI 25">13<small>25</small></button>
+            <button type="button" data-tooth="14" data-arch="UPT" aria-pressed="false" style="--sw:#808080" title="Upper-left first molar &mdash; Universal 14, FDI 26">14<small>26</small></button>
+            <button type="button" data-tooth="15" data-arch="UPT" aria-pressed="false" style="--sw:#ffa500" title="Upper-left second molar &mdash; Universal 15, FDI 27">15<small>27</small></button>
+            <button type="button" data-tooth="16" data-arch="UPT" aria-pressed="false" style="--sw:#f0e68c" title="Upper-left third molar &mdash; Universal 16, FDI 28">16<small>28</small></button>
+          </div>
+          <div class="v3d-arch is-baby">
+            <span class="v3d-arch-label">Primary, upper arch</span>
+            <button type="button" data-tooth="33" data-arch="UPT" aria-pressed="false" style="--sw:#ffdab9" title="Upper-right second molar (baby) &mdash; Universal A, FDI 55">33<small>55</small></button>
+            <button type="button" data-tooth="34" data-arch="UPT" aria-pressed="false" style="--sw:#cd5c5c" title="Upper-right first molar (baby) &mdash; Universal B, FDI 54">34<small>54</small></button>
+            <button type="button" data-tooth="35" data-arch="UPT" aria-pressed="false" style="--sw:#f08080" title="Upper-right canine (baby) &mdash; Universal C, FDI 53">35<small>53</small></button>
+            <button type="button" data-tooth="36" data-arch="UPT" aria-pressed="false" style="--sw:#e9967a" title="Upper-right lateral incisor (baby) &mdash; Universal D, FDI 52">36<small>52</small></button>
+            <button type="button" data-tooth="37" data-arch="UPT" aria-pressed="false" style="--sw:#fa8072" title="Upper-right central incisor (baby) &mdash; Universal E, FDI 51">37<small>51</small></button>
+            <button type="button" data-tooth="38" data-arch="UPT" aria-pressed="false" style="--sw:#ff7f50" title="Upper-left central incisor (baby) &mdash; Universal F, FDI 61">38<small>61</small></button>
+            <button type="button" data-tooth="39" data-arch="UPT" aria-pressed="false" style="--sw:#ff6347" title="Upper-left lateral incisor (baby) &mdash; Universal G, FDI 62">39<small>62</small></button>
+            <button type="button" data-tooth="40" data-arch="UPT" aria-pressed="false" style="--sw:#00fa9a" title="Upper-left canine (baby) &mdash; Universal H, FDI 63">40<small>63</small></button>
+            <button type="button" data-tooth="41" data-arch="UPT" aria-pressed="false" style="--sw:#00ff7f" title="Upper-left first molar (baby) &mdash; Universal I, FDI 64">41<small>64</small></button>
+            <button type="button" data-tooth="42" data-arch="UPT" aria-pressed="false" style="--sw:#4682b4" title="Upper-left second molar (baby) &mdash; Universal J, FDI 65">42<small>65</small></button>
+          </div>
+          <div class="v3d-arch is-baby">
+            <span class="v3d-arch-label">Primary, lower arch</span>
+            <button type="button" data-tooth="52" data-arch="LOT" aria-pressed="false" style="--sw:#cd853f" title="Lower-right second molar (baby) &mdash; Universal T, FDI 85">52<small>85</small></button>
+            <button type="button" data-tooth="51" data-arch="LOT" aria-pressed="false" style="--sw:#ff69b4" title="Lower-right first molar (baby) &mdash; Universal S, FDI 84">51<small>84</small></button>
+            <button type="button" data-tooth="50" data-arch="LOT" aria-pressed="false" style="--sw:#adff2f" title="Lower-right canine (baby) &mdash; Universal R, FDI 83">50<small>83</small></button>
+            <button type="button" data-tooth="49" data-arch="LOT" aria-pressed="false" style="--sw:#008080" title="Lower-right lateral incisor (baby) &mdash; Universal Q, FDI 82">49<small>82</small></button>
+            <button type="button" data-tooth="48" data-arch="LOT" aria-pressed="false" style="--sw:#b0c4de" title="Lower-right central incisor (baby) &mdash; Universal P, FDI 81">48<small>81</small></button>
+            <button type="button" data-tooth="47" data-arch="LOT" aria-pressed="false" style="--sw:#6495ed" title="Lower-left central incisor (baby) &mdash; Universal O, FDI 71">47<small>71</small></button>
+            <button type="button" data-tooth="46" data-arch="LOT" aria-pressed="false" style="--sw:#4169e1" title="Lower-left lateral incisor (baby) &mdash; Universal N, FDI 72">46<small>72</small></button>
+            <button type="button" data-tooth="45" data-arch="LOT" aria-pressed="false" style="--sw:#7b68ee" title="Lower-left canine (baby) &mdash; Universal M, FDI 73">45<small>73</small></button>
+            <button type="button" data-tooth="44" data-arch="LOT" aria-pressed="false" style="--sw:#6a5acd" title="Lower-left first molar (baby) &mdash; Universal L, FDI 74">44<small>74</small></button>
+            <button type="button" data-tooth="43" data-arch="LOT" aria-pressed="false" style="--sw:#87ceeb" title="Lower-left second molar (baby) &mdash; Universal K, FDI 75">43<small>75</small></button>
+          </div>
+          <div class="v3d-arch">
+            <span class="v3d-arch-label">Permanent, lower arch</span>
+            <button type="button" data-tooth="32" data-arch="LOT" aria-pressed="false" style="--sw:#ffe4e1" title="Lower-right third molar &mdash; Universal 32, FDI 48">32<small>48</small></button>
+            <button type="button" data-tooth="31" data-arch="LOT" aria-pressed="false" style="--sw:#db7093" title="Lower-right second molar &mdash; Universal 31, FDI 47">31<small>47</small></button>
+            <button type="button" data-tooth="30" data-arch="LOT" aria-pressed="false" style="--sw:#afeeee" title="Lower-right first molar &mdash; Universal 30, FDI 46">30<small>46</small></button>
+            <button type="button" data-tooth="29" data-arch="LOT" aria-pressed="false" style="--sw:#98fb98" title="Lower-right second premolar &mdash; Universal 29, FDI 45">29<small>45</small></button>
+            <button type="button" data-tooth="28" data-arch="LOT" aria-pressed="false" style="--sw:#eee8aa" title="Lower-right first premolar &mdash; Universal 28, FDI 44">28<small>44</small></button>
+            <button type="button" data-tooth="27" data-arch="LOT" aria-pressed="false" style="--sw:#da70d6" title="Lower-right canine &mdash; Universal 27, FDI 43">27<small>43</small></button>
+            <button type="button" data-tooth="26" data-arch="LOT" aria-pressed="false" style="--sw:#ff4500" title="Lower-right lateral incisor &mdash; Universal 26, FDI 42">26<small>42</small></button>
+            <button type="button" data-tooth="25" data-arch="LOT" aria-pressed="false" style="--sw:#1e90ff" title="Lower-right central incisor &mdash; Universal 25, FDI 41">25<small>41</small></button>
+            <button type="button" data-tooth="24" data-arch="LOT" aria-pressed="false" style="--sw:#7fff00" title="Lower-left central incisor &mdash; Universal 24, FDI 31">24<small>31</small></button>
+            <button type="button" data-tooth="23" data-arch="LOT" aria-pressed="false" style="--sw:#ff1493" title="Lower-left lateral incisor &mdash; Universal 23, FDI 32">23<small>32</small></button>
+            <button type="button" data-tooth="22" data-arch="LOT" aria-pressed="false" style="--sw:#9400d3" title="Lower-left canine &mdash; Universal 22, FDI 33">22<small>33</small></button>
+            <button type="button" data-tooth="21" data-arch="LOT" aria-pressed="false" style="--sw:#00ced1" title="Lower-left first premolar &mdash; Universal 21, FDI 34">21<small>34</small></button>
+            <button type="button" data-tooth="20" data-arch="LOT" aria-pressed="false" style="--sw:#2f4f4f" title="Lower-left second premolar &mdash; Universal 20, FDI 35">20<small>35</small></button>
+            <button type="button" data-tooth="19" data-arch="LOT" aria-pressed="false" style="--sw:#483d8b" title="Lower-left first molar &mdash; Universal 19, FDI 36">19<small>36</small></button>
+            <button type="button" data-tooth="18" data-arch="LOT" aria-pressed="false" style="--sw:#8fbc8f" title="Lower-left second molar &mdash; Universal 18, FDI 37">18<small>37</small></button>
+            <button type="button" data-tooth="17" data-arch="LOT" aria-pressed="false" style="--sw:#b22222" title="Lower-left third molar &mdash; Universal 17, FDI 38">17<small>38</small></button>
+          </div>
+            <p class="v3d-chart-note">The label value is what the output NIfTI carries; the small number underneath is the <abbr title="F&eacute;d&eacute;ration dentaire internationale">FDI</abbr> equivalent. Colours are <code>UNIVERSAL_COLORS</code> from the module &mdash; note that <code>#008080</code> serves twice in it, for labels 12 and 49. Cells drawn faintly are labels the pass did <strong>not</strong> produce on this scan: click one and the status line says so, rather than showing a tooth that is not there.</p>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Run the pass</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="read">Reading the scan &mdash; threshold only, no network yet</i>
+          <i data-k="predict"><code>nnUNetv2_predict</code> &mdash; one sliding window over the whole volume</i>
+          <i data-k="labelmap">Label map rebuilt &mdash;</i>
+          <i data-k="export">Surfaces written, the module&rsquo;s 3D opacities applied</i>
+          <i data-k="values">label values written</i>
+          <i data-k="done">labels produced</i>
+          <i data-k="teeth">of them teeth</i>
+          <i data-k="scans">scan in the queue</i>
+          <i data-k="label">label</i>
+          <i data-k="fdi">FDI</i>
+          <i data-k="absent">Not produced by this model.</i>
+          <i data-k="split">This model numbers each tooth instead &mdash; see the chart.</i>
+          <i data-k="nogeom">In this model&rsquo;s table, but not produced by the pass shown here.</i>
+          <i data-k="other">Not the pass on screen &mdash; only this model&rsquo;s label table, applied to the list.</i>
+          <i data-k="notinscan">not produced on this scan</i>
+        </span>
+        <figcaption>One network, four inventories &mdash; and 29 teeth counted one by one.
+        <strong>What is real.</strong> Everything on screen is a
+        <code>UniversalLabDentalsegmentator</code> pass run for this page on
+        <code>PreDentalSurgery</code>, the <code>CBCTDentalSurgery</code> sample
+        <em>Slicer itself</em> publishes &mdash; the one the module&rsquo;s own
+        <em>Test Files</em> button downloads, verified byte-identical by md5, so no
+        patient data leaves with this figure. One scan, <code>cuda</code>,
+        <strong>238.7&nbsp;s</strong>, queue finished 1 done / 0 failed. The pass wrote
+        <strong>32 labels</strong> of the 55 in its table: 29 individual teeth, plus
+        mandible&nbsp;(53), maxilla&nbsp;(54) and mandibular canal&nbsp;(55). The 23 that
+        are missing are missing from the <em>mouth</em>, not from the page &mdash; three
+        third molars (16, 17, 32) and the whole primary set (33&ndash;52), which an adult
+        does not have. Colours are the module&rsquo;s <code>UNIVERSAL_COLORS</code>, the
+        opacities its own 3D values, and every volume in the status line is
+        <em>measured</em> on the label map by voxel count.
+        <strong>The one thing to take away.</strong> Unlike
+        <a href="../AMASSS/AMASSS.html">AMASSS</a>, which loads one binary network per
+        structure and produces them one after another, this is a <em>single</em>
+        multi-label pass: all 32 labels come out of the same sweep, together. Switching
+        model above changes the label <em>table</em>, not the code &mdash; that is the
+        whole of <code>onApplyClickedForVolume()</code>&rsquo;s four branches. The list
+        then says, structure by structure, what the chosen model would have called it,
+        and marks what it would not have produced at all.
+        <strong>Read this before trusting a tooth.</strong> Label 1, the upper-right
+        third molar, comes out at <strong>4&nbsp;253&nbsp;mm&sup3;</strong> &mdash; four
+        times the next largest tooth (1&nbsp;028&nbsp;mm&sup3;) and larger than any molar
+        is. On this scan that label has collected material well beyond the tooth. It is
+        shown exactly as the model produced it, because a page about what the code does
+        is worth nothing if it quietly repairs the code&rsquo;s output.
+        <strong>What is staged, and said so.</strong> The sweep is one sliding window
+        made visible; nnU-Net tiles the volume in three dimensions, not bottom to top.
+        The change from the neutral instrument tint to the official colours at step&nbsp;2
+        is the LUT remap of <code>_buildLabelArray</code> dramatised &mdash; the
+        network&rsquo;s own class order is not observable from the output file. The
+        &ldquo;before&rdquo; surface is a plain threshold at 605, which is the Otsu split
+        between tissue and bone computed for this page (this CBCT is not HU-calibrated,
+        so no textbook bone value applies). And the surfaces are marching cubes +
+        windowed-sinc + quadric decimation run <em>for this page</em> by
+        <code>batchdentalseg_mesh.py</code> &mdash; 1&nbsp;200 triangles per tooth,
+        16&nbsp;000 for the mandible, 14&nbsp;000 for the maxilla &mdash; not the
+        module&rsquo;s own <code>.vtk</code> exports, which it also wrote.
+        <strong>Worth knowing</strong>: two of the 29 labels came out broken on this
+        scan, and both are shown unretouched. Label&nbsp;1 (upper-right third molar)
+        measures 4&nbsp;253&nbsp;mm&sup3;, four times any other tooth. Label&nbsp;2
+        (upper-right second molar) has a perfectly ordinary volume &mdash;
+        1&nbsp;019&nbsp;mm&sup3;, right at the median &mdash; but its material is
+        scattered in separate clumps across 94&nbsp;mm, reaching the far side of the
+        arch; label&nbsp;1 is broken up across 124&nbsp;mm the same way. Every other
+        tooth is one compact piece 7&ndash;22&nbsp;mm across. Volume alone would have
+        cleared label&nbsp;2, which is why the bounding box is checked too &mdash; and
+        why clicking either of those two frames most of the skull instead of a tooth.
+        That is the label, not the viewer.
+        </figcaption>
+      </figure>
       <h2 id="coeur">5. The non-learned core</h2>
 
       <figure class="diagram">
@@ -804,5 +1000,8 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/batchdentalseg-mesh.js"></script>
+<script src="../../assets/batchdentalseg-3d.js"></script>
 </body>
 </html>

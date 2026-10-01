@@ -143,6 +143,105 @@
         this model expecting a cranial segmentation.</p>
       </div>
 
+      <figure class="viewer3d" data-bds-3d>
+        <div class="v3d-modes" role="group" aria-label="Model selected in the combo box">
+          <button type="button" data-bds-model="DentalSegmentator" aria-pressed="true">DentalSegmentator</button>
+          <button type="button" data-bds-model="PediatricDentalsegmentator" aria-pressed="false">PediatricDentalsegmentator</button>
+          <button type="button" data-bds-model="NasoMaxillaDentSeg" aria-pressed="false">NasoMaxillaDentSeg</button>
+          <button type="button" data-bds-model="UniversalLabDentalsegmentator" aria-pressed="false">UniversalLabDentalsegmentator</button>
+        </div>
+        <div class="v3d-stage">
+          <button class="v3d-reset" type="button">Reset view</button>
+          <span class="v3d-state">Input CBCT &mdash; threshold only</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+          <span class="v3d-hint">Drag to rotate &middot; pinch or scroll to zoom &middot; click a structure</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. read the volume &mdash; <code>nnUNet_raw</code>/<code>_preprocessed</code>/<code>_results</code> all point at the model folder</li>
+          <li data-step="1">1. <code>nnUNetv2_predict</code> &mdash; <strong>one</strong> multi-label pass, <code>-f 0</code>, <code>-step_size 0.5</code>, <code>--disable_tta</code></li>
+          <li data-step="2">2. <code>_buildLabelArray</code> &mdash; a single export, then one LUT remap to the official values</li>
+          <li data-step="3">3. <code>_exportVTKPerLabel</code> &mdash; windowed-sinc, 40&nbsp;% quadric decimation, RAS&rarr;LPS flip</li>
+        </ol>
+        <ol class="v3d-parts">
+          <li data-part="SKULL" data-label="Upper Skull" style="--sw:#e3dd90" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Upper Skull</span> <code>SKULL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">The cranial vault. Three of the four models label it; UniversalLab does not &mdash; which is why there is no vault in this scene, since a UniversalLab pass is what it shows.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAXI" data-label="Maxilla" style="--sw:#b8860b" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Maxilla</span> <code>MAXI</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">The upper jaw as a label of its own, value 54 here. The largest structure of the pass at 129&nbsp;166&nbsp;mm&sup3; measured &mdash; and the one DentalSegmentator would have folded into the Upper Skull.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAND" data-label="Mandible" style="--sw:#d2691e" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Mandible</span> <code>MAND</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">The lower jaw, the only bone of the skull that moves. Present in all four tables, at three different values (2, 2, 2, 53). 33&nbsp;795&nbsp;mm&sup3; measured.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="UPT" data-label="Upper Teeth" style="--sw:#dc9565" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Upper Teeth</span> <code>UPT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">One label for the whole upper arch &mdash; in three of the models. UniversalLab has no such label: on this scan the upper arch came out as 15 separately numbered teeth. Use the chart.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="LOT" data-label="Lower Teeth" style="--sw:#ebdfb4" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Lower Teeth</span> <code>LOT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">Likewise the lower arch, which came out as 14 numbered teeth here. That is the whole difference between the two families of model, and it is a difference of label table, not of code.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="CANAL" data-label="Mandibular canal" style="--sw:#a0522d" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Mandibular canal</span> <code>CANAL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">The inferior alveolar canal, left and right: a thin bilateral tube inside the mandible, and the smallest structure of the pass (805&nbsp;mm&sup3; against 129&nbsp;166 for the maxilla).</span>
+            <span class="v3d-tag"></span>
+          </li>
+        </ol>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Run the pass</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="read">Reading the scan &mdash; threshold only, no network yet</i>
+          <i data-k="predict"><code>nnUNetv2_predict</code> &mdash; one sliding window over the whole volume</i>
+          <i data-k="labelmap">Label map rebuilt &mdash;</i>
+          <i data-k="export">Surfaces written, the module&rsquo;s 3D opacities applied</i>
+          <i data-k="values">label values written</i>
+          <i data-k="done">labels produced</i>
+          <i data-k="teeth">of them teeth</i>
+          <i data-k="scans">scan in the queue</i>
+          <i data-k="label">label</i>
+          <i data-k="fdi">FDI</i>
+          <i data-k="absent">Not produced by this model.</i>
+          <i data-k="split">This model numbers each tooth instead &mdash; see the chart.</i>
+          <i data-k="nogeom">In this model&rsquo;s table, but not produced by the pass shown here.</i>
+          <i data-k="other">Not the pass on screen &mdash; only this model&rsquo;s label table, applied to the list.</i>
+          <i data-k="notinscan">not produced on this scan</i>
+        </span>
+        <figcaption>What a pass actually produces. <strong>Real</strong>: a
+        <code>UniversalLabDentalsegmentator</code> run on
+        <code>PreDentalSurgery</code>, the CBCT sample Slicer publishes and the
+        module&rsquo;s <em>Test Files</em> button downloads &mdash; one scan,
+        <code>cuda</code>, 238.7&nbsp;s, 32 labels written, of which
+        <strong>29 separately numbered teeth</strong> plus mandible, maxilla and
+        mandibular canal. The 23 labels not written are teeth this adult does not have:
+        three third molars and the whole primary set. Click any tooth in the chart.
+        The point: one <em>multi-label</em> network, so every label comes out of the
+        <strong>same single pass</strong> &mdash; not one network per structure as in
+        <a href="AMASSS.html">AMASSS</a>. Changing the model above changes the label
+        table, not the code.
+        <strong>Worth knowing</strong>: two of the 29 labels came out broken on this
+        scan, and both are shown unretouched. Label&nbsp;1 (upper-right third molar)
+        measures 4&nbsp;253&nbsp;mm&sup3;, four times any other tooth. Label&nbsp;2
+        (upper-right second molar) has a perfectly ordinary volume &mdash;
+        1&nbsp;019&nbsp;mm&sup3;, right at the median &mdash; but its material is
+        scattered in separate clumps across 94&nbsp;mm, reaching the far side of the
+        arch; label&nbsp;1 is broken up across 124&nbsp;mm the same way. Every other
+        tooth is one compact piece 7&ndash;22&nbsp;mm across. Volume alone would have
+        cleared label&nbsp;2, which is why the bounding box is checked too &mdash; and
+        why clicking either of those two frames most of the skull instead of a tooth.
+        That is the label, not the viewer.
+        <strong>Staged</strong>: the sweep (nnU-Net tiles in three dimensions, not
+        bottom to top) and the neutral&rarr;official colour change, which stands in for
+        the LUT remap. The meshes are decimated for the browser, 1&nbsp;200 triangles
+        per tooth.</figcaption>
+      </figure>
       <h2 id="besoin">What you need, what you get</h2>
       <div class="io-grid">
         <div class="io-card">
@@ -259,5 +358,8 @@
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/batchdentalseg-mesh.js"></script>
+<script src="../../assets/batchdentalseg-3d.js"></script>
 </body>
 </html>
