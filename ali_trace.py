@@ -28,13 +28,11 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 SADT = os.environ.get(
     "SADT_REPO", os.path.join(os.path.dirname(ROOT), "SlicerAutomatedDentalTools"))
 
-SCAN = os.path.expanduser(
-    "~/Documents/SlicerDownloads/AMASSS/Test_Files/MG_test_scan/MG_test_scan.nii.gz")
+SCAN = webmesh.data("SlicerDownloads/AMASSS/Test_Files/MG_test_scan/MG_test_scan.nii.gz")
 #: GetBrain parcourt l'arbre et deduit la disposition des NOMS DE DOSSIERS,
 #: pas des noms de fichiers : on peut donc viser la racine et laisser ALI
 #: trouver les reperes ou qu'ils soient. ALI_MODELS pour cibler un groupe.
-MODELS = os.environ.get("ALI_MODELS", os.path.expanduser(
-    "~/Documents/SlicerDownloads/ALI/ALI_CBCT/Models/Landmark"))
+MODELS = os.environ.get("ALI_MODELS", webmesh.data("SlicerDownloads/ALI/ALI_CBCT/Models/Landmark"))
 OUT = os.environ.get("ALI_TRACE_OUT", os.path.join(ROOT, "assets", "ali-trace.json"))
 
 DEFAULT_LM = ["Ba", "S", "N"]

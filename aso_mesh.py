@@ -31,8 +31,8 @@ import numpy as np
 import vtk
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-MESHES = os.path.expanduser("~/Documents/sadt-atlas-meshes")
-ASO = os.path.expanduser("~/Documents/SlicerDownloads/ASO/ASO_CBCT/")
+MESHES = webmesh.data("sadt-atlas-meshes")
+ASO = webmesh.data("SlicerDownloads/ASO/ASO_CBCT/")
 TFM = ASO + "Test_Files/Fully-AutomatedOr/MG_test_Or_transform.tfm"
 # LE BON GOLD. Il y en a deux, et « le meme code produit deux orientations
 # differentes ». Les reperes qu'ASO a ecrits pour ce scan s'appellent ANS,
@@ -257,7 +257,7 @@ def main():
 # ---------------------------------------------------------------------------
 #  ASO_IOS — l'autre moteur
 # ---------------------------------------------------------------------------
-IOS = os.path.expanduser("~/Documents/SlicerDownloads/ASO/ASO_IOS/")
+IOS = webmesh.data("SlicerDownloads/ASO/ASO_IOS/")
 IOS_PATIENT = IOS + "Test_Files/Semi-Automated/Lower_new_9.vtk"
 IOS_GOLD = IOS + "Reference/Gold_Files/Lower_gold.vtk"
 IOS_MATRIX = IOS + "Test_Files/Semi-AutomatedOr/matrix_new_9.npy"

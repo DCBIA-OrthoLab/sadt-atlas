@@ -30,8 +30,7 @@ import SimpleITK as sitk
 import vtk
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-B = os.path.expanduser("~/Documents/SlicerDownloads/AREG/AREG_IOSCBCT/Test_Files/"
-                       "Fully-Automated-Registration/Registered/")
+B = webmesh.data("SlicerDownloads/AREG/AREG_IOSCBCT/Test_Files/Fully-Automated-Registration/Registered/")
 
 CBCT = B + "Oriented CBCT/P_0001_T2_Or.nii.gz"
 IOS = {"L": B + "PRE ASO IOS/P001_T2_L_SegOr.vtk",

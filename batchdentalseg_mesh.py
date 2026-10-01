@@ -70,16 +70,16 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 #: modele est donc nomme ici, et verifie contre les etiquettes reellement
 #: presentes dans le label map (une passe UniversalLab ne peut pas produire
 #: une valeur absente de sa table).
-RUN = os.path.expanduser("~/Documents/BatchSegUniversal/out")
+RUN = webmesh.data("BatchSegUniversal/out")
 REPORT = os.path.join(RUN, "BatchDentalSeg_report.json")   # s'il existe
 MODEL_RUN = "UniversalLabDentalsegmentator"
 
 #: Le scan d'entree, pour l'etape « avant ». Il doit etre le scan PUBLIE :
 #: la geometrie part dans un depot distant.
-SCAN_DIR = os.path.expanduser("~/Documents/BatchSegUniversal/in")
+SCAN_DIR = webmesh.data("BatchSegUniversal/in")
 #: `CBCTDentalSurgery`, l'echantillon publie par Slicer lui-meme -- celui que
 #: le bouton « Test Files » du module telecharge (TEST_FILES_SAMPLE_NAME).
-PUBLISHED = os.path.expanduser("~/Documents/Slicer-tmpDownloads/BATCHDENTALSEG/Scans")
+PUBLISHED = webmesh.data("Slicer-tmpDownloads/BATCHDENTALSEG/Scans")
 
 #: Le cas retenu pour la scene. Un seul : montrer un deuxieme cas voudrait
 #: dire montrer une deuxieme anatomie.

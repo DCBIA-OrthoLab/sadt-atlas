@@ -29,8 +29,7 @@ import SimpleITK as sitk
 import vtk
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-B = os.path.expanduser(
-    "~/Documents/SlicerDownloads/AREG/AREG_CBCT/Test_Files/Oriented-Automated/")
+B = webmesh.data("SlicerDownloads/AREG/AREG_CBCT/Test_Files/Oriented-Automated/")
 
 T1 = B + "T1Or/C_0001_T1_Or.nii.gz"
 T2 = B + "T2_Center/C_0001_T2.nii.gz"

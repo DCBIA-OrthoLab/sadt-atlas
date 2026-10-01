@@ -24,8 +24,7 @@ import numpy as np
 import vtk
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-B = os.path.expanduser("~/Documents/SlicerDownloads/AREG/AREG_IOS/Test_Files/"
-                       "AREG_test_scan/")
+B = webmesh.data("SlicerDownloads/AREG/AREG_IOS/Test_Files/AREG_test_scan/")
 T1 = B + "T1/A2_UpperT1.vtk"
 T2 = B + "T2/A2_UpperT2.vtk"
 T2REG = B + "Registered/A2_UpperT2Reg.vtk"

@@ -31,8 +31,7 @@ except ImportError:
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
-BASE = os.path.expanduser(
-    "~/Documents/SlicerDownloads/AMASSS/Test_Files/MG_test_scan/")
+BASE = webmesh.data("SlicerDownloads/AMASSS/Test_Files/MG_test_scan/")
 SRC = os.path.join(BASE, "MG_test_scan_Pred_MERGED.nii.gz")
 
 #: Le scan AVANT segmentation, pour l'animation « brut -> segmenté ». C'est le

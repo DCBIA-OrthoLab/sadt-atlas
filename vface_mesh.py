@@ -43,8 +43,7 @@ import SimpleITK as sitk
 import vtk
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-B = os.path.expanduser("~/Documents/SlicerDownloads/V_FACE/Test_Files/"
-                       "Oriented-Automated/")
+B = webmesh.data("SlicerDownloads/V_FACE/Test_Files/Oriented-Automated/")
 OUT = B + "Output/"
 
 #: Les trois cartes, et le recalage dont chacune est la lecture.
@@ -64,8 +63,7 @@ OR_TFM = {"CB":  OUT + "Oriented T1 Scans/CB/C_0001_T1_CB_Or_transform.tfm",
           "MAX": OUT + "Oriented T1 Scans/MAX/C_0001_T1_MAX_Or_transform.tfm"}
 ORIENTED_SCAN = OUT + "Oriented T1 Scans/CB/C_0001_T1_CB_Or.nii.gz"
 MIRROR_SCAN = OUT + "T2_Scan/CB/C_0001_T1_CB_Or_mir.nii.gz"
-MIRROR_TFM = os.path.expanduser("~/Documents/SlicerDownloads/Mirror_matrix/Mirror/"
-                                "Matrix_mirror.tfm")
+MIRROR_TFM = webmesh.data("SlicerDownloads/Mirror_matrix/Mirror/Matrix_mirror.tfm")
 #: Les reperes qu'ALI a predits, dans le repere oriente sur la base du crane.
 LM_DIR = OUT + "T1 Landmarks/CB/"
 LM_FILES = {"CB": "C_0001_T1_CB_Or_lm_Pred_CB.mrk.json",

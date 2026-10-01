@@ -22,11 +22,9 @@ import webmesh
 import vtk
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-MESHES = os.path.expanduser("~/Documents/sadt-atlas-meshes")
+MESHES = webmesh.data("sadt-atlas-meshes")
 TRACE = os.path.join(ROOT, "assets", "ali-trace.json")
-ARCH = os.path.expanduser(
-    "~/Documents/SlicerDownloads/ASO/ASO_IOS/Test_Files/Fully-AutomatedOr/"
-    "Lower_new_30_SegOr.vtk")
+ARCH = webmesh.data("SlicerDownloads/ASO/ASO_IOS/Test_Files/Fully-AutomatedOr/Lower_new_30_SegOr.vtk")
 
 # Le crane sert de contexte : on le veut leger et translucide, l'agent marche
 # DEDANS. Pas la peine d'y remettre les cinq structures d'AMASSS.

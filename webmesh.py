@@ -26,6 +26,26 @@ except ImportError:                                            # pragma: no cove
     sys.exit("VTK introuvable — lance ce script avec PythonSlicer, pas python3.")
 
 
+def data(*rel):
+    """Chemin d'une entree, sous la racine des donnees.
+
+    Par defaut `~/Documents`, comme les generateurs l'ont toujours fait. La
+    variable d'environnement `SADT_ATLAS_DATA` deplace toute l'arborescence
+    d'un coup -- vers une copie de sauvegarde, par exemple -- sans toucher a
+    une seule ligne des generateurs, parce que la copie conserve les chemins
+    relatifs a `~/Documents`.
+
+        SADT_ATLAS_DATA=/media/luciacev/Data/sadt-atlas-data \
+            PythonSlicer vface_mesh.py
+
+    `sync_data.py` fabrique et met a jour cette copie ; son manifeste est lu
+    dans les generateurs, donc une entree ajoutee ici est sauvegardee sans
+    qu'on ait a y penser.
+    """
+    root = os.environ.get("SADT_ATLAS_DATA") or os.path.expanduser("~/Documents")
+    return os.path.join(root, *rel)
+
+
 def clean(poly, keep_ratio=0.02):
     """Retire les composantes connexes minuscules.
 
