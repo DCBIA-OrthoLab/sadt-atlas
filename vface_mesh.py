@@ -72,7 +72,13 @@ LM_FILES = {"CB": "C_0001_T1_CB_Or_lm_Pred_CB.mrk.json",
             "U":  "C_0001_T1_CB_Or_lm_Pred_U.mrk.json",
             "L":  "C_0001_T1_CB_Or_lm_Pred_L.mrk.json"}
 BONE, SIGMA = 500.0, 1.5
-HEAT_TRIS, MIRROR_TRIS = 26000, 30000
+#: La carte est ce qu'on vient lire : elle a le gros du budget. Le scan brut
+#: et le miroir ne servent qu'au recit, 20 000 triangles leur suffisent.
+HEAT_TRIS, MIRROR_TRIS = 40000, 20000
+#: Nombre de sommets de la surface pleine moyennes pour UN sommet affiche.
+#: Un seul voisin suffisait a faire moucheter la carte : l'ecart entre « un
+#: voisin » et « la moyenne de 24 » atteignait 23 mm sur les discontinuites.
+SCALAR_K = 12
 
 
 # ---------------------------------------------------------------- utilitaires
@@ -167,40 +173,52 @@ def mean_surface_gap(a, b, sample=6000):
 
 
 def decimate_keep_scalar(poly, target, name="Distance"):
-    """Decime la GEOMETRIE, puis recopie le scalaire depuis l'original.
+    """Allege la surface de VFACE en gardant SA mesure, le plus fidelement possible.
 
-    La metrique d'attribut de vtkQuadricDecimation extrapole : sur la carte
-    fusionnee elle sortait -32,1 pour un minimum reel de -25,4. On decime donc
-    sans elle et on relit la valeur au sommet le plus proche de la surface
-    pleine -- aucune valeur inventee, aucune hors de la plage mesuree.
+    Trois choses apprises a mes depens, un lecteur ayant trouve la carte moins
+    nette qu'avant :
+
+    1. LISSER PUIS DECIMER, jamais l'inverse. Decimer d'abord laissait le
+       decimateur travailler sur le bruit, et le lissage d'apres deplacait les
+       sommets de 0,74 mm en mediane (jusqu'a 3,03) -- donc hors de la surface
+       ou la distance a ete mesuree. C'est l'ordre de webmesh.smooth_decimate,
+       eprouve ailleurs dans ce depot ; on le reutilise au lieu de refaire.
+    2. NETTOYER LES ILOTS. La surface fusionnee de VFACE en compte 243 ; le
+       pipeline de l'ancienne version les retirait, celui-ci les gardait.
+    3. MOYENNER LE SCALAIRE sur quelques voisins. On affiche 40 000 triangles
+       d'une surface qui en a 2,77 millions : un seul voisin par sommet, c'est
+       un echantillon ponctuel d'un champ bruite, et ca mouchete. La moyenne
+       sur SCALAR_K voisins coute une ligne et supprime les aberrations.
+
+    Aucune valeur n'est extrapolee : chaque sommet affiche une moyenne de
+    valeurs REELLEMENT mesurees par VFACE dans son voisinage immediat.
     """
     src_vals = poly.GetPointData().GetArray(name)
     if src_vals is None:
         sys.exit("La carte n'a pas de tableau « %s »." % name)
+
+    # Le localisateur reste sur la surface PLEINE : c'est la seule qui porte
+    # la mesure.
     loc = vtk.vtkPointLocator()
     loc.SetDataSet(poly)
     loc.BuildLocator()
 
-    d = vtk.vtkQuadricDecimation()
-    d.SetInputData(poly)
-    ntri = max(1, poly.GetNumberOfPolys())
-    d.SetTargetReduction(max(0.0, min(0.999, 1.0 - float(target) / ntri)))
-    d.Update()
-    sm = vtk.vtkWindowedSincPolyDataFilter()
-    sm.SetInputData(d.GetOutput())
-    sm.SetNumberOfIterations(14)
-    sm.SetPassBand(0.06)
-    sm.NonManifoldSmoothingOn()
-    sm.NormalizeCoordinatesOn()
-    sm.Update()
-    out = vtk.vtkPolyData()
-    out.DeepCopy(sm.GetOutput())
+    kept, dropped = webmesh.clean(poly, 0.02)
+    mesh = webmesh.smooth_decimate(kept, target, iterations=24, pass_band=0.05)
+    mesh = normals(mesh)
 
-    vals = np.empty(out.GetNumberOfPoints())
-    for i in range(out.GetNumberOfPoints()):
-        j = loc.FindClosestPoint(list(out.GetPoint(i)))
-        vals[i] = src_vals.GetTuple1(j)
-    return normals(out), vals
+    ids = vtk.vtkIdList()
+    n = mesh.GetNumberOfPoints()
+    vals = np.empty(n)
+    for i in range(n):
+        pt = list(mesh.GetPoint(i))
+        loc.FindClosestNPoints(SCALAR_K, pt, ids)
+        m = ids.GetNumberOfIds()
+        if m == 0:
+            vals[i] = src_vals.GetTuple1(loc.FindClosestPoint(pt))
+            continue
+        vals[i] = sum(src_vals.GetTuple1(ids.GetId(k)) for k in range(m)) / m
+    return mesh, vals, dropped
 
 
 def surface_from_volume(path, level, sigma, tris):
@@ -345,7 +363,7 @@ def main():
         rng = poly.GetPointData().GetArray("Distance").GetRange()
         if r["frame"] != "CB":
             poly = apply_matrix(poly, to_cb[r["frame"]])
-        mesh, vals = decimate_keep_scalar(poly, HEAT_TRIS)
+        mesh, vals, dropped = decimate_keep_scalar(poly, HEAT_TRIS)
         code = "H_" + r["code"]
         meshes[code] = mesh
         fields[code] = vals
@@ -355,13 +373,18 @@ def main():
         # +/-32. Une echelle commune rendrait deux cartes sur trois incolores.
         # La comparaison se fait sur les CHIFFRES, affiches dans la legende et
         # la ligne d'etat, pas sur la teinte.
-        r["limit"] = float(np.ceil(abs(vals).max() / 5.0) * 5.0) or 5.0
+        # L'echelle part du 95e centile et non du maximum : cale sur le max,
+        # la carte de la base du crane (mediane |d| 7 mm, pointes a 32)
+        # restait dans le gris pale du milieu de rampe presque partout. La
+        # plage reellement mesuree est annoncee a cote, elle n'est pas perdue.
+        r["limit"] = max(2.5, float(np.ceil(np.percentile(np.abs(vals), 95) / 2.5) * 2.5))
         r.update(dmin=round(float(vals.min()), 2), dmax=round(float(vals.max()), 2),
                  median=round(float(np.median(vals)), 2),
                  absmed=round(float(np.median(np.abs(vals))), 2),
                  p98=round(float(np.percentile(np.abs(vals), 98)), 2))
-        print("  %-4s %-12s %7d pts -> %5d tris, Distance %6.2f .. %6.2f mm"
-              % (r["code"], r["zone"], full, mesh.GetNumberOfPolys(),
+        print("  %-4s %-12s %7d pts -> %5d tris (%d ilots retires), "
+              "Distance %6.2f .. %6.2f mm"
+              % (r["code"], r["zone"], full, mesh.GetNumberOfPolys(), dropped,
                  vals.min(), vals.max()))
         print("       (plage de la surface pleine : %.2f .. %.2f — rien n'est extrapole)"
               % rng)
