@@ -189,6 +189,36 @@
         <figcaption>ALI_CBCT : un agent par landmark, réutilisé pour chaque patient, marche voxel par voxel jusqu'à osciller, change d'échelle, puis moyenne six raffinements (<code>Focus</code>).</figcaption>
       </figure>
 
+      <figure class="viewer3d" data-ali-cbct>
+        <div class="v3d-stage">
+          <span class="v3d-hint">Faites glisser pour tourner &middot; molette pour zoomer</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <ol class="v3d-parts v3d-lms">
+          <li data-lm="Ba" style="--sw:#ffb454" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Basion</span> <code>Ba</code>
+            <span class="v3d-what">Le bord antérieur du foramen magnum, sur la base du crâne.</span>
+          </li>
+          <li data-lm="S" style="--sw:#6fe3ba" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Selle</span> <code>S</code>
+            <span class="v3d-what">Le centre de la selle turcique, la fossette qui loge l'hypophyse.</span>
+          </li>
+          <li data-lm="N" style="--sw:#8cc8ff" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Nasion</span> <code>N</code>
+            <span class="v3d-what">La racine du nez, à la jonction des os frontal et nasaux.</span>
+          </li>
+        </ol>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Rejouer la recherche</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="walking">marche, un voxel par pas</i>
+          <i data-k="upscale">a oscillé — arrivé. Échelle maintenant</i>
+          <i data-k="steps">pas pour atteindre le landmark</i>
+        </span>
+        <figcaption>Le trajet <strong>réel</strong>, pas une reconstitution : <code>ali_trace.py</code> le relit dans le <code>position_mem</code> de l'agent lui-même pendant qu'ALI_CBCT tourne sur le scan de test publié. Chaque agent démarre au <strong>centre du volume</strong>. Le réseau ne dit jamais où est le landmark — il note six directions et l'agent avance d'<strong>un voxel</strong>. Il s'arrête quand il recommence à repasser sur ses propres pas, passe de 1&nbsp;mm à 0,3&nbsp;mm, et repart.</figcaption>
+      </figure>
+
       <h3 id="cbct-pretraitements">3.1 Prétraitements</h3>
 
       <p>Deux étapes, toutes deux écrites dans <code>temp_fold</code> et <strong>jamais nettoyées</strong> :</p>
@@ -353,6 +383,23 @@ real_label_pos  = [real_label_pos[2], real_label_pos[1], real_label_pos[0]]  # r
         <figcaption>ALI_IOS : le réseau (UNet 2D) segmente chaque vue rendue au pixel ; tout le reste — pose des caméras, passage pixel→sommet, retour à l'échelle d'origine — est géométrique.</figcaption>
       </figure>
 
+      <figure class="viewer3d" data-ali-ios>
+        <div class="v3d-stage">
+          <span class="v3d-hint">Faites glisser pour tourner &middot; cliquez une dent</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Lancer la passe caméra</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="seg">dentalmodelseg numérote d'abord les dents —</i>
+          <i data-k="camera">caméra posée sur la dent</i>
+          <i data-k="segment">le UNet segmente le rendu de la dent</i>
+          <i data-k="done">landmarks placés, une passe caméra par dent</i>
+        </span>
+        <figcaption>L'arcade de test publiée (ASO_IOS). Elle part d'une simple surface : la numérotation vient d'abord, de <code>dentalmodelseg</code>, et <strong>tout en dépend</strong> — c'est l'array de labels qui donne le centroïde de chaque dent, donc l'endroit où va la caméra. Sans lui, ALI_IOS ne trouve aucune dent et ne place rien ; c'est pourquoi l'étape est montrée plutôt que supposée. L'encart montre ce que le réseau voit vraiment : non pas une photo en couleurs mais la <strong>normale par sommet remappée en RVB</strong> (<code>TexturesVertex</code>, <code>surface.py:171</code>), plus le z-buffer comme quatrième canal. <strong>Le trajet de la caméra et la géométrie sont fidèles ; les positions des landmarks, elles, sont illustratives</strong> — contrairement à la scène CBCT ci-dessus, ce ne sont pas de vraies prédictions, parce qu'ALI_IOS a besoin de pytorch3d et d'un environnement conda.</figcaption>
+      </figure>
+
       <h3 id="ios-entrees">4.1 Entrées</h3>
 
       <p><code>.vtk</code>, <code>.vtp</code>, <code>.stl</code>, <code>.obj</code>, <code>.off</code>. Mais <strong>tout dépend d'un array de labels de dents</strong>, cherché sous <code>PredictedID</code>, <code>predictedId</code> ou <code>Universal_ID</code> (<code>surface.py:207</code>) : c'est lui qui donne le centroïde de chaque dent, donc la position de la caméra. Sans array, <code>RI</code> est mis à zéro et aucun label n'est trouvé.</p>
@@ -399,7 +446,7 @@ raster_settings = RasterizationSettings(image_size=224, blur_radius=0, faces_per
 
       <p><code>image_size / blur_radius / faces_per_pixel</code> sont des arguments positionnels du CLI, mais <strong>tous les appelants passent <code>224 / 0 / 1</code></strong> (<code>IOS.py:286</code>, <code>IOSCBCT.py:335</code>, <code>FlexReg.py:2517</code>). <code>blur_radius = 0</code> + <code>faces_per_pixel = 1</code> = rasterisation dure, une face par pixel : c'est ce qui rend <code>pix_to_face</code> exploitable comme table pixel → face.</p>
 
-      <p>La texture n'est pas une couleur : <code>TexturesVertex(verts_features=CN)</code> où <code>CN</code> est la <strong>normale par point remappée en RGB</strong> (<code>(n*0.5+0.5)*255</code>, <code>surface.py:171</code>). Le réseau voit donc une carte de normales éclairée en Phong, plus le z-buffer en 4<sup>e</sup> canal.</p>
+      <p>La texture n'est pas une couleur : <code>TexturesVertex(verts_features=CN)</code> où <code>CN</code> est la <strong>normale par point remappée en RGB</strong> (<code>(n*0.5+0.5)*255</code>, <code>surface.py:171</code>). Le réseau voit donc une carte de normales éclairée en Phong, plus le z-buffer en quatrième canal.</p>
 
       <p>Une caméra est posée par dent, à <code>radius</code> de son centroïde :</p>
 
@@ -647,5 +694,9 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/ali-cbct-mesh.js"></script>
+<script src="../../assets/ali-ios-mesh.js"></script>
+<script src="../../assets/ali-3d.js"></script>
 </body>
 </html>

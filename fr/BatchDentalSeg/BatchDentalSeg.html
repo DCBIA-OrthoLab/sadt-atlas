@@ -137,7 +137,7 @@
       <h3 id="entrees-acceptees">3.1 Ce qui est accepté</h3>
 
       <p><code>listVolumes()</code> (<code>Queue.py:28</code>)
-      fait un <code>glob</code> <strong>non récursif</strong> sur quatre motifs : <code>*.nii</code>, <code>*.nii.gz</code>,
+      fait, de façon <strong>non récursive</strong>, un <code>glob</code> sur quatre motifs : <code>*.nii</code>, <code>*.nii.gz</code>,
       <code>*.gipl</code>, <code>*.gipl.gz</code>. Les sous-dossiers ne sont pas visités, et <strong>le NRRD n'est
       pas reconnu</strong> — format par défaut de Slicer, et format que les autres modules du
       dépôt produisent couramment.</p>
@@ -359,7 +359,11 @@ intensités de premier plan : médiane 1317, moy. 1274, s 558, p0,5 -110, p99,5 
       20 dents temporaires (33 → 52), puis <code>Mandible</code> = 53, <code>Maxilla</code> = 54,
       <code>Mandibular canal</code> = 55. Pas de « Upper Skull » : ce modèle ne segmente pas la
       boîte crânienne, contrairement à ce qu'affiche sa description dans l'UI et à ce
-      que dit le README.</p>
+      que dit le README. La numérotation n'est pas arbitraire : label par label, les valeurs
+      1&ndash;32 sont exactement celles du <strong>Universal Numbering System</strong> (1 = dent
+      de sagesse supérieure droite &hellip; 32 = dent de sagesse inférieure droite), et 33&ndash;52
+      ses lettres <code>A</code>&ndash;<code>T</code> pour les dents temporaires ; l'équivalent <abbr title="F&eacute;d&eacute;ration dentaire internationale">FDI</abbr>
+      d'un label est donc fixé &mdash; la figure ci-dessous donne les deux.</p>
 
       <div class="callout warn">
         <div class="callout-title">Piège</div>
@@ -369,6 +373,198 @@ intensités de premier plan : médiane 1317, moy. 1274, s 558, p0,5 -110, p99,5 
       <p>Les valeurs sont posées sur chaque segment via un tag <code>LabelValue</code>
       (<code>_segmentLabelValue</code>), qui a <strong>priorité sur le nom</strong> quand il est présent.</p>
 
+      <figure class="viewer3d" data-bds-3d>
+        <div class="v3d-modes" role="group" aria-label="Modèle sélectionné dans la liste déroulante">
+          <button type="button" data-bds-model="DentalSegmentator" aria-pressed="true">DentalSegmentator</button>
+          <button type="button" data-bds-model="PediatricDentalsegmentator" aria-pressed="false">PediatricDentalsegmentator</button>
+          <button type="button" data-bds-model="NasoMaxillaDentSeg" aria-pressed="false">NasoMaxillaDentSeg</button>
+          <button type="button" data-bds-model="UniversalLabDentalsegmentator" aria-pressed="false">UniversalLabDentalsegmentator</button>
+        </div>
+        <div class="v3d-stage">
+          <button class="v3d-reset" type="button">Vue initiale</button>
+          <span class="v3d-state">CBCT d'entrée &mdash; simple seuillage</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+          <span class="v3d-hint">Faites glisser pour tourner &middot; pincez ou molette pour zoomer &middot; cliquez une structure</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. lecture du volume &mdash; <code>nnUNet_raw</code>/<code>_preprocessed</code>/<code>_results</code> pointent tous vers le dossier du modèle</li>
+          <li data-step="1">1. <code>nnUNetv2_predict</code> &mdash; <strong>une seule</strong> passe multi-label, <code>-f 0</code>, <code>-step_size 0.5</code>, <code>--disable_tta</code></li>
+          <li data-step="2">2. <code>_buildLabelArray</code> &mdash; un seul export, puis un remappage LUT vers les valeurs officielles</li>
+          <li data-step="3">3. <code>_exportVTKPerLabel</code> &mdash; windowed-sinc, décimation quadrique de 40&nbsp;%, bascule RAS&rarr;LPS</li>
+        </ol>
+        <ol class="v3d-parts">
+          <li data-part="SKULL" data-label="Upper Skull" style="--sw:#e3dd90" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Upper Skull</span> <code>SKULL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">La boîte crânienne. Trois des quatre modèles lui donnent un label ; UniversalLab non &mdash; et c'est pourquoi il n'y a pas de voûte dans cette scène, puisque c'est une passe UniversalLab qu'elle montre.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAXI" data-label="Maxilla" style="--sw:#b8860b" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Maxilla</span> <code>MAXI</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">La mâchoire supérieure comme label à part entière, ici la valeur 54. La plus grosse structure de la passe, 129&nbsp;166&nbsp;mm&sup3; mesurés &mdash; et celle que DentalSegmentator aurait fondue dans le Upper Skull.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAND" data-label="Mandible" style="--sw:#d2691e" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Mandible</span> <code>MAND</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">La mâchoire inférieure, le seul os du crâne qui bouge. Présente dans les quatre tables, sous trois valeurs différentes (2, 2, 2, 53). 33&nbsp;795&nbsp;mm&sup3; mesurés.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="UPT" data-label="Upper Teeth" style="--sw:#dc9565" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Upper Teeth</span> <code>UPT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">Un seul label pour toute l'arcade supérieure &mdash; dans trois des modèles. UniversalLab n'a pas ce label : sur ce scan, l'arcade supérieure est sortie en 15 dents numérotées séparément. Servez-vous du tableau.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="LOT" data-label="Lower Teeth" style="--sw:#ebdfb4" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Lower Teeth</span> <code>LOT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">De même pour l'arcade inférieure, sortie ici en 14 dents numérotées. Toute la différence entre les deux familles de modèles est là, et c'est une différence de table de labels, pas de code.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="CANAL" data-label="Mandibular canal" style="--sw:#a0522d" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Mandibular canal</span> <code>CANAL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">Le canal alvéolaire inférieur, à gauche et à droite : un tube fin et bilatéral à l'intérieur de la mandibule, et la plus petite structure de la passe (805&nbsp;mm&sup3; contre 129&nbsp;166 pour le maxillaire).</span>
+            <span class="v3d-tag"></span>
+          </li>
+        </ol>
+        <div class="v3d-chart" hidden>
+          <div class="v3d-arch">
+            <span class="v3d-arch-label">Permanentes, arcade supérieure &mdash; côté droit du patient en premier</span>
+            <button type="button" data-tooth="1" data-arch="UPT" aria-pressed="false" style="--sw:#ff0000" title="Troisième molaire supérieure droite &mdash; Universal 1, FDI 18">1<small>18</small></button>
+            <button type="button" data-tooth="2" data-arch="UPT" aria-pressed="false" style="--sw:#00ff00" title="Deuxième molaire supérieure droite &mdash; Universal 2, FDI 17">2<small>17</small></button>
+            <button type="button" data-tooth="3" data-arch="UPT" aria-pressed="false" style="--sw:#0000ff" title="Première molaire supérieure droite &mdash; Universal 3, FDI 16">3<small>16</small></button>
+            <button type="button" data-tooth="4" data-arch="UPT" aria-pressed="false" style="--sw:#ffff00" title="Deuxième prémolaire supérieure droite &mdash; Universal 4, FDI 15">4<small>15</small></button>
+            <button type="button" data-tooth="5" data-arch="UPT" aria-pressed="false" style="--sw:#ff00ff" title="Première prémolaire supérieure droite &mdash; Universal 5, FDI 14">5<small>14</small></button>
+            <button type="button" data-tooth="6" data-arch="UPT" aria-pressed="false" style="--sw:#00ffff" title="Canine supérieure droite &mdash; Universal 6, FDI 13">6<small>13</small></button>
+            <button type="button" data-tooth="7" data-arch="UPT" aria-pressed="false" style="--sw:#800000" title="Incisive latérale supérieure droite &mdash; Universal 7, FDI 12">7<small>12</small></button>
+            <button type="button" data-tooth="8" data-arch="UPT" aria-pressed="false" style="--sw:#008000" title="Incisive centrale supérieure droite &mdash; Universal 8, FDI 11">8<small>11</small></button>
+            <button type="button" data-tooth="9" data-arch="UPT" aria-pressed="false" style="--sw:#000080" title="Incisive centrale supérieure gauche &mdash; Universal 9, FDI 21">9<small>21</small></button>
+            <button type="button" data-tooth="10" data-arch="UPT" aria-pressed="false" style="--sw:#808000" title="Incisive latérale supérieure gauche &mdash; Universal 10, FDI 22">10<small>22</small></button>
+            <button type="button" data-tooth="11" data-arch="UPT" aria-pressed="false" style="--sw:#800080" title="Canine supérieure gauche &mdash; Universal 11, FDI 23">11<small>23</small></button>
+            <button type="button" data-tooth="12" data-arch="UPT" aria-pressed="false" style="--sw:#008080" title="Première prémolaire supérieure gauche &mdash; Universal 12, FDI 24">12<small>24</small></button>
+            <button type="button" data-tooth="13" data-arch="UPT" aria-pressed="false" style="--sw:#c0c0c0" title="Deuxième prémolaire supérieure gauche &mdash; Universal 13, FDI 25">13<small>25</small></button>
+            <button type="button" data-tooth="14" data-arch="UPT" aria-pressed="false" style="--sw:#808080" title="Première molaire supérieure gauche &mdash; Universal 14, FDI 26">14<small>26</small></button>
+            <button type="button" data-tooth="15" data-arch="UPT" aria-pressed="false" style="--sw:#ffa500" title="Deuxième molaire supérieure gauche &mdash; Universal 15, FDI 27">15<small>27</small></button>
+            <button type="button" data-tooth="16" data-arch="UPT" aria-pressed="false" style="--sw:#f0e68c" title="Troisième molaire supérieure gauche &mdash; Universal 16, FDI 28">16<small>28</small></button>
+          </div>
+          <div class="v3d-arch is-baby">
+            <span class="v3d-arch-label">Temporaires, arcade supérieure</span>
+            <button type="button" data-tooth="33" data-arch="UPT" aria-pressed="false" style="--sw:#ffdab9" title="Deuxième molaire supérieure droite (de lait) &mdash; Universal A, FDI 55">33<small>55</small></button>
+            <button type="button" data-tooth="34" data-arch="UPT" aria-pressed="false" style="--sw:#cd5c5c" title="Première molaire supérieure droite (de lait) &mdash; Universal B, FDI 54">34<small>54</small></button>
+            <button type="button" data-tooth="35" data-arch="UPT" aria-pressed="false" style="--sw:#f08080" title="Canine supérieure droite (de lait) &mdash; Universal C, FDI 53">35<small>53</small></button>
+            <button type="button" data-tooth="36" data-arch="UPT" aria-pressed="false" style="--sw:#e9967a" title="Incisive latérale supérieure droite (de lait) &mdash; Universal D, FDI 52">36<small>52</small></button>
+            <button type="button" data-tooth="37" data-arch="UPT" aria-pressed="false" style="--sw:#fa8072" title="Incisive centrale supérieure droite (de lait) &mdash; Universal E, FDI 51">37<small>51</small></button>
+            <button type="button" data-tooth="38" data-arch="UPT" aria-pressed="false" style="--sw:#ff7f50" title="Incisive centrale supérieure gauche (de lait) &mdash; Universal F, FDI 61">38<small>61</small></button>
+            <button type="button" data-tooth="39" data-arch="UPT" aria-pressed="false" style="--sw:#ff6347" title="Incisive latérale supérieure gauche (de lait) &mdash; Universal G, FDI 62">39<small>62</small></button>
+            <button type="button" data-tooth="40" data-arch="UPT" aria-pressed="false" style="--sw:#00fa9a" title="Canine supérieure gauche (de lait) &mdash; Universal H, FDI 63">40<small>63</small></button>
+            <button type="button" data-tooth="41" data-arch="UPT" aria-pressed="false" style="--sw:#00ff7f" title="Première molaire supérieure gauche (de lait) &mdash; Universal I, FDI 64">41<small>64</small></button>
+            <button type="button" data-tooth="42" data-arch="UPT" aria-pressed="false" style="--sw:#4682b4" title="Deuxième molaire supérieure gauche (de lait) &mdash; Universal J, FDI 65">42<small>65</small></button>
+          </div>
+          <div class="v3d-arch is-baby">
+            <span class="v3d-arch-label">Temporaires, arcade inférieure</span>
+            <button type="button" data-tooth="52" data-arch="LOT" aria-pressed="false" style="--sw:#cd853f" title="Deuxième molaire inférieure droite (de lait) &mdash; Universal T, FDI 85">52<small>85</small></button>
+            <button type="button" data-tooth="51" data-arch="LOT" aria-pressed="false" style="--sw:#ff69b4" title="Première molaire inférieure droite (de lait) &mdash; Universal S, FDI 84">51<small>84</small></button>
+            <button type="button" data-tooth="50" data-arch="LOT" aria-pressed="false" style="--sw:#adff2f" title="Canine inférieure droite (de lait) &mdash; Universal R, FDI 83">50<small>83</small></button>
+            <button type="button" data-tooth="49" data-arch="LOT" aria-pressed="false" style="--sw:#008080" title="Incisive latérale inférieure droite (de lait) &mdash; Universal Q, FDI 82">49<small>82</small></button>
+            <button type="button" data-tooth="48" data-arch="LOT" aria-pressed="false" style="--sw:#b0c4de" title="Incisive centrale inférieure droite (de lait) &mdash; Universal P, FDI 81">48<small>81</small></button>
+            <button type="button" data-tooth="47" data-arch="LOT" aria-pressed="false" style="--sw:#6495ed" title="Incisive centrale inférieure gauche (de lait) &mdash; Universal O, FDI 71">47<small>71</small></button>
+            <button type="button" data-tooth="46" data-arch="LOT" aria-pressed="false" style="--sw:#4169e1" title="Incisive latérale inférieure gauche (de lait) &mdash; Universal N, FDI 72">46<small>72</small></button>
+            <button type="button" data-tooth="45" data-arch="LOT" aria-pressed="false" style="--sw:#7b68ee" title="Canine inférieure gauche (de lait) &mdash; Universal M, FDI 73">45<small>73</small></button>
+            <button type="button" data-tooth="44" data-arch="LOT" aria-pressed="false" style="--sw:#6a5acd" title="Première molaire inférieure gauche (de lait) &mdash; Universal L, FDI 74">44<small>74</small></button>
+            <button type="button" data-tooth="43" data-arch="LOT" aria-pressed="false" style="--sw:#87ceeb" title="Deuxième molaire inférieure gauche (de lait) &mdash; Universal K, FDI 75">43<small>75</small></button>
+          </div>
+          <div class="v3d-arch">
+            <span class="v3d-arch-label">Permanentes, arcade inférieure</span>
+            <button type="button" data-tooth="32" data-arch="LOT" aria-pressed="false" style="--sw:#ffe4e1" title="Troisième molaire inférieure droite &mdash; Universal 32, FDI 48">32<small>48</small></button>
+            <button type="button" data-tooth="31" data-arch="LOT" aria-pressed="false" style="--sw:#db7093" title="Deuxième molaire inférieure droite &mdash; Universal 31, FDI 47">31<small>47</small></button>
+            <button type="button" data-tooth="30" data-arch="LOT" aria-pressed="false" style="--sw:#afeeee" title="Première molaire inférieure droite &mdash; Universal 30, FDI 46">30<small>46</small></button>
+            <button type="button" data-tooth="29" data-arch="LOT" aria-pressed="false" style="--sw:#98fb98" title="Deuxième prémolaire inférieure droite &mdash; Universal 29, FDI 45">29<small>45</small></button>
+            <button type="button" data-tooth="28" data-arch="LOT" aria-pressed="false" style="--sw:#eee8aa" title="Première prémolaire inférieure droite &mdash; Universal 28, FDI 44">28<small>44</small></button>
+            <button type="button" data-tooth="27" data-arch="LOT" aria-pressed="false" style="--sw:#da70d6" title="Canine inférieure droite &mdash; Universal 27, FDI 43">27<small>43</small></button>
+            <button type="button" data-tooth="26" data-arch="LOT" aria-pressed="false" style="--sw:#ff4500" title="Incisive latérale inférieure droite &mdash; Universal 26, FDI 42">26<small>42</small></button>
+            <button type="button" data-tooth="25" data-arch="LOT" aria-pressed="false" style="--sw:#1e90ff" title="Incisive centrale inférieure droite &mdash; Universal 25, FDI 41">25<small>41</small></button>
+            <button type="button" data-tooth="24" data-arch="LOT" aria-pressed="false" style="--sw:#7fff00" title="Incisive centrale inférieure gauche &mdash; Universal 24, FDI 31">24<small>31</small></button>
+            <button type="button" data-tooth="23" data-arch="LOT" aria-pressed="false" style="--sw:#ff1493" title="Incisive latérale inférieure gauche &mdash; Universal 23, FDI 32">23<small>32</small></button>
+            <button type="button" data-tooth="22" data-arch="LOT" aria-pressed="false" style="--sw:#9400d3" title="Canine inférieure gauche &mdash; Universal 22, FDI 33">22<small>33</small></button>
+            <button type="button" data-tooth="21" data-arch="LOT" aria-pressed="false" style="--sw:#00ced1" title="Première prémolaire inférieure gauche &mdash; Universal 21, FDI 34">21<small>34</small></button>
+            <button type="button" data-tooth="20" data-arch="LOT" aria-pressed="false" style="--sw:#2f4f4f" title="Deuxième prémolaire inférieure gauche &mdash; Universal 20, FDI 35">20<small>35</small></button>
+            <button type="button" data-tooth="19" data-arch="LOT" aria-pressed="false" style="--sw:#483d8b" title="Première molaire inférieure gauche &mdash; Universal 19, FDI 36">19<small>36</small></button>
+            <button type="button" data-tooth="18" data-arch="LOT" aria-pressed="false" style="--sw:#8fbc8f" title="Deuxième molaire inférieure gauche &mdash; Universal 18, FDI 37">18<small>37</small></button>
+            <button type="button" data-tooth="17" data-arch="LOT" aria-pressed="false" style="--sw:#b22222" title="Troisième molaire inférieure gauche &mdash; Universal 17, FDI 38">17<small>38</small></button>
+          </div>
+            <p class="v3d-chart-note">La valeur du label est celle que porte le NIfTI de sortie ; le petit nombre en dessous est l'équivalent <abbr title="F&eacute;d&eacute;ration dentaire internationale">FDI</abbr>. Les couleurs sont les <code>UNIVERSAL_COLORS</code> du module &mdash; notez que <code>#008080</code> y sert deux fois, pour les labels 12 et 49. Les cases dessinées en pâle sont des labels que la passe n'a <strong>pas</strong> produits sur ce scan : cliquez l'une d'elles et la ligne d'état le dit, plutôt que de montrer une dent qui n'est pas là.</p>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Lancer la passe</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="read">Lecture du scan &mdash; simple seuillage, pas encore de réseau</i>
+          <i data-k="predict"><code>nnUNetv2_predict</code> &mdash; une fenêtre glissante sur tout le volume</i>
+          <i data-k="labelmap">Carte de labels reconstruite &mdash;</i>
+          <i data-k="export">Surfaces écrites, opacités 3D du module appliquées</i>
+          <i data-k="values">valeurs de label écrites</i>
+          <i data-k="done">labels produits</i>
+          <i data-k="teeth">dont des dents</i>
+          <i data-k="scans">scan dans la file</i>
+          <i data-k="label">label</i>
+          <i data-k="fdi">FDI</i>
+          <i data-k="absent">Non produit par ce modèle.</i>
+          <i data-k="split">Ce modèle numérote plutôt chaque dent &mdash; voyez le tableau.</i>
+          <i data-k="nogeom">Dans la table de ce modèle, mais non produit par la passe montrée ici.</i>
+          <i data-k="other">Pas la passe à l'écran &mdash; seulement la table de labels de ce modèle, appliquée à la liste.</i>
+          <i data-k="notinscan">non produit sur ce scan</i>
+        </span>
+        <figcaption>Un réseau, quatre inventaires &mdash; et 29 dents comptées une à une.
+        <strong>Ce qui est réel.</strong> Tout ce qui est à l'écran vient d'une passe
+        <code>UniversalLabDentalsegmentator</code> lancée pour cette page sur
+        <code>PreDentalSurgery</code>, l'échantillon <code>CBCTDentalSurgery</code> que
+        <em>Slicer lui-même</em> publie &mdash; celui que télécharge le bouton
+        <em>Test Files</em> du module, vérifié identique octet pour octet par md5 : aucune
+        donnée patient ne part avec cette figure. Un scan, <code>cuda</code>,
+        <strong>238,7&nbsp;s</strong>, file terminée sur 1 réussi / 0 échoué. La passe a écrit
+        <strong>32 labels</strong> sur les 55 de sa table : 29 dents individuelles, plus
+        mandibule&nbsp;(53), maxillaire&nbsp;(54) et canal mandibulaire&nbsp;(55). Les 23 qui
+        manquent manquent à la <em>bouche</em>, pas à la page &mdash; trois dents de sagesse
+        (16, 17, 32) et toute la denture temporaire (33&ndash;52), qu'un adulte n'a plus. Les
+        couleurs sont les <code>UNIVERSAL_COLORS</code> du module, les opacités ses propres
+        valeurs 3D, et tous les volumes de la ligne d'état sont <em>mesurés</em> sur la carte
+        de labels par comptage de voxels.
+        <strong>Ce qu'il faut retenir.</strong> Contrairement à
+        <a href="../AMASSS/AMASSS.html">AMASSS</a>, qui charge un réseau binaire par
+        structure et les produit l'une après l'autre, il s'agit ici d'une <em>seule</em>
+        passe multi-label : les 32 labels sortent du même balayage, ensemble. Changer de
+        modèle ci-dessus change la <em>table</em> de labels, pas le code &mdash; c'est tout ce
+        que font les quatre branches de <code>onApplyClickedForVolume()</code>. La liste dit
+        alors, structure par structure, comment le modèle choisi l'aurait appelée, et
+        signale ce qu'il n'aurait pas produit du tout.
+        <strong>À lire avant de faire confiance à une dent.</strong> Le label 1, la dent de
+        sagesse supérieure droite, sort à <strong>4&nbsp;253&nbsp;mm&sup3;</strong> &mdash;
+        quatre fois la dent suivante la plus grosse (1&nbsp;028&nbsp;mm&sup3;) et plus gros
+        qu'aucune molaire ne l'est. Sur ce scan, ce label a ramassé de la matière bien au-delà
+        de la dent. Il est montré exactement tel que le modèle l'a produit, parce qu'une page
+        sur ce que fait le code ne vaut rien si elle répare en silence la sortie de ce code.
+        <strong>Ce qui est mis en scène, et dit comme tel.</strong> Le balayage est une
+        fenêtre glissante rendue visible ; nnU-Net découpe le volume en trois dimensions, pas
+        de bas en haut. Le passage de la teinte neutre d'instrument aux couleurs officielles à
+        l'étape&nbsp;2 est la mise en scène du remappage LUT de <code>_buildLabelArray</code>
+        &mdash; l'ordre des classes propre au réseau n'est pas observable depuis le fichier de
+        sortie. La surface « avant » est un simple seuillage à 605, qui est la séparation
+        d'Otsu entre tissu et os calculée pour cette page (ce CBCT n'est pas calibré en HU, et
+        aucune valeur d'os de manuel ne s'y applique). Et les surfaces sont des marching cubes
+        + windowed-sinc + décimation quadrique calculés <em>pour cette page</em> par
+        <code>batchdentalseg_mesh.py</code> &mdash; 1&nbsp;200 triangles par dent,
+        16&nbsp;000 pour la mandibule, 14&nbsp;000 pour le maxillaire &mdash; et non les
+        exports <code>.vtk</code> du module, qu'il a aussi écrits.
+        <strong>Bon à savoir</strong> : deux des 29 labels sont sortis cassés sur ce scan, et
+        tous deux sont montrés sans retouche. Le label&nbsp;1 (dent de sagesse supérieure
+        droite) mesure 4&nbsp;253&nbsp;mm&sup3;, quatre fois n'importe quelle autre dent. Le
+        label&nbsp;2 (deuxième molaire supérieure droite) a un volume parfaitement ordinaire
+        &mdash; 1&nbsp;019&nbsp;mm&sup3;, pile à la médiane &mdash; mais sa matière est
+        éparpillée en amas séparés sur 94&nbsp;mm, jusqu'à l'autre bout de l'arcade ; le
+        label&nbsp;1 est morcelé sur 124&nbsp;mm de la même façon. Toutes les autres dents
+        sont d'un seul morceau compact de 7 à 22&nbsp;mm. Le volume seul aurait laissé passer
+        le label&nbsp;2, et c'est pourquoi la boîte englobante est vérifiée aussi &mdash; et
+        pourquoi cliquer l'un de ces deux labels cadre la majeure partie du crâne plutôt
+        qu'une dent. C'est le label, pas le visualiseur.
+        </figcaption>
+      </figure>
       <h2 id="coeur">5. Le cœur non appris</h2>
 
       <figure class="diagram">
@@ -583,7 +779,7 @@ intensités de premier plan : médiane 1317, moy. 1274, s 558, p0,5 -110, p99,5 
             <tr><td>STL, OBJ</td><td><code>ExportSegmentsClosedSurfaceRepresentationToFiles</code></td><td>un fichier par segment</td><td>lissage 1.0, pas de fusion</td></tr>
             <tr><td>VTK (par label)</td><td><code>_exportVTKPerLabel</code></td><td><code>&lt;segNodeName&gt;_&lt;labelName&gt;.vtk</code></td><td>clean → <code>vtkWindowedSincPolyDataFilter</code> (60 it., <code>passBand</code> 0,05, lissage des bords/arêtes vives/non-manifold) → normales de cellules → <code>vtkQuadricDecimation</code> 40 % → <strong>flip RAS→<a class="gterm" href="../glossaire.html#g-lps" title="Voir au glossaire">LPS</a></strong> (<code>Scale(-1,-1,1)</code>), binaire</td></tr>
             <tr><td>VTK (fusionné)</td><td><code>_exportMergedVTK</code></td><td><code>&lt;segNodeName&gt;_merged.vtk</code></td><td><code>vtkDiscreteMarchingCubes</code> <strong>un contour par label présent</strong>, même chaîne de lissage, puis seuillage par label, décimation 40 %, tableau de cellules <code>Label</code> constant, concaténation, flip LPS</td></tr>
-            <tr><td>NIfTI (case)</td><td><code>ExportSegmentsBinaryLabelmapRepresentationToFiles</code></td><td>un <code>.nii.gz</code> <strong>binaire par segment</strong></td><td>à ne pas confondre avec la carte de labels ci-dessus</td></tr>
+            <tr><td>NIfTI (case)</td><td><code>ExportSegmentsBinaryLabelmapRepresentationToFiles</code></td><td>un fichier <strong>binaire</strong> <code>.nii.gz</code> par segment</td><td>à ne pas confondre avec la carte de labels ci-dessus</td></tr>
             <tr><td>glTF</td><td><code>OpenAnatomyExport</code></td><td></td><td>facteur de décimation réglable (défaut 0,9) ; installe SlicerOpenAnatomy si besoin</td></tr>
           </tbody>
         </table>
@@ -804,5 +1000,8 @@ intensités de premier plan : médiane 1317, moy. 1274, s 558, p0,5 -110, p99,5 
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/batchdentalseg-mesh.js"></script>
+<script src="../../assets/batchdentalseg-3d.js"></script>
 </body>
 </html>

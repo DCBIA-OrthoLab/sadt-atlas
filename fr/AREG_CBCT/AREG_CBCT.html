@@ -306,6 +306,42 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
 
       <h2 id="recalage">5. Le cœur algorithmique — le recalage</h2>
 
+      <figure class="viewer3d" data-areg="steps">
+        <div class="v3d-modes">
+          <button type="button" data-region="CB" aria-pressed="true">Base du crâne</button>
+          <button type="button" data-region="MAND" aria-pressed="false">Mandibule</button>
+          <button type="button" data-region="MAX" aria-pressed="false">Maxillaire</button>
+        </div>
+        <div class="v3d-stage">
+          <span class="v3d-hint">Faites glisser pour tourner &middot; pincez ou molette pour zoomer</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Recaler à nouveau</button>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. <strong>en amont</strong> &mdash; ALI_CBCT place les landmarks</li>
+          <li data-step="1">1. lecture du mobile T2 en <code>itk.F</code></li>
+          <li data-step="2">2. AMASSS prédit le masque</li>
+          <li data-step="3">3. masquage du T1 fixe &mdash; c'est tout ce qu'elastix verra</li>
+          <li data-step="4">4. une seule passe elastix : Mattes MI, 3 niveaux de pyramide, 1500 itérations chacun</li>
+          <li data-step="5">5. <code>MatrixRetrieval</code> &rarr; <code>Euler3DTransform</code></li>
+          <li data-step="6">6. resampling du T2 &mdash; sur <em>sa propre</em> grille, pas celle du T1</li>
+        </ol>
+        <span class="v3d-i18n" hidden>
+          <i data-k="ali">ALI_CBCT place les landmarks dont l'orientation a besoin &mdash;</i>
+          <i data-k="read">lecture du mobile T2 en itk.F</i>
+          <i data-k="predict">AMASSS prédit le masque</i>
+          <i data-k="mask">masquage du T1 fixe &mdash; c'est tout ce qu'elastix verra</i>
+          <i data-k="elastix">une seule passe elastix : Mattes MI, 3 niveaux de pyramide, 1500 itérations chacun</i>
+          <i data-k="matrix">MatrixRetrieval &rarr; Euler3DTransform</i>
+          <i data-k="resample">resampling du T2 &mdash; sur sa propre grille, pas celle du T1</i>
+          <i data-k="gap">écart de surface moyen dans le masque :</i>
+        </span>
+        <figcaption>La chaîne, dans l'ordre où le code l'exécute : une étape en amont &mdash; ALI_CBCT qui place les landmarks dont l'orientation a besoin (<code>CBCT.py:756</code>, mode Orientation, le jeu de Francfort) &mdash; puis les six étapes de <code>VoxelBasedRegistration</code>. Ces six landmarks sont bien ceux qu'ALI a réellement écrits pour ce scan ; <code>N</code> est absent parce que l'agent ne l'a pas trouvé, et il n'est pas inventé ici. La marche elle-même relève de la fiche ALI : on n'en donne ici que la version courte. T1 est en bleu, T2 en orange, le masque en vert. L'étape qui compte est la troisième : <code>VoxelBasedRegistration</code> masque d'abord le T1 fixe, si bien qu'<strong>elastix ne voit jamais que ce qui est à l'intérieur</strong> &mdash; c'est pour cela qu'AMASSS tourne en amont, et qu'il y a trois recalages plutôt qu'un seul. Les matrices sont celles qu'AREG a écrites. Leur sens a été vérifié plutôt que supposé : elastix renvoie l'application fixe&rarr;mobile, c'est donc son <em>inverse</em> qui amène T2 sur T1 &mdash; l'écart de surface moyen dans le masque passe de 3,27&nbsp;mm à 1,24&nbsp;mm avec lui, et monte à 6,03 sans. Mesuré hors ligne sur les maillages complets, pas dans le navigateur. <strong>Une réserve sur l'étape 4 :</strong> elastix n'écrit que sa transformation finale ; le mouvement que vous voyez est donc le vrai point d'arrivée, atteint en douceur &mdash; les poses intermédiaires de l'optimiseur au fil des trois niveaux de pyramide ne sont pas dans la sortie, et ne sont pas inventées ici.</figcaption>
+      </figure>
+
+
       <p>Tout est dans <code>VoxelBasedRegistration</code>
       (<code>utils.py:598</code>) :</p>
 
@@ -825,5 +861,8 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/areg-mesh.js"></script>
+<script src="../../assets/areg-3d.js"></script>
 </body>
 </html>

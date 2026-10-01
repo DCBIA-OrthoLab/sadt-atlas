@@ -143,7 +143,105 @@
         « crâne ». N'attendez pas ce modèle pour une segmentation du massif crânien.</p>
       </div>
 
-      <h2 id="besoin">Ce qu'il vous faut, ce que vous obtenez</h2>
+      <figure class="viewer3d" data-bds-3d>
+        <div class="v3d-modes" role="group" aria-label="Modèle sélectionné dans la liste déroulante">
+          <button type="button" data-bds-model="DentalSegmentator" aria-pressed="true">DentalSegmentator</button>
+          <button type="button" data-bds-model="PediatricDentalsegmentator" aria-pressed="false">PediatricDentalsegmentator</button>
+          <button type="button" data-bds-model="NasoMaxillaDentSeg" aria-pressed="false">NasoMaxillaDentSeg</button>
+          <button type="button" data-bds-model="UniversalLabDentalsegmentator" aria-pressed="false">UniversalLabDentalsegmentator</button>
+        </div>
+        <div class="v3d-stage">
+          <button class="v3d-reset" type="button">Vue initiale</button>
+          <span class="v3d-state">CBCT d'entrée &mdash; simple seuillage</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+          <span class="v3d-hint">Faites glisser pour tourner &middot; pincez ou molette pour zoomer &middot; cliquez une structure</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. lecture du volume &mdash; <code>nnUNet_raw</code>/<code>_preprocessed</code>/<code>_results</code> pointent tous vers le dossier du modèle</li>
+          <li data-step="1">1. <code>nnUNetv2_predict</code> &mdash; <strong>une seule</strong> passe multi-label, <code>-f 0</code>, <code>-step_size 0.5</code>, <code>--disable_tta</code></li>
+          <li data-step="2">2. <code>_buildLabelArray</code> &mdash; un seul export, puis un remappage LUT vers les valeurs officielles</li>
+          <li data-step="3">3. <code>_exportVTKPerLabel</code> &mdash; windowed-sinc, décimation quadrique de 40&nbsp;%, bascule RAS&rarr;LPS</li>
+        </ol>
+        <ol class="v3d-parts">
+          <li data-part="SKULL" data-label="Upper Skull" style="--sw:#e3dd90" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Upper Skull</span> <code>SKULL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">La boîte crânienne. Trois des quatre modèles lui donnent un label ; UniversalLab non &mdash; et c'est pourquoi il n'y a pas de voûte dans cette scène, puisque c'est une passe UniversalLab qu'elle montre.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAXI" data-label="Maxilla" style="--sw:#b8860b" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Maxilla</span> <code>MAXI</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">La mâchoire supérieure comme label à part entière, ici la valeur 54. La plus grosse structure de la passe, 129&nbsp;166&nbsp;mm&sup3; mesurés &mdash; et celle que DentalSegmentator aurait fondue dans le Upper Skull.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="MAND" data-label="Mandible" style="--sw:#d2691e" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Mandible</span> <code>MAND</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">La mâchoire inférieure, le seul os du crâne qui bouge. Présente dans les quatre tables, sous trois valeurs différentes (2, 2, 2, 53). 33&nbsp;795&nbsp;mm&sup3; mesurés.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="UPT" data-label="Upper Teeth" style="--sw:#dc9565" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Upper Teeth</span> <code>UPT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">Un seul label pour toute l'arcade supérieure &mdash; dans trois des modèles. UniversalLab n'a pas ce label : sur ce scan, l'arcade supérieure est sortie en 15 dents numérotées séparément. Servez-vous du tableau.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="LOT" data-label="Lower Teeth" style="--sw:#ebdfb4" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Lower Teeth</span> <code>LOT</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">De même pour l'arcade inférieure, sortie ici en 14 dents numérotées. Toute la différence entre les deux familles de modèles est là, et c'est une différence de table de labels, pas de code.</span>
+            <span class="v3d-tag"></span>
+          </li>
+          <li data-part="CANAL" data-label="Mandibular canal" style="--sw:#a0522d" tabindex="0">
+            <span class="v3d-name"><span class="sw"></span>Mandibular canal</span> <code>CANAL</code> <span class="v3d-lab"></span>
+            <span class="v3d-what">Le canal alvéolaire inférieur, à gauche et à droite : un tube fin et bilatéral à l'intérieur de la mandibule, et la plus petite structure de la passe (805&nbsp;mm&sup3; contre 129&nbsp;166 pour le maxillaire).</span>
+            <span class="v3d-tag"></span>
+          </li>
+        </ol>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Lancer la passe</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="read">Lecture du scan &mdash; simple seuillage, pas encore de réseau</i>
+          <i data-k="predict"><code>nnUNetv2_predict</code> &mdash; une fenêtre glissante sur tout le volume</i>
+          <i data-k="labelmap">Carte de labels reconstruite &mdash;</i>
+          <i data-k="export">Surfaces écrites, opacités 3D du module appliquées</i>
+          <i data-k="values">valeurs de label écrites</i>
+          <i data-k="done">labels produits</i>
+          <i data-k="teeth">dont des dents</i>
+          <i data-k="scans">scan dans la file</i>
+          <i data-k="label">label</i>
+          <i data-k="fdi">FDI</i>
+          <i data-k="absent">Non produit par ce modèle.</i>
+          <i data-k="split">Ce modèle numérote plutôt chaque dent &mdash; voyez le tableau.</i>
+          <i data-k="nogeom">Dans la table de ce modèle, mais non produit par la passe montrée ici.</i>
+          <i data-k="other">Pas la passe à l'écran &mdash; seulement la table de labels de ce modèle, appliquée à la liste.</i>
+          <i data-k="notinscan">non produit sur ce scan</i>
+        </span>
+        <figcaption>Ce qu'une passe produit réellement. <strong>Réel</strong> : une passe
+        <code>UniversalLabDentalsegmentator</code> sur
+        <code>PreDentalSurgery</code>, l'échantillon CBCT que Slicer publie et que
+        télécharge le bouton <em>Test Files</em> du module &mdash; un scan,
+        <code>cuda</code>, 238,7&nbsp;s, 32 labels écrits, dont
+        <strong>29 dents numérotées séparément</strong> plus mandibule, maxillaire et
+        canal mandibulaire. Les 23 labels non écrits sont des dents que cet adulte n'a pas :
+        trois dents de sagesse et toute la denture temporaire. Cliquez n'importe quelle dent du tableau.
+        Ce qu'il faut en retenir : un seul réseau <em>multi-label</em>, donc tous les labels sortent de la
+        <strong>même et unique passe</strong> &mdash; et non d'un réseau par structure comme dans
+        <a href="AMASSS.html">AMASSS</a>. Changer de modèle ci-dessus change la table de
+        labels, pas le code.
+        <strong>Bon à savoir</strong> : deux des 29 labels sont sortis cassés sur ce
+        scan, et tous deux sont montrés sans retouche. Le label&nbsp;1 (dent de sagesse
+        supérieure droite) mesure 4&nbsp;253&nbsp;mm&sup3;, quatre fois n'importe quelle
+        autre dent. Le label&nbsp;2 (deuxième molaire supérieure droite) a un volume
+        parfaitement ordinaire &mdash; 1&nbsp;019&nbsp;mm&sup3;, pile à la médiane &mdash; mais sa matière est
+        éparpillée en amas séparés sur 94&nbsp;mm, jusqu'à l'autre bout de
+        l'arcade ; le label&nbsp;1 est morcelé sur 124&nbsp;mm de la même façon. Toutes les autres
+        dents sont d'un seul morceau compact de 7 à 22&nbsp;mm. Le volume seul aurait
+        laissé passer le label&nbsp;2, et c'est pourquoi la boîte englobante est vérifiée aussi &mdash; et
+        pourquoi cliquer l'un de ces deux labels cadre la majeure partie du crâne plutôt qu'une dent.
+        C'est le label, pas le visualiseur.
+        <strong>Mis en scène</strong> : le balayage (nnU-Net découpe en trois dimensions, pas
+        de bas en haut) et le passage de la teinte neutre aux couleurs officielles, qui tient lieu
+        de remappage LUT. Les maillages sont décimés pour le navigateur, 1&nbsp;200 triangles
+        par dent.</figcaption>
+      </figure>      <h2 id="besoin">Ce qu'il vous faut, ce que vous obtenez</h2>
       <div class="io-grid">
         <div class="io-card">
           <h4>À fournir</h4>
@@ -262,5 +360,8 @@
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/batchdentalseg-mesh.js"></script>
+<script src="../../assets/batchdentalseg-3d.js"></script>
 </body>
 </html>

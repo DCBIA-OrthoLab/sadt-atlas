@@ -7,6 +7,9 @@
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/labo.css">
 <script src="../../assets/site.js"></script>
+<script src="../../assets/vface-mesh.js"></script>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/vface-3d.js"></script>
 </head>
 <body class="guide" data-cat="analyse">
 <div class="layout">
@@ -154,6 +157,86 @@
       </ol>
 
       <h2 id="lire">Comment lire le résultat</h2>
+      <p>Avant le tableau, l'image. C'est de cette mesure que le classifieur est
+      nourri &mdash; le patient face à son propre reflet, et l'écart qui reste après
+      superposition sur une structure.</p>
+
+      <figure class="viewer3d" data-vface="steps">
+        <div class="v3d-modes">
+          <button type="button" data-vregion="CB" aria-pressed="true">Base du crâne</button>
+          <button type="button" data-vregion="MAX" aria-pressed="false">Maxillaire</button>
+          <button type="button" data-vregion="MAND" aria-pressed="false">Mandibule</button>
+        </div>
+        <div class="v3d-stage">
+          <span class="v3d-hint">Faites glisser pour tourner &middot; pincez ou molette pour zoomer</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Refaire le miroir</button>
+        </div>
+        <div class="v3d-ramp v3d-ramp-div" aria-hidden="true">
+          <span class="v3d-ramp-lo">&minus;35&nbsp;mm</span><i></i><span class="v3d-ramp-hi">+35&nbsp;mm</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. <strong>en amont</strong> &mdash; ALI + <code>semi_aso_cbct</code> : le plan mi-sagittal sur x = 0</li>
+          <li data-step="1">1. <code>t1_landmarks</code> &mdash; les 26 points qu'ALI a prédits ici</li>
+          <li data-step="2">2. <code>t1_masks</code> &mdash; AMASSS : les surfaces osseuses sur lesquelles les cartes sont mesurées</li>
+          <li data-step="3">3. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, une réflexion par rapport à x = 0</li>
+          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; sur <em>une seule</em> structure</li>
+          <li data-step="5">5. <code>bone_surfaces</code> &mdash; la carte <code>ModelDistance</code> propre à VFACE</li>
+        </ol>
+        <span class="v3d-i18n" hidden>
+          <i data-k="orient">orienté : le plan mi-sagittal repose maintenant sur x = 0</i>
+          <i data-k="lm">les landmarks prédits par ALI</i>
+          <i data-k="masks">AMASSS segmente l'os sur lequel les cartes seront mesurées</i>
+          <i data-k="mirror">réflexion par rapport à x = 0</i>
+          <i data-k="plane">le plan que toute la chaîne en amont existe pour établir</i>
+          <i data-k="register">la matrice propre à AREG &mdash; cette structure seulement</i>
+          <i data-k="map">ModelDistance, la carte propre à VFACE</i>
+          <i data-k="absmed">|d| médian</i>
+        </span>
+        <figcaption>
+        Un vrai run de VFACE, pas une reconstitution. Tout ici sort de l'outil sur son
+        propre jeu de test publié : les trois matrices d'AREG, le scan miroir, les 26
+        landmarks prédits par ALI, et les trois cartes <code>ModelDistance</code>.
+        <strong>Le miroir</strong> est <code>Matrix_mirror.tfm</code> =
+        <code>diag(-1, 1, 1)</code>, translation nulle &mdash; une réflexion pure par
+        rapport à <strong>x&nbsp;=&nbsp;0</strong>, un plan du <em>monde</em>. Rien en elle
+        ne sait quoi que ce soit du patient, et c'est précisément la raison d'être de toute
+        la chaîne en amont : amener le plan mi-sagittal du patient sur ce plan-là.
+        La réflexion est animée en passant par son état dégénéré,
+        <code>diag(0, 1, 1)</code>, parce qu'une réflexion ne s'interpole pas par des
+        rotations &mdash; le déterminant devrait passer de &minus;1 à +1 sans jamais valoir
+        zéro. Le plan se dessine à mi-bascule. <strong>Et voici le point important.</strong>
+        <code>createlistprocess.py</code> appelle ModelToModel Distance trois fois, une fois
+        par recalage, et les trois cartes ne disent pas la même chose. Superposé sur la
+        <strong>base du crâne</strong>, tout le visage est déplacé latéralement : |d| médian
+        7,0&nbsp;mm, 46&nbsp;% des sommets au-delà de 8&nbsp;mm, plage de &minus;25 à +32.
+        Superposé sur le <strong>maxillaire</strong>, le crâne supérieur rejoint son propre
+        miroir à 1,0&nbsp;mm près. Sur la <strong>mandibule</strong>, à 0,45&nbsp;mm près. Se
+        superposer <em>sur</em> une structure rend cette structure symétrique par
+        construction &mdash; ce n'est pas un défaut de la mesure, c'<em>est</em> la mesure.
+        <strong>Le sens de ces matrices a été mesuré, pas supposé.</strong> elastix écrit
+        l'application fixe&rarr;mobile : c'est donc son <em>inverse</em> qui amène le miroir
+        sur T1. L'écart de surface moyen tombe de 2,88&nbsp;mm à 1,73&nbsp;mm avec
+        l'inverse, et monte à 4,57 avec la matrice telle qu'écrite &mdash; pire que de
+        laisser le miroir tranquille. Le générateur essaie désormais les deux sens contre T1
+        à chaque run, garde le meilleur, et refuse d'écrire le fichier si aucun des deux ne
+        fait mieux que ne rien faire. <strong>Trois surfaces différentes, trois échelles
+        différentes.</strong> Ce sont bien les fichiers qu'écrit VFACE : la carte de la base
+        du crâne couvre tout le crâne, celle du maxillaire le seul crâne supérieur, celle de
+        la mandibule la seule mandibule &mdash; de sorte que, quand une carte ne couvre
+        qu'une structure, le reste du crâne reste en gris neutre derrière elle. Leurs plages
+        vont de &plusmn;2,6&nbsp;mm à &plusmn;32 : chaque carte porte donc sa propre
+        échelle, montrée dans la barre ; comparez-les sur les chiffres de la ligne d'état,
+        pas sur la teinte. Le bleu est négatif, le rouge positif, le gris pâle vaut zéro
+        &mdash; la distance est signée, telle que VFACE l'écrit. <strong>La commande qui compte est la rangée de
+        boutons</strong>, et les étapes ci-dessous sont cliquables si vous voulez vous
+        arrêter sur l'une d'elles. Il n'y a pas de second scan ici &mdash; le
+        &laquo;&nbsp;T2&nbsp;&raquo; est le reflet du patient lui-même.
+        </figcaption>
+      </figure>
+
       <p>Le livrable final est un tableau de classification, une ligne par patient, avec
       trois indications :</p>
       <ul>

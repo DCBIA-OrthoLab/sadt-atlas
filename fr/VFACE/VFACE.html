@@ -7,6 +7,9 @@
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/labo.css">
 <script src="../../assets/site.js"></script>
+<script src="../../assets/vface-mesh.js"></script>
+<script src="../../assets/scene3d.js"></script>
+<script src="../../assets/vface-3d.js"></script>
 </head>
 <body data-cat="analyse">
 <div class="layout">
@@ -337,6 +340,102 @@
       et aux <code>.mrk.json</code> par <code>transform.GetInverse().TransformPoint</code>
       (<code>Automatrix_CLI.py:171</code>).</p>
 
+      <figure class="viewer3d" data-vface="steps">
+        <div class="v3d-modes">
+          <button type="button" data-vregion="CB" aria-pressed="true">Base du crâne</button>
+          <button type="button" data-vregion="MAX" aria-pressed="false">Maxillaire</button>
+          <button type="button" data-vregion="MAND" aria-pressed="false">Mandibule</button>
+        </div>
+        <div class="v3d-stage">
+          <span class="v3d-hint">Faites glisser pour tourner &middot; pincez ou molette pour zoomer</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Refaire le miroir</button>
+        </div>
+        <div class="v3d-ramp v3d-ramp-div" aria-hidden="true">
+          <span class="v3d-ramp-lo">&minus;35&nbsp;mm</span><i></i><span class="v3d-ramp-hi">+35&nbsp;mm</span>
+        </div>
+        <ol class="v3d-chips v3d-steps">
+          <li data-step="0">0. <strong>en amont</strong> &mdash; ALI + <code>semi_aso_cbct</code> : le plan mi-sagittal sur x = 0</li>
+          <li data-step="1">1. <code>t1_landmarks</code> &mdash; les 26 points qu'ALI a prédits ici</li>
+          <li data-step="2">2. <code>t1_masks</code> &mdash; AMASSS : les surfaces osseuses sur lesquelles les cartes sont mesurées</li>
+          <li data-step="3">3. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, une réflexion par rapport à x = 0</li>
+          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; sur <em>une seule</em> structure</li>
+          <li data-step="5">5. <code>bone_surfaces</code> &mdash; la carte <code>ModelDistance</code> propre à VFACE</li>
+        </ol>
+        <span class="v3d-i18n" hidden>
+          <i data-k="orient">orienté : le plan mi-sagittal repose maintenant sur x = 0</i>
+          <i data-k="lm">les landmarks prédits par ALI</i>
+          <i data-k="masks">AMASSS segmente l'os sur lequel les cartes seront mesurées</i>
+          <i data-k="mirror">réflexion par rapport à x = 0</i>
+          <i data-k="plane">le plan que toute la chaîne en amont existe pour établir</i>
+          <i data-k="register">la matrice propre à AREG &mdash; cette structure seulement</i>
+          <i data-k="map">ModelDistance, la carte propre à VFACE</i>
+          <i data-k="absmed">|d| médian</i>
+        </span>
+        <figcaption>
+        Un vrai run de VFACE, pas une reconstitution. Tout ici sort de l'outil sur son
+        propre jeu de test publié : les trois matrices d'AREG, le scan miroir, les 26
+        landmarks prédits par ALI, et les trois cartes <code>ModelDistance</code>.
+        <strong>Le miroir</strong> est <code>Matrix_mirror.tfm</code> =
+        <code>diag(-1, 1, 1)</code>, translation nulle &mdash; une réflexion pure par
+        rapport à <strong>x&nbsp;=&nbsp;0</strong>, un plan du <em>monde</em>. Rien en elle
+        ne sait quoi que ce soit du patient, et c'est précisément la raison d'être de toute
+        la chaîne en amont : amener le plan mi-sagittal du patient sur ce plan-là.
+        La réflexion est animée en passant par son état dégénéré,
+        <code>diag(0, 1, 1)</code>, parce qu'une réflexion ne s'interpole pas par des
+        rotations &mdash; le déterminant devrait passer de &minus;1 à +1 sans jamais valoir
+        zéro. Le plan se dessine à mi-bascule. <strong>Et voici le point important.</strong>
+        <code>createlistprocess.py</code> appelle ModelToModel Distance trois fois, une fois
+        par recalage, et les trois cartes ne disent pas la même chose. Superposé sur la
+        <strong>base du crâne</strong>, tout le visage est déplacé latéralement : |d| médian
+        7,0&nbsp;mm, 46&nbsp;% des sommets au-delà de 8&nbsp;mm, plage de &minus;25 à +32.
+        Superposé sur le <strong>maxillaire</strong>, le crâne supérieur rejoint son propre
+        miroir à 1,0&nbsp;mm près. Sur la <strong>mandibule</strong>, à 0,45&nbsp;mm près. Se
+        superposer <em>sur</em> une structure rend cette structure symétrique par
+        construction &mdash; ce n'est pas un défaut de la mesure, c'<em>est</em> la mesure.
+        <strong>Le sens de ces matrices a été mesuré, pas supposé.</strong> elastix écrit
+        l'application fixe&rarr;mobile : c'est donc son <em>inverse</em> qui amène le miroir
+        sur T1. L'écart de surface moyen tombe de 2,88&nbsp;mm à 1,73&nbsp;mm avec
+        l'inverse, et monte à 4,57 avec la matrice telle qu'écrite &mdash; pire que de
+        laisser le miroir tranquille. Le générateur essaie désormais les deux sens contre T1
+        à chaque run, garde le meilleur, et refuse d'écrire le fichier si aucun des deux ne
+        fait mieux que ne rien faire. <strong>Trois surfaces différentes, trois échelles
+        différentes.</strong> Ce sont bien les fichiers qu'écrit VFACE : la carte de la base
+        du crâne couvre tout le crâne, celle du maxillaire le seul crâne supérieur, celle de
+        la mandibule la seule mandibule &mdash; de sorte que, quand une carte ne couvre
+        qu'une structure, le reste du crâne reste en gris neutre derrière elle. Leurs plages
+        vont de &plusmn;2,6&nbsp;mm à &plusmn;32 : chaque carte porte donc sa propre
+        échelle, montrée dans la barre ; comparez-les sur les chiffres de la ligne d'état,
+        pas sur la teinte. Le bleu est négatif, le rouge positif, le gris pâle vaut zéro
+        &mdash; la distance est signée, telle que VFACE l'écrit. <strong>Ce qui n'est pas
+        montré, et pourquoi.</strong> Les deux étapes d'orientation n'animent aucune
+        rotation : ce scan arrive déjà orienté, la pose dont il vient n'existe donc nulle
+        part, et ce que vous voyez est l'état atteint plutôt qu'un trajet reconstitué. Le
+        repère de la carte du maxillaire a été vérifié plutôt que supposé &mdash; il vit
+        dans le repère orienté sur le maxillaire, pas dans celui de la base du crâne, et sur
+        les cinq compositions candidates c'est <code>inv(CB)&middot;MAX</code> qui l'amène
+        sur les autres à 0,23&nbsp;mm près, contre 3,38 pour l'identité ; deviner aurait
+        donc laissé un ou deux degrés d'écart sans que rien ne paraisse cassé. Les surfaces
+        sont décimées à environ 26&nbsp;000 triangles pour le navigateur, et chaque sommet
+        conserve la distance relevée au sommet le plus proche de la surface en pleine
+        résolution plutôt qu'une valeur interpolée quadriquement, qui dépassait de
+        6&nbsp;mm la plage mesurée.
+        <strong>Deux corrections qui méritent d'être consignées.</strong> Une version
+        antérieure de cette figure recalait le miroir avec un ICP écrit pour la page, parce
+        que cette sortie n'avait pas encore été trouvée. Cet ICP glissait sur le maxillaire
+        &mdash; 10,2&deg; de rotation là où la vraie matrice d'AREG en tourne 4,4&deg;
+        &mdash; et sa distance non signée, sur un maillage plus grossier, annonçait une
+        médiane de 1,36&nbsp;mm, ce qui faisait passer ce patient pour presque symétrique.
+        Il ne l'est pas. La version suivante appliquait les matrices d'AREG dans le mauvais
+        sens : le miroir tournait donc à l'envers sur son chemin vers la pose recalée
+        &mdash; un lecteur l'a vu sur la page avant le générateur, et c'est pourquoi le sens
+        est désormais mesuré à chaque build au lieu de reposer sur une convention.
+        </figcaption>
+      </figure>
+
+
       <p><strong>Système de coordonnées</strong> : tout est en <strong>LPS</strong>. ALI écrit
       <code>"coordinateSystem": "LPS"</code> (<code>io.py:36</code>),
       <code>derive_landmarks</code> aussi, et <code>createDictPatient</code> lit le champ <code>position</code> brut
@@ -567,7 +666,7 @@
 from_centred = sitk.ReadTransform(&lt;pat&gt;_MAX_Or_transform.tfm).GetInverse()
 moved = from_centred.TransformPoint(to_centred.TransformPoint(p))</code></pre>
 
-      <p>Les deux <code>.tfm</code> d'<a href="../ASO/ASO.html">ASO</a> partagent le même scan centré comme référence, donc le
+      <p>Les deux fichiers d'<a href="../ASO/ASO.html">ASO</a> en <code>.tfm</code> partagent le même scan centré comme référence, donc le
       centrage se simplifie et la composition est exacte. Gain : quelques minutes par
       patient, et <strong>un seul point d'édition manuelle</strong> — corriger un landmark à la
       pause <code>t1_landmarks</code> se propage automatiquement au repère MAX. Le regroupement
@@ -753,7 +852,7 @@ moved = from_centred.TransformPoint(to_centred.TransformPoint(p))</code></pre>
         <li><strong><code>LANDMARKS</code></strong> : <code>loadEditableMarkups</code> force <code>SetLocked(False)</code> sur le nœud
         et sur chaque point, et rend l'affichage visible — <a href="../ALI/ALI.html">ALI</a> écrit ses points
         verrouillés et cachés. Les positions de départ sont mémorisées ; au
-        <code>Continue</code>, <code>savePauseEdits</code> ne réécrit <strong>que</strong> les fichiers dont au moins un
+        <code>Continue</code>, <code>savePauseEdits</code> ne réécrit que les fichiers dont au moins un
         point a bougé (<code>VFACE.py:2095</code>).</li>
         <li><strong><code>REGISTRATION</code></strong> : <code>setUpAdjustment</code> superpose le scan recalé en
         demi-opacité sur le T1, l'attache à un <code>vtkMRMLLinearTransformNode</code> avec
@@ -876,7 +975,7 @@ moved = from_centred.TransformPoint(to_centred.TransformPoint(p))</code></pre>
             <tr><td><code>T2_Scan/{CB,MAX}</code> ou <code>T2 Centered</code></td><td>le miroir (ou le vrai T2 en longitudinal)</td><td>non</td></tr>
             <tr><td><code>T2_Masks</code></td><td>masques mirrorés, <strong>inutilisés</strong> (CMFReg)</td><td>non</td></tr>
             <tr><td><code>Registered Scan/&lt;region&gt;/&lt;pat&gt;_OutReg/</code></td><td>scan recalé + <code>_Reg_matrix.tfm</code></td><td>non</td></tr>
-            <tr><td><code>T1 Landmarks/{CB,MAX}</code></td><td><code>.mrk.json</code> <a href="../ALI/ALI.html">ALI</a> et dérivés</td><td>non</td></tr>
+            <tr><td><code>T1 Landmarks/{CB,MAX}</code></td><td><a href="../ALI/ALI.html">ALI</a> <code>.mrk.json</code> et dérivés</td><td>non</td></tr>
             <tr><td><code>Mirrored Landmarks/{CB,MAX}</code></td><td>suffixe <code>_mir</code></td><td>non</td></tr>
             <tr><td><code>Mirrored &amp; Registered Landmarks/{CB,MAND,MAX}</code></td><td>suffixes <code>_CB_reg</code>, <code>_MAND_reg</code>, <code>_MAX_reg</code></td><td>non</td></tr>
             <tr><td><code>Measurements</code></td><td><code>Measurements_{CB,MAND,MAX}.xlsx</code>, <code>PostProcess_Measurements.xlsx</code></td><td><strong>oui</strong> si Quantitative</td></tr>
