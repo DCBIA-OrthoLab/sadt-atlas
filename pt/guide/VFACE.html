@@ -179,15 +179,15 @@
           <span class="v3d-ramp-lo">&minus;35&nbsp;mm</span><i></i><span class="v3d-ramp-hi">+35&nbsp;mm</span>
         </div>
         <ol class="v3d-chips v3d-steps">
-          <li data-step="0">0. <strong>a montante</strong> &mdash; ALI + <code>semi_aso_cbct</code>: o plano sagital mediano sobre x = 0</li>
+          <li data-step="0">0. <code>t1_oriented_cb</code> &mdash; <code>semi_aso_cbct</code> gira o paciente 2,67&deg; sobre o plano x = 0</li>
           <li data-step="1">1. <code>t1_landmarks</code> &mdash; os 26 pontos que o ALI prediz aqui</li>
           <li data-step="2">2. <code>t1_masks</code> &mdash; AMASSS: as superfícies ósseas sobre as quais os mapas são medidos</li>
           <li data-step="3">3. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, uma reflexão em torno de x = 0</li>
-          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; em <em>uma única</em> estrutura</li>
+          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; em <em>uma única</em> estrutura, com os landmarks convergindo</li>
           <li data-step="5">5. <code>bone_surfaces</code> &mdash; o mapa <code>ModelDistance</code> do próprio VFACE</li>
         </ol>
         <span class="v3d-i18n" hidden>
-          <i data-k="orient">orientado: o plano sagital mediano agora está sobre x = 0</i>
+          <i data-k="orient">semi_aso_cbct gira o paciente até que o plano sagital mediano fique sobre x = 0</i>
           <i data-k="lm">os landmarks preditos pelo ALI</i>
           <i data-k="masks">o AMASSS segmenta o osso sobre o qual os mapas serão medidos</i>
           <i data-k="mirror">refletir em torno de x = 0</i>
@@ -195,6 +195,8 @@
           <i data-k="register">a matriz do próprio AREG &mdash; somente esta estrutura</i>
           <i data-k="map">ModelDistance, o mapa do próprio VFACE</i>
           <i data-k="absmed">|d| mediano</i>
+          <i data-k="pairs">pares contralaterais</i>
+          <i data-k="median">mediana</i>
         </span>
         <figcaption>
         Uma execução real do VFACE, não uma reconstrução. Tudo aqui sai da própria
@@ -229,13 +231,42 @@
         arquivos que o VFACE escreve: o mapa da base do crânio cobre o crânio inteiro, o
         da maxila apenas o crânio superior, o da mandíbula apenas a mandíbula &mdash;
         então, quando um mapa cobre uma única estrutura, o resto do crânio permanece em
-        cinza neutro atrás dele. As faixas vão de &plusmn;2,6&nbsp;mm a &plusmn;32,
-        portanto cada mapa carrega a sua própria escala, mostrada na barra; compare-os
+        cinza neutro atrás dele. As faixas medidas vão de &plusmn;2,6&nbsp;mm a
+        &plusmn;32, portanto cada mapa carrega a sua própria escala, mostrada na barra e
+        definida no seu percentil 95 em vez do seu máximo; compare-os
         pelos números da linha de estado, não pela cor. Azul é negativo, vermelho é
         positivo, cinza-claro é zero &mdash; a distância é sinalizada, tal como o VFACE a
         escreve. <strong>O controle que importa é a fileira de botões</strong>, e as etapas
         abaixo são clicáveis se você quiser parar em uma delas. Não há um segundo exame
-        aqui &mdash; o &ldquo;T2&rdquo; é o próprio reflexo do paciente.
+        aqui &mdash; o &ldquo;T2&rdquo; é o próprio reflexo do paciente. <strong>O plano, e
+        como ele é calculado: ele não é.</strong> x&nbsp;=&nbsp;0 é um plano do mundo,
+        fixado pelo fato de <code>Matrix_mirror.tfm</code> ser <code>diag(-1, 1, 1)</code>,
+        com translação nula e parâmetros fixos nulos. Nada ajusta um plano a este paciente.
+        O que é calculado é a <em>orientação</em> que leva o paciente até ele: o ALI coloca
+        os landmarks, depois <code>semi_aso_cbct</code> faz uma inicialização com 3
+        landmarks seguida de um ICP rígido sobre um padrão de referência, e aqui isso dá uma
+        rotação de 2,67&deg;. A etapa&nbsp;0 a executa de verdade &mdash; uma versão
+        anterior desta legenda afirmava que a pose anterior à orientação &ldquo;não existe
+        em lugar algum&rdquo;, o que era simplesmente falso: ela está em
+        <code>Centered T1 Scans</code>, e a transformação escrita pelo VFACE faz a ligação
+        entre as duas. A sua direção foi medida, não suposta. <strong>Na etapa&nbsp;4 os
+        landmarks permanecem na tela</strong>, para que você possa ver se o registro
+        realmente os aproxima. Como o espelho troca esquerda e direita, cada ponto
+        espelhado é emparelhado com o seu homólogo <em>contralateral</em> &mdash; RGo contra
+        LGo &mdash; o que a seção sobre a medição já explica; emparelhar cada rótulo consigo
+        mesmo dá 51&nbsp;mm de absurdo, o emparelhamento contralateral dá 4,70&nbsp;mm antes
+        do registro. Distância mediana depois do registro: 1,57&nbsp;mm na base do crânio,
+        2,16 na mandíbula, e <strong>12,84 na maxila contra 12,79 antes &mdash; essa não
+        converge de forma alguma</strong>, o que é a mesma fraqueza que o seu ajuste de
+        superfície frouxo já mostrava. As duas extremidades são medidas; apenas o caminho
+        entre elas é interpolado. <strong>Um defeito encontrado na saída publicada.</strong>
+        Estas posições registradas são aqui recalculadas a partir da matriz verificada em vez
+        de lidas em <code>Mirrored &amp; Registered Landmarks</code>, porque essa pasta
+        concorda com a matriz em 0,04&nbsp;mm para a maxila e 0,13 para a mandíbula, mas se
+        afasta em 20,02&nbsp;mm na base do crânio &mdash; os seus pontos estão deslocados em
+        bloco rígido de cerca de 23&nbsp;mm em x e se <em>afastam</em> do alvo. A
+        concordância nas outras duas é também a prova mais forte de que a inversa é a
+        direção correta.
         </figcaption>
       </figure>
 

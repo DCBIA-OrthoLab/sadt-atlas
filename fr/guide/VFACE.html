@@ -178,15 +178,15 @@
           <span class="v3d-ramp-lo">&minus;35&nbsp;mm</span><i></i><span class="v3d-ramp-hi">+35&nbsp;mm</span>
         </div>
         <ol class="v3d-chips v3d-steps">
-          <li data-step="0">0. <strong>en amont</strong> &mdash; ALI + <code>semi_aso_cbct</code> : le plan mi-sagittal sur x = 0</li>
+          <li data-step="0">0. <code>t1_oriented_cb</code> &mdash; <code>semi_aso_cbct</code> tourne le patient de 2,67&deg; sur le plan x = 0</li>
           <li data-step="1">1. <code>t1_landmarks</code> &mdash; les 26 points qu'ALI a prédits ici</li>
           <li data-step="2">2. <code>t1_masks</code> &mdash; AMASSS : les surfaces osseuses sur lesquelles les cartes sont mesurées</li>
           <li data-step="3">3. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, une réflexion par rapport à x = 0</li>
-          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; sur <em>une seule</em> structure</li>
+          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; sur <em>une seule</em> structure, les landmarks convergent</li>
           <li data-step="5">5. <code>bone_surfaces</code> &mdash; la carte <code>ModelDistance</code> propre à VFACE</li>
         </ol>
         <span class="v3d-i18n" hidden>
-          <i data-k="orient">orienté : le plan mi-sagittal repose maintenant sur x = 0</i>
+          <i data-k="orient">semi_aso_cbct tourne le patient jusqu'à ce que le plan mi-sagittal repose sur x = 0</i>
           <i data-k="lm">les landmarks prédits par ALI</i>
           <i data-k="masks">AMASSS segmente l'os sur lequel les cartes seront mesurées</i>
           <i data-k="mirror">réflexion par rapport à x = 0</i>
@@ -194,6 +194,8 @@
           <i data-k="register">la matrice propre à AREG &mdash; cette structure seulement</i>
           <i data-k="map">ModelDistance, la carte propre à VFACE</i>
           <i data-k="absmed">|d| médian</i>
+          <i data-k="pairs">paires contralatérales</i>
+          <i data-k="median">médiane</i>
         </span>
         <figcaption>
         Un vrai run de VFACE, pas une reconstitution. Tout ici sort de l'outil sur son
@@ -227,13 +229,42 @@
         du crâne couvre tout le crâne, celle du maxillaire le seul crâne supérieur, celle de
         la mandibule la seule mandibule &mdash; de sorte que, quand une carte ne couvre
         qu'une structure, le reste du crâne reste en gris neutre derrière elle. Leurs plages
-        vont de &plusmn;2,6&nbsp;mm à &plusmn;32 : chaque carte porte donc sa propre
-        échelle, montrée dans la barre ; comparez-les sur les chiffres de la ligne d'état,
+        mesurées vont de &plusmn;2,6&nbsp;mm à &plusmn;32 : chaque carte porte donc sa
+        propre échelle, montrée dans la barre et fixée à son 95e centile plutôt qu'à son
+        maximum ; comparez-les sur les chiffres de la ligne d'état,
         pas sur la teinte. Le bleu est négatif, le rouge positif, le gris pâle vaut zéro
         &mdash; la distance est signée, telle que VFACE l'écrit. <strong>La commande qui compte est la rangée de
         boutons</strong>, et les étapes ci-dessous sont cliquables si vous voulez vous
         arrêter sur l'une d'elles. Il n'y a pas de second scan ici &mdash; le
-        &laquo;&nbsp;T2&nbsp;&raquo; est le reflet du patient lui-même.
+        &laquo;&nbsp;T2&nbsp;&raquo; est le reflet du patient lui-même. <strong>Le plan, et
+        comment il est calculé : il ne l'est pas.</strong> x&nbsp;=&nbsp;0 est un plan du
+        monde, fixé par le fait que <code>Matrix_mirror.tfm</code> vaut
+        <code>diag(-1, 1, 1)</code>, translation nulle et paramètres fixes nuls. Rien
+        n'ajuste un plan à ce patient. Ce qui est calculé, c'est l'<em>orientation</em> qui
+        amène le patient dessus : ALI place les landmarks, puis <code>semi_aso_cbct</code>
+        fait une initialisation à 3 landmarks suivie d'un ICP rigide sur un étalon, et ici
+        cela donne une rotation de 2,67&deg;. L'étape&nbsp;0 la joue pour de vrai &mdash;
+        une version antérieure de cette légende affirmait que la pose d'avant orientation
+        &laquo;&nbsp;n'existe nulle part&nbsp;&raquo;, ce qui était simplement faux : elle
+        est dans <code>Centered T1 Scans</code>, et la transformation écrite par VFACE fait
+        le lien entre les deux. Son sens a été mesuré, pas supposé. <strong>À
+        l'étape&nbsp;4 les landmarks restent à l'écran</strong>, pour que vous puissiez voir
+        si le recalage les rapproche vraiment. Comme le miroir échange gauche et droite,
+        chaque point miroir est apparié à son homologue <em>contralatéral</em> &mdash; RGo
+        contre LGo &mdash; ce que la section sur la mesure explique déjà ; apparier chaque
+        label avec lui-même donne 51&nbsp;mm d'absurdité, l'appariement contralatéral donne
+        4,70&nbsp;mm avant recalage. Distance médiane après recalage : 1,57&nbsp;mm sur la
+        base du crâne, 2,16 sur la mandibule, et <strong>12,84 sur le maxillaire contre
+        12,79 avant &mdash; celui-là ne converge pas du tout</strong>, ce qui est la même
+        faiblesse que montrait déjà son ajustement de surface relâché. Les deux extrémités
+        sont mesurées ; seul le chemin entre elles est interpolé. <strong>Un défaut trouvé
+        dans la sortie publiée.</strong> Ces positions recalées sont ici recalculées depuis
+        la matrice vérifiée plutôt que lues dans
+        <code>Mirrored &amp; Registered Landmarks</code>, car ce dossier s'accorde avec la
+        matrice à 0,04&nbsp;mm pour le maxillaire et 0,13 pour la mandibule, mais s'en écarte de 20,02&nbsp;mm pour la base
+        du crâne &mdash; ses points sont décalés en bloc rigide d'environ 23&nbsp;mm en x et
+        s'<em>éloignent</em> de la cible. L'accord sur les deux autres est aussi la preuve
+        la plus forte que l'inverse est le bon sens.
         </figcaption>
       </figure>
 
