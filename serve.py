@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sert SADT Atlas sur le réseau, filtré par liste blanche.
 
-    python3 serve.py            # lit serve.conf
+    python3 serve.py            # lit serve.conf, ou serve.conf.example à défaut
     python3 serve.py --conf autre.conf
 
 La liste blanche est relue dès que serve.conf change : enregistre le fichier,
@@ -80,7 +80,7 @@ class Allow:
             ip = ipaddress.ip_address(addr)
         except ValueError:
             return False
-        if ip.version == 6 and ip.ipv4_mapped:       # ::ffff:152.19.x.x
+        if ip.version == 6 and ip.ipv4_mapped:       # ::ffff:198.51.100.x
             ip = ip.ipv4_mapped
         with self.lock:
             return any(ip in n for n in self.nets)
@@ -139,7 +139,14 @@ def main():
     args = ap.parse_args()
 
     if not os.path.exists(args.conf):
-        sys.exit(f"conf introuvable : {args.conf}")
+        modele = os.path.join(ROOT, "serve.conf.example")
+        if args.conf == os.path.join(ROOT, "serve.conf") and os.path.exists(modele):
+            log("serve.conf absent — repli sur serve.conf.example : "
+                "la machine elle-même et le tailnet seulement.")
+            log("Pour ouvrir à d'autres adresses : cp serve.conf.example serve.conf")
+            args.conf = modele
+        else:
+            sys.exit(f"conf introuvable : {args.conf}")
 
     Handler.allow = Allow(args.conf)
     port = args.port or Handler.allow.port
@@ -170,7 +177,7 @@ def adresses(port):
         import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("192.0.2.1", 1)); lan = s.getsockname()[0]; s.close()
-        out.append(("réseau UNC", f"http://{lan}:{port}/"))
+        out.append(("réseau local", f"http://{lan}:{port}/"))
     except Exception:
         pass
     return out
