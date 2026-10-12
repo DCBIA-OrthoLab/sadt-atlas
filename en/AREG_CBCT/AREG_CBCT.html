@@ -204,7 +204,7 @@
       </div>
 
       <p>Unlike the IOS path, <strong>nothing on the CBCT side goes through conda</strong>: <code>AREGLogic</code>
-      and its <code>shapeaxi</code> env (<code>AREG.py:3087</code>) are only used by IOS.
+      and its <code>shapeaxi</code> env (<code>AREG.py:3298</code>) are only used by IOS.
       CBCT is launched with <code>slicer.cli.run</code> (<code>AREG.py:1552</code>,
       <code>AREG.py:1804</code>) and the packages are <code>pip_install</code>ed inside
       Slicer itself.</p>
@@ -230,7 +230,7 @@
         <table>
           <thead><tr><th>Mode</th><th>Class</th><th>Upstream</th><th>T1 masks</th></tr></thead>
           <tbody>
-            <tr><td>Semi-Automated</td><td><code>Semi_CBCT</code> (<code>CBCT.py:266</code>)</td><td>none</td><td><strong>supplied by the operator</strong> ("T1 Masks" field)</td></tr>
+            <tr><td>Semi-Automated</td><td><code>Semi_CBCT</code> (<code>CBCT.py:270</code>)</td><td>none</td><td><strong>supplied by the operator</strong> ("T1 Masks" field)</td></tr>
             <tr><td>Fully-Automated</td><td><code>Auto_CBCT</code> (<code>CBCT.py:446</code>)</td><td>none</td><td>AMASSS <code>CBMASK</code>/<code>MANDMASK</code>/<code>MAXMASK</code>, written <strong>into the input T1 folder</strong> <span class="badge predit">predicted</span></td></tr>
             <tr><td>Orientation &amp; Registration</td><td><code>Or_Auto_CBCT</code> (<code>CBCT.py:731</code>)</td><td>PRE_ASO → <a href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> → SEMI_ASO on T1, into <code>&lt;T1 folder&gt;Or</code></td><td>AMASSS on <code>&lt;T1 folder&gt;Or</code> <span class="badge predit">predicted</span></td></tr>
           </tbody>
@@ -255,7 +255,7 @@
             <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO</a> recentres the T1 &mdash; no network, a translation</span>
                 <span class="pipe-out"><code>&lt;T1 folder&gt;Or</code></span></li>
             <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> places the orientation landmarks <span class="badge predit">predicted</span></span>
-                <span class="pipe-out"><code>CBCT.py:756</code></span></li>
+                <span class="pipe-out"><code>CBCT.py:766</code></span></li>
             <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> orients the T1 onto the gold standard</span>
                 <span class="pipe-out"><code>&lt;T1 folder&gt;Or</code></span></li>
           </ol>
@@ -336,14 +336,14 @@
       <p><strong>Centering T2</strong> — <code>pre_aso_cbct</code>. Despite its name and its
       <code>model_folder</code> parameter pointing at <code>Models/Orientation/PreASO</code>, this CLI <strong>uses
       no network at all</strong>: it computes <code>T = -physical_center_of_the_image</code>
-      (<code>PRE_ASO_CBCT.py:163</code>), resamples
+      (<code>PRE_ASO_CBCT.py:92</code>), resamples
       with the inverse and writes the <code>TranslationTransform</code> as a <code>.tfm</code> alongside. Direction
       prediction by a <code>DenseNet</code> once existed, commented out, and was removed
       (commit <code>4296774</code>). The <code>model_folder</code> and <code>SmallFOV</code> arguments are <strong>dead</strong>,
       but the PreASO weights are still downloaded.</p>
 
       <p><strong>Masking the fixed image</strong> — <code>MaskedImage</code>
-      (<code>utils.py:584</code>):</p>
+      (<code>utils.py:587</code>):</p>
 
       <pre><code>fixed_seg_sitk.SetOrigin(fixed_image_sitk.GetOrigin())   # origin forced
 fixed_image_masked = applyMask(fixed_image_sitk, fixed_seg_sitk, label=SegLabel)
@@ -366,7 +366,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
       <p><code>SegLabel</code> is in practice always <code>None</code>: the <code>LabelSelectcomboBox</code> combo box is
       hard-hidden (<code>AREG.py:548</code>) and <code>SegmentationLabels</code> stays
       <code>[0]</code>, which the CLI re-translates into <code>None</code>. <code>GetSegmentationLabel</code>
-      (<code>CBCT.py:177</code>), which read the labels present
+      (<code>CBCT.py:181</code>), which read the labels present
       in the mask, is called nowhere: <strong>dead code</strong>.</p>
 
       <h2 id="recalage">5. The algorithmic core — the registration</h2>
@@ -403,12 +403,12 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
           <i data-k="resample">resample T2 &mdash; on its own grid, not T1's</i>
           <i data-k="gap">mean surface gap inside the mask:</i>
         </span>
-        <figcaption>The chain, in the order the code runs it: one upstream step &mdash; ALI_CBCT placing the landmarks the orientation needs (<code>CBCT.py:756</code>, Orientation mode, the Frankfurt set) &mdash; then the six steps of <code>VoxelBasedRegistration</code>. Those six landmarks are the ones ALI actually wrote for this scan; <code>N</code> is absent because the agent did not find it, and it is not invented here. The walk itself belongs to the ALI page, so this is the short version. T1 is blue, T2 orange, the mask green. The step that matters is the third: <code>VoxelBasedRegistration</code> masks the fixed T1 first, so <strong>elastix only ever sees what is inside it</strong> &mdash; which is why AMASSS runs upstream, and why there are three registrations rather than one. The matrices are the ones AREG wrote. Their direction was checked rather than assumed: elastix returns the fixed&rarr;moving mapping, so it is the <em>inverse</em> that brings T2 onto T1 &mdash; the mean surface gap inside the mask drops from 3.27&nbsp;mm to 1.24&nbsp;mm with it, and climbs to 6.03 without. Measured offline on the full meshes, not in the browser. <strong>One caveat on step 4:</strong> elastix writes only its final transform, so the motion you see is the real endpoint reached smoothly &mdash; the optimiser’s intermediate poses across the three pyramid levels are not in the output, and are not invented here.</figcaption>
+        <figcaption>The chain, in the order the code runs it: one upstream step &mdash; ALI_CBCT placing the landmarks the orientation needs (<code>CBCT.py:766</code>, Orientation mode, the Frankfurt set) &mdash; then the six steps of <code>VoxelBasedRegistration</code>. Those six landmarks are the ones ALI actually wrote for this scan; <code>N</code> is absent because the agent did not find it, and it is not invented here. The walk itself belongs to the ALI page, so this is the short version. T1 is blue, T2 orange, the mask green. The step that matters is the third: <code>VoxelBasedRegistration</code> masks the fixed T1 first, so <strong>elastix only ever sees what is inside it</strong> &mdash; which is why AMASSS runs upstream, and why there are three registrations rather than one. The matrices are the ones AREG wrote. Their direction was checked rather than assumed: elastix returns the fixed&rarr;moving mapping, so it is the <em>inverse</em> that brings T2 onto T1 &mdash; the mean surface gap inside the mask drops from 3.27&nbsp;mm to 1.24&nbsp;mm with it, and climbs to 6.03 without. Measured offline on the full meshes, not in the browser. <strong>One caveat on step 4:</strong> elastix writes only its final transform, so the motion you see is the real endpoint reached smoothly &mdash; the optimiser’s intermediate poses across the three pyramid levels are not in the output, and are not invented here.</figcaption>
       </figure>
 
 
       <p>Everything happens in <code>VoxelBasedRegistration</code>
-      (<code>utils.py:598</code>):</p>
+      (<code>utils.py:601</code>):</p>
 
       <ol>
         <li>read the moving T2 as <code>itk.F</code>;</li>
@@ -465,7 +465,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
 
       <p>The library is <strong>itk-elastix</strong> (<code>itk.ElastixRegistrationMethod</code>), not
       SimpleITK or ANTs. Parameters, all made explicit in
-      <code>make_rigid_param_map_deterministic</code> (<code>utils.py:527</code>),
+      <code>make_rigid_param_map_deterministic</code> (<code>utils.py:530</code>),
       layered on top of elastix's default <code>"rigid"</code> map:</p>
 
       <div class="table-wrap">
@@ -498,7 +498,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
       (<code>RandomCoordinate</code> sampler, 10000 samples, <code>AdaptiveStochasticGradientDescent</code>,
       2 levels, on the <strong>unmasked</strong> images) were removed by commit
       <code>350a8de</code> on 2025-09-23, along with the use of <code>initial_transform</code> in
-      <code>ElastixReg</code> (<code>utils.py:573</code>), which is called
+      <code>ElastixReg</code> (<code>utils.py:576</code>), which is called
       with <code>None</code> everywhere. The only "coarse to fine" left is the 3-level
       pyramid; the coarse pre-alignment is now handled by PRE_ASO's centering of T2 and
       by <code>AutomaticTransformInitialization</code>.</p>
@@ -545,7 +545,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
       The second one recursively walks the <code>&lt;Region&gt;/&lt;patient&gt;_OutReg/</code> tree and
       skips its own outputs thanks to the <code>_seg_</code> suffix.</p>
 
-      <p><strong><a href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a></strong> (Orientation mode only, <code>CBCT.py:756</code>):</p>
+      <p><strong><a href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a></strong> (Orientation mode only, <code>CBCT.py:766</code>):</p>
 
       <pre><code>{"input": &lt;temp&gt;, "dir_models": &lt;model_folder_3&gt;,
  "lm_type": "'N', 'S', 'Ba', 'RPo', 'LPo', 'LOr', 'ROr'",
@@ -556,7 +556,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
       <p>Multi-scale reinforcement agents (1 mm then 0.3 mm), <a class="gterm" href="../glossary.html#g-fov" title="See glossary">FOV</a> 64³ voxels,
       a <code>DNet</code> network = 3D <code>DenseNet</code> <a class="gterm" href="../glossary.html#g-monai" title="See glossary">MONAI</a> (<code>growth_rate=34</code>, blocks <code>(6,12,24,16)</code>)
       followed by a 6-output MLP = the 6 directions of displacement
-      (<code>brain.py:48</code>) <span class="badge predit">predicted</span>. The landmark list depends on the
+      (<code>brain.py:39</code>) <span class="badge predit">predicted</span>. The landmark list depends on the
       reference plane: <code>IF ANS PNS UR1O UR6O UL6O</code> (<a class="gterm" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a>) or <code>N S Ba RPo LPo LOr ROr</code>
       (Frankfort).</p>
 
@@ -593,10 +593,10 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
       <p>Added by commit <code>2609bc4</code> ("Pause <a href="../VFACE/VFACE.html">VFACE</a> at chosen steps"… and AREG before
       it). In "Review and manual adjustment," the operator checks the steps where the
       run should stop; the selection is stored in <code>QSettings</code> under
-      <code>AREG/ReviewSteps</code> (<code>AREG.py:1922</code>).</p>
+      <code>AREG/ReviewSteps</code> (<code>AREG.py:2137</code>).</p>
 
       <p><strong>The breakpoints available in CBCT</strong> (<code>getReviewSteps</code>, <code>CBCT.py:258</code>),
-      and what they allow (<code>CATALOGUE</code>, <code>Review.py:568</code>):</p>
+      and what they allow (<code>CATALOGUE</code>, <code>Review.py:578</code>):</p>
 
       <div class="table-wrap">
         <table>
@@ -615,7 +615,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
       <p><strong>Mechanics of the pause.</strong> <code>markProcessesForReview</code>
       (<code>AREG.py:1936</code>) sets <code>ReviewPause=True</code> on the steps whose
       <code>ReviewId</code> is checked. At the end of a CLI run, <code>enterReviewPause</code>
-      (<code>AREG.py:1949</code>) returns <code>True</code> and defers <code>beginReview</code> via
+      (<code>AREG.py:2164</code>) returns <code>True</code> and defers <code>beginReview</code> via
       <code>QTimer.singleShot(0, ...)</code> — mandatory: this happens inside a VTK observer
       callback, where the Qt event loop is not running and where loading a volume would
       fill the stdout pipe that Slicer is no longer draining.</p>
@@ -636,7 +636,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
       <code>sitk.CompositeTransform([original, nudge.GetInverse()])</code> <strong>into the existing
       .tfm</strong> — whatever consumes it downstream applies a single matrix per patient and cannot
       chain them. The scan is then hardened and rewritten in place
-      (<code>Review.py:510</code>). If the matrix is the identity
+      (<code>Review.py:520</code>). If the matrix is the identity
       within 1e-9, nothing is written.</p>
 
       <p><strong>Batch navigation</strong>:</p>
@@ -645,20 +645,20 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
         <li><em>Previous / Next patient</em> (<code>AREG.py:2117</code>): walk the
         queue without ever advancing the run; <code>saveEdits()</code> is called before each
         change, so corrections are kept.</li>
-        <li><em>Flag</em> (<code>AREG.py:2131</code>): marks a patient "to redo".
+        <li><em>Flag</em> (<code>AREG.py:2354</code>): marks a patient "to redo".
         The button only appears if a correctable step exists further back.</li>
         <li><em>Go back</em> (<code>AREG.py:2138</code>): <code>previousCorrectableStep()</code>
-        (<code>AREG.py:2052</code>) walks <code>executed_steps</code> back
+        (<code>AREG.py:2267</code>) walks <code>executed_steps</code> back
         to the last step of type <code>LANDMARKS</code> or <code>REGISTRATION</code> — read-only steps are
         skipped. Intermediate steps are <strong>replayed only for the flagged
-        patients</strong>: <code>restrictStepToPatients</code> (<code>Review.py:727</code>)
+        patients</strong>: <code>restrictStepToPatients</code> (<code>Review.py:737</code>)
         builds a temp folder holding only these patients, via <strong>symbolic
         links</strong> (a CBCT weighs 200 MB), tree structure preserved, then rewrites the
         step's input key (<code>t1_folder</code>, <code>t2_folder</code>, <code>input</code>, <code>inputVolume</code>…:
         <code>INPUT_KEYS</code>, <code>Review.py:717</code>). The narrowed
         steps are inserted at the head of <code>list_Processes_Parameters</code>. The links are
         cleared at the end of the run by <code>clearReviewTempFolders</code>.</li>
-        <li><em>Next step</em> (<code>AREG.py:2181</code>): saves the current
+        <li><em>Next step</em> (<code>AREG.py:2379</code>): saves the current
         patient, logs how many patients were accepted without being opened, and
         resumes the run.</li>
       </ul>
@@ -752,7 +752,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
       <h2 id="environnement">10. Environment</h2>
 
       <p>Everything is installed into Slicer's Python by <code>install_function</code>
-      (<code>AREG.py:86</code>) when the launch button is clicked, after a
+      (<code>AREG.py:87</code>) when the launch button is clicked, after a
       confirmation dialog:</p>
 
       <p><code>itk==5.4.0</code>, <strong><code>itk-elastix==0.19.2</code></strong> (the registration engine),
@@ -840,12 +840,12 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
         is generally non-zero. And the gap is not limited to the <code>.tfm</code>: the output
         volume <strong>is not elastix's own result image</strong>, it is rebuilt by
         <code>ResampleImage(sitk.ReadImage(moving_image_path), transform)</code>
-        (<code>utils.py:686</code>) from that same
+        (<code>utils.py:689</code>) from that same
         matrix. The <code>.tfm</code> and the registered volume are therefore consistent with each
         other, but both drift from what elastix actually optimized.</p>
         <p><code>CenterOfRotationPoint</code> appears <strong>nowhere in the repository</strong> (verified by grep),
         and <code>MatrixRetrieval</code> is <strong>duplicated identically</strong> in
-        <code>MRI2CBCT_CLI/MRI2CBCT_CLI_utils/AREG_MRI.py:78</code>:
+        <code>MRI2CBCT_CLI/MRI2CBCT_CLI_utils/AREG_MRI.py:69</code>:
         the same gap applies to the MRI↔CBCT registration.</p>
       </div>
 
@@ -884,7 +884,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
         <li>A manually corrected <code>.tfm</code> becomes a <code>CompositeTransform</code>, not an
         <code>Euler3DTransform</code>: a downstream consumer that assumes a simple transform
         might fail to read it back.</li>
-        <li>Dead code found: <code>TestReference</code> (<code>CBCT.py:61</code>,
+        <li>Dead code found: <code>TestReference</code> (<code>CBCT.py:65</code>,
         which would call <code>NumberScan</code> with a single argument and raise a <code>TypeError</code>),
         <code>GetSegmentationLabel</code>, <code>getGPUUsage</code>, <code>GetMatrixPatients</code> and <code>ModifiedDictPatients</code>
         (no caller ever passes <code>matrix_folder</code> or <code>todo_str</code>), <code>ElastixReg(initial_transform=...)</code>,

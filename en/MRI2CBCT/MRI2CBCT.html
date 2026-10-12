@@ -128,10 +128,10 @@
 
       <p><strong>Everything runs in Slicer's Python</strong>, no <code>conda run</code> anywhere, unlike
       <a href="../FlexReg/FlexReg.html">FlexReg</a>/AREG_IOS. <code>install_function()</code>
-      (<code>MRI2CBCT.py:78</code>) does a <code>pip_install</code> inside Slicer
+      (<code>MRI2CBCT.py:138</code>) does a <code>pip_install</code> inside Slicer
       itself and is called again at the head of every action. CUDA is optional:
       <code>nnunet_predict</code> tests <code>torch.cuda.is_available()</code> and falls back to <code>-device cpu</code>
-      (<code>condyle_segmentation.py:55</code>).</p>
+      (<code>condyle_segmentation.py:46</code>).</p>
 
       <div class="table-wrap">
         <table>
@@ -244,11 +244,11 @@
 
       <p>"Effectively mandatory" is visible in the code: <code>ElastixReg</code> is called with
       <code>initial_transform=None</code> and <code>NumberOfResolutions = 1</code>
-      (<code>AREG_MRI.py:61</code>), and <code>process_images</code>'s error
+      (<code>AREG_MRI.py:52</code>), and <code>process_images</code>'s error
       message says <em>"PLEASE MAKE SURE THE IMAGES ARE OF SIMILAR SIZE,
       ORIENTATION, AND APPROXIMATED"</em>. The registration inputs also follow a
       strict naming convention, checked by <code>get_corresponding_file</code>
-      (<code>AREG_MRI.py:98</code>):
+      (<code>AREG_MRI.py:89</code>):
       <code>&lt;ID&gt;_CBCT*.nii.gz</code>, <code>&lt;ID&gt;_MR*.nii.gz</code> or <code>&lt;ID&gt;_MRI*.nii.gz</code>, mask
       <code>&lt;ID&gt;_CBCT*.nii.gz</code>. Only <code>.nii.gz</code> is accepted, never <code>.nii</code>.</p>
 
@@ -270,7 +270,7 @@
         <li><code>SetDirection(new_direction)</code> — a 3×3 matrix built from the checkbox
         table, flattened row by row by <code>getCheckboxValuesOrient</code>
         (<code>MRI2CBCT.py:847</code>); default <code>(0,0,-1, 1,0,0, 0,-1,0)</code>
-        (<code>MRI2CBCT.py:866</code>), the value commented
+        (<code>MRI2CBCT.py:949</code>), the value commented
         "USE THIS DIRECTION FOR MRI" at the bottom of the CLI. The table enforces a single
         ±1 per row and per column: only the 48 signed permutation matrices are
         reachable.</li>
@@ -374,7 +374,7 @@
       derived by walking up two levels from the trainer folder.</p>
 
       <p><strong>Preprocessing specific to the module</strong>, <code>detect_side_and_half</code>
-      (<code>condyle_segmentation.py:84</code>):
+      (<code>condyle_segmentation.py:75</code>):
       the center of mass of the MRI's non-zero voxels is compared <strong>in world coordinates</strong>
       to the CBCT's center (<code>cog_w[0] &gt; cbct_mid_w[0]</code> → side <code>Right</code>). The CBCT is split
       in two along axis index 0, the retained half being chosen from the sign of
@@ -457,7 +457,7 @@ mask = biggest_cc(mask)                                  # scipy.ndimage.label</
       <p>The <code>MRI2CBCT_APPROX</code> CLI <strong>registers
       nothing</strong>: it produces a pair of points and a rotation, and the widget finishes the
       job (the CLI has no access to Slicer's modules). <code>approximation()</code>
-      (<code>approximate.py:77</code>), per CBCT/MRI
+      (<code>approximate.py:70</code>), per CBCT/MRI
       pair (folders, or a single file if both inputs are files — "Scene Volume"
       mode):</p>
 
@@ -534,7 +534,7 @@ mask = biggest_cc(mask)                                  # scipy.ndimage.label</
         <li><strong>MRI point</strong> = <code>world_center_of_mass</code>, center of mass of the whole MRI's
         non-zero voxels, in RAS;</li>
         <li><strong>rotation</strong> = <code>compute_rotation_correction</code>
-        (<code>approx_utils.py:38</code>): both images go through
+        (<code>approx_utils.py:29</code>): both images go through
         <code>nib.as_closest_canonical</code>, the 3×3 part of each affine is orthogonalized by SVD
         (<code>U @ Vt</code>), returning <code>R_cbct @ R_mri.T</code>. After recanonicalization the frames
         are already close to RAS: this rotation only catches the residual that is not
@@ -751,7 +751,7 @@ scaled     = normalized * (max_norm - min_norm) + min_norm</code></pre>
         patients.</figcaption>
       </figure>
 
-      <p><strong>Inversion</strong> (<code>mri_inverse.py:19</code>):
+      <p><strong>Inversion</strong> (<code>mri_inverse.py:10</code>):
       <code>inverted = max_intensity − array</code>, then the voxels that were 0 are reset to 0.
       Bone, dark on MRI, becomes bright as on CBCT: the intensity relationship between
       the two modalities becomes roughly monotonic. Suffix <code>_inv</code>, <code>os.listdir</code> so
@@ -775,7 +775,7 @@ scaled     = normalized * (max_norm - min_norm) + min_norm</code></pre>
       </div>
 
       <p><strong>Elastix</strong>, <code>ElastixReg</code>
-      (<code>AREG_MRI.py:49</code>):</p>
+      (<code>AREG_MRI.py:40</code>):</p>
 
       <pre><code>elastix_object = itk.ElastixRegistrationMethod.New(fixed_image, moving_image)
 parameter_object.AddParameterMap(parameter_object.GetDefaultParameterMap("rigid"))
@@ -841,7 +841,7 @@ parameter_object.SetParameter("NumberOfSpatialSamples", "10000")</code></pre>
         is shared with AREG_CBCT.</p>
       </div>
 
-      <p><strong>Application</strong> (<code>AREG_MRI.py:231</code>):</p>
+      <p><strong>Application</strong> (<code>AREG_MRI.py:222</code>):</p>
 
       <pre><code>transformed_mri = sitk.Resample(original_mri_sitk, original_mri_sitk,
                                 transform, sitk.sitkLinear, 0.0, ...)</code></pre>
@@ -884,7 +884,7 @@ parameter_object.SetParameter("NumberOfSpatialSamples", "10000")</code></pre>
       <div class="callout bug">
         <div class="callout-title">Confirmed bug</div>
         <p><strong><code>install_function()</code> always fails.</strong> The dependency list
-        (<code>MRI2CBCT.py:96</code>) contains <code>('nnunet_version', "==2.8.0")</code>;
+        (<code>MRI2CBCT.py:156</code>) contains <code>('nnunet_version', "==2.8.0")</code>;
         that package does not exist on PyPI (<a href="../AMASSS/AMASSS.html">AMASSS</a> correctly declares <code>('nnunetv2','2.8.0')</code>).
         <code>check_lib_installed</code> therefore always returns <code>False</code>: an install dialog on
         every action, a <code>pip_install</code> that raises, <code>errorDisplay</code>, and a <code>False</code> return —
@@ -935,7 +935,7 @@ parameter_object.SetParameter("NumberOfSpatialSamples", "10000")</code></pre>
         <div class="callout-title">Confirmed bug</div>
         <p><strong>T2 without T1 breaks the resample</strong>: <code>mri_output_folder</code> / <code>cbct_output_folder</code> are
         only defined in the T1 branch
-        (<code>MRI2CBCT_RESAMPLE_CBCT_MRI.py:157</code>) → <code>NameError</code>.</p>
+        (<code>MRI2CBCT_RESAMPLE_CBCT_MRI.py:162</code>) → <code>NameError</code>.</p>
       </div>
 
       <div class="callout warn">
@@ -975,7 +975,7 @@ parameter_object.SetParameter("NumberOfSpatialSamples", "10000")</code></pre>
 
       <ul>
         <li><code>run_script_get_transformation</code> and <code>run_script_crop_volumes</code>
-        (<code>MRI2CBCT_APPROX.py:63</code>) are
+        (<code>MRI2CBCT_APPROX.py:67</code>) are
         never called; <code>main()</code> only runs the first step, and the XML parameters
         <code>mean_folder</code> / <code>ROI_file</code> are commented out. The import
         <code>from MRI2CBCT_CLI_utils import approximation, get_transformation, crop_volume</code>
@@ -999,8 +999,8 @@ parameter_object.SetParameter("NumberOfSpatialSamples", "10000")</code></pre>
         never used — but it requires <code>nnunetv2</code> to be importable inside Slicer even though
         prediction goes through a subprocess.</li>
         <li><code>run_resample</code> exists twice:
-        <code>resample.py:243</code> and a copy in
-        <code>MRI2CBCT_RESAMPLE_CBCT_MRI.py:32</code>;
+        <code>resample.py:235</code> and a copy in
+        <code>MRI2CBCT_RESAMPLE_CBCT_MRI.py:37</code>;
         it is the local copy that is actually used.</li>
         <li><code>downloadModel()</code> claims in its docstring to use <code>getModelUrl</code>; it downloads
         a hardcoded <code>TestFile.zip</code>, for the four "Test File" buttons.</li>
@@ -1014,10 +1014,10 @@ parameter_object.SetParameter("NumberOfSpatialSamples", "10000")</code></pre>
           <tbody>
             <tr><td>Interpreter</td><td>Slicer's Python, everywhere (<code>slicer.cli.run</code>, <code>#!/usr/bin/env python-real</code>)</td></tr>
             <tr><td>Conda</td><td>none</td></tr>
-            <tr><td>GPU</td><td>optional, automatic CPU fallback in nnU-Net (<code>condyle_segmentation.py:55</code>)</td></tr>
+            <tr><td>GPU</td><td>optional, automatic CPU fallback in nnU-Net (<code>condyle_segmentation.py:46</code>)</td></tr>
             <tr><td>torch</td><td><code>2.2.0</code>, index <code>download.pytorch.org/whl/cu118</code> (<code>MRI2CBCT.py:117</code>)</td></tr>
             <tr><td>numpy</td><td>pinned to <strong>1.26.4</strong>; <code>numexpr==2.9.0</code></td></tr>
-            <tr><td>pydicom</td><td>pinned to <strong>3.0.2</strong> — downgrading it breaks <code>dicomweb-client</code>, <code>highdicom</code> and every DICOM module in Slicer (<code>MRI2CBCT.py:83</code>)</td></tr>
+            <tr><td>pydicom</td><td>pinned to <strong>3.0.2</strong> — downgrading it breaks <code>dicomweb-client</code>, <code>highdicom</code> and every DICOM module in Slicer (<code>MRI2CBCT.py:143</code>)</td></tr>
             <tr><td>dicom2nifti</td><td><code>2.6.2</code></td></tr>
             <tr><td>Registration</td><td><code>itk-elastix</code> (0.19.2 in Slicer 5.12)</td></tr>
             <tr><td>Other</td><td><code>einops</code>, <code>nibabel</code>, <code>pandas</code>, <code>scikit-learn</code>, <code>torchreg</code>, <code>SimpleITK</code>, <code>psutil</code></td></tr>

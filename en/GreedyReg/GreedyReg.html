@@ -131,7 +131,7 @@
       <div class="callout ok">
         <div class="callout-title">Verified</div>
         <p>The Slicer module never launches <code>greedy</code> itself: it assembles the
-        parameters (<code>Logic.py:286</code>) and lets the CLI do it. The docstring of
+        parameters (<code>Logic.py:288</code>) and lets the CLI do it. The docstring of
         <code>GreedyRegLogic</code> states this explicitly, and it checks out: no
         <code>subprocess</code> in the widget outside of the binary download.</p>
       </div>
@@ -153,7 +153,7 @@
       <div class="callout">
         <div class="callout-title">Note</div>
         <p>Important point for anyone taking this over: there is <strong>no conda
-        environment</strong>. The comment at <code>Logic.py:76</code> says so — the CLI runs
+        environment</strong>. The comment at <code>Logic.py:79</code> says so — the CLI runs
         in Slicer's own Python, so a <code>slicer.util.pip_install</code> issued from the
         widget is immediately visible to the subprocess. No GPU either: greedy is CPU-only.</p>
       </div>
@@ -165,7 +165,7 @@
 
       <p><code>greedyBinaryPath()</code> looks for <code>GreedyReg_CLI/bin/{linux|mac|windows}/greedy[.exe]</code>.
       If it is missing, a red banner offers <code>downloadGreedyBinary()</code>
-      (<code>Logic.py:106</code>), which fetches an <strong>ITK-SNAP 4.2.2</strong> archive from
+      (<code>Logic.py:109</code>), which fetches an <strong>ITK-SNAP 4.2.2</strong> archive from
       SourceForge and extracts only <code>bin/greedy</code> from it:</p>
 
       <div class="table-wrap">
@@ -180,7 +180,7 @@
       </div>
 
       <p>The Windows path is the most fragile, and the code documents this well
-      (<code>Logic.py:161</code>): NSIS's <code>/D=</code> does not support quotes, so the
+      (<code>Logic.py:163</code>): NSIS's <code>/D=</code> does not support quotes, so the
       install happens in <code>%SystemDrive%\_greedyreg_nsis_tmp</code> (a path with no
       spaces), <code>greedy.exe</code> is copied out, then <code>Uninstall.exe /S</code> runs.</p>
 
@@ -236,16 +236,16 @@
       <ul>
         <li>six <code>ctkSliderWidget</code> sliders (rotations ±180°, translations ±200 mm),
         composed in this order: <code>Translate</code> then <code>RotateX</code>,
-        <code>RotateY</code>, <code>RotateZ</code> (<code>GreedyReg.py:1192</code>);</li>
+        <code>RotateY</code>, <code>RotateZ</code> (<code>GreedyReg.py:1135</code>);</li>
         <li>"Center T2 on T1": a pure translation between the centers of the two volumes,
-        computed in IJK then converted to <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> by <code>GetIJKToRASMatrix</code> (<code>Logic.py:381</code>);</li>
+        computed in IJK then converted to <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> by <code>GetIJKToRASMatrix</code> (<code>Logic.py:383</code>);</li>
         <li>Slicer's native handles (<code>SetEditorScalingEnabled(False)</code> → never any
         scaling);</li>
         <li>an admitted prototype, "Sensitivity Demo": a Qt wheel reparented onto the
         Red/Yellow/Green views. The rotation axis depends on the view (Red→Z, Yellow→X,
         Green→Y), dragging outside the wheel translates within the slice plane (0.5 mm/pixel ×
         gain), and the wheel's size tracks the zoom (<code>baseFov / fovMean</code>, clamped to
-        0.55-1.90). The comment at <code>GreedyReg.py:499</code> explains why: the native
+        0.55-1.90). The comment at <code>GreedyReg.py:500</code> explains why: the native
         handles recompute their delta from the raw mouse position, so damping the matrix
         afterward has no visible effect.</li>
       </ul>
@@ -258,7 +258,7 @@
 
       <h3 id="mode-auto">4.2 Automatic mode</h3>
 
-      <p><code>onRunRegistration()</code> (<code>GreedyReg.py:1204</code>) builds a directory
+      <p><code>onRunRegistration()</code> (<code>GreedyReg.py:1147</code>) builds a directory
       tree inside <code>tempfile.mkdtemp()</code>: <code>T1/</code>, <code>T2/</code>,
       <code>INIT/</code>, <code>MASK/</code>, <code>OUTPUT/</code>, exports both volumes under
       the fake identifier <code>CASE0001</code>, writes the init, then calls the CLI in
@@ -273,23 +273,23 @@
 
       <h3 id="mode-distant">4.3 Distant mode</h3>
 
-      <p><code>onRunDistantRegistration()</code> (<code>GreedyReg.py:1406</code>):</p>
+      <p><code>onRunDistantRegistration()</code> (<code>GreedyReg.py:1347</code>):</p>
 
       <ol>
         <li>only one region is kept, by priority order <strong>cranial base &gt; mandible &gt;
-        maxilla</strong> (<code>_selectedDistantRegion</code>, <code>GreedyReg.py:1397</code>):
+        maxilla</strong> (<code>_selectedDistantRegion</code>, <code>GreedyReg.py:1338</code>):
         checking several boxes does not add up their landmarks, the first one found wins;</li>
         <li>both volumes are exported as <code>.nii.gz</code> into a temporary folder;</li>
         <li>a <strong>job queue</strong> for ALI is built: one job per (scan × model
         subfolder), run in series by chaining <code>ModifiedEvent</code> observers
-        (<code>GreedyReg.py:1493</code>);</li>
+        (<code>GreedyReg.py:1433</code>);</li>
         <li>the output json files are read back, coordinates converted <strong><a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a> → RAS</strong>
-        (<code>[-x, -y, z]</code>, <code>Logic.py:517</code>);</li>
+        (<code>[-x, -y, z]</code>, <code>Logic.py:519</code>);</li>
         <li>if ≥ 3 landmarks are common to both scans, <code>rigidFromLandmarks()</code>
         computes a rigid transform by SVD; otherwise an explicit failure.</li>
       </ol>
 
-      <p>Regions and landmarks (<code>REGION_CONFIG</code>, <code>Logic.py:20</code>):</p>
+      <p>Regions and landmarks (<code>REGION_CONFIG</code>, <code>Logic.py:24</code>):</p>
 
       <div class="table-wrap">
         <table>
@@ -355,12 +355,12 @@
       observes a cube of <code>agent_FOV = [64,64,64]</code> voxels, and picks a move from
       <code>MOVEMENTS</code>; the <code>DNet</code> network (a 1024-channel transition layer,
       <code>out_channels = len(MOVEMENTS["id"])</code>) is reloaded per landmark from the
-      folder's <code>.pth</code> files (<code>ALI_CBCT.py:159</code>). Parameters imposed by
-      GreedyReg (<code>Logic.py:471</code>): <code>spacing = [1, 0.3]</code> mm (coarse then
+      folder's <code>.pth</code> files (<code>ALI_CBCT.py:306</code>). Parameters imposed by
+      GreedyReg (<code>Logic.py:473</code>): <code>spacing = [1, 0.3]</code> mm (coarse then
       fine search), <code>speed_per_scale = [1,1]</code>, <code>spawn_radius = 10</code>,
       <code>DCMInput = false</code>.</p>
 
-      <p><strong>The rigid computation</strong> (<code>Logic.py:535</code>) is a
+      <p><strong>The rigid computation</strong> (<code>Logic.py:537</code>) is a
       <span class="badge calcule">computed</span> classic Kabsch: centering,
       <code>H = movingᵀ·fixed</code>, SVD, <code>R = Vᵀ·Uᵀ</code>, reflection correction if
       <code>det(R) &lt; 0</code>, <code>t = c_fixed − R·c_moving</code>. The resulting matrix
@@ -375,7 +375,7 @@
 
       <h2 id="commande">5. The greedy command line</h2>
 
-      <p><code>buildRegistrationCommand()</code> (<code>GreedyReg_CLI.py:100</code>) always
+      <p><code>buildRegistrationCommand()</code> (<code>GreedyReg_CLI.py:104</code>) always
       produces exactly this, with no option exposed beyond the metric and the number of
       degrees of freedom:</p>
 
@@ -476,7 +476,7 @@
       <div class="callout warn">
         <div class="callout-title">Trap</div>
         <p><strong>Pairing.</strong> <code>ID_PATTERN = ^([A-Za-z]+\d+)</code> applied to the
-        file name, uppercased (<code>GreedyReg_CLI.py:37</code>). <code>A01_t1.nii.gz</code>
+        file name, uppercased (<code>GreedyReg_CLI.py:41</code>). <code>A01_t1.nii.gz</code>
         → identifier <code>A01</code>. A pair exists when the same identifier is found in both
         the T1 folder and the T2 folder; masks (<code>.nii</code>/<code>.nii.gz</code>) and
         inits (<code>.mat</code>) are optional and matched by the same identifier. A file named
@@ -489,7 +489,7 @@
 
       <p><strong>Mask.</strong> Exported from a <code>vtkMRMLSegmentationNode</code> or a
       labelmap to <code>.nii.gz</code>, then binarized on the CLI side:
-      <code>(get_fdata() &gt; 0).astype(float32)</code> (<code>GreedyReg_CLI.py:92</code>). All
+      <code>(get_fdata() &gt; 0).astype(float32)</code> (<code>GreedyReg_CLI.py:96</code>). All
       segments of a multi-label segmentation are therefore merged into a single mask. This is
       the only real use of <code>nibabel</code>, along with the affine rewrite of the distant
       batch.</p>
@@ -511,16 +511,16 @@
 
       <p>Two independent batches, which do not do the same thing.</p>
 
-      <p><strong>Automatic batch</strong> (<code>GreedyReg.py:1537</code>). The widget does not
+      <p><strong>Automatic batch</strong> (<code>GreedyReg.py:1477</code>). The widget does not
       loop: it launches a <strong>single</strong> <code>GreedyReg_CLI</code> run over the
       folders, and it is the CLI that iterates (<code>main()</code>,
-      <code>GreedyReg_CLI.py:141</code>), emitting <code>&lt;filter-progress&gt;</code> /
+      <code>GreedyReg_CLI.py:145</code>), emitting <code>&lt;filter-progress&gt;</code> /
       <code>&lt;filter-comment&gt;</code> tags read by Slicer's CLI infrastructure. The output
       folder is <strong>the T2 folder itself</strong>. No mask is binarized upstream, no init
       is passed (<code>initFolder=""</code>): the batch always starts from the nudged identity.
       First case that fails → <code>sys.exit(1)</code> → the whole batch stops.</p>
 
-      <p><strong>Distant batch</strong> (<code>GreedyReg.py:1606</code>). Here, the widget
+      <p><strong>Distant batch</strong> (<code>GreedyReg.py:1545</code>). Here, the widget
       loops case by case, with an <a href="../ALI/ALI.html">ALI</a> job queue per pair. The result is not a registered
       volume but a <strong>rewritten header</strong> (<code>GreedyReg.py:1690</code>):</p>
 
@@ -556,7 +556,7 @@ nib.save(nib.Nifti1Image(movingImg.get_fdata(), newAffine, movingImg.header), ou
       greedy docs, "Affine mode" section).</p>
 
       <p>The "Save Transform Matrix" button does a plain <code>shutil.copy</code> of this file
-      (<code>GreedyReg.py:1288</code>).</p>
+      (<code>GreedyReg.py:1229</code>).</p>
 
       <div class="callout warn">
         <div class="callout-title">Trap</div>
@@ -581,7 +581,7 @@ nib.save(nib.Nifti1Image(movingImg.get_fdata(), newAffine, movingImg.header), ou
       <h2 id="convention">9. Initialization convention: very likely inverted</h2>
 
       <p>Manual mode writes the Slicer transform node's matrix, as-is, into
-      <code>&lt;ID&gt;_init.mat</code> (<code>Logic.py:277</code>).</p>
+      <code>&lt;ID&gt;_init.mat</code> (<code>Logic.py:279</code>).</p>
 
       <ul>
         <li>This matrix is a <code>MatrixTransformToParent</code> applied to the
@@ -628,9 +628,9 @@ nib.save(nib.Nifti1Image(movingImg.get_fdata(), newAffine, movingImg.header), ou
           <thead><tr><th>Item</th><th>Value</th><th>Source</th></tr></thead>
           <tbody>
             <tr><td>Interpreter</td><td>Slicer's Python, for the widget <strong>and</strong> the CLI (<code>#!/usr/bin/env python-real</code>)</td><td><code>GreedyReg_CLI.py:1</code></td></tr>
-            <tr><td>CLI dependency</td><td><code>nibabel</code> alone, installed by <code>ensureNibabelInstalled()</code> after confirmation</td><td><code>Logic.py:82</code></td></tr>
-            <tr><td>Distant mode dependencies</td><td><code>itk</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code>, <code>monai</code> (<code>1.3.2</code> if Python ≥ 3.10, otherwise <code>0.7.0</code>)</td><td><code>Logic.py:336</code></td></tr>
-            <tr><td>torch</td><td><strong>assumed already present</strong> via the extension's NNUNet/PyTorch chain, never installed here</td><td>comment at <code>Logic.py:331</code></td></tr>
+            <tr><td>CLI dependency</td><td><code>nibabel</code> alone, installed by <code>ensureNibabelInstalled()</code> after confirmation</td><td><code>Logic.py:85</code></td></tr>
+            <tr><td>Distant mode dependencies</td><td><code>itk</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code>, <code>monai</code> (<code>1.3.2</code> if Python ≥ 3.10, otherwise <code>0.7.0</code>)</td><td><code>Logic.py:337</code></td></tr>
+            <tr><td>torch</td><td><strong>assumed already present</strong> via the extension's NNUNet/PyTorch chain, never installed here</td><td>comment at <code>Logic.py:332</code></td></tr>
             <tr><td>GPU</td><td>irrelevant for greedy; useful for <a href="../ALI/ALI.html">ALI</a> (<code>torch.cuda.empty_cache()</code> on the ALI side)</td><td>—</td></tr>
             <tr><td>conda / WSL</td><td><strong>none</strong>, unlike most modules in the repository</td><td>—</td></tr>
           </tbody>
@@ -693,7 +693,7 @@ nib.save(nib.Nifti1Image(movingImg.get_fdata(), newAffine, movingImg.header), ou
         <div class="callout-title">Trap</div>
         <p><strong>Silent <a href="../ALI/ALI.html">ALI</a> failure</strong>: <a href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> logs weight problems as
         a warning and exits with code 0. The code guards against this by systematically
-        printing <code>GetOutputText()</code> (<code>GreedyReg.py:1508</code>), but the user
+        printing <code>GetOutputText()</code> (<code>GreedyReg.py:1448</code>), but the user
         only sees "only 0 matched landmarks."</p>
       </div>
 

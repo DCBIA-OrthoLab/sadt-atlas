@@ -135,7 +135,7 @@
       <p>Three steps are <strong>Python functions</strong> run on Slicer's main thread, not CLIs:
       <code>run_aq3dc</code>, <code>run_bds</code> (BatchDentalSegmentator /
       <a class="gterm" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>), <code>batch_process</code> (heatmaps), plus <code>derive_landmarks</code> and
-      <code>postprocess</code>. <code>executeProcess()</code> (<code>VFACE.py:2443</code>) tells the two apart
+      <code>postprocess</code>. <code>executeProcess()</code> (<code>VFACE.py:2454</code>) tells the two apart
       with a battery of nine tests (<code>test1</code>..<code>test9</code>) on the object's type.</p>
 
       <figure class="diagram">
@@ -308,10 +308,10 @@
       Python. The CLIs go through <code>slicer.cli.run</code>; the Python steps run
       <em>on</em> the main thread (the window freezes, hence the explicit message posted
       beforehand, <code>VFACE.py:2482</code>). Only two dependencies are
-      installed by <code>CheckDependency()</code> (<code>VFACE.py:1062</code>):
+      installed by <code>CheckDependency()</code> (<code>VFACE.py:1027</code>):
       <code>joblib</code> and <code>lightgbm</code>. <code>pytorch</code> and nnU-Net come from
       <code>SlicerNNUNetLib</code>. CUDA: <code>run_bds</code> hardcodes <code>device="cuda"</code>
-      (<code>createlistprocess.py:1553</code>),
+      (<code>createlistprocess.py:1555</code>),
       with a CPU fallback handled by <code>Parameter.isSelectedDeviceAvailable()</code>.</p>
 
       <h2 id="entrees">3. Inputs and preprocessing</h2>
@@ -322,7 +322,7 @@
       (<code>VFACE.py:1221</code>) refuses to start on an empty folder.</p>
 
       <p><strong>Patient identity</strong>: <code>patientIdFromFileName</code>
-      (<code>functionaq3dc.py:1369</code>) cuts the name
+      (<code>functionaq3dc.py:1370</code>) cuts the name
       on <code>_Scan</code>, <code>_Or</code>, <code>_MAND</code>, <code>_MD</code>, <code>_MAX</code>, <code>_MX</code>, <code>_CB</code>, <code>_lm</code>, <code>_T2</code>, <code>_T1</code>,
       <code>_Cl</code>, <code>.</code>. The same chain is duplicated three times in
       <code>createlistprocess</code> (marked <code>TIMEPOINT-SUFFIX</code>): <strong>only <code>_T1</code>/<code>_T2</code> are
@@ -334,7 +334,7 @@
 
       <p><strong>Centering</strong> (<code>pre_aso_cbct</code>, <code>model_folder=False</code>): purely geometric,
       translation of the volume's center to the origin, plus a <code>.tfm</code> written alongside
-      (<code>PRE_ASO_CBCT.py:217</code>). No
+      (<code>PRE_ASO_CBCT.py:146</code>). No
       network is involved here.</p>
 
       <figure class="diagram">
@@ -385,7 +385,7 @@
       <p><code>semi_aso_cbct</code> does a 3-landmark init then a rigid
       <code>vtkIterativeClosestPointTransform</code> (1000 iterations,
       <code>StartByMatchingCentroidsOn</code>) of the patient's landmarks onto the gold's
-      (<code>utils.py:620</code>), and writes
+      (<code>utils.py:623</code>), and writes
       <code>&lt;pat&gt;_&lt;suffix&gt;_transform.tfm</code> = the inverse of (<a href="../ASO/ASO.html">ASO</a> ∘ centering). After
       that, the <strong>mid-sagittal plane sits at x = 0</strong>, which is the condition for the
       mirror to be valid.</p>
@@ -530,7 +530,7 @@
 
 
       <p><strong>Coordinate system</strong>: everything is in <strong>LPS</strong>. ALI writes
-      <code>"coordinateSystem": "LPS"</code> (<code>io.py:36</code>),
+      <code>"coordinateSystem": "LPS"</code> (<code>io.py:39</code>),
       so does <code>derive_landmarks</code>, and <code>createDictPatient</code> reads the raw <code>position</code>
       field with no conversion. The signs of the measurement components follow directly
       from this (§5.1). The module's only <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a>↔LPS flips are in
@@ -547,7 +547,7 @@
         <table>
           <thead><tr><th>Model</th><th>Origin</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>ALI-CBCT</td><td>release <code>v0.1-v2.0_models</code> (7 zips: Cranial Base, Lower Bones 1/2, Upper Bones v2, teeth)</td><td>RL agents, <code>DNet</code> = <code>monai DenseNet</code> (<code>brain.py:48</code>)</td></tr>
+            <tr><td>ALI-CBCT</td><td>release <code>v0.1-v2.0_models</code> (7 zips: Cranial Base, Lower Bones 1/2, Upper Bones v2, teeth)</td><td>RL agents, <code>DNet</code> = <code>monai DenseNet</code> (<code>brain.py:39</code>)</td></tr>
             <tr><td><a href="../AMASSS/AMASSS.html#modeles">AMASSS</a></td><td><code>AMASSS_CBCT/AMASSS_Models.zip</code></td><td>3D UNet, label map output</td></tr>
             <tr><td>DentalSegmentator</td><td><code>Dataset111_453CT_v100.zip</code> (SlicerDentalSegmentator v1.0.0-alpha)</td><td>nnU-Net 3d_fullres, fold 0</td></tr>
             <tr><td><code>sym_asymm.txt</code>, <code>mand_asym.txt</code>, <code>max_asym.txt</code></td><td>release <code>VFACE/V_FACE_Models.zip</code></td><td><strong>LightGBM</strong>, joblib pickles</td></tr>
@@ -563,13 +563,13 @@
       neighborhood of <code>agent_FOV = [64,64,64]</code>, two scales <code>spacing = [1, 0.3]</code> mm,
       <code>speed_per_scale = [1,1]</code>, <code>spawn_radius = 10</code>. Six possible moves
       (<code>MOVEMENT_MATRIX_6</code>,
-      <code>constants.py:22</code>). Output: one
+      <code>constants.py:29</code>). Output: one
       <code>.mrk.json</code> per anatomical group (<code>CB</code>, <code>U</code>, <code>L</code>, <code>CI</code>), named
       <code>&lt;scan&gt;_lm_Pred_&lt;group&gt;.mrk.json</code>.</p>
 
       <p>The landmarks requested for the measurements are the <strong>deduplicated union</strong> of
       the <code>Point 1</code> / <code>Point 2 / Line</code> columns of the MAND and CB lists
-      (<code>createlistprocess.py:141</code>) —
+      (<code>createlistprocess.py:144</code>) —
       <code>dict.fromkeys</code> keeps a landmark shared by both from triggering two agents.</p>
 
       <h3 id="amasss-masques">4.2 AMASSS — the masks</h3>
@@ -613,7 +613,7 @@
       code but are <strong>never selected</strong> by VFACE: dead code here,
       and their <code>Path(__file__).parent/"Resources"</code> paths are, for that matter, off by
       one level (<code>VFACE_utils/Resources/...</code>), unlike the corrected path of the
-      default model (<code>segmentation_logic.py:457</code>).</p>
+      default model (<code>segmentation_logic.py:469</code>).</p>
 
       <h3 id="areg-cbct">4.4 The registration — AREG-CBCT</h3>
 
@@ -621,7 +621,7 @@
 
       <p><code>VoxelBasedRegistration</code> masks T1 with the corresponding AMASSS mask then
       launches <strong>rigid Elastix</strong> (<code>make_rigid_param_map_deterministic</code>,
-      <code>utils.py:527</code>): 3 resolutions,
+      <code>utils.py:530</code>): 3 resolutions,
       pyramid <code>8,8 4,4 2,2</code>, <code>AdvancedMattesMutualInformation</code> 64 bins,
       <code>ConjugateGradient</code> 1500 iterations, <code>ImageSampler = Grid</code>,
       <code>NumberOfThreads = 1</code> (determinism). No learning.</p>
@@ -686,7 +686,7 @@
       (<code>R</code>/<code>L</code>, <code>A</code>/<code>P</code>, <code>S</code>/<code>I</code> for skeletal measurements; <code>M</code>/<code>D</code>, <code>B</code>/<code>L</code>, <code>E</code>/<code>I</code>
       for teeth; <code>ClockWise</code>/<code>CounterC</code> for T1↔T2 angles). The returned
       <code>*_Component</code> values are <strong>absolute values</strong>; it is <code>reorganizeStat</code>
-      (<code>createlistprocess.py:1597</code>) that
+      (<code>createlistprocess.py:1599</code>) that
       gives them back a sign from the label.</p>
 
       <div class="callout warn">
@@ -705,7 +705,7 @@
       <p>Outside the repository, downloaded by the <em>Default</em> button into
       <code>&lt;Documents&gt;/SlicerDownloads/V_FACE/DefaultList</code>. The file name decides
       its role (<code>SplitMeasurements</code>,
-      <code>createlistprocess.py:1829</code>):
+      <code>createlistprocess.py:1831</code>):
       <code>CB</code>/<code>CRANIAL</code>, <code>MAND</code>/<code>MANDIBLE</code>, <code>MAX</code>/<code>MAXILLA</code>, <code>FEAT</code>/<code>FEATURE</code>.</p>
 
       <div class="table-wrap">
@@ -742,7 +742,7 @@
       <div class="callout warn">
         <div class="callout-title">Trap</div>
         <p><code>create_list_landmark</code>
-        (<code>createlistprocess.py:2054</code>) does
+        (<code>createlistprocess.py:2056</code>) does
         <code>pd.read_excel(path)</code> <strong>without <code>sheet_name=None</code></strong>: only the first sheet is
         read. A landmark appearing only in the <code>Angle between 2 lines</code> sheet would
         never be requested from ALI. It does not show up with the default list
@@ -777,7 +777,7 @@ moved = from_centred.TransformPoint(to_centred.TransformPoint(p))</code></pre>
       are dropped, so <code>Measurements_MAND.xlsx</code> and <code>Measurements_MAX.xlsx</code> have
       no angular columns.</p>
 
-      <p><code>postprocess</code> (<code>createlistprocess.py:2540</code>)
+      <p><code>postprocess</code> (<code>createlistprocess.py:2546</code>)
       takes the reverse path: it <strong>decodes each column name of <code>features.xlsx</code></strong>
       to figure out which row of which xlsx to read.</p>
 
@@ -950,7 +950,7 @@ moved = from_centred.TransformPoint(to_centred.TransformPoint(p))</code></pre>
         <li><strong><code>REGISTRATION</code></strong>: <code>setUpAdjustment</code> overlays the registered scan at
         half opacity onto T1, attaches it to a <code>vtkMRMLLinearTransformNode</code> with
         interaction handles. At <code>Continue</code>, <code>saveAdjustedRegistration</code>
-        (<code>VFACE.py:2126</code>) converts the RAS displacement to LPS
+        (<code>VFACE.py:2207</code>) converts the RAS displacement to LPS
         (<code>flip = diag(-1,-1,1)</code>, <code>lps = flip @ ras @ flip</code>) and <strong>composes it into
         AREG's own <code>.tfm</code></strong>:
         <code>sitk.CompositeTransform([areg, nudge.GetInverse()])</code>, because <a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a>
@@ -967,7 +967,7 @@ moved = from_centred.TransformPoint(to_centred.TransformPoint(p))</code></pre>
       volume would fill Slicer's stdout pipe with no reader (the same family of bug as
       <code>_briefCliOutput</code> and <code>outputToFile</code>).</p>
 
-      <p><code>buildPauseQueue</code> (<code>VFACE.py:1713</code>) filters the files
+      <p><code>buildPauseQueue</code> (<code>VFACE.py:1813</code>) filters the files
       found by <strong>patient identity</strong>, never by date: a reused output folder
       contains the patients from earlier runs. <code>belongsToRun</code> accepts an id
       that extends an expected id at a <code>_</code> boundary (heatmaps come out as
@@ -1161,7 +1161,7 @@ if not output or not os.path.isabs(output) or not os.path.isdir(output):
         <li><strong>The Python steps freeze the interface.</strong> No thread: <code>startPythonProcess</code>
         calls the function directly, with fd 1 and 2 redirected to a temporary file
         (<code>outputToFile</code>,
-        <code>VFACE.py:2537</code>) — torch and nnU-Net write from
+        <code>VFACE.py:2548</code>) — torch and nnU-Net write from
         C, where replacing <code>sys.stdout</code> would not be enough.</li>
         <li><strong>The <code>spacing</code> parameter is passed as a Python list</strong> (<code>[0.3,0.3,0.3]</code>) to a
         parameter declared <code>&lt;string&gt;</code> in the XML, and the CLI does <code>spacing.split(",")</code>.
@@ -1170,7 +1170,7 @@ if not output or not os.path.isabs(output) or not os.path.isdir(output):
         <li><strong>Notable dead code</strong>: the whole <code>AQ3DCWidget</code> widget (~1200 lines of
         <code>functionaq3dc.py</code>, never instantiated outside
         tests); <code>Measure.isUtilMeasure</code> (the call is commented out,
-        <code>functionaq3dc.py:2182</code>);
+        <code>functionaq3dc.py:2183</code>);
         <code>check_skeletal</code> and <code>SKELETAL_LM_RL</code> in
         <code>Measure.py</code>; <code>GetDictPatients</code> /
         <code>GetMatrixPatients</code>; the <code>T1</code>/<code>T2</code> variables computed and never used

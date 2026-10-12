@@ -154,7 +154,7 @@
       <p><strong><a href="../ALI/ALI.html#ali-ios">ALI_IOS</a> is never called.</strong> <code>Auto_IOS.getALIModelList()</code>
       (<code>IOS.py:161</code>) exists and points to a weights release,
       but <code>SearchModelALI</code> is gated by <code>if self.type == "CBCT"</code>
-      (<code>ASO.py:961</code>, <code>ASO.py:1030</code>), and <code>SwitchMode</code>
+      (<code>ASO.py:990</code>, <code>ASO.py:1071</code>), and <code>SwitchMode</code>
       hides the field in both IOS modes. In IOS, the anchor points are not
       predicted landmarks but <strong>tooth centroids</strong>.</p>
 
@@ -257,7 +257,7 @@
       </div>
 
       <p>The automatic mode is therefore just the semi mode preceded by generating the
-      missing landmarks (<code>CBCT.py:489</code>).</p>
+      missing landmarks (<code>CBCT.py:490</code>).</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 760 210" role="img" aria-label="Comparison of ASO_CBCT's two modes: Fully-Automated chains recentering, network landmark prediction, then orientation; Semi-Automated jumps directly to orientation on supplied fiducials">
@@ -311,7 +311,7 @@
       <h3 id="pre-aso-cbct">4.2 PRE_ASO_CBCT — recentering, no more network <span class="badge calcule">computed</span></h3>
 
       <p>Despite its name and its six arguments, this CLI now does only one thing
-      (<code>PRE_ASO_CBCT.py:163</code>):</p>
+      (<code>PRE_ASO_CBCT.py:92</code>):</p>
 
       <pre><code>T = -np.array(img.TransformContinuousIndexToPhysicalPoint(np.array(img.GetSize()) / 2.0))
 translation = sitk.TranslationTransform(3); translation.SetOffset(T.tolist())
@@ -325,14 +325,14 @@ img_trans = ResampleImage(img, translation.GetInverse())</code></pre>
 
       <p>The arguments <code>model_folder</code>, <code>SmallFOV</code> and <code>temp_folder</code> are parsed and never
       used. <code>PreASOResample</code>
-      (<code>ResamplePreASO.py:199</code>, an isotropic
+      (<code>ResamplePreASO.py:196</code>, an isotropic
       128³ resampling) is imported but never called, and <code>DenseNet</code>
-      (<code>Net.py:39</code>, a 3D monai <code>DenseNet169</code>
+      (<code>Net.py:30</code>, a 3D monai <code>DenseNet169</code>
       regressing a unit direction vector via cosine loss) is commented out in
       <code>__init__.py</code>. <strong>There is no longer any
       pre-orientation network in ASO_CBCT at all</strong>: its training code remains, the
       <code>PreASOModels.zip</code> weights are still downloaded and validated
-      (<code>CBCT.py:133</code>, <code>TestModel</code> requires a <code>.ckpt</code>), for
+      (<code>CBCT.py:126</code>, <code>TestModel</code> requires a <code>.ckpt</code>), for
       nothing.</p>
 
       <p>Output: the recentered volume under its original name, and
@@ -341,7 +341,7 @@ img_trans = ResampleImage(img, translation.GetInverse())</code></pre>
 
       <div class="callout bug">
         <div class="callout-title">Confirmed bug</div>
-        <p><code>convertdicom2nifti</code> (<code>utils.py:504</code>) tries
+        <p><code>convertdicom2nifti</code> (<code>utils.py:507</code>) tries
         <code>sitk.ImageSeriesReader</code> then falls back to <code>dicom2nifti</code>. This fallback is broken:
         it calls <code>search(output_folder, "nii.gz")</code>, but <code>search</code>
         (<code>utils.py:189</code>) is declared as
@@ -356,7 +356,7 @@ img_trans = ResampleImage(img, translation.GetInverse())</code></pre>
       constants (<code>CBCT.py:515</code>): <code>spacing="[1,0.3]"</code>,
       <code>speed_per_scale="[1,1]"</code>, <code>agent_FOV="[64,64,64]"</code>, <code>spawn_radius="10"</code>, and
       <code>lm_type</code> reformatted into a literal Python list by <code>format_lm_string</code>
-      (<code>CBCT.py:481</code>). ALI_CBCT is a two-scale <strong>search
+      (<code>CBCT.py:482</code>). ALI_CBCT is a two-scale <strong>search
       agent</strong> system (1 mm then 0.3 mm, a <a class="gterm" href="../glossary.html#g-fov" title="See glossary">FOV</a> 64³ voxels around
       the agent); it writes <strong>one json per anatomical group</strong>,
       <code>&lt;id&gt;_lm_Pred_&lt;group&gt;.mrk.json</code>
@@ -388,7 +388,7 @@ img_trans = ResampleImage(img, translation.GetInverse())</code></pre>
       <strong>2500 draws</strong>, whichever comes first.</p>
 
       <p><strong>c) The initialization</strong>, <code>InitICP</code>
-      (<code>utils.py:649</code>):</p>
+      (<code>utils.py:652</code>):</p>
 
       <ol>
         <li>translation bringing <code>A_source</code> onto <code>A_target</code>;</li>
@@ -402,7 +402,7 @@ img_trans = ResampleImage(img, translation.GetInverse())</code></pre>
         angle computed from <code>C</code>.</li>
       </ol>
 
-      <p><code>RotationMatrix</code> (<code>utils.py:921</code>) is the
+      <p><code>RotationMatrix</code> (<code>utils.py:936</code>) is the
       quaternion-based Rodrigues formula, identical to the one in <a href="../FlexReg/FlexReg.html">FlexReg</a> and ASO_IOS.
       A crucial point: <code>TransformMatrix = RotationTransformMatrix  # @ TranslationTransformMatrix</code>
       — the translation from step 1 is <strong>deliberately excluded</strong> from the returned
@@ -415,7 +415,7 @@ img_trans = ResampleImage(img, translation.GetInverse())</code></pre>
       translation is then zeroed out: <code>TransformMatrixBis[:3, 3] = [0, 0, 0]</code>.</p>
 
       <p><strong>e) Composition.</strong> <code>TransformList</code> accumulates <code>[translation, R2, R3, R_icp]</code>, then
-      (<code>utils.py:803</code>):</p>
+      (<code>utils.py:816</code>):</p>
 
       <pre><code>for i in range(len(TransformList) - 1, 0, -1):   # stops at 1: the translation is discarded
     TransformSITK.AddTransform(TransformList[i])
@@ -428,7 +428,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       This is consistent because PRE_ASO_CBCT centered the volume on that origin — and
       this is precisely what the semi mode lacks.</p>
 
-      <p><code>ResampleImage</code> (<code>utils.py:835</code>) calls
+      <p><code>ResampleImage</code> (<code>utils.py:848</code>) calls
       <code>SetReferenceImage(image)</code>: <strong>same grid, same size, same spacing</strong>,
       linear interpolation, <code>DefaultPixelValue = 0</code>. The volume rotates within its
       existing box, nothing is resampled to a different resolution, and whatever falls
@@ -571,7 +571,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       suffix <code>_Seg</code>; the others go to the input folder to be segmented, with
       exotic formats converted to <code>.vtk</code> along the way.</p>
 
-      <p><strong>b) <a href="../ALI/ALI.html">DentalModelSeg</a></strong> <span class="badge predit">predicted</span>, via conda (<code>IOS.py:275</code>):</p>
+      <p><strong>b) <a href="../ALI/ALI.html">DentalModelSeg</a></strong> <span class="badge predit">predicted</span>, via conda (<code>IOS.py:288</code>):</p>
 
       <pre><code>conda run -n shapeaxi python -m CrownSegmentationcli \
   None &lt;csv&gt; &lt;out&gt; 0 latest 0 Universal_ID 0 Seg &lt;vtk_folder&gt; &lt;dentalmodelseg_path&gt;</code></pre>
@@ -587,7 +587,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <p>The <code>dentalmodelseg_path</code> computed in <code>Process</code> is dead: <code>run_conda_tool</code>
       (<code>ASO.py:1417</code>) replaces it with the result of a
       <code>which dentalmodelseg</code> inside the environment. The <code>if os.path.isfile(path_input)</code>
-      branch (<code>IOS.py:266</code>) is dead too — <code>path_input</code> is
+      branch (<code>IOS.py:279</code>) is dead too — <code>path_input</code> is
       always a folder created by <code>os.makedirs</code> — and it references a <code>self.input</code> that
       does not exist. <code>path_preor</code> is created and never used.</p>
 
@@ -597,7 +597,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       launches <code>slicer.cli.run</code> on the next one.</p>
 
       <p><strong>c) <code>PrePreAso</code> — the orientation</strong> <span class="badge calcule">computed</span>, the core
-      (<code>pre_icp.py:103</code>). <code>organizeLandmark</code> (<code>pre_icp.py:43</code>) sorts the
+      (<code>pre_icp.py:103</code>). <code>organizeLandmark</code> (<code>pre_icp.py:34</code>) sorts the
       3 or 4 chosen teeth into <code>(left, middle(s), right)</code> using the universal
       numbering: on the upper arch (1–16) the number increases from right
       to left, so <code>max → left</code>; on the lower arch (17–32) it's the reverse.</p>
@@ -623,7 +623,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       mesh.</p>
 
       <p><strong>d) The refinement.</strong> <code>ICP([InitIcp(), vtkICP()], option=vtkMeanTeeth(dents))</code>
-      (<code>PRE_ASO_IOS.py:292</code>). The <code>option</code> is
+      (<code>PRE_ASO_IOS.py:346</code>). The <code>option</code> is
       applied to both meshes before the chain runs: <strong>the ICP only ever sees the 3 or
       4 centroids</strong>, never the crown geometry. <code>InitIcp</code>
       (<code>icp.py:136</code>) is the class version of ASO_CBCT's
@@ -670,7 +670,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <p>Landmark names are built by a Cartesian product in the UI:
       <code>{dent}{repère}</code> with repère ∈ <code>O, MB, DB</code> (occlusal) or <code>CB, CL, OIP, R, RIP</code>
       (cervical), then <code>listlandmark2diclandmark</code> splits them by arch based solely on the
-      initial <code>U</code>/<code>L</code> (<code>utils.py:272</code>).</p>
+      initial <code>U</code>/<code>L</code> (<code>utils.py:275</code>).</p>
 
       <p>The matrix obtained from the landmarks is then applied to the full mesh.</p>
 
@@ -754,7 +754,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <p>A checkbox that forces a single arch
       (<code>ASO.py:1850</code>): the chosen arch drives the orientation, and
       <strong>the same matrix is applied to the opposite arch</strong> (<code>file[jaw.inv()]</code>,
-      <code>PRE_ASO_IOS.py:473</code>) to preserve the
+      <code>PRE_ASO_IOS.py:216</code>) to preserve the
       occlusal relationship. Upper/lower pairing is done by file name, via
       <code>Files_vtk_link</code> / <code>Files_vtk_json_semilink</code>
       (<code>data_file.py</code>): the recognized markers
@@ -763,7 +763,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <div class="callout warn">
         <div class="callout-title">Pitfall</div>
         <p><code>UpperOrLower</code>
-        (<code>utils.py:180</code>) <strong>defaults to <code>"Lower"</code></strong> when no marker is found: a
+        (<code>utils.py:183</code>) <strong>defaults to <code>"Lower"</code></strong> when no marker is found: a
         poorly named file is silently treated as mandibular.</p>
       </div>
 
@@ -850,7 +850,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <p>Two distinct regimes, and this is a source of confusion.</p>
 
       <p><strong>The CLIs</strong> run in Slicer's Python. <code>install_function</code>
-      (<code>ASO.py:69</code>) <code>pip_install</code>s whatever is missing there: <code>itk</code>,
+      (<code>ASO.py:74</code>) <code>pip_install</code>s whatever is missing there: <code>itk</code>,
       <code>torch==2.2.0</code>, <code>pytorch_lightning</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code> and
       <code>monai</code> at 1.3.2 (Python ≥ 3.10) or 0.7.0 otherwise.</p>
 
@@ -863,14 +863,14 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       </div>
 
       <p><strong>The conda environment</strong> is only set up for the automatic IOS mode, by
-      <code>onCheckRequirements</code> (<code>ASO.py:1867</code>):</p>
+      <code>onCheckRequirements</code> (<code>ASO.py:2548</code>):</p>
 
       <div class="table-wrap">
         <table>
           <thead><tr><th>Element</th><th>Value</th><th>Source</th></tr></thead>
           <tbody>
-            <tr><td>Env</td><td><code>shapeaxi</code>, shared with <a href="../ALI/ALI.html">ALI</a>, AREG, <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td><code>ASO.py:2415</code></td></tr>
-            <tr><td>Python</td><td><strong>3.12</strong></td><td><code>ASO.py:2417</code></td></tr>
+            <tr><td>Env</td><td><code>shapeaxi</code>, shared with <a href="../ALI/ALI.html">ALI</a>, AREG, <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td><code>ASO.py:2438</code></td></tr>
+            <tr><td>Python</td><td><strong>3.12</strong></td><td><code>ASO.py:2440</code></td></tr>
             <tr><td>Creation</td><td><code>torch>=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td><code>install_shapeaxi</code></td></tr>
             <tr><td>pytorch3d + shapeaxi</td><td>pre-built wheels chosen based on the installed torch version</td><td><code>install_pytorch.py</code></td></tr>
             <tr><td>Windows</td><td>conda via WSL (<code>CondaSetUpCallWsl</code>) + checking for <code>libxrender1</code>, <code>libgl1</code>/<code>libgl1-mesa-glx</code>, <code>libglx-mesa0</code></td><td><code>check_lib_wsl</code></td></tr>
@@ -895,7 +895,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <div class="callout bug">
         <div class="callout-title">Confirmed bug</div>
         <p><strong>The semi-CBCT mode is broken as it stands.</strong>
-        <code>SEMI_ASO_CBCT.py:113</code> requires
+        <code>SEMI_ASO_CBCT.py:207</code> requires
         <code>data["tfm"]</code>, introduced by commit <code>1bfb51f</code> at the same time as the matrix
         output. This <code>.tfm</code> only exists because PRE_ASO_CBCT writes it — but the semi
         mode does not run PRE_ASO_CBCT and works on the user's raw folder.
@@ -904,7 +904,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
         counted as a failure without interrupting the others. The mode therefore only
         works if a <code>.tfm</code> happens to sit next to the scan — typically after a
         prior pass through Fully mode, since
-        <code>PRE_ASO_CBCT.py:217</code> writes its own
+        <code>PRE_ASO_CBCT.py:146</code> writes its own
         into the scan's folder. Verified: <code>GetPatients</code>
         (<code>utils.py:1042</code>) only fills the
         <code>tfm</code> key if a <code>.tfm</code> file is present in the input tree.</p>
@@ -918,7 +918,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
         <p><strong><code>MergeJson</code> deletes files in the input folder.</strong> In semi mode,
         <code>input_dir</code> is the user's folder: all of its <code>.mrk.json</code> files without <code>MERGED</code>
         in their name are merged and then <strong>erased</strong>
-        (<code>utils.py:111</code>).</p>
+        (<code>utils.py:114</code>).</p>
       </div>
 
       <div class="callout warn">
@@ -932,8 +932,8 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <div class="callout warn">
         <div class="callout-title">Pitfall</div>
         <p><strong>Inconsistent minimum landmark count.</strong> The UI requires 3 checked landmarks
-        (<code>TestCheckbox</code>, <code>CBCT.py:85</code>) but <code>ICP</code> bails out
-        as soon as <code>len(list_landmark) &lt;= 3</code> (<code>utils.py:754</code>).
+        (<code>TestCheckbox</code>, <code>CBCT.py:78</code>) but <code>ICP</code> bails out
+        as soon as <code>len(list_landmark) &lt;= 3</code> (<code>utils.py:767</code>).
         So 4 are actually needed, and more if pruning removes some.</p>
       </div>
 
@@ -959,7 +959,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <div class="callout bug">
         <div class="callout-title">Confirmed bug</div>
         <p><strong>Patient identifiers diverge between ASO and AREG.</strong>
-        <code>PatientNumber</code> (<code>utils.py:295</code>) cuts on
+        <code>PatientNumber</code> (<code>utils.py:298</code>) cuts on
         <code>_U</code>/<code>_L</code>, while <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> rebuilds it as <code>patient_id.split("_")[0]</code>
         (<code>AREG_IOS.py:321</code>). A name like <code>P01_T1_U.vtk</code>
         gives <code>P01_T1</code> on one side and <code>P01</code> on the other: ASO's <code>.tfm</code> is never

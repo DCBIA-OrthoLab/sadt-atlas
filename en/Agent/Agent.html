@@ -145,7 +145,7 @@
 
       <div class="callout">
         <div class="callout-title">Dead code</div>
-        <p><code>AgentLogic.process()</code> (<code>Agent.py:1315</code>) reruns the CLI with only
+        <p><code>AgentLogic.process()</code> (<code>Agent.py:1191</code>) reruns the CLI with only
         <code>folders</code> and <code>prompt</code> (missing <code>modeagent</code> and
         <code>temp_folder</code>, both required on the XML side) and reads <code>GetOutputText()</code>
         immediately after a <code>wait=False</code>. Never called.
@@ -175,7 +175,7 @@
       <h3 id="llm">3.1 The LLM — qwen3:8b via Ollama</h3>
 
       <p>A single constant, duplicated at both ends: <code>DEFAULT_MODEL = "qwen3:8b"</code>
-      (<code>utils.py:21</code>) and <code>MODEL_NAME = "qwen3:8b"</code> (<code>Agent.py:18</code>).
+      (<code>utils.py:21</code>) and <code>MODEL_NAME = "qwen3:8b"</code> (<code>Agent.py:29</code>).
       <code>get_router_model()</code> honors a <code>ROUTER_MODEL</code> environment variable that lets you swap
       in any Ollama model without touching the code.</p>
 
@@ -187,7 +187,7 @@
         <tbody>
           <tr><td>Inference engine</td><td><strong>Ollama</strong> (so <a class="gterm" href="../glossary.html#g-llamacpp" title="See glossary">llama.cpp</a> underneath), local HTTP API</td><td><code>import ollama</code>, port 11434</td></tr>
           <tr><td>Weight format</td><td><strong><a class="gterm" href="../glossary.html#g-gguf" title="See glossary">GGUF</a></strong> — imposed by Ollama, no transformers checkpoint</td><td>inferred from the engine</td></tr>
-          <tr><td>Download</td><td><code>ollama pull qwen3:8b</code> from the ollama.com registry</td><td><code>Agent.py:1266</code>, and automatic fallback in <code>chat_with_auto_pull</code></td></tr>
+          <tr><td>Download</td><td><code>ollama pull qwen3:8b</code> from the ollama.com registry</td><td><code>Agent.py:1142</code>, and automatic fallback in <code>chat_with_auto_pull</code></td></tr>
           <tr><td>Size / <a class="gterm" href="../glossary.html#g-quantification" title="See glossary">quantization</a></td><td>default tag: <strong>5.2 GB, Q4_K_M, 8.19 G parameters</strong></td><td>not determinable from the repository: read on <a href="https://ollama.com/library/qwen3">ollama.com/library/qwen3</a></td></tr>
           <tr><td>CPU or GPU</td><td><strong>decided by Ollama, not by the code</strong></td><td>see below</td></tr>
         </tbody>
@@ -198,19 +198,19 @@
         <p>The module never passes a device directive. The Ollama binary decides, and the code draws an explicit
         consequence from that: on Linux, an Ollama installed via <strong>snap</strong> is sandboxed, does not see
         the NVIDIA GPU, and falls back to CPU — <strong>80–90 s per response</strong> for an 8B model, a figure
-        measured and hardcoded in the code (<code>Agent.py:1231</code>). The module detects <code>/snap/</code>
+        measured and hardcoded in the code (<code>Agent.py:1107</code>). The module detects <code>/snap/</code>
         in the binary's <code>realpath</code> and warns about it, without being able to fix it (the snap server
         already holds port 11434, and removing it needs sudo).</p>
       </div>
 
-      <p>When no Ollama is found, <code>install_official_ollama()</code> (<code>Agent.py:101</code>) downloads
+      <p>When no Ollama is found, <code>install_official_ollama()</code> (<code>Agent.py:111</code>) downloads
       the official portable archive into <code>~/.slicer_agent/ollama</code> (overridable via
       <code>SLICER_AGENT_HOME</code>): <code>ollama-linux-{amd64,arm64}.tgz</code>,
       <code>ollama-windows-{amd64,arm64}.zip</code>, or <code>Ollama-darwin.zip</code>, extracted with
       <code>ditto</code> and then de-quarantined with <code>xattr</code>. These archives bundle the CUDA/Metal
       libraries, hence the deliberate choice not to use <code>curl | sudo sh</code> (no root password from the
       GUI) nor the snap package. <code>LD_LIBRARY_PATH</code> is pointed at
-      <code>&lt;install&gt;/lib/ollama</code> so the binary finds its own libs (<code>Agent.py:56</code>).</p>
+      <code>&lt;install&gt;/lib/ollama</code> so the binary finds its own libs (<code>Agent.py:67</code>).</p>
 
       <p>Only two call settings, in <code>chat_with_auto_pull</code> (<code>utils.py:96</code>):</p>
       <ul>
@@ -340,7 +340,7 @@ Rules:
       <div class="callout warn">
         <div class="callout-title">Path resolution is entirely delegated to the LLM</div>
         <p>The widget passes the list of items dropped into the drop zone, joined with commas
-        (<code>Agent.py:790</code>); the CLI splits it back on <code>,</code> and wraps it:</p>
+        (<code>Agent.py:770</code>); the CLI splits it back on <code>,</code> and wraps it:</p>
         <pre><code>FOLDERS_CONTEXT:
 &lt;one path per line&gt;
 
@@ -420,7 +420,7 @@ Rules:
       <code>build_cli_args</code>, an <code>old -&gt; new</code> diff is displayed, and <strong>a new Yes/No
       confirmation</strong> is required. If the diff is empty, the loop stops.</p>
 
-      <p><code>_suggestFixFor</code> (<code>Agent.py:903</code>) supplements this with a non-LLM, keyword-based
+      <p><code>_suggestFixFor</code> (<code>Agent.py:1240</code>) supplements this with a non-LLM, keyword-based
       diagnosis: missing Ollama model, <code>ModuleNotFoundError</code>,
       <code>NameError: name 'nn' is not defined</code> (a known regression in <code>transformers&gt;=4.53.0</code>,
       huggingface/transformers#43784), <code>Numpy is not available</code> (numpy 2 ABI clash against the torch
@@ -584,7 +584,7 @@ Rules:
 
       <h2 id="environnement">11. Environment</h2>
 
-      <p><code>CheckDependencies</code> (<code>Agent.py:1141</code>) runs a
+      <p><code>CheckDependencies</code> (<code>Agent.py:16</code>) runs a
       <code>slicer.util.pip_install</code> inside Slicer's Python, <strong>in this order, which matters</strong>:</p>
 
       <div class="table-wrap"><table>
@@ -605,7 +605,7 @@ Rules:
       (<code>_ollama_responding</code>, 0.5 s timeout), relaunched if needed via
       <code>Popen([binary, "serve"])</code> with a wait of up to ~30 s in 500 ms steps while keeping the UI
       alive. <code>ensure_agent_ollama_running()</code> is called again <strong>before every message</strong>
-      (<code>Agent.py:772</code>), because a server launched by the module does not survive a Slicer
+      (<code>Agent.py:752</code>), because a server launched by the module does not survive a Slicer
       restart.</p>
 
       <p>Windows: <code>CREATE_NO_WINDOW</code> so as not to flash a console window. No WSL, unlike the rest of
@@ -634,11 +634,11 @@ Rules:
         <li><strong>The history mixes UI prose with routing context</strong>: chat bubbles are sent back as-is
         as <code>assistant</code> turns to a router constrained to JSON.</li>
         <li><strong><code>OnRetrieveButton</code> rebuilds the history by splitting on the emoji</strong>
-        <code>👨:</code> / <code>🤖:</code> (<code>Agent.py:1126</code>): a message containing these characters
+        <code>👨:</code> / <code>🤖:</code> (<code>Agent.py:1004</code>): a message containing these characters
         desynchronizes the alternation.</li>
         <li><strong>Theme detection by pixel sampling</strong> (<code>widget.grab()</code>, luminance of pixel
         (5,5)), because <code>QPalette</code> returns light-theme colors even under a dark theme in Slicer
-        (<code>Agent.py:656</code>). It works, but depends on the timing of the first render — hence the
+        (<code>Agent.py:649</code>). It works, but depends on the timing of the first render — hence the
         <code>QTimer.singleShot(0, ...)</code> in <code>setup</code>.</li>
         <li><strong>Dead code</strong>: <code>AgentLogic.process()</code>, <code>build_tool_spec()</code> (and
         all the <code>patterns</code>/<code>defaults</code> support around it), <code>ValidationReport</code>,

@@ -141,7 +141,7 @@
       any version change ripples through all of them.</p>
 
       <p>The model json is read <strong>from the <code>main</code> branch on GitHub</strong>, not from the
-      local copy (<code>DOCShapeAXI_CLI.py:118</code>): an installed version can download
+      local copy (<code>DOCShapeAXI_CLI.py:121</code>): an installed version can download
       weights published after it.</p>
 
       <h2 id="fichiers">2. Files involved</h2>
@@ -170,12 +170,12 @@
 
       <p>The CLI flat-lists <code>args.input_dir</code>, keeps the <code>.vtk</code> files, and writes
       <code>&lt;output_dir&gt;/files_&lt;data_type&gt;.csv</code> with the header <code>surf</code> and <strong>one file name
-      per line</strong> (<code>csv_edit</code>, <code>DOCShapeAXI_CLI.py:102</code>).
+      per line</strong> (<code>csv_edit</code>, <code>DOCShapeAXI_CLI.py:105</code>).
       Paths are relative; <code>SaxiDataset</code> joins them with <code>mount_point = input_dir</code>.</p>
 
       <p><code>data_type</code> contains spaces ("Mandibular Condyle"), so the csv is named
       <code>files_Mandibular Condyle.csv</code>. The csv is <strong>regenerated only if it does not
-      already exist</strong> (<code>DOCShapeAXI_CLI.py:282</code>): adding
+      already exist</strong> (<code>DOCShapeAXI_CLI.py:285</code>): adding
       meshes to the input folder without emptying the output folder will not get them
       processed.</p>
 
@@ -197,7 +197,7 @@
         <div class="callout-title">Confirmed bug (shapeaxi package)</div>
         <p>Worth knowing: <code>saxi_predict</code> reads <code>model.hparams.scale_factor</code> (0.0507 in
         the condyles checkpoint) and passes it to <code>EvalTransform(scale_factor)</code>
-        (<code>DOCShapeAXI_CLI.py:206</code>), but
+        (<code>DOCShapeAXI_CLI.py:209</code>), but
         <code>UnitSurfTransform.__call__</code> calls <code>utils.GetUnitSurf(surf)</code> <strong>without
         forwarding it</strong> when the input is a <code>vtkPolyData</code>. The scale factor learned at
         training time is therefore <strong>silently ignored at inference</strong>, replaced by a
@@ -402,7 +402,7 @@ predictions.append(x)</code></pre>
         <div class="callout-title">Note</div>
         <p>This is the module's most distinctive part, and it runs <strong>systematically</strong>
         after prediction — neither an option nor a checkbox
-        (<code>saxi_gradcam</code>, <code>DOCShapeAXI_CLI.py:126</code>).</p>
+        (<code>saxi_gradcam</code>, <code>DOCShapeAXI_CLI.py:129</code>).</p>
       </div>
 
       <figure class="diagram">
@@ -474,7 +474,7 @@ mv_cam = LayerGradCam(model, target_layer[-1], device_ids=[0])</code></pre>
       channel dimension, which is collapsed right after by <code>mv_att.sum(dim=1)</code>.</p>
 
       <p><strong>c) Rescaling</strong> (<code>scale_cam_image</code>,
-      <code>DOCShapeAXI_CLI.py:43</code>, adapted from
+      <code>DOCShapeAXI_CLI.py:46</code>, adapted from
       pytorch-grad-cam): <code>cv2.resize</code> to <strong>224×224</strong>, clipping at the <strong>1st and 99th
       percentiles</strong>, then an affine remap into <strong>[-1, 1]</strong>. Percentile clipping keeps
       one outlier pixel from swamping the whole dynamic range; the output is therefore
@@ -548,7 +548,7 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
       </div>
 
       <p>The column accumulation is intentional
-      (<code>DOCShapeAXI_CLI.py:240</code>): if the prediction csv already exists, it is
+      (<code>DOCShapeAXI_CLI.py:243</code>): if the prediction csv already exists, it is
       <strong>read back in</strong> and used as a base, which is why an airway dataset ends up with
       <code>binary_prediction</code>, <code>severity_prediction</code> and
       <code>regression_prediction</code> side by side. Corollary: rerunning on the same output
@@ -556,7 +556,7 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
 
       <p>The log is a <strong>single-line file rewritten each time</strong> (<code>'w+'</code> for every subject);
       the widget watches its <code>mtime</code> and resets the progress bar to zero when the
-      <code>predict</code>/<code>explainability</code> field changes (<code>DOCShapeAXI.py:694</code>).</p>
+      <code>predict</code>/<code>explainability</code> field changes (<code>DOCShapeAXI.py:697</code>).</p>
 
       <h2 id="predit-calcule">7. What is predicted vs. what is computed</h2>
 
@@ -591,13 +591,13 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
         <table>
           <thead><tr><th>Item</th><th>Value</th><th>Source</th></tr></thead>
           <tbody>
-            <tr><td>Conda env</td><td><code>shapeaxi</code>, <strong>shared</strong> with <a href="../ALI/ALI.html">ALI</a>/AREG/ASO/FlexReg</td><td><code>DOCShapeAXI.py:801</code></td></tr>
+            <tr><td>Conda env</td><td><code>shapeaxi</code>, <strong>shared</strong> with <a href="../ALI/ALI.html">ALI</a>/AREG/ASO/FlexReg</td><td><code>DOCShapeAXI.py:804</code></td></tr>
             <tr><td>Python</td><td><strong>3.12</strong></td><td><code>DOCShapeAXI.py:842</code></td></tr>
             <tr><td>Env creation</td><td><code>torch&gt;=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td>same</td></tr>
             <tr><td>pytorch3d</td><td>wheel chosen from <code>torch.__version__</code> + CUDA, from <code>https://ImageMindAnalytics.github.io/pytorch3d-wheels/simple/</code></td><td><code>install_pytorch.py:24</code></td></tr>
             <tr><td>shapeaxi</td><td><code>shapeaxi&gt;=2.0.2</code>, installed <strong>after</strong> pytorch3d</td><td><code>install_pytorch.py:186</code></td></tr>
             <tr><td>Patch</td><td><code>patch_dentalmodelseg()</code> rewrites <code>saxi_nets.DentalModelSeg</code> → <code>saxi_nets_lightning.DentalModelSeg</code> in the installed package</td><td><code>install_pytorch.py:210</code></td></tr>
-            <tr><td>GPU</td><td>not mandatory (<code>torch.device('cuda' if …)</code>) but <code>LayerGradCam(..., device_ids=[0])</code> assumes GPU 0</td><td><code>DOCShapeAXI_CLI.py:148</code></td></tr>
+            <tr><td>GPU</td><td>not mandatory (<code>torch.device('cuda' if …)</code>) but <code>LayerGradCam(..., device_ids=[0])</code> assumes GPU 0</td><td><code>DOCShapeAXI_CLI.py:151</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -650,11 +650,11 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
         regardless.</li>
         <li><strong>The model download is conditioned on the output folder already
         existing</strong> (<code>if os.path.exists(args.output_dir): if not os.path.exists(...)</code>,
-        <code>DOCShapeAXI_CLI.py:277</code>). If the folder
+        <code>DOCShapeAXI_CLI.py:280</code>). If the folder
         does not exist, the download is <strong>skipped</strong> and the error surfaces later, at
         checkpoint loading. The CLI never creates <code>output_dir</code>.</li>
         <li><strong><code>process.log</code> is written inside the module's own tree</strong>
-        (<code>os.path.dirname(__file__)</code>, <code>DOCShapeAXI.py:811</code>),
+        (<code>os.path.dirname(__file__)</code>, <code>DOCShapeAXI.py:814</code>),
         and the empty file <code>DOCShapeAXI/process.log</code> is
         checked into the repository. On a read-only install (<code>/opt</code>,
         <code>Program Files</code>), creating the <code>DOCShapeAXILogic</code> raises an exception.</li>
@@ -662,7 +662,7 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
 
       <div class="callout bug">
         <div class="callout-title">Confirmed bug</div>
-        <p><strong><code>gradcam_save()</code></strong> (<code>DOCShapeAXI_CLI.py:62</code>)
+        <p><strong><code>gradcam_save()</code></strong> (<code>DOCShapeAXI_CLI.py:65</code>)
         calls <code>shutil.copy</code> while <code>shutil</code> is <strong>never imported</strong> in the file.
         Harmless: the function is never called. Same for the classes
         <code>MultiHead</code> and <code>SelfAttention</code> defined near the top of the CLI
@@ -682,7 +682,7 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
         driven mainly by the point-cloud geometry will produce an uninformative
         multi-view map, with nothing flagging it.</li>
         <li><strong><code>num_workers=4</code></strong> in the explainability DataLoader
-        (<code>DOCShapeAXI_CLI.py:144</code>) while
+        (<code>DOCShapeAXI_CLI.py:147</code>) while
         prediction uses none: four processes read the <code>.vtk</code> files in parallel
         while the GPU renders 42 views.</li>
         <li><strong>Model selection goes through the words of the combo label.</strong> Renaming

@@ -100,17 +100,17 @@
               <td>affine / rigid</td>
             </tr>
             <tr>
-              <td><code>SEMI_ASO_CBCT.py:176</code></td>
+              <td><code>SEMI_ASO_CBCT.py:111</code></td>
               <td><code>&lt;patient&gt;_&lt;add_name&gt;_transform.tfm</code></td>
               <td><strong><code>sitk.CompositeTransform</code></strong> (<code>utils.py:802</code>)</td>
             </tr>
             <tr>
-              <td><code>AREG_MRI.py:227</code></td>
+              <td><code>AREG_MRI.py:218</code></td>
               <td><code>&lt;mri&gt;_reg_transform.tfm</code></td>
               <td>composite</td>
             </tr>
             <tr>
-              <td><code>Review.py:499</code> and <code>VFACE.py:2168</code></td>
+              <td><code>Review.py:509</code> and <code>VFACE.py:2249</code></td>
               <td>registration + manual nudge</td>
               <td><code>CompositeTransform([areg, nudge.GetInverse()])</code></td>
             </tr>
@@ -207,7 +207,7 @@ except Exception as e:
         <li><strong>Volumes</strong> (<code>Automatrix_CLI.py:209</code>):
         <code>resampler.SetTransform(transform)</code> — the transformation is passed
         as-is, the content moves by <code>T⁻¹</code>.</li>
-        <li><strong>Landmarks</strong> (<code>Automatrix_CLI.py:176</code>):
+        <li><strong>Landmarks</strong> (<code>Automatrix_CLI.py:181</code>):
         <pre><code>tfm_inverted = transform.GetInverse()
 point['position'] = list(tfm_inverted.TransformPoint(point['position']))</code></pre>
         <code>T⁻¹</code> is explicitly applied to the point, so it moves like the volume's
@@ -291,7 +291,7 @@ point['position'] = list(tfm_inverted.TransformPoint(point['position']))</code><
         <code>ASO_CBCT/utils.py:278</code>,
         <code>AREG_CBCT/utils.py:373</code>,
         <code>ALI_IOS/io.py:85</code>,
-        <code>mgl_patch.py:193</code>,
+        <code>mgl_patch.py:184</code>,
         <code>VFACE/functionaq3dc.py#L1733</code>. This is also
         Slicer's default on write. So <code>point['position']</code> is already in LPS, and
         applying it directly to an ITK transformation is correct.</li>
@@ -301,7 +301,7 @@ point['position'] = list(tfm_inverted.TransformPoint(point['position']))</code><
         <div class="callout-title">Pitfall</div>
         <p>The fragile part is that <strong>the <code>coordinateSystem</code> field is never
         read</strong>. <a href="../FlexReg/FlexReg.html">FlexReg</a> does
-        read it (<code>FlexReg.py:2434</code>); AutoMatrix does not. A json
+        read it (<code>FlexReg.py:2447</code>); AutoMatrix does not. A json
         declaring <code>"coordinateSystem": "RAS"</code> — which older annotations or other
         tools write — will be transformed with x and y of the wrong sign, with no
         message. The output file will even keep its original <code>coordinateSystem: RAS</code>,
@@ -334,12 +334,12 @@ point['position'] = list(tfm_inverted.TransformPoint(point['position']))</code><
       pre-CLI version created one and did <code>model.SetAndObserveTransformNodeID(...)</code>
       then <code>model.HardenTransform()</code> before <code>slicer.util.exportNode(..., world=True)</code>.
       That whole block is gone. The widget's <code>saveOutput</code> method
-      (<code>AutoMatrix.py:861</code>), which called <code>exportNode</code>, is still there but is no longer called: <strong>dead code</strong>.</p>
+      (<code>AutoMatrix.py:843</code>), which called <code>exportNode</code>, is still there but is no longer called: <strong>dead code</strong>.</p>
 
       <h2 id="types-donnees">5. Data types handled</h2>
 
       <p><code>GetPatients</code> collects <code>.vtk .vtp .stl .off .obj .nii .nii.gz .nrrd .mrk.json</code>
-      (<code>Automatrix_CLI.py:72</code>). The CLI then only
+      (<code>Automatrix_CLI.py:77</code>). The CLI then only
       distinguishes two cases:</p>
 
       <pre><code>is_landmark = scan.endswith(".mrk.json")
@@ -388,7 +388,7 @@ resampler.SetReferenceImage(reference)</code></pre>
       correct, and it's up to the user to declare it, nothing is auto-detected.</p>
 
       <p>The output grid is chosen as follows
-      (<code>Automatrix_CLI.py:191</code> and
+      (<code>Automatrix_CLI.py:196</code> and
       <code>:301</code>), in decreasing priority:</p>
 
       <ol>
@@ -411,7 +411,7 @@ resampler.SetReferenceImage(reference)</code></pre>
       <div class="callout bug">
         <div class="callout-title">Confirmed bug</div>
         <p>The <code>reference is None</code> branch of <code>ResampleImage</code>
-        (<code>Automatrix_CLI.py:215</code>) is
+        (<code>Automatrix_CLI.py:220</code>) is
         <strong>unreachable</strong> — the caller always passes a reference. It is also
         wrong: it does <code>new_origin = transform.TransformPoint(image.GetOrigin())</code>
         when the resampler's convention would call for <code>T⁻¹</code>.</p>
@@ -449,7 +449,7 @@ FixedParameters: 0 0 0</code></pre>
 
       <h2 id="appariement">8. File ↔ matrix matching</h2>
 
-      <p><code>GetPatients</code> (<code>Automatrix_CLI.py:60</code>)
+      <p><code>GetPatients</code> (<code>Automatrix_CLI.py:65</code>)
       builds <code>{patient_key: {'scan': [...], 'matrix': [...]}}</code>. The key is obtained
       through a chain of <code>.split()</code> calls that is <strong>not the same on both sides</strong>:</p>
 
@@ -527,7 +527,7 @@ FixedParameters: 0 0 0</code></pre>
       </div>
 
       <p>When the matrix path is a <strong>file</strong> rather than a folder, it is attached to
-      every patient (<code>Automatrix_CLI.py:167</code>).</p>
+      every patient (<code>Automatrix_CLI.py:172</code>).</p>
 
       <div class="callout bug">
         <div class="callout-title">Confirmed bug</div>
@@ -541,7 +541,7 @@ FixedParameters: 0 0 0</code></pre>
 
       <h3 id="from-areg">The "From AReg" path</h3>
 
-      <p><code>suffix_map</code> (<code>Automatrix_CLI.py:227</code>)
+      <p><code>suffix_map</code> (<code>Automatrix_CLI.py:232</code>)
       bypasses all the matching logic for landmark files:</p>
 
       <pre><code>suffix_map = {
@@ -569,7 +569,7 @@ matrix_path = os.path.join(args.matrix_lineEdit, subdir,
           therefore raises <code>AttributeError</code> as soon as it's taken.</li>
           <li><strong>It is never taken</strong>: <code>CheckBoxSuffixBased</code> (labeled "From AReg") is
           hidden at <code>setup</code> by <code>self.ui.CheckBoxSuffixBased.setVisible(False)</code>
-          (<code>AutoMatrix.py:296</code>), so <code>fromAreg</code> is
+          (<code>AutoMatrix.py:298</code>), so <code>fromAreg</code> is
           always <code>"False"</code>. Dead code — which explains why 1 and 2 were never
           noticed.</li>
         </ol>
@@ -660,7 +660,7 @@ out_file      = outpath.split(extension_scan)[0] + out_suffix + extension_scan</
           <li><strong>Outputs overwritten</strong> if <code>checkBoxMatrixName</code> is unchecked with several matrices (<a href="#sorties">§9</a>).</li>
           <li><strong><code>OnEndProcess</code> divides by <code>self.nb_scans</code></strong> (<code>AutoMatrix.py:953</code>) with no guard: an empty input folder causes a <code>ZeroDivisionError</code> at the end of processing.</li>
           <li><strong><code>CheckGoodEntre</code> is logically wrong</strong> (<code>AutoMatrix.py:1013</code>): the extension test is <code>len(dico['.vtk'])==0 and len(dico['.vtp']) and len(dico['.stl']) and …</code>, where only the first term is a comparison. The rest are integers evaluated as booleans, so the "Folder empty or wrong type" warning only fires in an unlikely conjunction. A genuinely empty folder passes validation.</li>
-          <li><strong><code>onPredictButton</code> does not stop on error</strong>: <code>TestProcess</code> returns a tuple <code>(ok, out)</code>, so the <code>isinstance(error, str)</code> check at <code>AutoMatrix.py:766</code> is always false, and processing starts even with empty fields.</li>
+          <li><strong><code>onPredictButton</code> does not stop on error</strong>: <code>TestProcess</code> returns a tuple <code>(ok, out)</code>, so the <code>isinstance(error, str)</code> check at <code>AutoMatrix.py:748</code> is always false, and processing starts even with empty fields.</li>
           <li><strong><code>.split(extension_scan)[0]</code></strong> cuts at the <strong>first</strong> occurrence: a path whose folder contains the same substring as the extension would be truncated.</li>
           <li><strong>Non-<code>defined</code> landmarks</strong> left in the old coordinate frame, mixed with transformed points in the same file (<a href="#types-donnees">§5</a>).</li>
           <li><strong>The "From AReg" path, dead and broken</strong> (<a href="#appariement">§8</a>).</li>

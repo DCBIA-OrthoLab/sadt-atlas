@@ -87,12 +87,12 @@
 
       <p>The repository never spells out the acronym in any documentation: the README
       contains no CNE section, and no longer documents the <a href="../MedX/MedX.html">MedX</a> it replaced either &mdash; neither name appears in it. The module's help text
-      (<code>CNE.py:147</code>) says only "This tool helps to create
+      (<code>CNE.py:157</code>) says only "This tool helps to create
       summaries of clinical notes".</p>
 
       <p>Two log lines, and only those, give the expansion:
       <code>logger.info("CNE (Clinical Notes Extraction)")</code>
-      (<code>CNE.py:329</code> and <code>CNE.py:606</code>), and the CLI
+      (<code>CNE.py:342</code> and <code>CNE.py:663</code>), and the CLI
       publishes the same name to the Slicer supervisor:
       <code>&lt;filter-name&gt;Clinical Notes Extraction&lt;/filter-name&gt;</code>
       (<code>CNE_CLI.py:91</code>). <strong>CNE = Clinical Notes Extraction</strong>,
@@ -165,7 +165,7 @@
 
       <p>The system instruction is copied verbatim from MedX:
       <code>"Using the following note, extract structured key-value pairs about the patient's symptoms and diagnoses:"</code>
-      (<code>CNE_CLI.py:22</code> vs
+      (<code>CNE_CLI.py:26</code> vs
       <code>MedX_Summarize.py:50</code>).</p>
 
       <h2 id="fichiers">2. Files involved</h2>
@@ -217,7 +217,7 @@
         <div class="callout-title">Gotcha</div>
         <p>The extra index explicitly points to the <strong>CPU wheels</strong>. Yet the CLI
         requests <code>n_gpu_layers=-1</code> with the comment "Use GPU if available"
-        (<code>CNE_CLI.py:162</code>): with a CPU-only build this
+        (<code>CNE_CLI.py:166</code>): with a CPU-only build this
         parameter has no effect. In practice inference runs on CPU, and a
         7–8 B Q4-quantized model costs several tens of seconds per note there.</p>
       </div>
@@ -229,7 +229,7 @@
       <h2 id="modeles">4. The models</h2>
 
       <p>No weights ship in the repository. <code>getModelPath()</code>
-      (<code>CNE.py:478</code>) downloads the GGUF on demand, via
+      (<code>CNE.py:513</code>) downloads the GGUF on demand, via
       <code>urllib.request.urlretrieve</code> with a <code>QProgressDialog</code>, into
       <code>&lt;Documents&gt;/SlicerDownloads/CNE/model/</code>.</p>
 
@@ -268,11 +268,11 @@
 
       <p><code>SUPPORTED_EXTENSIONS = (".txt", ".pdf", ".docx")</code>. The scan is
       <strong>non-recursive</strong>: <code>glob.glob(os.path.join(notesFolder_input, f"*{ext}"))</code>
-      (<code>CNE_CLI.py:133</code>) — unlike every other
+      (<code>CNE_CLI.py:137</code>) — unlike every other
       module in the repository, which uses <code>iglob(**, recursive=True)</code>. A folder made of
       per-patient subfolders will yield nothing.</p>
 
-      <p>Text extraction (<code>CNE_CLI.py:73</code>):</p>
+      <p>Text extraction (<code>CNE_CLI.py:77</code>):</p>
 
       <div class="table-wrap">
         <table>
@@ -285,7 +285,7 @@
         </table>
       </div>
 
-      <p><code>clean_text()</code> (<code>CNE_CLI.py:40</code>) is the only
+      <p><code>clean_text()</code> (<code>CNE_CLI.py:44</code>) is the only
       preprocessing step, and its motivation is stated in the code: normalize what
       varies between PDF/Word exports but never appeared in the plain-text
       training notes — smart apostrophes and quotes to ASCII, en dash and em
@@ -302,7 +302,7 @@
       <h2 id="inference">6. Inference</h2>
 
       <p>A single pass per file, with no chunking
-      (<code>CNE_CLI.py:192</code>):</p>
+      (<code>CNE_CLI.py:196</code>):</p>
 
       <pre><code>messages = []
 if notesType.upper() == "TMJ":
@@ -384,7 +384,7 @@ output = llm.create_chat_completion(messages=messages, max_tokens=500, temperatu
 
       <ul>
         <li>Model loading is wrapped by redirecting <code>stderr</code> to
-        <code>/dev/null</code> via <code>os.dup2</code> (<code>CNE_CLI.py:155</code>), to
+        <code>/dev/null</code> via <code>os.dup2</code> (<code>CNE_CLI.py:159</code>), to
         mask llama.cpp's chatter, which would otherwise pollute the error channel that
         Slicer interprets as a CLI failure.</li>
       </ul>
@@ -427,7 +427,7 @@ for key, value in data.items():
       dashboard was not carried over.</p>
 
       <p>The output folder is created by <code>os.makedirs(..., exist_ok=True)</code> on the widget
-      side (<code>CNE.py:578</code>).</p>
+      side (<code>CNE.py:613</code>).</p>
 
       <h2 id="predit-calcule">9. What is predicted vs. what is computed</h2>
 
@@ -468,7 +468,7 @@ for key, value in data.items():
         <li><strong>The Ortho model does not download</strong>: wrong file name, HTTP 404 (§4).
         Fix: <code>model-q4_0.gguf</code> → <code>model-q4_k_m.gguf</code>.</li>
         <li><strong>The test files' output folders do not exist.</strong>
-        <code>copyTestFiles()</code> (<code>CNE.py:409</code>) copies <code>input_&lt;type&gt;</code> <strong>and</strong>
+        <code>copyTestFiles()</code> (<code>CNE.py:454</code>) copies <code>input_&lt;type&gt;</code> <strong>and</strong>
         <code>output_&lt;type&gt;</code>, but <code>Resources/testfiles/</code>
         contains only the two <code>input_</code> folders. The <code>shutil.copytree</code> of the output
         folder is skipped with a warning, and the UI ends up with an output path
@@ -483,7 +483,7 @@ for key, value in data.items():
         <code>response_format</code>, even though llama.cpp offers both. Post-processing is therefore
         a heuristic fishing operation (§7).</li>
         <li><strong>Radio button set to neither TMJ nor Ortho</strong> → <code>notesType = ""</code>
-        (<code>CNE.py:382</code>) → in <code>getModelPath</code>, <code>repo_id</code> is never
+        (<code>CNE.py:427</code>) → in <code>getModelPath</code>, <code>repo_id</code> is never
         assigned and the <code>UnboundLocalError</code> surfaces as "Failed to load model". This case
         should not occur (<code>setExclusive(True)</code> and a default of TMJ), but nothing
         blocks it.</li>
@@ -500,7 +500,7 @@ for key, value in data.items():
         <code>CNE_CLI.xml</code> still describes "Apply a Gaussian blur to an
         image", attributes the module to "Andras Lasso (PerkLab)", and its <code>&lt;index&gt;</code>
         values are 0, 2, 3, 4 — index 1 is missing.</li>
-        <li><strong><code>onCliProgress</code></strong> (<code>CNE.py:594</code>) reads <code>caller.GetProgress()</code>
+        <li><strong><code>onCliProgress</code></strong> (<code>CNE.py:651</code>) reads <code>caller.GetProgress()</code>
         and does nothing with it; it is not even connected to any observer. Dead
         code. Actual progress goes through the CLI's <code>&lt;filter-progress&gt;</code> tags, read
         by <code>qSlicerCLIProgressBar</code>.</li>

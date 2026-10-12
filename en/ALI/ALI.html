@@ -90,7 +90,7 @@
             <tr><td><code>ALI.py:1246</code></td><td>ALI_IOS</td><td><code>conda run -n shapeaxi python -m ALI_IOS</code></td><td>direct use</td></tr>
             <tr><td><code>ASO_Method/CBCT.py:515</code></td><td>ALI_CBCT</td><td><code>slicer.cli.run</code></td><td>landmarks for SEMI_ASO orientation</td></tr>
             <tr><td><code>AREG_Method/IOSCBCT.py:300</code></td><td>both</td><td><code>slicer.cli.run</code></td><td>12 occlusal points on CBCT <strong>and</strong> on IOS, to register one onto the other</td></tr>
-            <tr><td><code>GreedyReg_Method/Logic.py:493</code></td><td>ALI_CBCT</td><td><code>slicer.cli.run</code></td><td>"Distant Registration": landmark-based registration</td></tr>
+            <tr><td><code>GreedyReg_Method/Logic.py:495</code></td><td>ALI_CBCT</td><td><code>slicer.cli.run</code></td><td>"Distant Registration": landmark-based registration</td></tr>
             <tr><td><code>FlexReg.py:2517</code></td><td>ALI_IOS (<code>Lower_MG_*.pth</code>)</td><td><code>conda run -n shapeaxi</code></td><td>the 13 mucogingival points of the MGL patch</td></tr>
             <tr><td><code>Agent_CLI/manifest.yaml:2</code></td><td>both</td><td>remote pipeline</td><td>declared as <code>ali_cbct</code> / <code>ali_ios</code></td></tr>
           </tbody>
@@ -104,7 +104,7 @@
           <thead><tr><th>Called</th><th>When</th><th>Why</th></tr></thead>
           <tbody>
             <tr><td><code>CrownSegmentationcli</code> (ShapeAXI)</td><td>IOS, if a scan has no label array</td><td>segment the crowns — the cameras are aimed tooth by tooth</td></tr>
-            <tr><td><code>dentalmodelseg</code> directly</td><td>IOS, from the CLI itself (<code>segmentation.py:80</code>)</td><td>same thing, when the CLI is run outside the widget</td></tr>
+            <tr><td><code>dentalmodelseg</code> directly</td><td>IOS, from the CLI itself (<code>segmentation.py:72</code>)</td><td>same thing, when the CLI is run outside the widget</td></tr>
           </tbody>
         </table>
       </div>
@@ -133,7 +133,7 @@
         </table>
       </div>
 
-      <p>Non-obvious point: <strong>ALI_CBCT does not go through conda</strong>. It runs in Slicer's own Python, which is why <code>itk</code>, <code>dicom2nifti</code>, <code>pydicom</code> and <code>monai</code> are installed by <code>install_function</code> (<code>ALI.py:875</code>). ALI_IOS needs pytorch3d, which does not exist in Slicer: it goes through <code>conda run</code>. CUDA is required nowhere — both fall back to CPU (<code>DEVICE = cuda if available else cpu</code>), at the cost of time.</p>
+      <p>Non-obvious point: <strong>ALI_CBCT does not go through conda</strong>. It runs in Slicer's own Python, which is why <code>itk</code>, <code>dicom2nifti</code>, <code>pydicom</code> and <code>monai</code> are installed by <code>install_function</code> (<code>ALI.py:874</code>). ALI_IOS needs pytorch3d, which does not exist in Slicer: it goes through <code>conda run</code>. CUDA is required nowhere — both fall back to CPU (<code>DEVICE = cuda if available else cpu</code>), at the cost of time.</p>
 
       <p>The ALI_IOS CLI is also registered as a Slicer module (<code>slicer.modules.ali_ios</code>, <code>ALI_IOS.xml</code>), and AREG calls it through that route — in Slicer's Python, then, where <code>pytorch3d</code> is not installed. A fragile path, see §7.</p>
 
@@ -232,7 +232,7 @@
       <p>Two steps, both written into <code>temp_fold</code> and <strong>never cleaned up</strong>:</p>
 
       <ol>
-        <li><strong>Histogram windowing</strong>, <code>CorrectHisto(scan, out, 0.01, 0.99)</code> (<code>preprocess.py:27</code>): a 1000-bin histogram, normalized cumulative, clipped to the 1% and 99% percentiles, hard-bounded to <code>[-1500, 4000]</code> HU. Output <code>int16</code>, spacing/origin/direction preserved. Watch out: the default signature says <code>max_porcent=0.95</code>, but the call passes <code>0.99</code>.</li>
+        <li><strong>Histogram windowing</strong>, <code>CorrectHisto(scan, out, 0.01, 0.99)</code> (<code>preprocess.py:14</code>): a 1000-bin histogram, normalized cumulative, clipped to the 1% and 99% percentiles, hard-bounded to <code>[-1500, 4000]</code> HU. Output <code>int16</code>, spacing/origin/direction preserved. Watch out: the default signature says <code>max_porcent=0.95</code>, but the call passes <code>0.99</code>.</li>
         <li><strong>Isotropic resampling</strong>, one file per scale: <code>SetSpacing</code> (itk, linear interpolation — nearest-neighbor if <code>seg</code>/<code>Seg</code> is in the name) for each <code>sp</code> in <code>spacing = [1, 0.3]</code> mm. The new size is <code>size * spacing / sp</code> and the origin is recentered on the same physical box.</li>
       </ol>
 
@@ -241,13 +241,13 @@
         <p>The files are named <code>&lt;stem&gt;_sp&lt;1|0-3&gt;&lt;suffixes&gt;</code> and <strong>reused if they already exist</strong>: it's a cache, and therefore also a trap if the input changes without a name change.</p>
       </div>
 
-      <p>At load time (<code>environment.py:81</code>): <code>sitk.DICOMOrient(img, "LPS")</code> — without this, the agents, which only ever read the raw array and never the direction cosines, walk through a mirrored volume. Then <code>EnsureChannelFirst</code> + <code>BorderPad(padding)</code> with <code>padding = agent_FOV/2 + 1 = [33,33,33]</code>, so that any 64³ crop is valid wherever the agent stands.</p>
+      <p>At load time (<code>environment.py:73</code>): <code>sitk.DICOMOrient(img, "LPS")</code> — without this, the agents, which only ever read the raw array and never the direction cosines, walk through a mirrored volume. Then <code>EnsureChannelFirst</code> + <code>BorderPad(padding)</code> with <code>padding = agent_FOV/2 + 1 = [33,33,33]</code>, so that any 64³ crop is valid wherever the agent stands.</p>
 
       <p>The array is stored in numpy <code>(z,y,x)</code> order and the origin is <strong>reversed</strong> to match that same order — but not the spacing, which stays <code>(x,y,z)</code>. This has no effect only because resampling makes the spacing isotropic.</p>
 
       <h3 id="cbct-environnement">3.2 The environment</h3>
 
-      <p><code>Environment</code> (<code>environment.py:26</code>) is a patient: a dictionary <code>{scale_key: {image, spacing, origin, size}}</code> plus the list of predicted landmarks. One instance per patient, with every scale held in memory.</p>
+      <p><code>Environment</code> (<code>environment.py:18</code>) is a patient: a dictionary <code>{scale_key: {image, spacing, origin, size}}</code> plus the list of predicted landmarks. One instance per patient, with every scale held in memory.</p>
 
       <p><code>GetZone(scale, center, crop_size)</code> is the only thing the agent ever sees of the world:</p>
 
@@ -259,17 +259,17 @@ crop = rescale(cropTransform(self.data[scale]["image"])).type(torch.float32)</co
 
       <h3 id="cbct-agent">3.3 The agent and its network</h3>
 
-      <p>One agent per landmark (<code>agent.py:73</code>), instantiated once and then reused for every patient. A fresh <code>Brain</code> is built and its weights reloaded <strong>for each (patient, landmark) pair</strong> (<code>ALI_CBCT.py:194</code>) — 2 DenseNets rebuilt and 2 <code>.pth</code> files reread per point and per scan.</p>
+      <p>One agent per landmark (<code>agent.py:149</code>), instantiated once and then reused for every patient. A fresh <code>Brain</code> is built and its weights reloaded <strong>for each (patient, landmark) pair</strong> (<code>ALI_CBCT.py:123</code>) — 2 DenseNets rebuilt and 2 <code>.pth</code> files reread per point and per scan.</p>
 
-      <p>The network, <code>DNet</code> (<code>brain.py:48</code>):</p>
+      <p>The network, <code>DNet</code> (<code>brain.py:39</code>):</p>
 
       <pre><code>self.featNet = DenseNet(spatial_dims=3, in_channels=1, out_channels=1024,
                         growth_rate=34, block_config=(6, 12, 24, 16))
 self.dens = DN(in_channels=1024, out_channels=6)   # MLP 1024-512-256-128-6</code></pre>
 
-      <p>A 3D DenseNet-121 from monai (growth rate 34 instead of 32), followed by a 4-layer MLP. Input <code>[1, 1, 64, 64, 64]</code>, output 6 scores, one per move: <code>Up / Down / Back / Front / Left / Right</code> — that is, ±1 voxel along each of the array's three axes (<code>constants.py:22</code>).</p>
+      <p>A 3D DenseNet-121 from monai (growth rate 34 instead of 32), followed by a 4-layer MLP. Input <code>[1, 1, 64, 64, 64]</code>, output 6 scores, one per move: <code>Up / Down / Back / Front / Left / Right</code> — that is, ±1 voxel along each of the array's three axes (<code>constants.py:29</code>).</p>
 
-      <p><strong>This is not a <a class="gterm" href="../glossary.html#g-heatmap" title="See glossary">heatmap</a>: it is a direction classifier.</strong> The network's <span class="badge predit">prediction</span> does not say where the point is, it says which way to step. <code>Predict</code> takes the <code>argmax</code> of the 6 scores (<code>brain.py:166</code>).</p>
+      <p><strong>This is not a <a class="gterm" href="../glossary.html#g-heatmap" title="See glossary">heatmap</a>: it is a direction classifier.</strong> The network's <span class="badge predit">prediction</span> does not say where the point is, it says which way to step. <code>Predict</code> takes the <code>argmax</code> of the 6 scores (<code>brain.py:157</code>).</p>
 
       <div class="callout bug">
         <div class="callout-title">Confirmed bug</div>
@@ -280,7 +280,7 @@ self.dens = DN(in_channels=1024, out_channels=6)   # MLP 1024-512-256-128-6</cod
 
       <h3 id="cbct-recherche">3.4 The search</h3>
 
-      <p><code>Agent.Search()</code> (<code>agent.py:242</code>):</p>
+      <p><code>Agent.Search()</code> (<code>agent.py:345</code>):</p>
 
       <ol>
         <li>scale 0 (1 mm), position <strong>at the center of the volume</strong>;</li>
@@ -292,7 +292,7 @@ self.dens = DN(in_channels=1024, out_channels=6)   # MLP 1024-512-256-128-6</cod
 
       <p>Time budget: <code>15 s</code> on GPU, <code>60 s</code> on CPU, per landmark and per patient, overridable with <code>ALI_SEARCH_MAX_TIME</code>. Overrun → <code>-1</code>, landmark not written. Same if the agent leaves the volume three times (<code>search_atempt &gt; 2</code>); each time it exits, it is respawned at random (<code>spawn_radius = 10</code> voxels around the start, at scales &gt; 0).</p>
 
-      <p><strong>The final refinement</strong>, <code>Focus()</code> (<code>agent.py:215</code>): from the position found, six restarts at <strong>4 voxels</strong> (1.2 mm at the final scale) along ±x, ±y, ±z; each one walks again until <code>Visited()</code>; the retained position is the <strong>average of the six landings</strong>. That is what makes the result sub-voxel.</p>
+      <p><strong>The final refinement</strong>, <code>Focus()</code> (<code>agent.py:305</code>): from the position found, six restarts at <strong>4 voxels</strong> (1.2 mm at the final scale) along ±x, ±y, ±z; each one walks again until <code>Visited()</code>; the retained position is the <strong>average of the six landings</strong>. That is what makes the result sub-voxel.</p>
 
       <div class="callout warn">
         <div class="callout-title">Pitfall</div>
@@ -301,7 +301,7 @@ self.dens = DN(in_channels=1024, out_channels=6)   # MLP 1024-512-256-128-6</cod
 
       <h3 id="cbct-sortie">3.5 Output</h3>
 
-      <p><code>SavePredictedLandmarks(scale_keys[-1], output_dir)</code> (<code>environment.py:118</code>) converts the index back into a physical coordinate:</p>
+      <p><code>SavePredictedLandmarks(scale_keys[-1], output_dir)</code> (<code>environment.py:110</code>) converts the index back into a physical coordinate:</p>
 
       <pre><code>physical_origin = abs(ref_origin / ref_spacing)
 real_label_pos  = (pos - physical_origin) * ref_spacing
@@ -312,11 +312,11 @@ real_label_pos  = [real_label_pos[2], real_label_pos[1], real_label_pos[0]]  # b
         <p>The <code>abs()</code> assumes the origin is negative on all three axes — true for an LPS volume centered at the origin, false in general.</p>
       </div>
 
-      <p>Points are grouped by anatomical family (<code>LABEL_GROUPS</code>: <code>CB</code>, <code>U</code>, <code>L</code>, <code>CI</code>) and one file is written per group: <code>&lt;patient without extension&gt;_lm_Pred_&lt;group&gt;.mrk.json</code>, <code>coordinateSystem: "LPS"</code>, <code>description</code> <strong>always empty</strong> (<code>io.py:5</code>). <a href="../GreedyReg/GreedyReg.html">GreedyReg</a> flips it back to <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> (<code>Logic.py:518</code>).</p>
+      <p>Points are grouped by anatomical family (<code>LABEL_GROUPS</code>: <code>CB</code>, <code>U</code>, <code>L</code>, <code>CI</code>) and one file is written per group: <code>&lt;patient without extension&gt;_lm_Pred_&lt;group&gt;.mrk.json</code>, <code>coordinateSystem: "LPS"</code>, <code>description</code> <strong>always empty</strong> (<code>io.py:8</code>). <a href="../GreedyReg/GreedyReg.html">GreedyReg</a> flips it back to <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> (<code>Logic.py:520</code>).</p>
 
       <h3 id="cbct-poids">3.6 Weights</h3>
 
-      <p><code>GetBrain(dir)</code> (<code>io.py:75</code>) walks the tree recursively and infers the layout <strong>from the folder names</strong>, not from the file names:</p>
+      <p><code>GetBrain(dir)</code> (<code>io.py:78</code>) walks the tree recursively and infers the layout <strong>from the folder names</strong>, not from the file names:</p>
 
       <pre class="ascii"><code>&lt;dir_models&gt;/&lt;LANDMARK&gt;/&lt;SCALE&gt;/&lt;anything&gt;.pth
               ^ 2 levels up          ^ 1 level up</code></pre>
@@ -405,14 +405,14 @@ real_label_pos  = [real_label_pos[2], real_label_pos[1], real_label_pos[0]]  # b
           <i data-k="segment">UNet segmenting the render of tooth</i>
           <i data-k="done">landmarks placed, one camera pass per tooth</i>
         </span>
-        <figcaption>The published test arch (ASO_IOS). It starts as plain surface: the numbering comes first, from <code>dentalmodelseg</code>, and <strong>everything depends on it</strong> &mdash; the label array is what gives each tooth&rsquo;s centroid, and therefore where the camera goes. Without it ALI_IOS finds no tooth and places nothing, which is why the step is shown rather than assumed. The inset is what the network actually sees: not a colour photo but the <strong>per-vertex normal remapped to RGB</strong> (<code>TexturesVertex</code>, <code>surface.py:171</code>), plus the z-buffer as a fourth channel. <strong>The camera path and the geometry are faithful; the landmark positions here are illustrative</strong> &mdash; unlike the CBCT scene above, these are not real predictions, because ALI_IOS needs pytorch3d and a conda env.</figcaption>
+        <figcaption>The published test arch (ASO_IOS). It starts as plain surface: the numbering comes first, from <code>dentalmodelseg</code>, and <strong>everything depends on it</strong> &mdash; the label array is what gives each tooth&rsquo;s centroid, and therefore where the camera goes. Without it ALI_IOS finds no tooth and places nothing, which is why the step is shown rather than assumed. The inset is what the network actually sees: not a colour photo but the <strong>per-vertex normal remapped to RGB</strong> (<code>TexturesVertex</code>, <code>surface.py:101</code>), plus the z-buffer as a fourth channel. <strong>The camera path and the geometry are faithful; the landmark positions here are illustrative</strong> &mdash; unlike the CBCT scene above, these are not real predictions, because ALI_IOS needs pytorch3d and a conda env.</figcaption>
       </figure>
 
       <h3 id="ios-entrees">4.1 Inputs</h3>
 
-      <p><code>.vtk</code>, <code>.vtp</code>, <code>.stl</code>, <code>.obj</code>, <code>.off</code>. But <strong>everything depends on a tooth-label array</strong>, looked up under <code>PredictedID</code>, <code>predictedId</code> or <code>Universal_ID</code> (<code>surface.py:207</code>): that's what gives the centroid of each tooth, and therefore the camera position. Without an array, <code>RI</code> is set to zero and no label is found.</p>
+      <p><code>.vtk</code>, <code>.vtp</code>, <code>.stl</code>, <code>.obj</code>, <code>.off</code>. But <strong>everything depends on a tooth-label array</strong>, looked up under <code>PredictedID</code>, <code>predictedId</code> or <code>Universal_ID</code> (<code>surface.py:137</code>): that's what gives the centroid of each tooth, and therefore the camera position. Without an array, <code>RI</code> is set to zero and no label is found.</p>
 
-      <p>If the scan doesn't have one, <code>SegmentSurface</code> (<code>segmentation.py:80</code>) calls <code>dentalmodelseg</code> on a <strong>copy</strong> (a <code>.stl</code> passed to shapeaxi with <code>--overwrite 1</code> is deleted by <code>dental_model_seg.py</code>), via a csv (passing <code>--surf</code> a single file crashes shapeaxi on an attribute it doesn't define). Segmentation doesn't move the points — 5e-5 mm measured over 118k points according to the comment — so the landmarks stay valid in the original file.</p>
+      <p>If the scan doesn't have one, <code>SegmentSurface</code> (<code>segmentation.py:72</code>) calls <code>dentalmodelseg</code> on a <strong>copy</strong> (a <code>.stl</code> passed to shapeaxi with <code>--overwrite 1</code> is deleted by <code>dental_model_seg.py</code>), via a csv (passing <code>--surf</code> a single file crashes shapeaxi on an attribute it doesn't define). Segmentation doesn't move the points — 5e-5 mm measured over 118k points according to the comment — so the landmarks stay valid in the original file.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 700 140" role="img" aria-label="dentalmodelseg: multi-view crown segmentation, called ahead of ALI_IOS when the mesh has no tooth-label array">
@@ -441,20 +441,20 @@ real_label_pos  = [real_label_pos[2], real_label_pos[1], real_label_pos[0]]  # b
         <figcaption>dentalmodelseg segments and numbers the teeth before ALI_IOS can place one camera per tooth. Called as a preprocessing step, not by ALI_IOS itself when a label array already exists.</figcaption>
       </figure>
 
-      <p><strong>Canonical scaling</strong>, <code>ScaleSurf</code> (<code>surface.py:94</code>): centering on the bounding-box midpoint, then <code>scale = 1 / ||max - center||</code>. The whole pipeline works inside this <strong>unit sphere</strong>; <code>Upscale</code> reverses the process at the end.</p>
+      <p><strong>Canonical scaling</strong>, <code>ScaleSurf</code> (<code>surface.py:24</code>): centering on the bounding-box midpoint, then <code>scale = 1 / ||max - center||</code>. The whole pipeline works inside this <strong>unit sphere</strong>; <code>Upscale</code> reverses the process at the end.</p>
 
-      <p><strong>Leveling (MG only)</strong>, <code>LowerArchMatrix</code> (<code>orientation.py:98</code>): the MG cameras are built around a vertical axis assumed to be Z. The <a class="gterm" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane is fitted with <a class="gterm" href="../glossary.html#g-svd" title="See glossary">SVD</a> on the centroids of teeth 18–31 (at least 4 teeth, spread ≥ 4 labels), with the sign fixed so the crowns point up, then a <strong>minimal rotation</strong> (Rodrigues) brings the normal onto <code>+Z</code>. Below <code>MAX_TILT_DEGREES = 12°</code> the scan is left strictly untouched — sending an already-level scan into a fixed frame would rotate it within the plane and degrade the prediction. Landmarks are passed back through <code>inv(matrix)</code> before being written.</p>
+      <p><strong>Leveling (MG only)</strong>, <code>LowerArchMatrix</code> (<code>orientation.py:89</code>): the MG cameras are built around a vertical axis assumed to be Z. The <a class="gterm" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane is fitted with <a class="gterm" href="../glossary.html#g-svd" title="See glossary">SVD</a> on the centroids of teeth 18–31 (at least 4 teeth, spread ≥ 4 labels), with the sign fixed so the crowns point up, then a <strong>minimal rotation</strong> (Rodrigues) brings the normal onto <code>+Z</code>. Below <code>MAX_TILT_DEGREES = 12°</code> the scan is left strictly untouched — sending an already-level scan into a fixed frame would rotate it within the plane and degrade the prediction. Landmarks are passed back through <code>inv(matrix)</code> before being written.</p>
 
       <h3 id="ios-cameras">4.2 The cameras</h3>
 
-      <p><code>GenPhongRenderer</code> (<code>render.py:20</code>):</p>
+      <p><code>GenPhongRenderer</code> (<code>render.py:11</code>):</p>
 
       <pre><code>cameras = FoVPerspectiveCameras(znear=0.01, zfar=10, fov=90)
 raster_settings = RasterizationSettings(image_size=224, blur_radius=0, faces_per_pixel=1)</code></pre>
 
-      <p><code>image_size / blur_radius / faces_per_pixel</code> are positional arguments of the CLI, but <strong>every caller passes <code>224 / 0 / 1</code></strong> (<code>IOS.py:286</code>, <code>IOSCBCT.py:335</code>, <code>FlexReg.py:2517</code>). <code>blur_radius = 0</code> plus <code>faces_per_pixel = 1</code> means hard rasterization, one face per pixel: that's what makes <code>pix_to_face</code> usable as a pixel-to-face lookup table.</p>
+      <p><code>image_size / blur_radius / faces_per_pixel</code> are positional arguments of the CLI, but <strong>every caller passes <code>224 / 0 / 1</code></strong> (<code>IOS.py:297</code>, <code>IOSCBCT.py:335</code>, <code>FlexReg.py:2517</code>). <code>blur_radius = 0</code> plus <code>faces_per_pixel = 1</code> means hard rasterization, one face per pixel: that's what makes <code>pix_to_face</code> usable as a pixel-to-face lookup table.</p>
 
-      <p>The texture isn't a color: <code>TexturesVertex(verts_features=CN)</code> where <code>CN</code> is the <strong>per-vertex normal remapped to RGB</strong> (<code>(n*0.5+0.5)*255</code>, <code>surface.py:171</code>). So the network sees a Phong-lit normal map, plus the z-buffer as a 4th channel.</p>
+      <p>The texture isn't a color: <code>TexturesVertex(verts_features=CN)</code> where <code>CN</code> is the <strong>per-vertex normal remapped to RGB</strong> (<code>(n*0.5+0.5)*255</code>, <code>surface.py:101</code>). So the network sees a Phong-lit normal map, plus the z-buffer as a 4th channel.</p>
 
       <p>One camera is placed per tooth, at <code>radius</code> from its centroid:</p>
 
@@ -474,7 +474,7 @@ raster_settings = RasterizationSettings(image_size=224, blur_radius=0, faces_per
         <p>The directions in <code>dic_cam['O']</code> are <strong>normalized incorrectly</strong>: <code>np.array([0.5,0,1.0]) / linalg.norm([0.5,0.5,1.0])</code> divides by the norm of a <em>different</em> vector (<code>model.py:66</code>). So the cameras are not on the sphere of radius <code>radius</code>. Harmless as long as the weights were trained with the same table.</p>
       </div>
 
-      <p><strong>The MG cameras</strong>, the only adaptive part (<code>agent.py:192</code>):</p>
+      <p><strong>The MG cameras</strong>, the only adaptive part (<code>agent.py:280</code>):</p>
 
       <ul>
         <li><strong>arch tangent</strong>: the difference between the centroids of teeth <code>label-1</code> and <code>label+1</code> (the lower labels 18→31 run in sequence along the arch), flattened in z;</li>
@@ -485,7 +485,7 @@ raster_settings = RasterizationSettings(image_size=224, blur_radius=0, faces_per
 
       <h3 id="ios-reseau">4.3 The network</h3>
 
-      <p>A 2D <code>monai.networks.nets.UNet</code>, loaded <strong>for every tooth</strong> (<code>net.load_state_dict</code> inside the loop, <code>ALI_IOS.py:443</code>):</p>
+      <p>A 2D <code>monai.networks.nets.UNet</code>, loaded <strong>for every tooth</strong> (<code>net.load_state_dict</code> inside the loop, <code>ALI_IOS.py:852</code>):</p>
 
       <div class="table-wrap">
         <table>
@@ -506,7 +506,7 @@ raster_settings = RasterizationSettings(image_size=224, blur_radius=0, faces_per
 
       <p>This isn't a heatmap in the Gaussian-regression sense: it's a <strong>per-pixel segmentation</strong>. Class 1 is the landmark (<code>MG</code>, or <code>O</code>), 2 and 3 carry <code>MB</code>/<code>DB</code> (<code>O</code> model) or <code>CB</code> (<code>C</code> model) — see <code>MODELS_DICT</code> and <code>dic_label</code> (<code>model.py:51</code>).</p>
 
-      <p>Decoding the output is where the two paths diverge (<code>ALI_IOS.py:453</code>):</p>
+      <p>Decoding the output is where the two paths diverge (<code>ALI_IOS.py:948</code>):</p>
 
       <pre><code># MG: argmax on the raw logits
 pred_data = torch.argmax(images_pred.detach().cpu().float(), dim=1)...
@@ -526,7 +526,7 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
         <li><code>tens_pix_to_face[...]</code>: the rendered face under each of those pixels;</li>
         <li>filtering — and it differs:
           <ul>
-            <li><code>O</code>/<code>C</code>: <code>RemoveExtraFaces</code> keeps only faces where at least one vertex carries the tooth's <code>Universal_ID</code> (<code>surface.py:229</code>);</li>
+            <li><code>O</code>/<code>C</code>: <code>RemoveExtraFaces</code> keeps only faces where at least one vertex carries the tooth's <code>Universal_ID</code> (<code>surface.py:159</code>);</li>
             <li><code>MG</code>: <strong>no per-tooth filtering</strong>, only <code>face &gt;= 0</code>. The mucogingival point sits on the gum, not on the crown; <code>RemoveExtraFaces</code> would eliminate all of them;</li>
           </ul>
         </li>
@@ -539,7 +539,7 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
 
       <div class="callout warn">
         <div class="callout-title">Pitfall</div>
-        <p>Three safeguards, <strong>MG only</strong>, driven by CLI options (<code>ALI_IOS.py:654</code>) that <strong>no caller in the repository passes</strong> — so their defaults always apply:</p>
+        <p>Three safeguards, <strong>MG only</strong>, driven by CLI options (<code>ALI_IOS.py:515</code>) that <strong>no caller in the repository passes</strong> — so their defaults always apply:</p>
       </div>
 
       <div class="table-wrap">
@@ -553,9 +553,9 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
         </table>
       </div>
 
-      <p><code>EstimateMissingArchPositions</code> (<code>ALI_IOS.py:89</code>) fits a degree-2 polynomial of each centroid coordinate against the label index, on the teeth present (≥ 4 teeth, spread ≥ 4 labels), and evaluates it at <code>label</code> and <code>label ± 0.5</code> for the tangent. According to the code's error message, these points land <strong>4 to 21 mm</strong> off, against 0.5 mm for a point aimed at a real tooth — hence the default of <code>False</code>.</p>
+      <p><code>EstimateMissingArchPositions</code> (<code>ALI_IOS.py:90</code>) fits a degree-2 polynomial of each centroid coordinate against the label index, on the teeth present (≥ 4 teeth, spread ≥ 4 labels), and evaluates it at <code>label</code> and <code>label ± 0.5</code> for the tangent. According to the code's error message, these points land <strong>4 to 21 mm</strong> off, against 0.5 mm for a point aimed at a real tooth — hence the default of <code>False</code>.</p>
 
-      <p>Last resort if nothing lands on the mesh: the point is anchored on the tooth itself, lowered by <code>0.2</code> in unit-sphere space, then snapped (<code>ALI_IOS.py:550</code>).</p>
+      <p>Last resort if nothing lands on the mesh: the point is anchored on the tooth itself, lowered by <code>0.2</code> in unit-sphere space, then snapped (<code>ALI_IOS.py:594</code>).</p>
 
       <p><strong>Every degradation is written into the json.</strong> <code>entry["desc"]</code> becomes the control point's <code>description</code> field (<code>io.py:23</code>):</p>
 
@@ -571,7 +571,7 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
         </table>
       </div>
 
-      <p>This is the field that <a href="../FlexReg/FlexReg.html">FlexReg</a> and <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> read: <code>DoubtfulLandmarks</code> (<code>mgl_patch.py:142</code>) treats <strong>any non-empty description</strong> as doubtful and discards the point, letting the spline skip over the gap — unless fewer than 3 points would remain. Measured over 364 predictions according to the comment: 4.2 mm median deviation from the neighboring curve, against 1.2 mm for the others.</p>
+      <p>This is the field that <a href="../FlexReg/FlexReg.html">FlexReg</a> and <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> read: <code>DoubtfulLandmarks</code> (<code>mgl_patch.py:133</code>) treats <strong>any non-empty description</strong> as doubtful and discards the point, letting the spline skip over the gap — unless fewer than 3 points would remain. Measured over 364 predictions according to the comment: 4.2 mm median deviation from the neighboring curve, against 1.2 mm for the others.</p>
 
       <div class="callout">
         <div class="callout-title">Note</div>
@@ -580,17 +580,17 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
 
       <h3 id="ios-sortie-poids">4.6 Output and weights</h3>
 
-      <p>One file per (patient, arch, model): <code>&lt;patient&gt;_&lt;Lower|Upper&gt;_&lt;O|C|MG&gt;_Pred.json</code>, <code>coordinateSystem: "LPS"</code> (<code>io.py:64</code>). The coordinates are those of the input mesh, with no flip: the "LPS" label is true because the <code>.vtk</code> files in this pipeline are LPS, not because the code checks it.</p>
+      <p>One file per (patient, arch, model): <code>&lt;patient&gt;_&lt;Lower|Upper&gt;_&lt;O|C|MG&gt;_Pred.json</code>, <code>coordinateSystem: "LPS"</code> (<code>io.py:67</code>). The coordinates are those of the input mesh, with no flip: the "LPS" label is true because the <code>.vtk</code> files in this pipeline are LPS, not because the code checks it.</p>
 
       <p><code>GenControlPoint</code> filters on <code>landmarks_selected</code>: an <code>O</code> model always predicts <code>XO</code>/<code>XMB</code>/<code>XDB</code>, but only the requested types are written.</p>
 
-      <p>Weight discovery (<code>ALI_IOS.py:205</code>) — from the file name alone:</p>
+      <p>Weight discovery (<code>ALI_IOS.py:997</code>) — from the file name alone:</p>
 
       <pre class="ascii"><code>&lt;jaw&gt;_&lt;model_id&gt;_&lt;anything&gt;.pth
  ^ "Lower" present in the name? otherwise "Upper"
         ^ basename.split("_")[1], must be O, C or MG</code></pre>
 
-      <p>Verified on one installation: <code>Lower_O_model.pth</code>, <code>Upper_C_model.pth</code>, <code>Lower_MG_v6.pth</code>. Two candidates for the same pair → <code>sorted()</code> settles it and a warning is issued. The widget itself detects <code>_O_</code>/<code>_C_</code> by substring (<code>ALI.py:2070</code>) and <code>Lower_MG_*</code> separately (<code>HasMGModel</code>, <code>ALI.py:856</code>): two conventions for the same file.</p>
+      <p>Verified on one installation: <code>Lower_O_model.pth</code>, <code>Upper_C_model.pth</code>, <code>Lower_MG_v6.pth</code>. Two candidates for the same pair → <code>sorted()</code> settles it and a warning is issued. The widget itself detects <code>_O_</code>/<code>_C_</code> by substring (<code>ALI.py:2036</code>) and <code>Lower_MG_*</code> separately (<code>HasMGModel</code>, <code>ALI.py:856</code>): two conventions for the same file.</p>
 
       <p>Download: <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/ALI_IOS_models/Models.zip">https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/ALI_IOS_models/Models.zip</a> (<code>IOS.py:161</code>) — the contents of the historical ALIDDM v1.0.3 archive plus <code>Lower_MG_v6.pth</code>. Extracted to <code>&lt;Documents&gt;/SlicerDownloads/ALI/ALI_IOS/Models/Prediction/</code>: exactly the path FlexReg goes looking in.</p>
 
@@ -615,7 +615,7 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
 
       <div class="callout bug">
         <div class="callout-title">Confirmed bug</div>
-        <p>Nothing is trained here: the repository contains no training entry point. The <code>Agent.Train</code> / <code>Agent.Validate</code> methods (<code>agent.py:201</code>) call <code>self.brain.Train</code> / <code>self.brain.Validate</code>, <strong>which do not exist</strong> on the <code>Brain</code> class: dead code that would raise an <code>AttributeError</code>. Same for <code>Environment.LoadJsonLandmarks</code>, <code>GetRewardLst</code>, <code>GetRandomPoses*</code>, <code>GetSampleFromPoses</code>, <code>ResetLandmarks</code> — the entire training scaffolding was left behind by the rest.</p>
+        <p>Nothing is trained here: the repository contains no training entry point. The <code>Agent.Train</code> / <code>Agent.Validate</code> methods (<code>agent.py:291</code>) call <code>self.brain.Train</code> / <code>self.brain.Validate</code>, <strong>which do not exist</strong> on the <code>Brain</code> class: dead code that would raise an <code>AttributeError</code>. Same for <code>Environment.LoadJsonLandmarks</code>, <code>GetRewardLst</code>, <code>GetRandomPoses*</code>, <code>GetSampleFromPoses</code>, <code>ResetLandmarks</code> — the entire training scaffolding was left behind by the rest.</p>
       </div>
 
       <h2 id="environnement">6. Environment</h2>
@@ -624,10 +624,10 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
         <table>
           <thead><tr><th>Item</th><th>Value</th><th>Source</th></tr></thead>
           <tbody>
-            <tr><td>CBCT backend</td><td>Slicer Python + <code>itk</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code>, <code>monai</code> (<code>1.3.2</code> if Python ≥ 3.10, otherwise <code>0.7.0</code>)</td><td><code>ALI.py:875</code></td></tr>
-            <tr><td>IOS backend</td><td>conda env <code>shapeaxi</code>, shared with AREG, <a href="../ASO/ASO.html">ASO</a>, <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td><code>ALI.py:2108</code></td></tr>
-            <tr><td>Env Python</td><td><strong>3.12</strong></td><td><code>ALI.py:2110</code></td></tr>
-            <tr><td>Env creation</td><td><code>torch&gt;=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td><code>ALI.py:2132</code></td></tr>
+            <tr><td>CBCT backend</td><td>Slicer Python + <code>itk</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code>, <code>monai</code> (<code>1.3.2</code> if Python ≥ 3.10, otherwise <code>0.7.0</code>)</td><td><code>ALI.py:874</code></td></tr>
+            <tr><td>IOS backend</td><td>conda env <code>shapeaxi</code>, shared with AREG, <a href="../ASO/ASO.html">ASO</a>, <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td><code>ALI.py:2074</code></td></tr>
+            <tr><td>Env Python</td><td><strong>3.12</strong></td><td><code>ALI.py:2076</code></td></tr>
+            <tr><td>Env creation</td><td><code>torch&gt;=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td><code>ALI.py:2098</code></td></tr>
             <tr><td>pytorch3d</td><td>wheel chosen based on the installed torch version, PEP 503 index <code>ImageMindAnalytics.github.io/pytorch3d-wheels</code></td><td><code>install_pytorch.py</code></td></tr>
             <tr><td>shapeaxi</td><td><code>&gt;=2.0.2</code>, installed <strong>after</strong> pytorch3d</td><td><code>install_pytorch.py:189</code></td></tr>
             <tr><td>Windows</td><td>conda via WSL (<code>CondaSetUpCallWsl</code>), checks for <code>libxrender1</code>, <code>libgl1</code>/<code>libgl1-mesa-glx</code>, <code>libglx-mesa0</code></td><td><code>ALI.py:2165</code></td></tr>
@@ -650,15 +650,15 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
         <li><strong><code>Move()</code> tests its bounds wrong</strong>: <code>if new_pos.all() &gt; 0 and (...)</code> — <code>.all()</code> returns a boolean, compared against <code>0</code>. The test checks "no coordinate is zero," not "no coordinate is negative" (<code>agent.py:193</code>).</li>
         <li><strong>The <code>int16</code> cast before <code>argmax</code></strong> is still there on the <code>O</code> and <code>C</code> models. The comment in the MG code explains precisely why it's wrong.</li>
         <li><strong><code>get_view_rasterize</code> for non-MG rasterizes without <code>R</code>/<code>T</code></strong>: <code>renderer.rasterizer(meshes.clone())</code> (<code>agent.py:366</code>) doesn't pass the matrices used by the render right above it, so <code>pix_to_face</code> comes from the default camera, not the one that produced the image. The MG path was written explicitly to fix this ("with the SAME R,T so pix_to_face stays aligned", <code>agent.py:267</code>). That's the original upstream code, and it was never replayed for <code>O</code>/<code>C</code>.</li>
-        <li><strong><code>val_pred</code> / <code>post_pred</code></strong> (<code>ALI_IOS.py:447</code>): an <code>AsDiscrete(argmax=True, to_onehot=4)</code> is computed on every view and then never read. Dead computation on every single tooth.</li>
+        <li><strong><code>val_pred</code> / <code>post_pred</code></strong> (<code>ALI_IOS.py:942</code>): an <code>AsDiscrete(argmax=True, to_onehot=4)</code> is computed on every view and then never read. Dead computation on every single tooth.</li>
         <li><strong>MG name collisions.</strong> Six of the 13 output names are the training name of a <em>different</em> tooth: <code>LR1MG</code> is the output for tooth 26 and the training name for tooth 25 (<code>model.py:25</code>). Any translation between the two conventions has to be decided on the whole label set, never label by label.</li>
         <li><strong>The widget's DICOM path is broken.</strong> <code>Auto_CBCT</code> implements neither <code>NumberScanDCM</code>, nor <code>TestScanDCM</code>, nor <code>getTestFileListDCM</code>: the base versions return <code>None</code>. Checking "DICOM" gives <code>nb_patient = None</code>, then a <code>TypeError</code> when downloading the test files and a division by <code>None</code> in <code>OnEndProcess</code>. The CLI itself knows how to convert.</li>
         <li><strong>The Agent manifest is incomplete.</strong> <code>ali_cbct</code> declares 6 parameters for 10 expected positionals, <code>ali_ios</code> declares 6 for 10 and <strong>omits <code>teeth_mg</code></strong> (index 4): the following values shift by one slot (<code>manifest.yaml:48</code>).</li>
         <li><strong><code>temp_fold</code> is never cleaned up</strong> by ALI_CBCT, and resampled files are reused as-is if they exist: a silent cache between two runs.</li>
-        <li><strong><code>Auto_IOS.getALIModelList</code></strong> returns <code>super().getALIModelList()</code>, an empty abstract method → <code>None</code> (<code>IOS.py:172</code>).</li>
+        <li><strong><code>Auto_IOS.getALIModelList</code></strong> returns <code>super().getALIModelList()</code>, an empty abstract method → <code>None</code> (<code>IOS.py:183</code>).</li>
         <li><strong><code>slicer.modules.ali_ios</code></strong> is called by AREG through <code>slicer.cli.run</code> (<code>IOSCBCT.py:350</code>), so inside Slicer's Python, where <code>pytorch3d</code> and <code>shapeaxi</code> are not installed. The ALI widget itself only ever calls it through <code>conda run</code>. The two paths cannot both work on the same install.</li>
         <li><strong><code>SURFACE_LANDMARKS</code></strong> (<code>ALI.py:127</code>) offers <code>R</code>, <code>RIP</code>, <code>OIP</code>, which have no entry in <code>MODELS_DICT</code>: selecting them alone makes the CLI fail with "No matching models found."</li>
-        <li><strong><code>onPredictButton</code> chains the two IOS processes badly</strong>: the <code>if "CrownSegmentationcli"</code> and the <code>if "ALI_IOS"</code> that follows are not mutually exclusive, and the <code>else</code> after it attaches to the second one (<code>ALI.py:987</code>). When segmentation is needed, ALI_IOS is relaunched from <code>onProcessUpdate</code>; otherwise from <code>onPredictButton</code>. Two entry points for the same step.</li>
+        <li><strong><code>onPredictButton</code> chains the two IOS processes badly</strong>: the <code>if "CrownSegmentationcli"</code> and the <code>if "ALI_IOS"</code> that follows are not mutually exclusive, and the <code>else</code> after it attaches to the second one (<code>ALI.py:986</code>). When segmentation is needed, ALI_IOS is relaunched from <code>onProcessUpdate</code>; otherwise from <code>onPredictButton</code>. Two entry points for the same step.</li>
       </ul>
 
       <h2 id="litterature">8. Literature</h2>
