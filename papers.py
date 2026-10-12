@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
 """Références bibliographiques exposées dans le Guide.
 
-Source unique, consommée par build.py pour écrire la section « Pour aller plus
-loin » de chaque page du Guide, en français et en anglais. L'Atlas garde sa
-bibliographie complète dans <Outil>/SOURCES.html ; ce fichier n'en retient que
-ce qu'un utilisateur a besoin de lire.
+Source unique, consommée par build.py pour écrire la section « Comment citer »
+de chaque page du Guide, dans les cinq langues. L'Atlas garde sa bibliographie
+complète dans <Outil>/SOURCES.html ; ce fichier n'en retient que ce qu'un
+utilisateur a besoin de lire.
 
-Chaque entrée : url, ref (auteur/revue/année), title (titre exact), fr, en.
-« free » ajoute, quand il existe, un lien vers une version en accès libre.
+Chaque entrée : url, ref (auteur/revue/année), title (titre exact), et la
+présentation dans les cinq langues. « free » ajoute, quand il existe, un lien
+vers une version en accès libre. « self » est ce qu'on cite pour l'outil,
+« around » des lectures de contexte.
+
+CITATIONS, en fin de fichier, donne la référence entière des entrées « self »,
+celle qu'on recopie dans un papier ; SOFTWARE sert aux modules qu'aucune
+publication ne décrit.
 
 Règle : aucune URL qui ne figure pas déjà dans la bibliographie de l'outil.
 build.py le vérifie à chaque construction.
@@ -1219,3 +1225,118 @@ VIDEOS = {
  "Agent":     [("-CW8tnLyPHU", "AI Agent directly in 3D Slicer to help you learn dental and "
                 "cranofacial imaging", 30)],
 }
+
+
+# ---------------------------------------------------------------------------
+#  Ce qu'on cite dans un papier
+# ---------------------------------------------------------------------------
+# Indexe par DOI (ou par URL quand il n'y a pas de DOI), parce qu'un meme
+# papier sert a deux outils : ASO et AREG_CBCT partagent le papier
+# d'orientation, MRI2CBCT et MedX partagent celui de CLIP 2025.
+#
+# Recopie de <Outil>/SOURCES.md, colonne « Référence », en retirant ce qui
+# n'appartient pas a une reference : le commentaire editorial de la fiche
+# (« le papier de reference du module », l'etat des acces payants), les
+# guillemets francais et les ISBN. Rien n'est ajoute qui ne soit dans la
+# source. Ne vaut que pour les entrees « self » : une lecture de contexte
+# n'est pas ce qu'on cite pour l'outil.
+CITATIONS = {
+ "https://doi.org/10.1111/ocr.12642":
+   "Gillot M, Miranda F, Baquero B, Ruellas A, Gurgel M, Al Turkestani N, "
+   "Anchling L, Hutin N, Biggs E, Yatabe M, Paniagua B, Fillion-Robin JC, "
+   "Allemang D, Bianchi J, Cevidanes L, Prieto JC. Automatic landmark "
+   "identification in cone-beam computed tomography. Orthodontics & "
+   "Craniofacial Research, 2023, 26(4), 560-567.",
+ "https://doi.org/10.1007/978-3-031-23179-7_4":
+   "Baquero B, Gillot M, Cevidanes L, Al Turkestani N, Gurgel M, Leclercq M, "
+   "Bianchi J, Yatabe M, Ruellas A, Massaro C, Aliaga A, Alvarez Castrillon MA, "
+   "Rey D, Aristizabal JF, Prieto JC. Automatic Landmark Identification on "
+   "IntraOralScans. In: Clinical Image-Based Procedures (CLIP 2022), Lecture "
+   "Notes in Computer Science vol. 13746, Springer Cham, 2023, p. 32-42.",
+ "https://doi.org/10.1371/journal.pone.0275033":
+   "Gillot M, Baquero B, Le C, Deleat-Besson R, Bianchi J, Ruellas A, Gurgel M, "
+   "Yatabe M, Al Turkestani N, Najarian K, Soroushmehr R, Pieper S, Kikinis R, "
+   "Paniagua B, Gryak J, Ioshida M, Massaro C, Gomes L, Oh H, Evangelista K, "
+   "Chaves Junior CM, Garib D, Costa F, Benavides E, Soki F, Fillion-Robin JC, "
+   "Joshi H, Cevidanes L, Prieto JC. Automatic multi-anatomical skull structure "
+   "segmentation of cone-beam computed tomography scans using 3D UNETR. "
+   "PLOS ONE, 2022, 17(10), e0275033.",
+ "https://doi.org/10.1007/978-3-031-45249-9_5":
+   "Anchling L, Hutin N, Huang Y, Barone S, Roberts S, Miranda F, Gurgel M, "
+   "Al Turkestani N, Tinawi S, Bianchi J, Yatabe M, Ruellas A, Prieto JC, "
+   "Cevidanes L. Automated Orientation and Registration of Cone-Beam Computed "
+   "Tomography Scans. In: Clinical Image-Based Procedures (CLIP 2023), held "
+   "with MICCAI 2023, Lecture Notes in Computer Science vol. 14242, Springer "
+   "Cham, 2023, p. 43-58.",
+ "https://doi.org/10.1007/978-3-031-46914-5_18":
+   "Hutin N, Anchling L, Cevidanes L, Miranda F, Curado D, Gurgel M, Barone S, "
+   "Bianchi J, Al Turkestani N, Ruellas A, Eason M, Mavani K, Prieto JC, "
+   "Aliaga A. AReg IOS: Automatic Registration on IntraOralScans. In: Shape in "
+   "Medical Imaging (ShapeMI 2023), held with MICCAI 2023, Lecture Notes in "
+   "Computer Science vol. 14350, Springer, 2023, p. 223-235.",
+ "https://arxiv.org/abs/1904.11929":
+   "Venet L, Pati S, Yushkevich P, Bakas S. Accurate and Robust Alignment of "
+   "Variable-Stained Histologic Images Using a General-Purpose Greedy "
+   "Diffeomorphic Registration Tool. arXiv:1904.11929, 2019.",
+ "https://doi.org/10.1007/978-3-031-73083-2_7":
+   "Leroux G, Mattos CT, Claret J, Caleme E, Barone S, Gurgel M, Miranda F, "
+   "Gonçalves JR, Zupelari-Gonçalves P, Morettin-Zupelari M, Wolford LM, "
+   "Hsu NS, Ruellas ACO, Bianchi J, Prieto JC, Cevidanes L. Novel CBCT-MRI "
+   "Registration Approach for Enhanced Analysis of Temporomandibular "
+   "Degenerative Joint Disease. In: Clinical Image-Based Procedures (CLIP "
+   "2024), held with MICCAI 2024, Lecture Notes in Computer Science vol. 15196, "
+   "Springer, 2024, p. 63-72.",
+ "https://doi.org/10.1007/978-3-032-05479-1_5":
+   "Gaydamour A, Tulissi E, Mattos CT, Teixeira RHF, Shin MY, Hershey A, "
+   "Kwon A, Miranda F, Gurgel M, Barone S, Aliaga A, Yatabe M, "
+   "Zupelari-Gonçalves P, Morettin-Zupelari M, Hanauer DI, Hsu NS, Pieper S, "
+   "Caleme E, Bianchi J, Gonçalves JR, Gonçalves D, Wolford L, Ruellas ACO, "
+   "Prieto JC, Li T, Zhu H, Dai R, Styner M, Al Turkestani N, DaSilva AF, "
+   "Cevidanes L. AI-Driven Multimodal TMJ Patient Modeling: From Unstructured "
+   "Notes to Precision Treatment. In: Clinical Image-Based Procedures (CLIP "
+   "2025), held with MICCAI 2025, Lecture Notes in Computer Science vol. 16126, "
+   "Springer, 2025, p. 42-52.",
+ "https://doi.org/10.1016/j.jdent.2024.105130":
+   "Dot G, Chaurasia A, Dubois G, Savoldelli C, Haghighat S, Azimian S, "
+   "Rahbar Taramsari A, Sivaramakrishnan G, Issa J, Dubey A, Schouman T, "
+   "Gajny L. DentalSegmentator: Robust open source deep learning-based CT and "
+   "CBCT image segmentation. Journal of Dentistry, 2024, 147, 105130.",
+ "https://dentistry.unc.edu/2026/03/31/annual-meeting-highlights-asod-research-accomplishments/":
+   "Buisson A. Automated Classification of Facial Asymmetry, Identification of "
+   "Regional Asymmetry Patterns. Poster, 104th IADR General Session / 55th "
+   "AADOCR / 50th CADR, San Diego, March 25-28, 2026.",
+ "https://doi.org/10.1117/12.3087010":
+   "Sanna A, Ng J, Ruellas A, Aliaga A, Gaydamour A, Tulissi E, Huang Y, "
+   "Prieto JC, Al Turkestani N, Yatabe M, Bianchi J, Pieper S, Cevidanes L, "
+   "Li T. Automated classification of skeletal facial asymmetry in CBCT using "
+   "a reproducible 3D Slicer workflow for patient-specific decision support. "
+   "In: Gimi BS (ed.), Medical Imaging 2026: Clinical and Biomedical Imaging, "
+   "Proc. SPIE vol. 13929, 139292J. SPIE, 2026.",
+ "https://doi.org/10.1117/12.3007053":
+   "Prieto JC, Miranda F, Gurgel M, Anchling L, Hutin N, Barone S, "
+   "Al Turkestani N, Aliaga A, Yatabe M, Bianchi J, Cevidanes L. ShapeAXI: "
+   "Shape Analysis Explainability and Interpretability. Proc. SPIE 12931, "
+   "Medical Imaging 2024: Imaging Informatics for Healthcare, Research, and "
+   "Applications, 1293116, 2024.",
+ "https://projectweek.na-mic.org/PW43_2025_Montreal/Projects/"
+ "InterpretableDeepLearningForTheDetectionAndClassificationOfImpactedCanines"
+ "AndSeverityOfRootResorption/":
+   "Tulissi E, Cevidanes L, Prieto J, Bianchi J. Interpretable Deep Learning "
+   "for the Detection and Classification of Impacted Canines and severity of "
+   "root resorption. Project page, NA-MIC Project Week 43, Montreal, 2025.",
+ "https://projectweek.na-mic.org/PW45_2026_Boston/Projects/"
+ "New3DSlicerModuleToPredictSurgeryMovementForMaxillofacialSurgery/":
+   "Buisson A, Dumont P, Prieto JC, Cevidanes L, Pieper S, Dominguez MI. "
+   "New 3D Slicer Module to predict surgery movement for maxillofacial "
+   "surgery. Project page, NA-MIC Project Week 45, Boston, 2026.",
+ "https://projectweek.na-mic.org/PW45_2026_Boston/Projects/"
+ "AiAgentForSlicerautomateddentaltools/":
+   "Dumont P, Buisson A, Prieto JC, Cevidanes L, Pieper S. AI-Agent for "
+   "SlicerAutomatedDentalTools. 45th NA-MIC Project Week, Boston, 2026.",
+}
+
+# Ce qu'on cite pour un module qu'aucune publication ne decrit : l'extension
+# elle-meme, comme logiciel. Le lecteur ajoute la date a laquelle il l'a
+# consultee, les styles de revue ne la demandent pas tous.
+SOFTWARE = ("SlicerAutomatedDentalTools. DCBIA-OrthoLab. "
+            "https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools")

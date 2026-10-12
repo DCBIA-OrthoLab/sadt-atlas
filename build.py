@@ -395,55 +395,108 @@ def sync_nav():
 PAPERS_RX = re.compile(r'\n*[ \t]*<!-- papers:start -->.*?<!-- papers:end -->\n*', re.S)
 
 PAPERS_UI = {
- "fr": {"h2": "Pour aller plus loin",
-        "self": "Sur {tool} lui-même",
-        "around": "Autour de la méthode",
+ "fr": {"h2": "Comment citer",
+        "cite": "Si vous avez utilisé {tool} dans un travail de recherche, citez :",
+        "software": "Rien ne décrit le module lui-même, citez donc l'extension "
+                    "comme logiciel :",
+        "accessed": "Ajoutez la date à laquelle vous l'avez consultée si le style "
+                    "de votre revue la demande.",
+        "context": "Contexte, à ne pas citer pour l'outil",
         "free": "texte intégral libre",
         "biblio": "La bibliographie complète de l'outil, ce qui a été trouvé, et ce qui a "
                   "été cherché sans rien trouver, est dans "
                   "<a href=\"{href}\">ses sources</a>."},
- "en": {"h2": "Further reading",
-        "self": "On {tool} itself",
-        "around": "Around the method",
+ "en": {"h2": "How to cite",
+        "cite": "If you used {tool} in your research, cite:",
+        "software": "Nothing describes the module itself, so cite the extension "
+                    "as software:",
+        "accessed": "Add the date you accessed it if your journal's style asks "
+                    "for one.",
+        "context": "Background, not a citation for the tool",
         "free": "free full text",
         "biblio": "The tool's full bibliography, what was found, and what was looked for "
                   "without success, is in <a href=\"{href}\">its sources</a>."},
- "pt": {"h2": "Para saber mais",
-        "self": "Sobre o próprio {tool}",
-        "around": "Em torno do método",
+ "pt": {"h2": "Como citar",
+        "cite": "Se você usou o {tool} em uma pesquisa, cite:",
+        "software": "Nada descreve o próprio módulo, portanto cite a extensão "
+                    "como software:",
+        "accessed": "Acrescente a data de acesso se o estilo da sua revista exigir.",
+        "context": "Contexto, não é uma citação da ferramenta",
         "free": "texto completo gratuito",
         "biblio": "A bibliografia completa da ferramenta, o que foi encontrado, e o que foi "
                   "procurado sem sucesso, está em <a href=\"{href}\">suas fontes</a>."},
- "ko": {"h2": "더 읽을거리",
-        "self": "{tool} 자체에 관한 문헌",
-        "around": "방법론 관련 문헌",
+ "ko": {"h2": "인용 방법",
+        "cite": "연구에서 이 도구({tool})를 사용했다면 다음을 인용하십시오:",
+        "software": "모듈 자체를 다룬 문헌이 없으므로, 확장 기능을 소프트웨어로 "
+                    "인용하십시오:",
+        "accessed": "학술지 양식이 요구한다면 접속 날짜를 덧붙이십시오.",
+        "context": "배경 문헌, 도구 자체의 인용이 아님",
         "free": "무료 전문",
         "biblio": "이 도구의 전체 참고문헌(찾아낸 것과 찾아봤지만 없었던 것)은 "
                   "<a href=\"{href}\">출처 페이지</a>에 있습니다."},
- "th": {"h2": "อ่านเพิ่มเติม",
-        "self": "เกี่ยวกับ {tool} โดยตรง",
-        "around": "เกี่ยวกับวิธีการ",
+ "th": {"h2": "วิธีอ้างอิง",
+        "cite": "หากคุณใช้ {tool} ในงานวิจัย ให้อ้างอิง:",
+        "software": "ไม่มีเอกสารที่อธิบายโมดูลนี้โดยตรง "
+                    "จึงให้อ้างอิงส่วนขยายในฐานะซอฟต์แวร์:",
+        "accessed": "หากรูปแบบของวารสารกำหนด ให้เพิ่มวันที่ที่คุณเข้าถึงด้วย",
+        "context": "เอกสารประกอบ ไม่ใช่การอ้างอิงเครื่องมือ",
         "free": "ฉบับเต็มอ่านฟรี",
         "biblio": "บรรณานุกรมทั้งหมดของเครื่องมือนี้ (ทั้งสิ่งที่พบ และสิ่งที่ค้นแล้วไม่พบ) "
                   "อยู่ใน<a href=\"{href}\">หน้าแหล่งอ้างอิง</a>"},
 }
 
 
+def source_label(url):
+    """De quoi étiqueter le lien d'un papier, sans dépendre de la langue."""
+    if "doi.org/" in url:
+        return "doi:" + url.split("doi.org/", 1)[1]
+    if "arxiv.org/abs/" in url:
+        return "arXiv:" + url.split("/abs/", 1)[1]
+    return url.split("//", 1)[-1].split("/", 1)[0]
+
+
 def papers_block(lang, tool):
-    """Section « Pour aller plus loin » d'une page du Guide, depuis papers.py."""
+    """Section « Comment citer » d'une page du Guide, depuis papers.py.
+
+    Les entrées « self » sont ce qu'on cite pour l'outil : chacune sort sa
+    référence entière dans un <pre class="cite">, donc copiable d'un clic
+    puisque site.js pose un bouton sur tout `.content pre`. Les entrées
+    « around » restent des lectures de contexte, en liste compacte, parce que
+    ce n'est pas ce qu'on cite pour l'outil. Un module qu'aucune publication
+    ne décrit renvoie sur l'extension elle-même, citée comme logiciel.
+    """
     d = papers.PAPERS.get(tool)
     if not d:
         return None
     ui = PAPERS_UI[lang]
     out = ["      <!-- papers:start -->",
-           f'      <h2 id="lire-plus">{ui["h2"]}</h2>']
+           f'      <h2 id="citer">{ui["h2"]}</h2>']
     note = d.get("note")
     if note:
         out.append(f'      <p>{note[lang]}</p>')
 
-    def items(entries):
+    if d["self"]:
+        out.append(f'      <h3 id="a-citer">{ui["cite"].format(tool=tool)}</h3>')
+        for e in d["self"]:
+            ref = papers.CITATIONS.get(e["url"])
+            if not ref:
+                print(f"  ! {tool} : {e['url']} sans citation dans papers.CITATIONS")
+                ref = e["ref"]
+            extra = ""
+            if e.get("free"):
+                extra = f' <a href="{e["free"]}">{ui["free"]}</a>.'
+            out.append(f'      <pre class="cite">{html.escape(ref, quote=False)}</pre>')
+            out.append(f'      <p><a href="{e["url"]}">{source_label(e["url"])}</a>. '
+                       f'{e[lang]}{extra}</p>')
+    else:
+        out.append(f'      <h3 id="a-citer">{ui["software"]}</h3>')
+        out.append(f'      <pre class="cite">{html.escape(papers.SOFTWARE, quote=False)}</pre>')
+        out.append(f'      <p>{ui["accessed"]}</p>')
+
+    if d["around"]:
+        out.append(f'      <h3 id="contexte">{ui["context"]}</h3>')
         lines = ["      <ul>"]
-        for e in entries:
+        for e in d["around"]:
             title = html.escape(e["title"], quote=False)
             extra = ""
             if e.get("free"):
@@ -452,14 +505,8 @@ def papers_block(lang, tool):
                 f'        <li><strong>{html.escape(e["ref"], quote=False)}</strong>: '
                 f'<a href="{e["url"]}"><em>{title}</em></a>. {e[lang]}{extra}</li>')
         lines.append("      </ul>")
-        return lines
+        out += lines
 
-    if d["self"]:
-        out.append(f'      <h3 id="sur-outil">{ui["self"].format(tool=tool)}</h3>')
-        out += items(d["self"])
-    if d["around"]:
-        out.append(f'      <h3 id="autour">{ui["around"]}</h3>')
-        out += items(d["around"])
     out.append("      <p>" + ui["biblio"].format(href=f"../{tool}/SOURCES.html") + "</p>")
     out.append("      <!-- papers:end -->")
     return "\n".join(out) + "\n"
@@ -671,8 +718,8 @@ GUIDE_ABOUT = {
         attendues, leur format, et ce qui ressort à la fin.</li>
         <li><strong>Marche à suivre</strong> : les étapes dans l'ordre, champ par champ.</li>
         <li><strong>Si ça coince</strong> : les échecs fréquents et ce qui les provoque.</li>
-        <li><strong>Pour aller plus loin</strong> : les publications derrière l'outil quand
-        il y en a, et le renvoi vers la fiche Atlas.</li>
+        <li><strong>Comment citer</strong> : la référence à citer dans un papier quand
+        l'outil en a une, et le renvoi vers la fiche Atlas.</li>
       </ul>
 
       <h2 id="commencer">Par où commencer</h2>
@@ -721,8 +768,8 @@ GUIDE_ABOUT = {
         <li><strong>Step by step</strong>: the steps in order, field by field.</li>
         <li><strong>When it goes wrong</strong>: the common failures and what causes
         them.</li>
-        <li><strong>Further reading</strong>: the publications behind the tool where there
-        are any, and the pointer to the Atlas page.</li>
+        <li><strong>How to cite</strong>: the reference to cite in a paper where the tool
+        has one, and the pointer to the Atlas page.</li>
       </ul>
 
       <h2 id="commencer">Where to start</h2>
@@ -772,8 +819,8 @@ GUIDE_ABOUT = {
         <li><strong>Passo a passo</strong>: as etapas em ordem, campo por campo.</li>
         <li><strong>Se algo der errado</strong>: as falhas frequentes e o que as
         provoca.</li>
-        <li><strong>Para saber mais</strong>: as publicações por trás da ferramenta, quando
-        existem, e o link para a página do Atlas.</li>
+        <li><strong>Como citar</strong>: a referência a citar em um artigo quando a
+        ferramenta tem uma, e o link para a página do Atlas.</li>
       </ul>
 
       <h2 id="commencer">Por onde começar</h2>
@@ -821,8 +868,8 @@ GUIDE_ABOUT = {
         결과물.</li>
         <li><strong>사용 절차</strong>: 순서대로, 항목 하나하나.</li>
         <li><strong>문제가 생기면</strong>: 자주 일어나는 실패와 그 원인.</li>
-        <li><strong>더 읽을거리</strong>: 도구의 바탕이 된 논문(있는 경우)과 아틀라스
-        페이지로 가는 링크.</li>
+        <li><strong>인용 방법</strong>: 도구에 논문이 있는 경우 인용할 참고문헌과
+        아틀라스 페이지로 가는 링크.</li>
       </ul>
 
       <h2 id="commencer">어디서 시작할까</h2>
@@ -867,7 +914,7 @@ GUIDE_ABOUT = {
         และผลลัพธ์ที่ได้ในตอนท้าย</li>
         <li><strong>ขั้นตอน</strong>: ขั้นตอนตามลำดับ ทีละช่อง</li>
         <li><strong>หากเกิดปัญหา</strong>: ความล้มเหลวที่พบบ่อยและสาเหตุ</li>
-        <li><strong>อ่านเพิ่มเติม</strong>: บทความเบื้องหลังเครื่องมือ (ถ้ามี)
+        <li><strong>วิธีอ้างอิง</strong>: เอกสารอ้างอิงที่ต้องใช้ในบทความเมื่อเครื่องมือมี
         และลิงก์ไปยังหน้าแอตลาส</li>
       </ul>
 
