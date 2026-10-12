@@ -186,23 +186,75 @@
 
       <h3 id="arbre-appels">L'arbre d'appels, mode « Full pipeline » + « Asymmetry Assesment » + « Quantitative + Visualization »</h3>
 
-      <pre class="ascii">T1 (CBCT brut)
- ├─ resample 0.3mm iso, centré           -&gt; T1 Resample/CBCT
- ├─ PRE_ASO x2 (MAX, CB)                 -&gt; Centered T1 Scans/{MAX,CB} (+ .tfm)
- ├─ ALI (6 lm MAX) ─ SEMI_ASO(occlusal+midsag) -&gt; Oriented T1 Scans/MAX
- ├─ ALI (7 lm CB)  ─ SEMI_ASO(Frankfort+midsag) -&gt; Oriented T1 Scans/CB
- ├─ AMASSS CBMASK,MANDMASK (sur CB) et MAXMASK (sur MAX) -&gt; T1 Masks
- ├─ AutoMatrix(Matrix_mirror.tfm) sur les scans orientés -&gt; T2_Scan/{CB,MAX}
- ├─ AREG x3 (CB, MAX, MAND)              -&gt; Registered Scan/&lt;region&gt;/&lt;pat&gt;_OutReg/
- ├─ ALI (tous les landmarks, sur CB)     -&gt; T1 Landmarks/CB
- ├─ derive_landmarks (CB -&gt; MAX, rigide) -&gt; T1 Landmarks/MAX
- ├─ AutoMatrix miroir sur les landmarks  -&gt; Mirrored Landmarks/{CB,MAX}
- ├─ AutoMatrix matrices AREG x3          -&gt; Mirrored &amp; Registered Landmarks/{CB,MAND,MAX}
- ├─ AQ3DC x3 (CB, MAND, MAX)             -&gt; Measurements/Measurements_*.xlsx
- ├─ postprocess                          -&gt; Measurements/PostProcess_Measurements.xlsx
- ├─ VFACE_CLI (LightGBM)                 -&gt; Classification/Classification.xlsx
- ├─ BDS x5 (nnU-Net)                     -&gt; VTK Files/{T1 CB,T1 MAX,T2 CB,T2 MAND,T2 MAX}
- └─ ModelToModel Distance x3             -&gt; Heatmaps/</pre>
+      <div class="pipe">
+        <p class="pipe-seed"><code>T1</code> &mdash; un seul CBCT brut, rien d&rsquo;autre</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>Préparation</h4>
+          <ol>
+            <li><span class="pipe-act">rééchantillonner à 0,3&nbsp;mm isotrope, centré</span>
+                <span class="pipe-out"><code>T1 Resample/CBCT</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO</a> &times;2, pour le maxillaire et la base du crâne</span>
+                <span class="pipe-out"><code>Centered T1 Scans/{MAX,CB}</code> + <code>.tfm</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> place 6 landmarks maxillaires, puis <a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> oriente sur occlusal + mi-sagittal</span>
+                <span class="pipe-out"><code>Oriented T1 Scans/MAX</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> place 7 landmarks de base du crâne, puis <a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> oriente sur Francfort + mi-sagittal</span>
+                <span class="pipe-out"><code>Oriented T1 Scans/CB</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> segmente <code>CBMASK</code> et <code>MANDMASK</code> sur le scan CB, <code>MAXMASK</code> sur le scan MAX</span>
+                <span class="pipe-out"><code>T1 Masks</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="mirror">
+          <h4>Miroir</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html#mirror">AutoMatrix</a> applique <code>Matrix_mirror.tfm</code> aux scans orientés &mdash; <strong>c&rsquo;est de là que vient le &laquo;&nbsp;T2&nbsp;&raquo;</strong></span>
+                <span class="pipe-out"><code>T2_Scan/{CB,MAX}</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="reg">
+          <h4>Recalage</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AREG_CBCT/AREG_CBCT.html#recalage">AREG</a> &times;3, une fois par région &mdash; base du crâne, maxillaire, mandibule</span>
+                <span class="pipe-out"><code>Registered Scan/&lt;region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>Mesures</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> place tous les landmarks de mesure, sur le scan CB</span>
+                <span class="pipe-out"><code>T1 Landmarks/CB</code></span></li>
+            <li><span class="pipe-act"><code>derive_landmarks</code> les reporte de CB&nbsp;&rarr;&nbsp;MAX par un ajustement rigide</span>
+                <span class="pipe-out"><code>T1 Landmarks/MAX</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html#mirror">AutoMatrix</a> fait le miroir des landmarks</span>
+                <span class="pipe-out"><code>Mirrored Landmarks/{CB,MAX}</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html#from-areg">AutoMatrix</a> leur applique les trois matrices AREG</span>
+                <span class="pipe-out"><code>Mirrored &amp; Registered Landmarks/{CB,MAND,MAX}</code></span></li>
+            <li><span class="pipe-act"><code>AQ3DC</code> &times;3 mesure distances et angles</span>
+                <span class="pipe-out"><code>Measurements/Measurements_*.xlsx</code></span></li>
+            <li><span class="pipe-act">le post-traitement assemble la ligne de features</span>
+                <span class="pipe-out"><code>Measurements/PostProcess_Measurements.xlsx</code></span></li>
+            <li><span class="pipe-act"><code>VFACE_CLI</code> fait tourner les trois modèles <a class="gterm" href="../glossaire.html#g-lightgbm" title="Voir au glossaire">LightGBM</a></span>
+                <span class="pipe-out"><code>Classification/Classification.xlsx</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="viz">
+          <h4>Visualisation</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../BatchDentalSeg/BatchDentalSeg.html#sorties">BatchDentalSeg</a> &times;5 construit les surfaces osseuses</span>
+                <span class="pipe-out"><code>VTK Files/{T1 CB,T1 MAX,T2 CB,T2 MAND,T2 MAX}</code></span></li>
+            <li><span class="pipe-act"><code>ModelToModel Distance</code> &times;3 écrit les cartes d&rsquo;asymétrie</span>
+                <span class="pipe-out"><code>Heatmaps/</code></span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">Les noms de phase sont ceux du module, pris dans
+        <code>VFACE_utils/review_steps.py</code> ; <code>mirror_masks</code> est laissé de côté
+        parce qu&rsquo;il n&rsquo;existe qu&rsquo;en mode <code>CMFReg</code>.</p>
+      </div>
 
       <p>Le PDF <code>Janson module.pdf</code> est le schéma
       de ce pipeline (extractible avec <code>pdftotext</code>), utile pour lire le code.</p>
@@ -357,15 +409,15 @@
           <span class="v3d-ramp-lo">&minus;35&nbsp;mm</span><i></i><span class="v3d-ramp-hi">+35&nbsp;mm</span>
         </div>
         <ol class="v3d-chips v3d-steps">
-          <li data-step="0">0. <strong>en amont</strong> &mdash; ALI + <code>semi_aso_cbct</code> : le plan mi-sagittal sur x = 0</li>
+          <li data-step="0">0. <code>t1_oriented_cb</code> &mdash; <code>semi_aso_cbct</code> tourne le patient de 2,67&deg; sur le plan x = 0</li>
           <li data-step="1">1. <code>t1_landmarks</code> &mdash; les 26 points qu'ALI a prédits ici</li>
           <li data-step="2">2. <code>t1_masks</code> &mdash; AMASSS : les surfaces osseuses sur lesquelles les cartes sont mesurées</li>
           <li data-step="3">3. <code>mirror_scans</code> &mdash; <code>diag(-1, 1, 1)</code>, une réflexion par rapport à x = 0</li>
-          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; sur <em>une seule</em> structure</li>
+          <li data-step="4">4. <code>registration_cb</code> / <code>_max</code> / <code>_mand</code> &mdash; sur <em>une seule</em> structure, les landmarks convergent</li>
           <li data-step="5">5. <code>bone_surfaces</code> &mdash; la carte <code>ModelDistance</code> propre à VFACE</li>
         </ol>
         <span class="v3d-i18n" hidden>
-          <i data-k="orient">orienté : le plan mi-sagittal repose maintenant sur x = 0</i>
+          <i data-k="orient">semi_aso_cbct tourne le patient jusqu'à ce que le plan mi-sagittal repose sur x = 0</i>
           <i data-k="lm">les landmarks prédits par ALI</i>
           <i data-k="masks">AMASSS segmente l'os sur lequel les cartes seront mesurées</i>
           <i data-k="mirror">réflexion par rapport à x = 0</i>
@@ -373,6 +425,8 @@
           <i data-k="register">la matrice propre à AREG &mdash; cette structure seulement</i>
           <i data-k="map">ModelDistance, la carte propre à VFACE</i>
           <i data-k="absmed">|d| médian</i>
+          <i data-k="pairs">paires contralatérales</i>
+          <i data-k="median">médiane</i>
         </span>
         <figcaption>
         Un vrai run de VFACE, pas une reconstitution. Tout ici sort de l'outil sur son
@@ -406,9 +460,12 @@
         du crâne couvre tout le crâne, celle du maxillaire le seul crâne supérieur, celle de
         la mandibule la seule mandibule &mdash; de sorte que, quand une carte ne couvre
         qu'une structure, le reste du crâne reste en gris neutre derrière elle. Leurs plages
-        vont de &plusmn;2,6&nbsp;mm à &plusmn;32 : chaque carte porte donc sa propre
-        échelle, montrée dans la barre ; comparez-les sur les chiffres de la ligne d'état,
-        pas sur la teinte. Le bleu est négatif, le rouge positif, le gris pâle vaut zéro
+        mesurées vont de &plusmn;2,6&nbsp;mm à &plusmn;32 : chaque carte porte donc sa propre
+        échelle, montrée dans la barre et fixée à son 95e centile plutôt qu'à son maximum
+        &mdash; base du crâne &plusmn;25&nbsp;mm, maxillaire &plusmn;5, mandibule
+        &plusmn;2,5, en saturant moins de 3&nbsp;% des sommets. Réglée sur le maximum, la
+        carte de la base du crâne restait presque partout dans le pâle du milieu de la
+        rampe ; comparez-les sur les chiffres de la ligne d'état, pas sur la teinte. Le bleu est négatif, le rouge positif, le gris pâle vaut zéro
         &mdash; la distance est signée, telle que VFACE l'écrit. <strong>Ce qui n'est pas
         montré, et pourquoi.</strong> Les deux étapes d'orientation n'animent aucune
         rotation : ce scan arrive déjà orienté, la pose dont il vient n'existe donc nulle
@@ -418,10 +475,18 @@
         les cinq compositions candidates c'est <code>inv(CB)&middot;MAX</code> qui l'amène
         sur les autres à 0,23&nbsp;mm près, contre 3,38 pour l'identité ; deviner aurait
         donc laissé un ou deux degrés d'écart sans que rien ne paraisse cassé. Les surfaces
-        sont décimées à environ 26&nbsp;000 triangles pour le navigateur, et chaque sommet
-        conserve la distance relevée au sommet le plus proche de la surface en pleine
-        résolution plutôt qu'une valeur interpolée quadriquement, qui dépassait de
-        6&nbsp;mm la plage mesurée.
+        sont décimées à environ 40&nbsp;000 triangles pour le navigateur &mdash; la surface
+        fusionnée que produit VFACE en porte 2,77&nbsp;millions, ce que vous voyez est donc
+        un échantillon d'un champ bien plus riche. Trois choix gardent cet échantillon
+        fidèle, et chacun est une correction : la surface est lissée <em>avant</em>
+        décimation plutôt qu'après (décimer d'abord puis lisser déplaçait les sommets d'une
+        médiane de 0,74&nbsp;mm, jusqu'à 3,03, hors de la surface sur laquelle la distance
+        avait été mesurée) ; ses 243 îlots déconnectés sont retirés ; et chaque sommet
+        moyenne la distance sur ses 12 voisins les plus proches en pleine résolution au lieu
+        d'en copier un seul (un échantillon unique s'écartait de la moyenne locale jusqu'à
+        23&nbsp;mm aux discontinuités, ce qui mouchetait la carte). Rien n'est extrapolé :
+        chaque sommet montre une moyenne de valeurs que VFACE a réellement mesurées dans son
+        voisinage immédiat.
         <strong>Deux corrections qui méritent d'être consignées.</strong> Une version
         antérieure de cette figure recalait le miroir avec un ICP écrit pour la page, parce
         que cette sortie n'avait pas encore été trouvée. Cet ICP glissait sur le maxillaire
@@ -432,6 +497,34 @@
         sens : le miroir tournait donc à l'envers sur son chemin vers la pose recalée
         &mdash; un lecteur l'a vu sur la page avant le générateur, et c'est pourquoi le sens
         est désormais mesuré à chaque build au lieu de reposer sur une convention.
+        <strong>Le plan, et comment il est calculé : il ne l'est pas.</strong>
+        x&nbsp;=&nbsp;0 est un plan du monde, fixé par le fait que
+        <code>Matrix_mirror.tfm</code> vaut <code>diag(-1, 1, 1)</code>, translation nulle et
+        paramètres fixes nuls. Rien n'ajuste un plan à ce patient. Ce qui est calculé, c'est
+        l'<em>orientation</em> qui amène le patient dessus : ALI place les landmarks, puis
+        <code>semi_aso_cbct</code> fait une initialisation à 3 landmarks suivie d'un ICP
+        rigide sur un étalon, et ici cela donne une rotation de 2,67&deg;. L'étape&nbsp;0 la
+        joue pour de vrai &mdash; une version antérieure de cette légende affirmait que la
+        pose d'avant orientation &laquo;&nbsp;n'existe nulle part&nbsp;&raquo;, ce qui était
+        simplement faux : elle est dans <code>Centered T1 Scans</code>, et la transformation
+        écrite par VFACE fait le lien entre les deux. Son sens a été mesuré, pas supposé.
+        <strong>À l'étape&nbsp;4 les landmarks restent à l'écran</strong>, pour que vous
+        puissiez voir si le recalage les rapproche vraiment. Comme le miroir échange gauche
+        et droite, chaque point miroir est apparié à son homologue <em>contralatéral</em>
+        &mdash; RGo contre LGo &mdash; ce que la section sur la mesure explique déjà ;
+        apparier chaque label avec lui-même donne 51&nbsp;mm d'absurdité, l'appariement
+        contralatéral donne 4,70&nbsp;mm avant recalage. Distance médiane après recalage :
+        1,57&nbsp;mm sur la base du crâne, 2,16 sur la mandibule, et <strong>12,84 sur le
+        maxillaire contre 12,79 avant &mdash; celui-là ne converge pas du tout</strong>, ce
+        qui est la même faiblesse que montrait déjà son ajustement de surface relâché. Les
+        deux extrémités sont mesurées ; seul le chemin entre elles est interpolé.
+        <strong>Un défaut trouvé dans la sortie publiée.</strong> Ces positions recalées sont
+        ici recalculées depuis la matrice vérifiée plutôt que lues dans
+        <code>Mirrored &amp; Registered Landmarks</code>, car ce dossier s'accorde avec la
+        matrice à 0,04&nbsp;mm pour le maxillaire et 0,13 pour la mandibule, mais s'en écarte
+        de 20,02&nbsp;mm pour la base du crâne &mdash; ses points sont décalés en bloc rigide
+        d'environ 23&nbsp;mm en x et s'<em>éloignent</em> de la cible. L'accord sur les deux
+        autres est aussi la preuve la plus forte que l'inverse est le bon sens.
         </figcaption>
       </figure>
 
