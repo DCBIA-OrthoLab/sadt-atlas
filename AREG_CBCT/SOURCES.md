@@ -1,4 +1,4 @@
-# AREG_CBCT — sources
+# AREG_CBCT : sources
 
 AREG_CBCT est publié **une seule fois**, dans un chapitre d'actes d'atelier
 MICCAI (LNCS 14242, 2023) qu'il partage avec ASO : le même texte décrit
@@ -22,12 +22,12 @@ développement interne.
 
 | Fichier | Référence | Type | DOI / ID |
 |---|---|---|---|
-| `2024_Barone_VSP_ClasseIII_voxel_based.xml` / `.txt` | Barone S., Cevidanes L., Miranda F., Gurgel M.L., Anchling L., Hutin N., Bianchi J., Goncalves J.R., Giudice A. *Enhancing skeletal stability and Class III correction through active orthodontist engagement in virtual surgical planning: A voxel-based 3-dimensional analysis.* American Journal of Orthodontics and Dentofacial Orthopedics, 165(3):321-331, 2024. | Article de revue, texte intégral JATS (Europe PMC) + texte brut — licence CC-BY | [10.1016/j.ajodo.2023.09.016](https://doi.org/10.1016/j.ajodo.2023.09.016) — PMID 38010236, PMCID **PMC10923113** |
-| `2022_Gillot_AMASSS_skull_segmentation.pdf` | Gillot M., Baquero B., Le C., Deleat-Besson R., Bianchi J., Ruellas A., Gurgel M., Yatabe M., Al Turkestani N., Najarian K., Soroushmehr R., Pieper S., Kikinis R., Paniagua B., Gryak J., Ioshida M., Massaro C., Gomes L., Oh H., Evangelista K., Chaves Junior C.M., Garib D., Costa F., Benavides E., Soki F., Fillion-Robin J.-C., Joshi H., Cevidanes L., Prieto J.C. *Automatic multi-anatomical skull structure segmentation of cone-beam computed tomography scans using 3D UNETR.* PLOS ONE, 17(10):e0275033, 2022. | Article de revue, PDF éditeur (CC-BY) | [10.1371/journal.pone.0275033](https://doi.org/10.1371/journal.pone.0275033) — PMID 36223330, PMCID PMC9555672 |
-| `2016_Ruellas_mandibular_regions_reference.pdf` | Ruellas A.C.O., Yatabe M.S., Souki B.Q., Benavides E., Nguyen T., Luiz R.R., Franchi L., Cevidanes L.H.S. *3D Mandibular Superimposition: Comparison of Regions of Reference for Voxel-Based Registration.* PLOS ONE, 11(6):e0157625, 2016. | Article de revue, PDF éditeur (CC-BY) | [10.1371/journal.pone.0157625](https://doi.org/10.1371/journal.pone.0157625) — PMID 27336366, PMCID PMC4919005 |
-| `2016_Ruellas_maxillary_regions_reference.pdf` | Ruellas A.C.O., Huanca Ghislanzoni L.T., Gomes M.R., Danesi C., Lione R., Nguyen T., McNamara J.A., Cozza P., Franchi L., Cevidanes L.H.S. *Comparison and reproducibility of 2 regions of reference for maxillary regional registration with cone-beam computed tomography.* American Journal of Orthodontics and Dentofacial Orthopedics, 149(4):533-542, 2016. | Article de revue, version auteur déposée (Archive ouverte UNIGE) | [10.1016/j.ajodo.2015.09.026](https://doi.org/10.1016/j.ajodo.2015.09.026) — PMID 27021458, PMCID PMC4817360 — [unige:104234](https://archive-ouverte.unige.ch/unige:104234) |
-| `2011_Nada_voxel_based_cranial_base.pdf` | Nada R.M., Maal T.J.J., Breuning K.H., Bergé S.J., Mostafa Y.A., Kuijpers-Jagtman A.M. *Accuracy and reproducibility of voxel based superimposition of cone beam computed tomography models on the anterior cranial base and the zygomatic arches.* PLOS ONE, 6(2):e16520, 2011. | Article de revue, PDF éditeur (CC-BY) | [10.1371/journal.pone.0016520](https://doi.org/10.1371/journal.pone.0016520) — PMID 21347419, PMCID PMC3036654 |
-| `2020_PonceGarcia_measurement_error_superimposition.xml` / `.txt` | Ponce-Garcia C., Ruellas A.C.O., Cevidanes L.H.S., Flores-Mir C., Carey J.P., Lagravere-Vich M. *Measurement error and reliability of three available 3D superimposition methods in growing patients.* Head & Face Medicine, 16(1):1, 2020. | Article de revue, texte intégral JATS (Europe PMC) + texte brut — CC-BY | [10.1186/s13005-020-0215-7](https://doi.org/10.1186/s13005-020-0215-7) — PMID 31987041, PMCID PMC6983972 |
+| `2024_Barone_VSP_ClasseIII_voxel_based.xml` / `.txt` | Barone S., Cevidanes L., Miranda F., Gurgel M.L., Anchling L., Hutin N., Bianchi J., Goncalves J.R., Giudice A. *Enhancing skeletal stability and Class III correction through active orthodontist engagement in virtual surgical planning: A voxel-based 3-dimensional analysis.* American Journal of Orthodontics and Dentofacial Orthopedics, 165(3):321-331, 2024. | Article de revue, texte intégral JATS (Europe PMC) + texte brut, licence CC-BY | [10.1016/j.ajodo.2023.09.016](https://doi.org/10.1016/j.ajodo.2023.09.016), PMID 38010236, PMCID **PMC10923113** |
+| `2022_Gillot_AMASSS_skull_segmentation.pdf` | Gillot M., Baquero B., Le C., Deleat-Besson R., Bianchi J., Ruellas A., Gurgel M., Yatabe M., Al Turkestani N., Najarian K., Soroushmehr R., Pieper S., Kikinis R., Paniagua B., Gryak J., Ioshida M., Massaro C., Gomes L., Oh H., Evangelista K., Chaves Junior C.M., Garib D., Costa F., Benavides E., Soki F., Fillion-Robin J.-C., Joshi H., Cevidanes L., Prieto J.C. *Automatic multi-anatomical skull structure segmentation of cone-beam computed tomography scans using 3D UNETR.* PLOS ONE, 17(10):e0275033, 2022. | Article de revue, PDF éditeur (CC-BY) | [10.1371/journal.pone.0275033](https://doi.org/10.1371/journal.pone.0275033), PMID 36223330, PMCID PMC9555672 |
+| `2016_Ruellas_mandibular_regions_reference.pdf` | Ruellas A.C.O., Yatabe M.S., Souki B.Q., Benavides E., Nguyen T., Luiz R.R., Franchi L., Cevidanes L.H.S. *3D Mandibular Superimposition: Comparison of Regions of Reference for Voxel-Based Registration.* PLOS ONE, 11(6):e0157625, 2016. | Article de revue, PDF éditeur (CC-BY) | [10.1371/journal.pone.0157625](https://doi.org/10.1371/journal.pone.0157625), PMID 27336366, PMCID PMC4919005 |
+| `2016_Ruellas_maxillary_regions_reference.pdf` | Ruellas A.C.O., Huanca Ghislanzoni L.T., Gomes M.R., Danesi C., Lione R., Nguyen T., McNamara J.A., Cozza P., Franchi L., Cevidanes L.H.S. *Comparison and reproducibility of 2 regions of reference for maxillary regional registration with cone-beam computed tomography.* American Journal of Orthodontics and Dentofacial Orthopedics, 149(4):533-542, 2016. | Article de revue, version auteur déposée (Archive ouverte UNIGE) | [10.1016/j.ajodo.2015.09.026](https://doi.org/10.1016/j.ajodo.2015.09.026), PMID 27021458, PMCID PMC4817360, [unige:104234](https://archive-ouverte.unige.ch/unige:104234) |
+| `2011_Nada_voxel_based_cranial_base.pdf` | Nada R.M., Maal T.J.J., Breuning K.H., Bergé S.J., Mostafa Y.A., Kuijpers-Jagtman A.M. *Accuracy and reproducibility of voxel based superimposition of cone beam computed tomography models on the anterior cranial base and the zygomatic arches.* PLOS ONE, 6(2):e16520, 2011. | Article de revue, PDF éditeur (CC-BY) | [10.1371/journal.pone.0016520](https://doi.org/10.1371/journal.pone.0016520), PMID 21347419, PMCID PMC3036654 |
+| `2020_PonceGarcia_measurement_error_superimposition.xml` / `.txt` | Ponce-Garcia C., Ruellas A.C.O., Cevidanes L.H.S., Flores-Mir C., Carey J.P., Lagravere-Vich M. *Measurement error and reliability of three available 3D superimposition methods in growing patients.* Head & Face Medicine, 16(1):1, 2020. | Article de revue, texte intégral JATS (Europe PMC) + texte brut, CC-BY | [10.1186/s13005-020-0215-7](https://doi.org/10.1186/s13005-020-0215-7), PMID 31987041, PMCID PMC6983972 |
 
 ## À consulter en ligne (pas librement téléchargeable)
 
@@ -51,7 +51,7 @@ méthode.
   la rend plus utile, pas moins.
 - **Ruellas 2016 (mandibule)** et **Ruellas 2016 (maxillaire)** : les deux
   articles qui ont fixé les **régions de référence** utilisées par le recalage
-  régional — corps mandibulaire / symphyse d'un côté, région palatine de l'autre.
+  régional, corps mandibulaire / symphyse d'un côté, région palatine de l'autre.
   Ce sont eux qui justifient les masques passés à AREG, pas le chapitre LNCS.
 - **Ponce-Garcia 2020 (Head & Face Medicine)** : erreur de mesure et
   reproductibilité de trois méthodes de superposition 3D chez le patient en
@@ -59,7 +59,7 @@ méthode.
   l'erreur à laquelle comparer AREG.
 - **Gillot 2022 (AMASSS)** : le segmenteur qui produit les masques de région de
   référence consommés par AREG. Décrit la version UNETR, **plus celle qui
-  tourne** (nnU-Net v2 aujourd'hui) — voir `../AMASSS/SOURCES.md`.
+  tourne** (nnU-Net v2 aujourd'hui) : voir `../AMASSS/SOURCES.md`.
 - **Barone 2024 (AJODO)** : chirurgie orthognathique de Classe III, analyse
   voxel-based ; l'article indique explicitement que « des outils automatisés
   fondés sur l'apprentissage profond ont été utilisés pour l'orientation, le
@@ -67,9 +67,9 @@ méthode.
   dans 3D Slicer. C'est un usage clinique de la chaîne ASO + AREG + AMASSS + ALI,
   pas une validation de l'outil.
 - Pages NA-MIC Project Week, sans DOI, utiles pour dater les étapes :
-  [PW39 2023 Montréal — Automated Registration of CBCT](https://projectweek.na-mic.org/PW39_2023_Montreal/Projects/AutomatedRegistrationCBCT/)
+  [PW39 2023 Montréal, Automated Registration of CBCT](https://projectweek.na-mic.org/PW39_2023_Montreal/Projects/AutomatedRegistrationCBCT/)
   (Anchling, Hutin, Gurgel, Barone, Miranda, Roberts, Prieto, Cevidanes) et
-  [PW40 2024 Gran Canaria — maintenance](https://projectweek.na-mic.org/PW40_2024_GranCanaria/Projects/AutomatedRegistrationOfConeBeanComputedTomographyScansMaintenance/)
+  [PW40 2024 Gran Canaria, maintenance](https://projectweek.na-mic.org/PW40_2024_GranCanaria/Projects/AutomatedRegistrationOfConeBeanComputedTomographyScansMaintenance/)
   (Claret, Leroux, Caleme, Mattos, Cevidanes, Prieto).
 - Dépôts de code, sans DOI : [lucanchling/AREG](https://github.com/lucanchling/AREG),
   [DCBIA-OrthoLab/SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools).
@@ -90,13 +90,13 @@ méthode.
 ## Comment le texte intégral a été récupéré
 
 Le chapitre est payant chez Springer, mais le **manuscrit auteur** déposé au NIH
-est libre d'accès. Deux recettes échouent dessus et une marche — noté ici pour
+est libre d'accès. Deux recettes échouent dessus et une marche, noté ici pour
 éviter de refaire le tour :
 
 | Voie | Résultat sur ce PMCID |
 |---|---|
 | `pmc.ncbi.nlm.nih.gov/.../pdf/` | HTML anti-bot |
-| API BioC `pmcoa.cgi` | « No result can be found » — elle ne sert que l'*open access subset* |
+| API BioC `pmcoa.cgi` | « No result can be found » : elle ne sert que l'*open access subset* |
 | **`eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=<numéro>`** | **JATS complet, corps inclus** |
 
 ```

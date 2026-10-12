@@ -1,4 +1,4 @@
-# MRI2CBCT — pipeline complet
+# MRI2CBCT : pipeline complet
 
 Recalage rigide multimodal IRM → CBCT de l'ATM. Six étapes indépendantes, chacune
 avec son bouton et son CLI, qui se terminent par un elastix rigide en information
@@ -52,7 +52,7 @@ lui-même et est rappelée en tête de chaque action. CUDA est optionnel :
 | [MRI2CBCT_REG](MRI2CBCT_CLI/MRI2CBCT_REG/MRI2CBCT_REG.py) | `registration_MR2CBCT` | inversion, normalisation, masque, elastix |
 
 Les paramètres passent par `slicer.cli.run`, qui sérialise une liste ou un tuple en
-`str(value)` amputé de ses crochets (`slicer/cli.py:setNodeParameters`) — d'où les
+`str(value)` amputé de ses crochets (`slicer/cli.py:setNodeParameters`) : d'où les
 `split(',')` et le `re.findall(r'\d+')` côté CLI.
 
 ## 3. L'ordre du pipeline, et ce qui est vraiment obligatoire
@@ -89,7 +89,7 @@ convention de nommage stricte, vérifiée par `get_corresponding_file`
 `modify_image_properties`. **Aucun resampling : réécriture d'en-tête.** Le tableau
 de voxels n'est pas touché, seuls `Direction`, `Spacing[2]` et `Origin` changent.
 
-1. `SetDirection(new_direction)` — matrice 3×3 issue de la table de cases à cocher,
+1. `SetDirection(new_direction)`, matrice 3×3 issue de la table de cases à cocher,
    aplatie en ligne par `getCheckboxValuesOrient`
    ([MRI2CBCT.py:847](MRI2CBCT/MRI2CBCT.py#L847)) ; défaut `(0,0,-1, 1,0,0, 0,-1,0)`
    ([MRI2CBCT.py:866](MRI2CBCT/MRI2CBCT.py#L866)), la valeur commentée
@@ -110,7 +110,7 @@ Sortie : `<id>_OR.nii` ou `<id>_OR.nii.gz`, selon l'extension d'entrée.
 
 ## 5. Cropping
 
-### 5.1 L/R crop — [LR_crop.py](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/LR_crop.py)
+### 5.1 L/R crop : [LR_crop.py](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/LR_crop.py)
 
 Purement géométrique, `sitk.RegionOfInterest`, moitié/moitié.
 
@@ -125,7 +125,7 @@ Purement géométrique, `sitk.RegionOfInterest`, moitié/moitié.
 Sorties dans `<output>/CBCT`, `/MRI`, `/Seg`. Les suffixes `left`/`right` sont
 ensuite relus par le resample, par simple `in input_path.lower()`.
 
-### 5.2 TMJ crop — [MRI2CBCT_TMJ_CROP.py](MRI2CBCT_CLI/MRI2CBCT_TMJ_CROP/MRI2CBCT_TMJ_CROP.py)
+### 5.2 TMJ crop : [MRI2CBCT_TMJ_CROP.py](MRI2CBCT_CLI/MRI2CBCT_TMJ_CROP/MRI2CBCT_TMJ_CROP.py)
 
 1. `GetPatients` apparie CBCT / IRM / Seg par identifiant
    ([TMJ_crop.py:24](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/TMJ_crop.py#L24) : longue chaîne
@@ -133,7 +133,7 @@ ensuite relus par le resample, par simple `in input_path.lower()`.
    un patient à elle seule ; un patient sans les trois est ignoré.
 2. `segment_condyle` (§6) → masque binaire dans le repère de la moitié de CBCT.
 3. Boîte englobante : `MARGIN = 3` voxels, **mais** `FIXED_BBOX_VOXELS = [400,400,400]`
-   est actif, donc la marge est morte — la boîte est un cube de 400 voxels centré sur
+   est actif, donc la marge est morte, la boîte est un cube de 400 voxels centré sur
    le **centroïde du masque**, clampé sur le volume.
 4. Les 8 coins passent en monde via `cbct_half.affine` ; le CBCT complet et l'IRM
    sont recadrés à cette boîte monde, chacun sur sa propre grille
@@ -175,7 +175,7 @@ remontant deux niveaux depuis le dossier du trainer.
 le centre de masse des voxels non nuls de l'IRM est comparé **en coordonnées monde**
 au centre du CBCT (`cog_w[0] > cbct_mid_w[0]` → côté `Right`). Le CBCT est coupé en
 deux sur l'axe d'index 0, la moitié retenue étant choisie d'après le signe de
-`affine[:3,0][0]` — donc indépendamment du sens de stockage des voxels. But :
+`affine[:3,0][0]`, donc indépendamment du sens de stockage des voxels. But :
 présenter au réseau le même champ de vue qu'à l'entraînement.
 
 **Post-traitement** :
@@ -239,7 +239,7 @@ Le CLI [MRI2CBCT_APPROX](MRI2CBCT_CLI/MRI2CBCT_APPROX/MRI2CBCT_APPROX.py) **ne r
 rien** : il produit une paire de points et une rotation, le widget finit le travail
 (le CLI n'a pas accès aux modules de Slicer). `approximation()`
 ([approximate.py:77](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/approximate.py#L77)), par paire
-CBCT/IRM (dossiers, ou fichier unique si les deux entrées sont des fichiers — mode
+CBCT/IRM (dossiers, ou fichier unique si les deux entrées sont des fichiers, mode
 « Scene Volume ») :
 
 1. `segment_condyle` → masque du condyle sur la bonne moitié de CBCT ;
@@ -280,7 +280,7 @@ dans la section Approximate par `injectUI`. Port de GreedyReg, tout dans le widg
   `onManualTransformChanged` construit un `vtkTransform` : `Translate` puis
   `RotateX/Y/Z`. `vtkTransform` étant en **PreMultiply**, la matrice finale est
   `T·Rx·Ry·Rz` : la rotation se fait **autour de l'origine du repère RAS**, pas autour
-  du centre du volume — d'où l'importance des étapes de centrage amont.
+  du centre du volume, d'où l'importance des étapes de centrage amont.
 - « Center MRI on CBCT » ajoute à la translation l'écart des centres des `GetRASBounds`.
 - « Enable Interactive Tool » active les poignées natives de Slicer, translation et
   rotation autorisées, **échelle désactivée** (`SetEditorScalingEnabled(False)`), et
@@ -316,7 +316,7 @@ Les deux rôles sont distincts
 ([normalize_percentile.py](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/normalize_percentile.py)) :
 
 - **les percentiles définissent la fenêtre d'intensité**. `np.percentile` est calculé
-  sur **tout le tableau, fond compris** — pas sur les voxels non nuls. Sur un CBCT
+  sur **tout le tableau, fond compris**, pas sur les voxels non nuls. Sur un CBCT
   majoritairement composé d'air, `p10` tombe dans le fond et `p95` écrête les
   structures les plus denses.
 - **`min_norm` / `max_norm` définissent l'intervalle de sortie** :
@@ -326,8 +326,8 @@ normalized = np.clip((array - lo) / (hi - lo), 0, 1)
 scaled     = normalized * (max_norm - min_norm) + min_norm
 ```
 
-Avec **Default 1**, l'IRM est en percentiles `[0, 100]` — donc une pure normalisation
-min–max sans écrêtage, remise sur `[0, 100]` — tandis que le CBCT est fenêtré entre
+Avec **Default 1**, l'IRM est en percentiles `[0, 100]`, donc une pure normalisation
+min–max sans écrêtage, remise sur `[0, 100]`, tandis que le CBCT est fenêtré entre
 son p10 et son p95 puis ramené sur `[0, 75]`, volontairement plus bas que l'IRM. Avec
 **Default 2** les deux modalités reçoivent le même traitement.
 
@@ -365,7 +365,7 @@ est binarisée `array == 1` ; sinon le masque sert tel quel. Un masque de taille
 différente est rééchantillonné sur la grille de l'image en plus proche voisin. Un
 fichier dont le nom ne contient ni `_CBCT` ni `_MR` est ignoré. **Le résultat est
 casté en `sitk.sitkInt16`** : les valeurs normalisées flottantes sont tronquées à
-l'entier — il ne reste que 76 niveaux distincts pour un CBCT normalisé sur `[0, 75]`.
+l'entier, il ne reste que 76 niveaux distincts pour un CBCT normalisé sur `[0, 75]`.
 
 **Elastix**, `ElastixReg`
 ([AREG_MRI.py:49](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/AREG_MRI.py#L49)) :
@@ -452,7 +452,7 @@ de détecteur de repère anatomique.
   ([MRI2CBCT.py:96](MRI2CBCT/MRI2CBCT.py#L96)) contient `('nnunet_version', "==2.8.0")` ;
   ce paquet n'existe pas sur PyPI (AMASSS déclare correctement `('nnunetv2','2.8.0')`).
   `check_lib_installed` renvoie donc toujours `False` : dialogue d'installation à
-  chaque action, `pip_install` qui lève, `errorDisplay`, retour `False` — **valeur que
+  chaque action, `pip_install` qui lève, `errorDisplay`, retour `False`, **valeur que
   tous les appelants ignorent**, l'action continue.
 - **Le centre de rotation d'elastix est perdu.** `MatrixRetrieval` lit
   `TransformParameters` mais pas le `CenterOfRotationPoint` que porte aussi le
@@ -464,7 +464,7 @@ de détecteur de repère anatomique.
 - **Deux conventions de `.tfm` pour la même étape.** L'approximation manuelle écrit
   `flip @ M @ flip` sans inverser
   ([ManualApprox_MRI2CBCT.py:472](MRI2CBCT/MRI2CBCT_utils/ManualApprox_MRI2CBCT.py#L472)),
-  là où FlexReg écrit `inv(flip @ M @ flip)` pour la même conversion — la convention
+  là où FlexReg écrit `inv(flip @ M @ flip)` pour la même conversion, la convention
   ITK étant fixe → mobile. La voie automatique passe par `slicer.util.saveNode`, qui
   applique la bonne convention.
 - **« Confirm & Save » plante si le volume vient de la scène** : `onConfirm` fait
@@ -474,7 +474,7 @@ de détecteur de repère anatomique.
   Seul « Load from Folders Above » fonctionne.
 - **Le gestionnaire d'erreur du resample plante aussi** :
   `logger.warning(e, file=sys.stderr)`
-  ([resample.py:240](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/resample.py#L240)) —
+  ([resample.py:240](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/resample.py#L240)),
   `Logger.warning` n'accepte pas `file=`, l'exception rattrapée devient un `TypeError`
   non rattrapé.
 - **T2 sans T1 casse le resample** : `mri_output_folder` / `cbct_output_folder` ne sont
@@ -501,7 +501,7 @@ de détecteur de repère anatomique.
   XML `mean_folder` / `ROI_file` sont commentés. L'import
   `from MRI2CBCT_CLI_utils import approximation, get_transformation, crop_volume`
   subsiste et force le chargement de `crop_approximation`, donc de `torch`, `sklearn`
-  et `torchreg` — exactement ce que l'import paresseux du `__init__` visait à éviter.
+  et `torchreg` : exactement ce que l'import paresseux du `__init__` visait à éviter.
 - [crop_approximation.py](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/crop_approximation.py)
   (359 l.) et [nmi.py](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/nmi.py) (155 l.) sont
   l'**ancienne** approximation : `torchreg.AffineRegistration` rigide (échelles
@@ -516,7 +516,7 @@ de détecteur de repère anatomique.
   Slicer, sans rapport avec le module.
 - `predict_entry_point` importé en tête de
   [MRI2CBCT_TMJ_CROP.py](MRI2CBCT_CLI/MRI2CBCT_TMJ_CROP/MRI2CBCT_TMJ_CROP.py#L5) et
-  jamais utilisé — mais il impose `nnunetv2` importable dans Slicer alors que la
+  jamais utilisé, mais il impose `nnunetv2` importable dans Slicer alors que la
   prédiction passe par un sous-processus.
 - `run_resample` existe en double :
   [resample.py:243](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/resample.py#L243) et une copie dans
@@ -534,7 +534,7 @@ de détecteur de repère anatomique.
 | GPU | optionnel, repli CPU automatique dans nnU-Net ([condyle_segmentation.py:55](MRI2CBCT_CLI/MRI2CBCT_CLI_utils/condyle_segmentation.py#L55)) |
 | torch | `2.2.0`, index `download.pytorch.org/whl/cu118` ([MRI2CBCT.py:117](MRI2CBCT/MRI2CBCT.py#L117)) |
 | numpy | épinglé **1.26.4** ; `numexpr==2.9.0` |
-| pydicom | épinglé **3.0.2** — le rétrograder casse `dicomweb-client`, `highdicom` et tous les modules DICOM de Slicer ([MRI2CBCT.py:83](MRI2CBCT/MRI2CBCT.py#L83)) |
+| pydicom | épinglé **3.0.2**, le rétrograder casse `dicomweb-client`, `highdicom` et tous les modules DICOM de Slicer ([MRI2CBCT.py:83](MRI2CBCT/MRI2CBCT.py#L83)) |
 | dicom2nifti | `2.6.2` |
 | Recalage | `itk-elastix` (0.19.2 dans Slicer 5.12) |
 | Autres | `einops`, `nibabel`, `pandas`, `scikit-learn`, `torchreg`, `SimpleITK`, `psutil` |
@@ -558,7 +558,7 @@ Deux divergences entre le papier et l'état actuel du code : l'approximation du 
 remplacée par nnU-Net condyle + `fiducialregistration` ; et ni la segmentation du
 condyle ni le crop TMJ ne figurent dans le résumé publié. Le README du dépôt annonce
 d'ailleurs encore *« Currently, cropping is done using the AutoCrop method. In the
-future, this step will be replaced by a trained model »* — c'est fait.
+future, this step will be replaced by a trained model »* : c'est fait.
 
 - [Novel CBCT-MRI Registration Approach… (CLIP 2024, LNCS 15196)](https://link.springer.com/chapter/10.1007/978-3-031-73083-2_7)
 - [MRI and CBCT image registration of TMJ: a systematic review](https://journalotohns.biomedcentral.com/articles/10.1186/s40463-016-0144-4)
@@ -566,7 +566,7 @@ future, this step will be replaced by a trained model »* — c'est fait.
 - [Aligning MRI and CBCT for Advanced TMJ Diagnostics (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12360114/)
 - [SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools)
 
-**Bibliographie complète : [SOURCES.md](SOURCES.md)** — références vérifiées,
+**Bibliographie complète : [SOURCES.md](SOURCES.md)**, références vérifiées,
 fichiers récupérés dans ce dossier (dont l'article de Caleme *et al.* 2025 en texte
 intégral et deux rapports NA-MIC Project Week), et ce qu'il reste à consulter en
 ligne. On y trouve aussi la seule évaluation chiffrée publiée du pipeline

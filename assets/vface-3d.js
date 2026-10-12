@@ -1,4 +1,4 @@
-/* vface-3d.js — l'asymetrie de VFACE, sur le socle scene3d.js.
+/* vface-3d.js : l'asymetrie de VFACE, sur le socle scene3d.js.
 
    TOUT CE QUE CETTE SCENE AFFICHE SORT D'UNE VRAIE PASSE DE VFACE sur son jeu
    de test publie : ses trois matrices AREG, son scan miroir, les reperes
@@ -274,7 +274,7 @@
           raw.xform = partial(new Float32Array(data.preOrient), 1 - o);
         }
         say(word("orient") + (data.preOrient
-            ? " — " + (data.orientDeg * (1 - o)).toFixed(2) + "°"
+            ? " · " + (data.orientDeg * (1 - o)).toFixed(2) + "°"
             : ""));
         scene.setMarks([]);
         rawOnly(0.9);
@@ -302,7 +302,7 @@
         var e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
         if (mir) { mir.xform = flip(e); mir.alpha = 0.5; }
         bone(0.5);
-        say(word("mirror") + (e < 0.92 ? "" : " — " + word("plane")));
+        say(word("mirror") + (e < 0.92 ? "" : " · " + word("plane")));
       } else if (st.k === "register") {
         /* La matrice qu'AREG a ecrite pour CETTE region, et rien d'autre.
            Son SENS a ete mesure et non suppose : elastix ecrit la
@@ -319,7 +319,7 @@
            maxillaire, on voit qu'il ne les rapproche PAS. */
         scene.setMarks(convergence(g));
         var lmd = active.lmBefore + (active.lmAfter - active.lmBefore) * g;
-        say(word("register") + " — " + active.label + " — "
+        say(word("register") + " · " + active.label + " · "
             + active.lmPairs + " " + word("pairs") + ", "
             + word("median") + " " + lmd.toFixed(2) + " mm");
       } else {
@@ -330,7 +330,7 @@
         showPlane(1 - f);
         scene.setMarks([]);
         paintMap(f);
-        say(word("map") + " — " + active.label + " — "
+        say(word("map") + " · " + active.label + " · "
             + word("absmed") + " " + active.absmed.toFixed(2) + " mm, "
             + active.dmin.toFixed(1) + " … +" + active.dmax.toFixed(1) + " mm");
       }

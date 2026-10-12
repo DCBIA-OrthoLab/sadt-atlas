@@ -1,4 +1,4 @@
-/* areg-3d.js — le recalage d'AREG_CBCT, sur le socle scene3d.js.
+/* areg-3d.js : le recalage d'AREG_CBCT, sur le socle scene3d.js.
 
    Ce que la scene doit faire comprendre : le recalage ne regarde PAS tout le
    crane. `VoxelBasedRegistration` masque d'abord le T1, et elastix ne voit
@@ -174,7 +174,7 @@
         /* L'ecart interpole entre les deux valeurs MESUREES ; la distance de
            surface se mesure hors ligne, sur les maillages pleins. */
         var gap = active.before + (active.after - active.before) * e;
-        say(stepName("elastix") + " — " + gap.toFixed(2) + " mm");
+        say(stepName("elastix") + " · " + gap.toFixed(2) + " mm");
         /* Le T2 revient en fondu : c'est lui qui bouge maintenant. */
         paint(0.34, 0.28, Math.min(1, f * 3));
       } else if (st.k === "matrix") {
@@ -341,7 +341,7 @@
         var e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
         current = partial(M, e);
         var g = data.before + (data.after - data.before) * e;
-        say((strings.icp || "") + " — " + g.toFixed(2) + " mm");
+        say((strings.icp || "") + " · " + g.toFixed(2) + " mm");
       } else {
         say((strings.done || "") + " " + data.after.toFixed(2) + " mm");
         if (t1) { t1.alpha = 0.24 + 0.26 * f; }

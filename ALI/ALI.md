@@ -1,7 +1,7 @@
-# ALI — pipeline complet
+# ALI : pipeline complet
 
 Identification automatique de landmarks. `ALI` est un widget de dispatch : il ne
-calcule rien, il choisit entre deux backends qui n'ont **aucun code en commun** —
+calcule rien, il choisit entre deux backends qui n'ont **aucun code en commun**,
 `ALI_CBCT` (volumes, agents de RL qui se déplacent dans le scan) et `ALI_IOS`
 (maillages, rendu multi-vues PyTorch3D). Les deux sortent des markups Slicer json
 en LPS, et c'est tout ce qu'ils partagent.
@@ -25,7 +25,7 @@ Côté sortant :
 
 | Appelé | Quand | Pourquoi |
 |---|---|---|
-| `CrownSegmentationcli` (ShapeAXI) | IOS, si un scan n'a pas d'array de labels | segmenter les couronnes — les caméras sont visées dent par dent |
+| `CrownSegmentationcli` (ShapeAXI) | IOS, si un scan n'a pas d'array de labels | segmenter les couronnes : les caméras sont visées dent par dent |
 | `dentalmodelseg` directement | IOS, depuis le CLI lui-même ([segmentation.py:80](ALI_IOS/ALI_IOS_utils/segmentation.py#L80)) | même chose, quand le CLI est lancé hors du widget |
 
 Le CLI ALI_IOS sait donc se segmenter tout seul **et** le widget le segmente en amont :
@@ -46,14 +46,14 @@ deux chemins pour la même chose, hérités l'un de l'autre.
 Point non évident : **ALI_CBCT ne passe pas par conda**. Il tourne dans le Python de
 Slicer, d'où l'installation de `itk`, `dicom2nifti`, `pydicom` et `monai` par
 `install_function` ([ALI.py:875](ALI/ALI.py#L875)). ALI_IOS a besoin de pytorch3d,
-qui n'existe pas dans Slicer : il passe par `conda run`. CUDA n'est requis nulle part —
+qui n'existe pas dans Slicer : il passe par `conda run`. CUDA n'est requis nulle part :
 les deux tombent sur CPU (`DEVICE = cuda if available else cpu`), au prix du temps.
 
 Le CLI ALI_IOS est aussi enregistré comme module Slicer (`slicer.modules.ali_ios`,
-[ALI_IOS.xml](ALI_IOS/ALI_IOS.xml)) et AREG l'appelle par ce biais — dans le Python de
+[ALI_IOS.xml](ALI_IOS/ALI_IOS.xml)) et AREG l'appelle par ce biais : dans le Python de
 Slicer, donc, où `pytorch3d` n'est pas installé. Chemin fragile, voir §7.
 
-## 3. ALI_CBCT — agents dans le volume
+## 3. ALI_CBCT : agents dans le volume
 
 ### 3.1 Prétraitements
 
@@ -65,7 +65,7 @@ Deux étapes, toutes deux écrites dans `temp_fold` et **jamais nettoyées** :
    à `[-1500, 4000]` HU. Sortie `int16`, spacing/origine/direction conservés.
    Attention : la signature par défaut dit `max_porcent=0.95`, l'appel passe `0.99`.
 2. **Resampling isotrope**, un fichier par échelle : `SetSpacing` (itk, interpolation
-   linéaire — plus proche voisin si `seg`/`Seg` est dans le nom) pour chaque `sp` de
+   linéaire, plus proche voisin si `seg`/`Seg` est dans le nom) pour chaque `sp` de
    `spacing = [1, 0.3]` mm. La nouvelle taille est `size * spacing / sp` et l'origine
    est recentrée sur la même boîte physique.
 
@@ -73,13 +73,13 @@ Les fichiers sont nommés `<stem>_sp<1|0-3><suffixes>` et **ré-utilisés s'ils 
 déjà** : c'est un cache, donc aussi un piège si l'entrée change sans changer de nom.
 
 Au chargement ([environment.py:81](ALI_CBCT/ALI_CBCT_utils/environment.py#L81)) :
-`sitk.DICOMOrient(img, "LPS")` — sans ça, les agents, qui ne lisent que l'array brut
+`sitk.DICOMOrient(img, "LPS")`, sans ça, les agents, qui ne lisent que l'array brut
 et jamais les cosinus directeurs, parcourent un volume miroir. Puis
 `EnsureChannelFirst` + `BorderPad(padding)` avec `padding = agent_FOV/2 + 1 = [33,33,33]`,
 pour que tout crop de 64³ soit valide où que soit l'agent.
 
 L'array est stocké en ordre numpy `(z,y,x)` et l'origine est **retournée** dans le même
-ordre — mais pas le spacing, qui reste `(x,y,z)`. C'est sans effet uniquement parce que
+ordre, mais pas le spacing, qui reste `(x,y,z)`. C'est sans effet uniquement parce que
 le resampling rend le spacing isotrope.
 
 ### 3.2 L'environnement
@@ -104,7 +104,7 @@ côté, à l'échelle `0-3` 19,2 mm.
 
 Un agent par landmark ([agent.py:73](ALI_CBCT/ALI_CBCT_utils/agent.py#L73)), instancié
 une fois puis ré-utilisé pour tous les patients. Un `Brain` neuf est construit et ses
-poids relus **pour chaque couple (patient, landmark)** ([ALI_CBCT.py:194](ALI_CBCT/ALI_CBCT.py#L194)) —
+poids relus **pour chaque couple (patient, landmark)** ([ALI_CBCT.py:194](ALI_CBCT/ALI_CBCT.py#L194)),
 2 DenseNet reconstruits et 2 `.pth` relus par point et par scan.
 
 Le réseau, `DNet` ([brain.py:48](ALI_CBCT/ALI_CBCT_utils/brain.py#L48)) :
@@ -117,7 +117,7 @@ self.dens = DN(in_channels=1024, out_channels=6)   # MLP 1024-512-256-128-6
 
 DenseNet-121 3D de monai (growth rate 34 au lieu de 32), suivi d'un MLP à 4 couches.
 Entrée `[1, 1, 64, 64, 64]`, sortie 6 scores, un par mouvement :
-`Up / Down / Back / Front / Left / Right` — soit ±1 voxel sur chacun des trois axes
+`Up / Down / Back / Front / Left / Right`, soit ±1 voxel sur chacun des trois axes
 de l'array ([constants.py:22](ALI_CBCT/ALI_CBCT_utils/constants.py#L22)).
 
 **Ce n'est pas une heatmap : c'est une classification de direction.** Le réseau ne dit
@@ -171,7 +171,7 @@ real_label_pos  = (pos - physical_origin) * ref_spacing
 real_label_pos  = [real_label_pos[2], real_label_pos[1], real_label_pos[0]]  # retour x,y,z
 ```
 
-Le `abs()` suppose l'origine négative sur les trois axes — vrai pour un volume LPS
+Le `abs()` suppose l'origine négative sur les trois axes : vrai pour un volume LPS
 centré, faux en général.
 
 Les points sont groupés par famille anatomique (`LABEL_GROUPS` : `CB`, `U`, `L`, `CI`)
@@ -194,7 +194,7 @@ Vérifié sur une installation : `Cranial_Base/Ba/1/Ba_Net_1.pth` et
 `Ba/0-3/Ba_Net_0-3.pth`. Les `SCALE` doivent être exactement `1` et `0-3`, car
 `scale_keys` vient de `str(spacing).replace(".", "-")`.
 
-Téléchargement par le bouton « Download latest models » — huit archives
+Téléchargement par le bouton « Download latest models », huit archives
 ([CBCT.py:104](ALI/ALI_Method/CBCT.py#L104)) :
 
 | Archive | Contenu |
@@ -210,7 +210,7 @@ Extraits dans `<Documents>/SlicerDownloads/ALI/ALI_CBCT/Models/Landmark/<nom>/`.
 ASO et GreedyReg utilisent une autre release pour les mêmes poids :
 `https://github.com/lucanchling/ALI_CBCT/releases/download/models_v01/`.
 
-## 4. ALI_IOS — rendu multi-vues
+## 4. ALI_IOS : rendu multi-vues
 
 ### 4.1 Entrées
 
@@ -224,7 +224,7 @@ Si le scan n'en a pas, `SegmentSurface` ([segmentation.py:80](ALI_IOS/ALI_IOS_ut
 appelle `dentalmodelseg` sur une **copie** (un `.stl` passé à shapeaxi avec `--overwrite 1`
 est supprimé par `dental_model_seg.py`), via un csv (`--surf` sur un fichier unique fait
 planter shapeaxi sur un attribut qu'il ne définit pas). La segmentation ne déplace pas les
-points — 5e-5 mm mesurés sur 118k points d'après le commentaire — donc les landmarks
+points, 5e-5 mm mesurés sur 118k points d'après le commentaire, donc les landmarks
 restent valides dans le fichier d'origine.
 
 **Mise à l'échelle canonique**, `ScaleSurf` ([surface.py:94](ALI_IOS/ALI_IOS_utils/surface.py#L94)) :
@@ -236,7 +236,7 @@ pipeline travaille dans cette **sphère unité** ; `Upscale` refait le chemin in
 construites autour d'un axe vertical supposé être Z. Plan occlusal ajusté par SVD sur les
 centroïdes des dents 18–31 (au moins 4 dents, étendue ≥ 4 labels), signe fixé pour que les
 couronnes soient en haut, puis **rotation minimale** (Rodrigues) amenant la normale sur
-`+Z`. Sous `MAX_TILT_DEGREES = 12°` le scan est laissé strictement intact — envoyer un scan
+`+Z`. Sous `MAX_TILT_DEGREES = 12°` le scan est laissé strictement intact : envoyer un scan
 déjà droit vers un repère fixe le ferait tourner dans le plan et dégraderait la prédiction.
 Les landmarks repassent par `inv(matrix)` avant écriture.
 
@@ -285,7 +285,7 @@ même table.
   les caméras regardaient *le long* de l'arcade et le point tombait hors du rendu ;
 - **point visé** : pas le centroïde de la dent mais `centroïde + b·normale + t·tangente`,
   `z += v`, avec `(b,t,v)` lu dans `MG_AIM_OFFSET`
-  ([model.py:35](ALI_IOS/ALI_IOS_utils/model.py#L35)) — médiane par dent sur 155 scans
+  ([model.py:35](ALI_IOS/ALI_IOS_utils/model.py#L35)), médiane par dent sur 155 scans
   d'entraînement, dispersion 0.02–0.03 ;
 - trois caméras : la normale vestibulaire, plus ±0.35 rad autour de l'axe Y, posées à
   `radius` du point visé et abaissées de `0.15·radius`.
@@ -313,7 +313,7 @@ et le réseau produit **une seule carte**, interprétée dans le repère de la c
 
 Ce n'est pas une heatmap au sens régression gaussienne : c'est une **segmentation par
 pixel**. La classe 1 est le landmark (`MG`, ou `O`), la 2 et la 3 portent `MB`/`DB`
-(modèle `O`) ou `CB` (modèle `C`) — voir `MODELS_DICT` et `dic_label`
+(modèle `O`) ou `CB` (modèle `C`), voir `MODELS_DICT` et `dic_label`
 ([model.py:51](ALI_IOS/ALI_IOS_utils/model.py#L51)).
 
 Décodage de la sortie, et c'est là que les deux chemins divergent
@@ -335,26 +335,26 @@ entiers fusionne les classes proches et, à égalité, `argmax` retombe sur l'in
 
 1. `index = (pred_data == 1.).nonzero()` : les pixels de la classe cherchée ;
 2. `tens_pix_to_face[...]` : la face rendue sous chacun de ces pixels ;
-3. filtrage — et il diffère :
+3. filtrage, et il diffère :
    - `O`/`C` : `RemoveExtraFaces` ne garde que les faces dont au moins un sommet porte le
      `Universal_ID` de la dent ([surface.py:229](ALI_IOS/ALI_IOS_utils/surface.py#L229)) ;
    - `MG` : **pas de filtrage** par dent, seulement `face >= 0`. Le point mucogingival est
      sur la gencive, pas sur la couronne ; `RemoveExtraFaces` les éliminerait toutes ;
 4. les 3 sommets de chaque face retenue, **moyennés** ;
 5. `vtkOctreePointLocator.FindClosestPoint` : le point moyen est **snappé sur un sommet
-   existant** — la moyenne d'un patch courbe tombe sous la surface ;
+   existant**, la moyenne d'un patch courbe tombe sous la surface ;
 6. `Upscale(pos, mean_arr, scale_factor)` : retour aux coordonnées du fichier.
 
 ### 4.5 Les points forcés, et le champ `description`
 
 Trois garde-fous, **MG uniquement**, pilotés par des options du CLI
-([ALI_IOS.py:654](ALI_IOS/ALI_IOS.py#L654)) qu'**aucun appelant du dépôt ne passe** —
+([ALI_IOS.py:654](ALI_IOS/ALI_IOS.py#L654)) qu'**aucun appelant du dépôt ne passe**,
 donc leurs défauts s'appliquent toujours :
 
 | Option | Défaut | Effet |
 |---|---|---|
 | `--force_landmarks` | **True** | si la classe 1 ne gagne aucun pixel, prendre les `k` pixels où elle est la plus probable |
-| `--force_topk` | **50** | ce `k` — `softmax(logits)[:,1]`, `topk(50)`, ces pixels tiennent lieu de prédiction |
+| `--force_topk` | **50** | ce `k` : `softmax(logits)[:,1]`, `topk(50)`, ces pixels tiennent lieu de prédiction |
 | `--estimate_missing` | **False** | poser un point sur une dent absente de la segmentation, caméras visées depuis un ajustement quadratique de l'arcade |
 
 `EstimateMissingArchPositions` ([ALI_IOS.py:89](ALI_IOS/ALI_IOS.py#L89)) ajuste un
@@ -379,7 +379,7 @@ elle-même, abaissé de `0.2` en espace sphère unité, puis snappé
 
 C'est ce champ que FlexReg et AREG_IOS lisent : `DoubtfulLandmarks`
 ([mgl_patch.py:142](FlexReg/FlexReg_utils/mgl_patch.py#L142)) traite **toute description
-non vide** comme douteuse et écarte le point, la spline enjambant le trou — sauf s'il
+non vide** comme douteuse et écarte le point, la spline enjambant le trou, sauf s'il
 resterait moins de 3 points. Mesuré sur 364 prédictions d'après le commentaire : 4.2 mm
 d'écart médian à la courbe des voisins, contre 1.2 mm pour les autres.
 
@@ -397,7 +397,7 @@ chaîne le sont, pas parce que le code le vérifie.
 `GenControlPoint` filtre sur `landmarks_selected` : un modèle `O` prédit toujours
 `XO`/`XMB`/`XDB`, mais seuls les types demandés sont écrits.
 
-Découverte des poids ([ALI_IOS.py:205](ALI_IOS/ALI_IOS.py#L205)) — uniquement sur le nom
+Découverte des poids ([ALI_IOS.py:205](ALI_IOS/ALI_IOS.py#L205)), uniquement sur le nom
 de fichier :
 
 ```
@@ -413,7 +413,7 @@ est émis. Le widget, lui, détecte `_O_`/`_C_` par sous-chaîne
 [ALI.py:856](ALI/ALI.py#L856)) : deux conventions pour le même fichier.
 
 Téléchargement : `https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/ALI_IOS_models/Models.zip`
-([IOS.py:161](ALI/ALI_Method/IOS.py#L161)) — le contenu de l'archive historique ALIDDM
+([IOS.py:161](ALI/ALI_Method/IOS.py#L161)), le contenu de l'archive historique ALIDDM
 v1.0.3 plus `Lower_MG_v6.pth`. Extrait dans
 `<Documents>/SlicerDownloads/ALI/ALI_IOS/Models/Prediction/` : c'est exactement le chemin
 que FlexReg va chercher.
@@ -437,7 +437,7 @@ Les méthodes `Agent.Train` / `Agent.Validate`
 ([agent.py:201](ALI_CBCT/ALI_CBCT_utils/agent.py#L201)) appellent `self.brain.Train` /
 `self.brain.Validate`, **qui n'existent pas** sur la classe `Brain` : code mort qui
 lèverait un `AttributeError`. Idem pour `Environment.LoadJsonLandmarks`,
-`GetRewardLst`, `GetRandomPoses*`, `GetSampleFromPoses`, `ResetLandmarks` — tout le
+`GetRewardLst`, `GetRandomPoses*`, `GetSampleFromPoses`, `ResetLandmarks` : tout le
 support d'entraînement est resté sans le reste.
 
 ## 6. Environnement
@@ -466,7 +466,7 @@ Deux détails d'installation qui n'ont rien d'anecdotique :
 
 - **`Focus()` n'a pas de garde-fou** : ni budget de temps, ni test de `search_atempt`.
   C'est la seule boucle non bornée du pipeline CBCT.
-- **`Move()` teste mal les bornes** : `if new_pos.all() > 0 and (...)` — `.all()` renvoie
+- **`Move()` teste mal les bornes** : `if new_pos.all() > 0 and (...)`, `.all()` renvoie
   un booléen, comparé à `0`. Le test vérifie « aucune coordonnée nulle », pas « aucune
   coordonnée négative » ([agent.py:193](ALI_CBCT/ALI_CBCT_utils/agent.py#L193)).
 - **Le cast `int16` avant l'`argmax`** subsiste sur les modèles `O` et `C`. Le commentaire
@@ -511,10 +511,10 @@ Deux détails d'installation qui n'ont rien d'anecdotique :
 
 ## 8. Littérature
 
-Les deux backends ont chacun leur papier, et le code correspond à ce qu'ils décrivent —
+Les deux backends ont chacun leur papier, et le code correspond à ce qu'ils décrivent :
 avec une réserve pour ALI_IOS.
 
-**ALI_CBCT** — [Automatic landmark identification in cone-beam computed tomography](https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642),
+**ALI_CBCT**, [Automatic landmark identification in cone-beam computed tomography](https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642),
 Gillot, Baquero, Cevidanes et al., *Orthodontics & Craniofacial Research*, 2023. La
 détection est reformulée en **problème de classification** : un agent virtuel placé dans le
 volume apprend à naviguer dans un espace multi-échelle vers le landmark. Erreur moyenne
@@ -522,10 +522,10 @@ annoncée **1,54 ± 0,87 mm** sur 32 landmarks, 4,2 s d'inférence. C'est exacte
 fait le code, y compris les deux échelles 1 mm / 0,3 mm. Dépôt d'origine :
 [Maxlo24/ALI_CBCT](https://github.com/Maxlo24/ALI_CBCT).
 
-**ALI_IOS** — [Automatic Landmark Identification on IntraOralScans](https://www.juanfernandoaristizabal.com/wp-content/uploads/2024/12/automatic-landmark-identification-on-intra-oral-scans.pdf),
+**ALI_IOS**, [Automatic Landmark Identification on IntraOralScans](https://www.juanfernandoaristizabal.com/wp-content/uploads/2024/12/automatic-landmark-identification-on-intra-oral-scans.pdf),
 Baquero, Gillot, Prieto, Cevidanes, *Clinical Image-Based Procedures (CLIP 2022)*, LNCS
 13746, p. 32-42. Mise à l'échelle sphère unité, 5 vues 2D par dent, segmentation de patch
-par vue, moyenne des coordonnées du patch, remontée à l'échelle d'origine — la description
+par vue, moyenne des coordonnées du patch, remontée à l'échelle d'origine : la description
 du modèle `O` du code, à la lettre. Dépôt d'origine :
 [DCBIA-OrthoLab/ALI_IOS](https://github.com/DCBIA-OrthoLab/ALI_IOS) ; côté prototype,
 [ALIDDM](https://projectweek.na-mic.org/PW36_2022_Virtual/Projects/ALIDDM/).

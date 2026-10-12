@@ -1,4 +1,4 @@
-# AREG_IOSCBCT — pipeline complet
+# AREG_IOSCBCT : pipeline complet
 
 Recalage **multimodal** : poser un Intra Oral Scan dans le repère d'un CBCT du
 même patient. Rien à voir avec [AREG_IOS.md](../AREG_IOS/AREG_IOS.md), qui est longitudinal
@@ -83,7 +83,7 @@ Le CLI AREG_IOSCBCT, lui, **ne charge aucun poids**.
 
 | Élément | Valeur |
 |---|---|
-| Exécution | `slicer.cli.run(slicer.modules.areg_ioscbct, ...)` — **Python de Slicer**, pas conda |
+| Exécution | `slicer.cli.run(slicer.modules.areg_ioscbct, ...)` : **Python de Slicer**, pas conda |
 | Exception | l'étape `CrownSegmentationcli` passe par `run_conda_tool("seg")` ([AREG.py:1611](AREG/AREG.py#L1611)) |
 | Dépendances installées dans Slicer | `pyvista==0.47.3`, `scipy`, `numpy`, `SimpleITK` ([AREG.py:1458](AREG/AREG.py#L1458)) |
 | GPU | **non requis** dans le CLI : aucun `torch` importé |
@@ -104,7 +104,7 @@ balaie les quatre dossiers et construit une clé `<patient_id>_<timepoint>`.
 | Extraction | Regex | Remarque |
 |---|---|---|
 | Timepoint | `[Tt]([0-2])` | **T0, T1, T2 uniquement**. Un `_T3` ne matche rien → patient ignoré silencieusement |
-| Arcade | `(?:^\|_)(?:u\|upper)(?=_\|\.\|$)` et idem `l/lower` | la lettre doit être un token délimité. Un `u` isolé au milieu du nom ne compte plus — sinon `P001_T1_L_Surface.vtk` était lu « upper » et recalé contre les mauvais landmarks |
+| Arcade | `(?:^\|_)(?:u\|upper)(?=_\|\.\|$)` et idem `l/lower` | la lettre doit être un token délimité. Un `u` isolé au milieu du nom ne compte plus : sinon `P001_T1_L_Surface.vtk` était lu « upper » et recalé contre les mauvais landmarks |
 | Patient | `([A-Za-z]+)[_]?([0-9]+)[_]?[Tt][0-2]` | lettres + chiffres collés |
 | Normalisation | underscores supprimés, zéros de tête retirés | `P_0001`, `P001`, `P00001` → `P1` |
 
@@ -190,7 +190,7 @@ neuve) et un warning explicite :
 applique la matrice à chaque landmark mobile et calcule le RMS des écarts.
 
 Retourne le maillage transformé, la matrice, et **les landmarks IOS transformés**
-— ces derniers sont ce qui finira dans le json de sortie.
+ : ces derniers sont ce qui finira dans le json de sortie.
 
 ### 4.4 L'ICP
 
@@ -217,14 +217,14 @@ d'origine** à chaque tour, ce qui évite l'accumulation d'erreur.
 
 **La fonction ne fait pas ce que son nom dit.** Elle s'appelle
 `run_icp_point_to_plane`, elle calcule bien `fixed_normals` par
-`compute_normals(inplace=True)` sur une copie du maillage fixe — et **ne s'en
+`compute_normals(inplace=True)` sur une copie du maillage fixe, et **ne s'en
 sert jamais**. Le critère minimisé est `‖R·s + t − d‖²`, c'est-à-dire du
 **point-à-point** classique. Les normales sont calculées puis jetées à chaque
 appel, deux fois par patient, sur une isosurface de marching cubes qui peut
 faire des centaines de milliers de faces.
 
 **Ce que l'ICP recale, exactement** : le maillage IOS complet (chaque vertex est
-un point mobile) contre **toute** l'isosurface à 400 — os alvéolaire, émail,
+un point mobile) contre **toute** l'isosurface à 400, os alvéolaire, émail,
 corticale, artefacts, bruit du seuillage. Il n'y a aucune restriction aux dents,
 aucun masque, aucun poids. Ce qui rend le résultat exploitable est uniquement la
 combinaison *bon pré-alignement par les landmarks* + *fenêtre de correspondance
@@ -232,7 +232,7 @@ de 1 mm*, qui élimine de fait tout ce qui n'est pas juste sous la surface
 occlusale.
 
 Les deux arcades sont recalées **indépendamment** contre la même isosurface,
-avec deux matrices distinctes `mat_icp_upper` et `mat_icp_lower` — l'occlusion
+avec deux matrices distinctes `mat_icp_upper` et `mat_icp_lower` : l'occlusion
 relative n'est pas contrainte.
 
 ## 5. Sorties
@@ -266,7 +266,7 @@ sont écrites sur disque ; seules les géométries transformées le sont. C'est
 assumé au niveau du widget : la fiche de revue `ioscbct_registration` est de
 type `VIEW` et non `REGISTRATION`, avec le texte « This step writes no matrix,
 so the result cannot be moved here »
-([Review.py:680](AREG/AREG_Method/Review.py#L680)) — l'opérateur ne peut donc
+([Review.py:680](AREG/AREG_Method/Review.py#L680)), l'opérateur ne peut donc
 pas corriger le recalage à la souris comme il le fait pour AREG_IOS ou AREG_CBCT.
 
 Si aucun patient n'a pu être recalé, `main()` lève une `RuntimeError`
@@ -300,7 +300,7 @@ deux jeux de landmarks prédits ailleurs et une isosurface seuillée.
   susceptible de devoir bouger d'un centre à l'autre.
 - **`run_icp_point_to_plane` est du point-à-point.** Les normales sont
   calculées et jetées. Soit le nom est faux, soit l'implémentation est
-  incomplète — dans les deux cas un repreneur qui compte sur le point-à-plan
+  incomplète : dans les deux cas un repreneur qui compte sur le point-à-plan
   (meilleure convergence sur des surfaces lisses, moins de glissement
   tangentiel) sera déçu.
 - **Deux modalités, un seul CBCT par clé patient**, mais **deux arcades
@@ -310,7 +310,7 @@ deux jeux de landmarks prédits ailleurs et une isosurface seuillée.
   `.nrrd .nii .gipl` et leurs variantes `.gz`
   ([IOSCBCT.py:32](AREG/AREG_Method/IOSCBCT.py#L32)) : la barre de progression
   peut annoncer des patients que le CLI ne verra jamais.
-- **Timepoints limités à T0–T2** par `[Tt]([0-2])` — voir le commentaire
+- **Timepoints limités à T0–T2** par `[Tt]([0-2])`, voir le commentaire
   `TIMEPOINT-SUFFIX` à
   [AREG_IOSCBCT.py:372](AREG_IOSCBCT/AREG_IOSCBCT.py#L372) et la note centrale
   dans [AREG_CBCT/AREG_CBCT_utils/utils.py:83](AREG_CBCT/AREG_CBCT_utils/utils.py#L83).
@@ -333,7 +333,7 @@ deux jeux de landmarks prédits ailleurs et une isosurface seuillée.
   s'en aperçoive pas.
 - **`fitness` et `inlier_rmse` sont lues après la boucle ICP**. Avec
   `max_iterations = 0` (impossible ici, mais fragile) ou une sortie au premier
-  `break` sur `< 3` correspondances, elles sont définies — mais le code ne s'en
+  `break` sur `< 3` correspondances, elles sont définies, mais le code ne s'en
   protège pas.
 - **Le pré-alignement peut être silencieusement l'identité.** Il est loggé en
   warning, jamais en erreur : un run entier peut n'avoir bénéficié d'aucun
@@ -354,7 +354,7 @@ qu'il consomme ont chacun le leur
 ([ALI_CBCT](https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642)). La partie
 multimodale IOS↔CBCT semble être un assemblage interne non publié.
 
-Le voisinage méthodologique dans la littérature — à titre de comparaison, pas
+Le voisinage méthodologique dans la littérature, à titre de comparaison, pas
 comme description de ce code :
 
 - [Novel Procedure for Automatic Registration between CBCT and Intraoral Scan Data Supported with 3D Segmentation](https://pmc.ncbi.nlm.nih.gov/articles/PMC10669060/) :
@@ -372,7 +372,7 @@ Références du dépôt :
 
 - [SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools)
 - [AREG (dépôt d'origine)](https://github.com/lucanchling/AREG)
-- [ALIDDM — poids ALI_IOS](https://github.com/baptistebaquero/ALIDDM/releases/tag/v1.0.3)
+- [ALIDDM, poids ALI_IOS](https://github.com/baptistebaquero/ALIDDM/releases/tag/v1.0.3)
 
 Bibliographie détaillée, fichiers récupérés et liens à visiter :
 [SOURCES.md](SOURCES.md).

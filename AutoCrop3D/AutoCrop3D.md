@@ -1,4 +1,4 @@
-# AutoCrop3D — pipeline complet
+# AutoCrop3D : pipeline complet
 
 Découpe en lot d'un dossier de volumes selon une boîte ROI unique (ou une ROI par
 patient). Aucun réseau, aucun conda, aucun GPU : c'est de la manipulation de
@@ -21,7 +21,7 @@ produites ailleurs.
 | `slicer.modules.cropvolume.logic()` | case « Use module "Crop Volume" for tilted images » | déléguer à Slicer le cas ROI tournée |
 
 Aucun modèle, aucun `.pth`, aucun téléchargement : vérifié par grep sur
-`torch|conda|\.pth|monai|nnunet` dans tout AutoCrop3D/ — zéro occurrence hors
+`torch|conda|\.pth|monai|nnunet` dans tout AutoCrop3D/, zéro occurrence hors
 `vtkPolyData` nommé `model`.
 
 ## 2. Fichiers en jeu
@@ -32,7 +32,7 @@ Aucun modèle, aucun `.pth`, aucun téléchargement : vérifié par grep sur
 | [AutoCrop3D_CLI.py](AutoCrop3D/Crop_Volumes_CLI/AutoCrop3D_CLI.py) | la voie principale, 175 lignes, tout le crop | Python de Slicer (`SlicerMacroBuildScriptedCLI`) |
 | [FilesType.py](AutoCrop3D/Crop_Volumes_CLI/Crop_Volumes_utils/FilesType.py) | `Search` (glob par extension) et `ChangeKeyDict` (appariement patient→ROI) | idem |
 | [GenerateVTKfromSeg.py](AutoCrop3D/Crop_Volumes_CLI/Crop_Volumes_utils/GenerateVTKfromSeg.py) | marching cubes sur la labelmap découpée | idem |
-| [CropCBCT.py](AutoCrop3D/Crop_Volumes_CLI/Crop_Volumes_utils/CropCBCT.py) | **code mort**, le dit lui-même : `!!! UNUSED !!!` | — |
+| [CropCBCT.py](AutoCrop3D/Crop_Volumes_CLI/Crop_Volumes_utils/CropCBCT.py) | **code mort**, le dit lui-même : `!!! UNUSED !!!` |, |
 
 Le CLI est un *scripted CLI* ([CMakeLists.txt](AutoCrop3D/Crop_Volumes_CLI/CMakeLists.txt)),
 donc lancé par `slicer.cli.run` dans le Python de Slicer. Pas d'environnement
@@ -64,7 +64,7 @@ surprises :
   signe opposé, sans aucun message.
 - `orientation` (la matrice 3×3 de la boîte). Ignorée : la boîte est supposée
   alignée sur les axes LPS. Dans le fichier de test elle vaut
-  `diag(-1,-1,1)`, une rotation de 180° autour de z — sans effet sur une boîte
+  `diag(-1,-1,1)`, une rotation de 180° autour de z : sans effet sur une boîte
   centrée. Une ROI réellement tournée serait silencieusement traitée comme sa
   boîte englobante axis-aligned. C'est précisément la raison d'être de la case
   « tilted images » (§5).
@@ -75,7 +75,7 @@ Côté volumes, `Search` accepte `.nii.gz`, `.nii`, `.nrrd.gz`, `.nrrd`,
 `.gipl.gz`, `.gipl` ([AutoCrop3D_CLI.py:48](AutoCrop3D/Crop_Volumes_CLI/AutoCrop3D_CLI.py#L48)),
 par un `glob.iglob(**, recursive=True)` suivi d'un `endswith`.
 
-## 4. Comment la boîte est appliquée — extraction d'indices, pas de resampling
+## 4. Comment la boîte est appliquée : extraction d'indices, pas de resampling
 
 C'est le point à retenir : **aucune interpolation**. Le passage physique → indice
 puis le découpage ([AutoCrop3D_CLI.py:77](AutoCrop3D/Crop_Volumes_CLI/AutoCrop3D_CLI.py#L77)) :
@@ -101,7 +101,7 @@ C'est la gestion correcte de `direction`.
 conserve `spacing` et `direction` à l'identique et **recalcule l'origine** du
 coin extrait. Sur un volume 50×60×70, spacing 0.3, origine (10,20,30),
 direction `diag(-1,-1,1)`, `img[5:20,5:20,5:20]` donne origine
-`(8.5, 18.5, 31.5)` — décalage de `-5·0.3` sur x et y (direction négative),
+`(8.5, 18.5, 31.5)` : décalage de `-5·0.3` sur x et y (direction négative),
 `+5·0.3` sur z. Les valeurs de voxel sont bit-à-bit identiques à l'entrée.
 
 **Mode « Keep the same size as input »** (`box_Size == 'True'`,
@@ -119,7 +119,7 @@ le décalage de crop est absorbé par l'origine. Conséquence pratique : une
 matrice de recalage calculée sur le volume entier reste **valide telle quelle**
 sur le volume découpé, puisque les coordonnées physiques n'ont pas bougé.
 
-## 5. La voie alternative — le module Crop Volume de Slicer
+## 5. La voie alternative : le module Crop Volume de Slicer
 
 `processCropVolume()` ([AutoCrop3D.py:915](AutoCrop3D/Crop_Volumes_UI/AutoCrop3D.py#L915)),
 activée par la case « Use module "Crop Volume" for tilted images » (commit
@@ -137,7 +137,7 @@ cropVolumeLogic.Apply(parameters)
 Seuls les trois IDs sont fixés : interpolation, isotropie, échelle de spacing
 restent aux valeurs par défaut du `vtkMRMLCropVolumeParametersNode`. Avec
 l'interpolation active, Crop Volume **rééchantillonne** dans le repère propre de
-la ROI, ce qui est justement ce qui permet de gérer une ROI tournée — au prix
+la ROI, ce qui est justement ce qui permet de gérer une ROI tournée : au prix
 d'une modification des valeurs de voxel, contrairement à la voie CLI. Les deux
 voies ne produisent donc pas le même fichier, et c'est voulu.
 
@@ -146,7 +146,7 @@ pas d'équivalent.
 
 Cette voie charge la ROI et le volume comme nœuds MRML (`loadMarkups`,
 `loadVolume`), donc **c'est elle, et elle seule, qui lit `coordinateSystem` et
-`orientation`** — Slicer s'en charge à la lecture du json.
+`orientation`** : Slicer s'en charge à la lecture du json.
 
 ## 6. Mode batch et appariement patient ↔ ROI
 
@@ -175,7 +175,7 @@ fichier ; le widget ne lit pas le contenu, seulement le `st_mtime`
 ## 7. Génération du VTK depuis une segmentation
 
 Déclenchée par `if "seg" in ScanOutPath.lower()`
-([AutoCrop3D_CLI.py:151](AutoCrop3D/Crop_Volumes_CLI/AutoCrop3D_CLI.py#L151)) — le
+([AutoCrop3D_CLI.py:151](AutoCrop3D/Crop_Volumes_CLI/AutoCrop3D_CLI.py#L151)), le
 test porte sur le **chemin complet de sortie**, donc un dossier parent nommé
 `Segmentations/` suffit à le déclencher sur tous les fichiers. L'échec est avalé
 par un `except: pass` nu.
@@ -183,7 +183,7 @@ par un `except: pass` nu.
 [convertNiftiToVTK](AutoCrop3D/Crop_Volumes_CLI/Crop_Volumes_utils/GenerateVTKfromSeg.py#L16) :
 
 1. `padding()` : `sitk.ConstantPad(img, [50,50,10], [0,0,0])`. Signature réelle
-   vérifiée : `ConstantPad(image, padLowerBound, padUpperBound, constant)` — le
+   vérifiée : `ConstantPad(image, padLowerBound, padUpperBound, constant)`, le
    troisième argument à zéro veut dire que **seule la borne inférieure est
    rembourrée**. Le commentaire « add 50 pixels around each dimension » est faux :
    une structure qui touche la face supérieure du crop restera ouverte.
@@ -196,7 +196,7 @@ par un `except: pass` nu.
    according to labels » ne décrit pas le code. Et `LABEL_COLORS` ne contient que
    les clés 1–6 : un labelmap à plus de 6 classes lève un `KeyError` avalé par le
    `except: pass` de l'appelant, donc pas de VTK et pas de message.
-4. `present_labels` est calculé puis jamais utilisé — code mort.
+4. `present_labels` est calculé puis jamais utilisé : code mort.
 
 Le lecteur NIfTI de VTK n'applique ni qform ni sform (le code ne les récupère
 même pas), et le padding de 50/50/10 voxels n'est jamais compensé. **Déduction**,
@@ -209,7 +209,7 @@ Slicer.
 |---|---|---|
 | CLI | `<stem>_<suffix><ext>` | `basename.split('.')[0] + "_" + suffix + key`, `key` étant l'extension de recherche (`.nii.gz`, …) |
 | CLI, segmentation | `<stem>_<suffix>_vtk.vtk` | idem |
-| Crop Volume | `<basename avec .nii.gz → _<suffix>.nii.gz>` | `basename.replace('.nii.gz', f'_{suffix}.nii.gz')` — **en dur sur `.nii.gz`** |
+| Crop Volume | `<basename avec .nii.gz → _<suffix>.nii.gz>` | `basename.replace('.nii.gz', f'_{suffix}.nii.gz')` : **en dur sur `.nii.gz`** |
 
 Suffixe par défaut : `cropped` ([AutoCrop3D.ui:308](AutoCrop3D/Crop_Volumes_UI/Resources/UI/AutoCrop3D.ui#L308)).
 L'arborescence d'entrée est reproduite dans le dossier de sortie via
@@ -262,7 +262,7 @@ appelé. Pas de CUDA, pas de WSL, pas de conda.
   chemin joint ([AutoCrop3D_CLI.py:129](AutoCrop3D/Crop_Volumes_CLI/AutoCrop3D_CLI.py#L129)) :
   un dossier portant le même nom que le fichier serait renommé lui aussi.
 - **Voie Crop Volume : `slicer.mrmlScene.Clear(0)` à chaque patient**
-  ([AutoCrop3D.py:998](AutoCrop3D/Crop_Volumes_UI/AutoCrop3D.py#L998)) — vide
+  ([AutoCrop3D.py:998](AutoCrop3D/Crop_Volumes_UI/AutoCrop3D.py#L998)), vide
   la scène entière, y compris les données que l'utilisateur y avait chargées.
 - **Voie Crop Volume : `slicer.util.saveNode` appelé depuis un `threading.Thread`**
   ([AutoCrop3D.py:979](AutoCrop3D/Crop_Volumes_UI/AutoCrop3D.py#L979)), donc accès
@@ -277,7 +277,7 @@ appelé. Pas de CUDA, pas de WSL, pas de conda.
 - **Code mort** : [CropCBCT.py](AutoCrop3D/Crop_Volumes_CLI/Crop_Volumes_utils/CropCBCT.py)
   (signalé dans sa propre docstring), `Autofill()` qui contient encore des chemins
   absolus d'un poste de développement, `registerSampleData()` qui référence
-  `AutoCrop3D2.png` — fichier absent du dépôt.
+  `AutoCrop3D2.png`, fichier absent du dépôt.
 
 ## 12. Littérature
 
@@ -286,8 +286,8 @@ Aucun papier ne porte sur AutoCrop3D. C'est un utilitaire de traitement par lot
 section [README.md:336](README.md#L336) et par l'aide du module
 Crop Volume de Slicer, dont il reprend la sémantique :
 
-- [Crop Volume — documentation Slicer](https://slicer.readthedocs.io/en/latest/user_guide/modules/cropvolume.html)
-- [Crop Volume Sequence — documentation Slicer](https://slicer.readthedocs.io/en/latest/user_guide/modules/cropvolumesequence.html)
+- [Crop Volume, documentation Slicer](https://slicer.readthedocs.io/en/latest/user_guide/modules/cropvolume.html)
+- [Crop Volume Sequence, documentation Slicer](https://slicer.readthedocs.io/en/latest/user_guide/modules/cropvolumesequence.html)
   (le README le cite comme la limitation qu'AutoCrop3D contourne : fichiers trop
   lourds pour être chargés en séquence)
 - [SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools)
@@ -296,6 +296,6 @@ Le `documentation-url` du CLI pointe vers
 `https://github.com/Jeanneclre/DCBIA-code`, dépôt personnel qui n'est pas celui
 du projet.
 
-**Bibliographie complète : [SOURCES.md](SOURCES.md)** — recherche faite, résultat
+**Bibliographie complète : [SOURCES.md](SOURCES.md)**, recherche faite, résultat
 négatif : aucun travail ne décrit AutoCrop3D. Deux articles récupérés dans ce
 dossier le citent en une phrase comme outil utilisé.

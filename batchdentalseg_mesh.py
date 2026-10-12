@@ -60,7 +60,7 @@ try:
     import vtk
     import SimpleITK as sitk
 except ImportError:
-    sys.exit("VTK / SimpleITK introuvables — lance ce script avec "
+    sys.exit("VTK / SimpleITK introuvables : lance ce script avec "
              "PythonSlicer, pas python3.")
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -334,12 +334,12 @@ def main():
             sys.exit("Le scan d'entree de la passe n'est PAS l'echantillon "
                      "publie. Refus.\n  %s\n  %s" % (scan, pub))
         print("entree identique a l'echantillon publie par Slicer "
-              "(CBCTDentalSurgery, md5) — publiable")
+              "(CBCTDentalSurgery, md5), publiable")
     elif not pub:
         print("ATTENTION : echantillon publie introuvable, provenance non "
               "verifiee")
 
-    print("\n— passe lue —")
+    print("\n== passe lue ==")
     print("  modele   %s" % model)
     print("  cas      %s" % CASE)
     print("  label map %s" % os.path.basename(seg))
@@ -374,7 +374,7 @@ def main():
           % (len(present), len(table),
              " (modele par dent)" if per_tooth else ""))
 
-    print("\n— surfaces —")
+    print("\n== surfaces ==")
     meshes, info = {}, {}
     for value in sorted(present):
         name = by_value[value]
@@ -382,7 +382,7 @@ def main():
         target = TARGETS.get(code, TOOTH_TARGET)
         poly, raw, dropped = extract(reader, value, target)
         if poly is None:
-            print("  %-6s etiquette %-2d sans surface — ignoree" % (code, value))
+            print("  %-6s etiquette %-2d sans surface : ignoree" % (code, value))
             continue
         nvox = present[value]
         meshes[code] = poly
@@ -419,7 +419,7 @@ def main():
 
     # Le « avant ». Un simple seuil osseux, ce que n'importe qui obtient sans
     # reseau : un bloc unique et anonyme. Tout l'interet de la comparaison
-    # est la — le reseau ne fait pas apparaitre de la matiere, il la NOMME.
+    # est la : le reseau ne fait pas apparaitre de la matiere, il la NOMME.
     if scan and os.path.exists(scan):
         img = read_volume(scan)
         got = (img.GetDimensions(), tuple(round(v, 6) for v in img.GetSpacing()))
@@ -429,7 +429,7 @@ def main():
                      "grille : il faudrait recaler, et ce script ne le fait "
                      "pas.\n  %r\n  %r" % (want, got))
         print("  grille du scan identique a celle du label map : "
-              "%r @ %r — aucune translation" % (got[0], got[1]))
+              "%r @ %r, aucune translation" % (got[0], got[1]))
         rr = vtk.vtkTrivialProducer()
         rr.SetOutput(img)
         iso = webmesh.iso_surface(rr, RAW_THRESHOLD, RAW_SIGMA)
@@ -445,7 +445,7 @@ def main():
     # --- controle de repere, a chaque passe ---------------------------------
     # Les coordonnees brutes du lecteur sont du LPS translate : +x gauche,
     # +y arriere, +z haut. On le VERIFIE sur l'anatomie au lieu de le croire.
-    print("\n— controle de repere (coordonnees brutes du lecteur) —")
+    print("\n== controle de repere (coordonnees brutes du lecteur) ==")
     cz, cy = {}, {}
     for code in anatomy:
         b = meshes[code].GetBounds()
@@ -507,7 +507,7 @@ def main():
         if by - fy <= 0:
             sys.exit("Axe anteroposterieur inverse : le cadrage serait faux.")
 
-    print("\n— encodage —")
+    print("\n== encodage ==")
     scans = report.get("scans") or []
     run = {
         "device": report.get("device") or RUN_FACTS.get("device"),
@@ -534,9 +534,9 @@ def main():
 
     out = os.path.join(ROOT, "assets", "batchdentalseg-mesh.js")
     webmesh.write(out, "BATCHDENTALSEG_MESH", payload,
-                  "Genere par batchdentalseg_mesh.py — ne pas editer a la "
+                  "Genere par batchdentalseg_mesh.py, ne pas editer a la "
                   "main.\n   Source : une passe BatchDentalSeg (%s), lue "
-                  "dans\n   %s, sur %s — l'echantillon CBCTDentalSurgery "
+                  "dans\n   %s, sur %s, l'echantillon CBCTDentalSurgery "
                   "publie par Slicer,\n   celui que le bouton « Test Files » "
                   "du module telecharge. Aucune donnee\n   patient. %d "
                   "etiquette(s) produites, dont %d dents.\n   Charge par "

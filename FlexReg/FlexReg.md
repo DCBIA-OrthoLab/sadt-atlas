@@ -1,4 +1,4 @@
-# FlexReg — pipeline complet
+# FlexReg : pipeline complet
 
 Recalage d'Intra Oral Scans patient par patient, avec un patch de recalage
 construit à la main au lieu d'être prédit. C'est la déclinaison interactive
@@ -8,7 +8,7 @@ d'AREG_IOS.
 
 Rien dans le dépôt n'appelle FlexReg : c'est un outil terminal, piloté par
 l'opérateur. Il appelle en revanche deux réseaux pré-entraînés, et il **produit
-l'entrée d'AREG_IOS** — les deux outils lisent exactement le même array de points.
+l'entrée d'AREG_IOS** : les deux outils lisent exactement le même array de points.
 
 | Appelé | Quand | Pourquoi |
 |---|---|---|
@@ -34,7 +34,7 @@ par un réseau ([PredPatch.py](AREG_IOS/AREG_IOS_utils/PredPatch.py), un
 
 Point non évident : le CLI n'est **pas** lancé dans l'environnement conda. Il
 passe par `slicer.cli.run(slicer.modules.flexreg_cli, ...)`
-([FlexReg.py:939](FlexReg/FlexReg.py#L939)), donc dans le Python de Slicer — d'où
+([FlexReg.py:939](FlexReg/FlexReg.py#L939)), donc dans le Python de Slicer, d'où
 l'installation de `torch` dans Slicer lui-même par `ensureBooted`. Seuls
 `dentalmodelseg` et `ALI_IOS` passent par `conda run -n shapeaxi`.
 
@@ -53,7 +53,7 @@ travailler en RAS comme Slicer, et re-flippe avant écriture
 ([FlexReg_CLI.py:39](FlexReg_CLI/FlexReg_CLI.py#L39)). Tous les calculs internes
 sont donc en RAS.
 
-**Mise en repère canonique** — le prétraitement clé,
+**Mise en repère canonique**, le prétraitement clé,
 [orientation.py](FlexReg_CLI/FlexReg_Method/orientation.py) :
 
 1. centroïdes des dents `Universal_ID` **3, 5, 12, 14** (UR6, UR4, UL4, UL6) ;
@@ -73,7 +73,7 @@ XY**, la composante z étant simplement ignorée.
 
 ## 4. Les modèles
 
-### 4.1 Segmentation des couronnes — DentalModelSeg
+### 4.1 Segmentation des couronnes : DentalModelSeg
 
 `checkSegmentation()` ([FlexReg.py:3657](FlexReg/FlexReg.py#L3657)) ne teste pas
 la présence de l'array : il **tente l'orientation ci-dessus** et lit l'exception.
@@ -100,18 +100,18 @@ L'architecture et les poids `latest` vivent dans le paquet pip `shapeaxi`, hors
 dépôt : **non déterminable ici**. Par filiation (DentalModelSeg vient de
 Fly-by-CNN) on attend un rendu multi-vues suivi d'une segmentation 2D par vue et
 d'une reprojection votée sur les sommets, mais ni le nombre de caméras, ni leur
-placement, ni la résolution de rendu ne sont vérifiables depuis ce dépôt — et
+placement, ni la résolution de rendu ne sont vérifiables depuis ce dépôt, et
 l'exemple d'à côté invite à la prudence : dans
 [PredPatch.py](AREG_IOS/AREG_IOS_utils/PredPatch.py), le buffer nommé `ico_verts`
 ne contient pas une icosphère mais **7 caméras serrées à `z=0.9`**. Ne pas
 supposer une sphère de caméras sans l'avoir lue.
 
 `downloadModel()` ([FlexReg.py:3629](FlexReg/FlexReg.py#L3629)) télécharge un
-`.pth` Fly-by-CNN (`07-21-22_val-loss0.169.pth`, release 3.0) — **jamais
+`.pth` Fly-by-CNN (`07-21-22_val-loss0.169.pth`, release 3.0), **jamais
 appelé**, code mort. Le modèle réellement utilisé est le `latest` embarqué dans
 `dentalmodelseg`.
 
-### 4.2 Landmarks mucogingivaux — ALI_IOS
+### 4.2 Landmarks mucogingivaux : ALI_IOS
 
 `computeMGLLandmarks()` ([FlexReg.py:2517](FlexReg/FlexReg.py#L2517)) :
 
@@ -127,7 +127,7 @@ Positions : `input`, `dir_models`, `lm_type=None`, `teeth=None`,
 ALI_IOS est également multi-vues (rendu PyTorch3D) : il place une caméra par dent
 en s'appuyant sur la segmentation, rend la vue en 224×224, et le réseau sort une
 carte de chaleur dont le pic donne la position du point. **Un landmark n'est
-placé que si sa dent porte un label** dans `Universal_ID` / `PredictedID` — d'où
+placé que si sa dent porte un label** dans `Universal_ID` / `PredictedID` : d'où
 le message d'erreur de FlexReg qui renvoie à la segmentation quand ALI n'a posé
 que _k_ points sur 13.
 
@@ -137,7 +137,7 @@ sinon un sélecteur de dossier s'ouvre.
 
 ## 5. Le cœur algorithmique
 
-### 5.1 Voie A — le Butterfly patch (arcade supérieure)
+### 5.1 Voie A : le Butterfly patch (arcade supérieure)
 
 [make_butterfly.py](FlexReg_CLI/FlexReg_Method/make_butterfly.py). Aucun réseau,
 purement géométrique.
@@ -178,7 +178,7 @@ le plus proche du barycentre des 4 landmarks, propagation de voisin en voisin
 **f) Écriture.** L'array s'appelle `Butterfly{index}` : chaque patch a son index,
 ce qui permet de les **cumuler**. En fin de CLI, tous les `Butterfly1..N` sont
 fusionnés par `torch.logical_or` en un seul array `Butterfly`
-([FlexReg_CLI.py:229](FlexReg_CLI/FlexReg_CLI.py#L229)) — c'est celui que l'ICP et
+([FlexReg_CLI.py:229](FlexReg_CLI/FlexReg_CLI.py#L229)), c'est celui que l'ICP et
 AREG_IOS lisent. Le résultat est réécrit **dans le fichier d'entrée**.
 
 Le mode `delete` renumérote les arrays au-dessus de l'index supprimé puis retire
@@ -193,7 +193,7 @@ le contour est recalculé à chaque mouvement du joystick. Constantes : `CELL = 
 mm pour la carte de hauteur, `LIFT = 0.4` mm au-dessus des dents,
 `NB_POINTS = 120` échantillons par arête.
 
-### 5.2 Voie B — le patch dessiné
+### 5.2 Voie B : le patch dessiné
 
 `draw()` ([FlexReg.py:4239](FlexReg/FlexReg.py#L4239)), `type="curve"`. Une courbe
 Slicer contrainte à la surface (`SetAndObserveSurfaceConstraintNode`) plus un point
@@ -207,18 +207,18 @@ La courbe est dessinée sur le modèle recentré face caméra ; avant l'envoi au
 `moveCurve()` lui applique l'inverse de la matrice de recentrage pour la ramener
 dans les coordonnées du fichier.
 
-### 5.3 Voie C — le patch MGL (arcade inférieure)
+### 5.3 Voie C : le patch MGL (arcade inférieure)
 
 Le palais donne un plateau stable en haut ; la mandibule n'en a pas. Le substitut
 retenu est la **ligne mucogingivale**. Tout ce bloc est calculé **dans le widget**,
-en numpy/scipy — pas de GPU, pas de CLI
+en numpy/scipy, pas de GPU, pas de CLI
 ([mgl_patch.py](FlexReg/FlexReg_utils/mgl_patch.py)).
 
 **a) Nettoyage des prédictions ALI.** `DoubtfulLandmarks()` lit la `description`
 qu'ALI écrit dans le json quand il a forcé un point (top-k pixels, repli sur la
 dent, dent absente). D'après le commentaire du code, mesuré sur 364 prédictions :
 **4.2 mm médian d'écart à la courbe des voisins, contre 1.2 mm** pour les autres.
-Ces points sont écartés par défaut, la spline enjambe le trou — sauf s'il resterait
+Ces points sont écartés par défaut, la spline enjambe le trou : sauf s'il resterait
 moins de 3 points. Puis `CanonicalLandmarks` (ancien nommage d'annotation →
 canonique, détecté par la présence d'un `LL7MG` ou `LR7MG`) et `RecentreNames`
 (le comptage reste ancré sur la ligne médiane quand un point manque en cours
@@ -234,7 +234,7 @@ vers l'intérieur. `OrientApical` fixe le signe en s'appuyant sur les couronnes.
 
 1. offsets opérateur (buccal / apical / tangentiel) appliqués aux landmarks ;
 2. `vtkParametricSpline` passant par eux, `SAMPLES_PER_SEGMENT = 25` ;
-3. **chaque échantillon est snappé sur le maillage** (`vtkPointLocator`) — une
+3. **chaque échantillon est snappé sur le maillage** (`vtkPointLocator`) : une
    spline interpolée sort de la surface dans les concavités interdentaires ;
 4. **Dijkstra** (`scipy.sparse.csgraph`) sur le graphe d'arêtes pondéré par
    longueur réelle, multi-source depuis ces vertex, `limit` = hauteur max,
@@ -246,7 +246,7 @@ vers l'intérieur. `OrientApical` fixe le signe en s'appuyant sur les couronnes.
    côté étant décidé par le signe de la composante apicale. La hauteur retenue est
    celle du *seed* d'où le vertex a été atteint, donc deux tronçons de hauteur
    différente coexistent sans marche d'escalier ;
-6. les couronnes (`Universal_ID` 18–31, `LOWER_TOOTH_LABELS`) sont **retirées** —
+6. les couronnes (`Universal_ID` 18–31, `LOWER_TOOTH_LABELS`) sont **retirées** :
    elles bougent entre T1 et T2 ;
 7. les landmarks eux-mêmes restent toujours dans le patch.
 
@@ -341,7 +341,7 @@ sont pré-entraînés et servent de **fournisseurs de repères**.
 ## 8. Environnement
 
 `ensureBooted()` ([FlexReg.py:181](FlexReg/FlexReg.py#L181)) centralise la
-vérification, **une seule fois**, au moment où une action en a besoin — pas à
+vérification, **une seule fois**, au moment où une action en a besoin, pas à
 l'affichage d'un scan. Les sondes coûtent 7.6 s mesurées : 2.2 s pour
 `conda --version`, 0.6 s pour le test d'environnement, 4.8 s pour l'import du
 module d'installation dedans.
@@ -352,7 +352,7 @@ module d'installation dedans.
 | Python | **3.12** (imposé : les wheels pytorch3d pré-compilées n'existent que pour cp310–cp313 ; shapeaxi ≥ 2.0.2 a levé le pin `grpcio` qui forçait 3.9) | idem |
 | Paquets de création | `torch>=2.8,<2.13`, `ocnn==2.2.1`, `SimpleITK` | `install_shapeaxi` |
 | pytorch3d + shapeaxi | installés **après** torch, par `FlexReg_utils.install_pytorch` qui lit la version de torch pour choisir la wheel | [install_pytorch.py](FlexReg/FlexReg_utils/install_pytorch.py) |
-| Dans Slicer | seul `torch` est ajouté — vtk, numpy, scipy, SimpleITK sont déjà là | `ensureBooted` |
+| Dans Slicer | seul `torch` est ajouté : vtk, numpy, scipy, SimpleITK sont déjà là | `ensureBooted` |
 | Windows | conda via WSL (`CondaSetUpCallWsl`), plus une vérif de `libxrender1`, `libgl1`/`libgl1-mesa-glx`, `libglx-mesa0` | `check_lib_wsl` |
 
 **numpy ne doit pas être touché** : le scipy de Slicer est compilé pour son numpy,
@@ -363,11 +363,11 @@ mélange des deux (`No module named 'numpy.strings'`), ce qui tuait l'aperçu MG
 
 - **Le CLI exige CUDA.** `Dilation`, `drawPatch` et la fusion finale des arrays
   appellent `.cuda()` sans repli CPU. Le patch MGL, lui, est calculé côté widget
-  et s'en passe — d'où le `while args.type != "icp_mgl"` qui saute la fusion pour
+  et s'en passe : d'où le `while args.type != "icp_mgl"` qui saute la fusion pour
   l'arcade basse.
 - **Le fichier d'entrée est écrasé** en mode patch, et la segmentation automatique
   l'écrase aussi (`overwrite=1`). Un `.stl` passé à `dentalmodelseg` est
-  purement et simplement supprimé — c'est la raison d'être de `ensureVtkInput()`.
+  purement et simplement supprimé : c'est la raison d'être de `ensureVtkInput()`.
 - **`vtkICP.__call__` retourne `source` inchangé** au lieu du maillage transformé.
   Sans effet ici car `list_icp` ne contient qu'une méthode, mais un enchaînement
   multi-étapes ne fonctionnerait pas tel quel.
@@ -392,7 +392,7 @@ communs, ROI palatine segmentée par analyse de forme 3D multi-vues, puis ICP.
 FlexReg en est la déclinaison « l'opérateur dessine la ROI au lieu de la faire
 prédire ».
 
-Aucun papier ne porte spécifiquement sur FlexReg ni sur la variante MGL — cette
+Aucun papier ne porte spécifiquement sur FlexReg ni sur la variante MGL : cette
 dernière semble être un développement interne non publié à ce jour. Les chiffres
 cités dans le code (4.2 mm vs 1.2 mm sur 364 prédictions) ne sont sourcés nulle
 part ailleurs que dans les commentaires.

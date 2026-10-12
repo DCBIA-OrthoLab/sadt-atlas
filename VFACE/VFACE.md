@@ -1,10 +1,10 @@
-# VFACE — pipeline complet
+# VFACE : pipeline complet
 
 Classification automatique de l'asymétrie faciale squelettique sur CBCT. VFACE
 n'apprend rien et ne segmente rien lui-même : c'est un **orchestrateur** qui
 enchaîne six autres modules du dépôt, en extrait des mesures linéaires et
 angulaires, et finit par trois classifieurs LightGBM. C'est le module le plus
-haut de la chaîne — l'arbre d'appels est l'information centrale.
+haut de la chaîne : l'arbre d'appels est l'information centrale.
 
 Le principe clinique tient en une phrase : **le T2 est le miroir du patient
 lui-même**. Il n'y a pas de second scan. Le scan est orienté, mirroré par
@@ -115,7 +115,7 @@ sur `_Scan`, `_Or`, `_MAND`, `_MD`, `_MAX`, `_MX`, `_CB`, `_lm`, `_T2`, `_T1`,
 reconnus**, un `_T3` casse l'appariement en silence.
 
 **Rééchantillonnage** : spacing `[0.3, 0.3, 0.3]`, `resample_size = "None"`,
-`center = "True"` — la taille propre du volume est conservée, seul le spacing
+`center = "True"`, la taille propre du volume est conservée, seul le spacing
 change. Sortie dans `<out>/T1 Resample/CBCT`.
 
 **Centrage** (`pre_aso_cbct`, `model_folder=False`) : purement géométrique,
@@ -178,10 +178,10 @@ Agents par renforcement : un agent par landmark, déplacement dans un voisinage
 
 Les landmarks demandés pour les mesures sont l'**union dédupliquée** des
 colonnes `Point 1` / `Point 2 / Line` des listes MAND et CB
-([createlistprocess.py:141](VFACE/VFACE_utils/createlistprocess.py#L141)) —
+([createlistprocess.py:141](VFACE/VFACE_utils/createlistprocess.py#L141)),
 `dict.fromkeys` évite qu'un landmark partagé déclenche deux agents.
 
-### 4.2 AMASSS — les masques
+### 4.2 AMASSS : les masques
 
 Deux appels : `CBMASK,MANDMASK` sur le scan CB-orienté, `MAXMASK` sur le scan
 MAX-orienté, `merge="SEPARATE"`, `genVtk=False`, `prediction_ID="seg"`. Noms
@@ -189,7 +189,7 @@ produits : `<base>_seg_<STRUCT>MASK.nii.gz`
 ([AMASSS_CLI.py:601](AMASSS_CLI/AMASSS_CLI.py#L601)). Ces masques ne servent
 qu'à **masquer l'image fixe du recalage**, pas à mesurer.
 
-### 4.3 BDS / DentalSegmentator — les surfaces
+### 4.3 BDS / DentalSegmentator : les surfaces
 
 `run_bds` appelle `run_dental_segmentation(model="DentalSegmentator",
 device="cuda", export_formats = VTK | VTK_MERGED)`. nnU-Net produit un label
@@ -199,7 +199,7 @@ map à 5 classes (`Upper Skull`, `Mandible`, `Upper Teeth`, `Lower Teeth`,
 converti en surfaces :
 
 - `_exportMergedVTK` : `vtkDiscreteMarchingCubes` (un contour par valeur de
-  label **présente**, indexé par position et non par valeur — le commentaire du
+  label **présente**, indexé par position et non par valeur, le commentaire du
   code explique le bug corrigé), `vtkWindowedSincPolyDataFilter` 60 itérations
   passband 0.05, normales par cellule, `vtkQuadricDecimation` 0.4 par label,
   puis IJK→RAS→LPS avant écriture ;
@@ -218,7 +218,7 @@ et leurs chemins `Path(__file__).parent/"Resources"` sont d'ailleurs faux d'un
 niveau (`VFACE_utils/Resources/...`), contrairement au chemin corrigé du modèle
 par défaut ([segmentation_logic.py:457](VFACE/VFACE_utils/segmentation_logic.py#L457)).
 
-### 4.4 Le recalage — AREG-CBCT
+### 4.4 Le recalage : AREG-CBCT
 
 `VoxelBasedRegistration` masque le T1 par le masque AMASSS correspondant puis
 lance **Elastix rigide** (`make_rigid_param_map_deterministic`,
@@ -238,13 +238,13 @@ trouvé gagne** ([utils.py:160](AREG_CBCT/AREG_CBCT_utils/utils.py#L160)). Or
 alphabétique (`CBMASK` < `MANDMASK`) qui empêche le recalage de base du crâne
 d'être masqué par la mandibule. Un renommage casse ça.
 
-## 5. Le cœur algorithmique — les mesures
+## 5. Le cœur algorithmique : les mesures
 
 ### 5.1 Les huit types de mesure
 
 Tous instanciés par `AQ3DCLogic.createMeasurement`
 ([functionaq3dc.py:1995](VFACE/VFACE_utils/functionaq3dc.py#L1995)), à partir de
-la colonne `Type of measurement` du xlsx — comparaison par **égalité exacte de
+la colonne `Type of measurement` du xlsx, comparaison par **égalité exacte de
 chaîne**. Les positions sont en LPS (`x` = gauche, `y` = postérieur,
 `z` = supérieur).
 
@@ -260,12 +260,12 @@ chaîne**. Les positions sont en LPS (`x` = gauche, `y` = postérieur,
 
 **Formule d'angle** (`Angle.__computeAngles`,
 [Measure.py:664](VFACE/VFACE_utils/Measure.py#L664)). `u = p2 − p1`,
-`v = p4 − p3`. Pour chaque axe `a` de `[2, 0, 1]` — respectivement **yaw**
+`v = p4 − p3`. Pour chaque axe `a` de `[2, 0, 1]`, respectivement **yaw**
 (plan axial), **pitch** (plan sagittal), **roll** (plan coronal) :
 
 1. on supprime la composante `a` (projection 2D), on normalise ;
 2. `θ = degrees(arctan2(‖u × v‖, u · v))` ;
-3. si `p2 == p3` (les deux lignes partagent leur sommet) : `θ ← 180 − θ` — c'est
+3. si `p2 == p3` (les deux lignes partagent leur sommet) : `θ ← 180 − θ`, c'est
    ce qui transforme `RCo-RGo / RGo-Me` en angle goniaque anatomique ;
 4. signe : `z = u_x·v_y − u_y·v_x` ; pour l'axe yaw le signe suit `z`, pour
    pitch et roll il est **inversé**.
@@ -329,7 +329,7 @@ lue. Un landmark qui n'apparaîtrait que dans la feuille `Angle between 2 lines`
 ne serait jamais demandé à ALI. Ça ne se voit pas avec la liste par défaut
 parce que ses 9 landmarks d'angle figurent tous dans la feuille de distances.
 
-### 5.3 `derive_landmarks` — les landmarks MAX sans second passage d'ALI
+### 5.3 `derive_landmarks` : les landmarks MAX sans second passage d'ALI
 
 [createlistprocess.py:1428](VFACE/VFACE_utils/createlistprocess.py#L1428). ALI
 n'est lancé qu'une fois, dans le repère CB. Les landmarks du repère MAX sont
@@ -343,13 +343,13 @@ moved = from_centred.TransformPoint(to_centred.TransformPoint(p))
 
 Les deux `.tfm` d'ASO partagent le même scan centré comme référence, donc le
 centrage se simplifie et la composition est exacte. Gain : quelques minutes par
-patient, et **un seul point d'édition manuelle** — corriger un landmark à la
+patient, et **un seul point d'édition manuelle**, corriger un landmark à la
 pause `t1_landmarks` se propage automatiquement au repère MAX. Le regroupement
 en fichiers de sortie reprend `GROUP_LABELS` d'ALI, lu par `ast.parse` sur
 [constants.py](ALI_CBCT/ALI_CBCT_utils/constants.py) pour éviter d'importer
 torch ([createlistprocess.py:1373](VFACE/VFACE_utils/createlistprocess.py#L1373)).
 
-### 5.4 `reorganizeStat` puis `postprocess` — de la mesure à la feature
+### 5.4 `reorganizeStat` puis `postprocess` : de la mesure à la feature
 
 `run_aq3dc` produit une ligne par (patient × mesure) avec 16 colonnes
 (`R-L Component/Meaning`, `A-P`, `S-I`, `3D Distance`, `Yaw`, `Pitch`, `Roll`).
@@ -380,8 +380,8 @@ par patient, colonnes `Asymmetry`/`Mand`/`Max` vides.
 
 `VFACE_CLI` charge trois pickles joblib
 ([VFACE_CLI.py:62](VFACE_CLI/VFACE_CLI.py#L62)). Ce sont des
-**`lightgbm.sklearn.LGBMClassifier`** — pas un réseau, pas un arbre de règles
-écrit à la main — vérifiés en les dépicklant :
+**`lightgbm.sklearn.LGBMClassifier`**, pas un réseau, pas un arbre de règles
+écrit à la main, vérifiés en les dépicklant :
 
 | Modèle | Hyperparamètres | Features | Arbres retenus |
 |---|---|---|---|
@@ -461,7 +461,7 @@ Trois natures, trois comportements :
 
 - **`VIEW`** : chargement et affichage, rien n'est réécrit.
 - **`LANDMARKS`** : `loadEditableMarkups` force `SetLocked(False)` sur le nœud
-  et sur chaque point, et rend l'affichage visible — ALI écrit ses points
+  et sur chaque point, et rend l'affichage visible, ALI écrit ses points
   verrouillés et cachés. Les positions de départ sont mémorisées ; au
   `Continue`, `savePauseEdits` ne réécrit **que** les fichiers dont au moins un
   point a bougé ([VFACE.py:2095](VFACE/VFACE.py#L2095)).
@@ -478,7 +478,7 @@ Trois natures, trois comportements :
 Deux contraintes d'ordonnancement importantes dans le plan :
 le bloc quantification est placé **avant** le bloc visualisation, pour que la
 seule pause éditable utile (`t1_landmarks`) n'arrive pas après cinq
-segmentations nnU-Net ; et `enterPauseForReview` ne charge rien directement —
+segmentations nnU-Net ; et `enterPauseForReview` ne charge rien directement,
 il arme un `QTimer.singleShot(0, self.beginReview)`, parce qu'on est dans un
 callback d'observateur VTK où la boucle Qt ne tourne pas et où lire un volume
 remplirait le pipe stdout de Slicer sans lecteur (même famille de bug que
@@ -507,7 +507,7 @@ depuis AREG **a été fait** (`2609bc4`, branche `vface-review-rebuild`) :
   proche (`previousCorrectableStep`, qui ne s'arrête que sur `LANDMARKS` ou
   `REGISTRATION`), réinjecte les étapes intermédiaires en tête de
   `list_process`, et les **restreint aux patients marqués** via
-  `restrictStepToPatients` — un dossier temporaire de liens symboliques
+  `restrictStepToPatients`, un dossier temporaire de liens symboliques
   (`shutil.copy` en repli), arborescence préservée ;
 - `review_flagged_carry` transmet la liste des patients rejoués à la
   reconstruction de la file de revue suivante, pour que les autres gardent
@@ -545,7 +545,7 @@ Conséquences concrètes :
 
 À noter avant de « corriger » ça : narrower AQ3DC / `postprocess` /
 la classification serait **nuisible**, parce que ces étapes écrivent un xlsx
-agrégé reconstruit de zéro — les restreindre effacerait les lignes des patients
+agrégé reconstruit de zéro, les restreindre effacerait les lignes des patients
 non marqués. Le correctif propre est d'ajouter les clés de volume/scan, pas
 toutes les clés de dossier.
 
@@ -588,7 +588,7 @@ appariée, en trois zones (`merged` CB, `Mandible`, `Upper_Skull`). Chaque paire
 tourne dans **son propre processus** (`_batch_worker.py`) parce que le filtre
 VTK alloue des locators côté C++ que `gc.collect()` ne rend pas ; jusqu'à
 `min(4, cpu_count // 2)` workers en parallèle, timeout 600 s, stdout/stderr vers
-des fichiers (jamais des pipes — un worker bavard bloquerait). Au-delà de 1 M de
+des fichiers (jamais des pipes : un worker bavard bloquerait). Au-delà de 1 M de
 points cumulés le worker décime à 0.5, au-delà de 2 M à 0.7, calcule la distance
 sur les maillages décimés puis **réinterpole** sur le maillage original par
 `vtkPointLocator`. L'array de sortie s'appelle `Distance`.
@@ -608,7 +608,7 @@ if not output or not os.path.isabs(output) or not os.path.isdir(output):
 courant de Slicer : un run sans dossier de sortie défini **vidait
 l'arborescence de travail** de tous ses sous-dossiers. Et le test portait sur
 `"Quantification"` alors que le menu dit `"Quantitative"`, si bien que le
-nettoyage effaçait `Measurements` et `Classification` — les résultats
+nettoyage effaçait `Measurements` et `Classification` : les résultats
 eux-mêmes. Les fichiers à la racine du dossier de sortie ne sont jamais
 supprimés (seul `item.is_dir()` est traité).
 
@@ -657,7 +657,7 @@ supprimés (seul `item.is_dir()` est traité).
 - **Les étapes Python gèlent l'interface.** Pas de thread : `startPythonProcess`
   appelle la fonction directement, avec redirection de fd 1 et 2 vers un fichier
   temporaire (`outputToFile`,
-  [VFACE.py:2537](VFACE/VFACE.py#L2537)) — torch et nnU-Net écrivent depuis le
+  [VFACE.py:2537](VFACE/VFACE.py#L2537)), torch et nnU-Net écrivent depuis le
   C, où remplacer `sys.stdout` ne suffirait pas.
 - **Le paramètre `spacing` est passé comme liste Python** (`[0.3,0.3,0.3]`) à un
   paramètre déclaré `<string>` dans le XML, et le CLI fait `spacing.split(",")`.
@@ -692,7 +692,7 @@ prétraitement standardisé, **mirroring**, recalage voxel, extraction de mesure
 anatomiques.
 
 **Le code diverge du papier sur la dernière étape.** Le résumé décrit une
-approche **non supervisée** — réduction de dimension (PCA, t-SNE, UMAP) puis
+approche **non supervisée** : réduction de dimension (PCA, t-SNE, UMAP) puis
 *Spectral Clustering*, UMAP+RBF donnant le meilleur score de silhouette. Le
 module, lui, embarque **trois classifieurs supervisés LightGBM binaires**
 entraînés sur 14 features fixes. Les deux ne sont pas le même modèle ; rien
@@ -701,7 +701,7 @@ du papier, et le script d'entraînement n'est pas versionné.
 
 Pour les briques amont, les références sont celles de leurs modules :
 
-- [AMASSS / ALI-CBCT — Automated Orientation and Registration of CBCT Scans (LNCS)](https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5)
+- [AMASSS / ALI-CBCT, Automated Orientation and Registration of CBCT Scans (LNCS)](https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5)
 - [SlicerDentalSegmentator](https://github.com/gaudot/SlicerDentalSegmentator) (poids `Dataset111_453CT`)
 - [SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools)
 

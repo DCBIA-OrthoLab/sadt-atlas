@@ -1,4 +1,4 @@
-/* sadt-atlas — thème, sommaire, recherche, confort de lecture.
+/* sadt-atlas : thème, sommaire, recherche, confort de lecture.
    Aucune dépendance. Fonctionne en file:// comme en http://. */
 (function () {
   "use strict";
@@ -12,7 +12,7 @@
     fr: { dark: "☾ sombre", light: "☀ clair", onpage: "Sur cette page",
           copy: "copier", copied: "copié", failed: "échec",
           search: "Rechercher…  /", searchAria: "Rechercher dans le site",
-          noResult: "Aucun résultat.", noIndex: "Index introuvable — lancer <code>python3 build.py</code>.",
+          noResult: "Aucun résultat.", noIndex: "Index introuvable, lancer <code>python3 build.py</code>.",
           prev: "← précédent", next: "suivant →", top: "↑ haut",
           toTop: "Revenir en haut", skip: "Aller au contenu",
           anchor: "Lien vers cette section", reading: "Ordre de lecture conseillé",
@@ -20,7 +20,7 @@
     en: { dark: "☾ dark", light: "☀ light", onpage: "On this page",
           copy: "copy", copied: "copied", failed: "failed",
           search: "Search…  /", searchAria: "Search the site",
-          noResult: "No results.", noIndex: "Index not found — run <code>python3 build.py</code>.",
+          noResult: "No results.", noIndex: "Index not found, run <code>python3 build.py</code>.",
           prev: "← previous", next: "next →", top: "↑ top",
           toTop: "Back to top", skip: "Skip to content",
           anchor: "Link to this section", reading: "Suggested reading order",
@@ -28,7 +28,7 @@
     pt: { dark: "☾ escuro", light: "☀ claro", onpage: "Nesta página",
           copy: "copiar", copied: "copiado", failed: "falhou",
           search: "Buscar…  /", searchAria: "Buscar no site",
-          noResult: "Nenhum resultado.", noIndex: "Índice não encontrado — rode <code>python3 build.py</code>.",
+          noResult: "Nenhum resultado.", noIndex: "Índice não encontrado, rode <code>python3 build.py</code>.",
           prev: "← anterior", next: "próximo →", top: "↑ topo",
           toTop: "Voltar ao topo", skip: "Ir para o conteúdo",
           anchor: "Link para esta seção", reading: "Ordem de leitura sugerida",
@@ -36,7 +36,7 @@
     ko: { dark: "☾ 어둡게", light: "☀ 밝게", onpage: "이 페이지에서",
           copy: "복사", copied: "복사됨", failed: "실패",
           search: "검색…  /", searchAria: "사이트 검색",
-          noResult: "결과 없음.", noIndex: "색인이 없습니다 — <code>python3 build.py</code>를 실행하십시오.",
+          noResult: "결과 없음.", noIndex: "색인이 없습니다, <code>python3 build.py</code>를 실행하십시오.",
           prev: "← 이전", next: "다음 →", top: "↑ 위로",
           toTop: "맨 위로", skip: "본문으로 건너뛰기",
           anchor: "이 섹션 링크", reading: "권장 읽기 순서",
@@ -44,7 +44,7 @@
     th: { dark: "☾ มืด", light: "☀ สว่าง", onpage: "ในหน้านี้",
           copy: "คัดลอก", copied: "คัดลอกแล้ว", failed: "ล้มเหลว",
           search: "ค้นหา…  /", searchAria: "ค้นหาในเว็บไซต์",
-          noResult: "ไม่พบผลลัพธ์", noIndex: "ไม่พบดัชนี — รัน <code>python3 build.py</code>",
+          noResult: "ไม่พบผลลัพธ์", noIndex: "ไม่พบดัชนี, รัน <code>python3 build.py</code>",
           prev: "← ก่อนหน้า", next: "ถัดไป →", top: "↑ บนสุด",
           toTop: "กลับขึ้นบนสุด", skip: "ข้ามไปยังเนื้อหา",
           anchor: "ลิงก์ไปยังหัวข้อนี้", reading: "ลำดับการอ่านที่แนะนำ",
@@ -116,7 +116,7 @@
 
     var cur = document.querySelector('.sidebar a[aria-current="page"]');
     var h1 = document.querySelector(".content h1");
-    var t = cur ? cur.textContent : (h1 ? h1.textContent.split("—")[0] : "SADT Atlas");
+    var t = cur ? cur.textContent : (h1 ? h1.textContent.split(":")[0] : "SADT Atlas");
     bar.querySelector(".mbar-title").textContent = t.trim();
     document.body.insertBefore(bar, document.body.firstChild);
 
@@ -442,7 +442,7 @@
     if (!head || !h1) return;
 
     var cur = document.querySelector('.sidebar a[aria-current="page"]');
-    var name = cur ? cur.textContent.trim() : h1.textContent.trim().split("—")[0].trim();
+    var name = cur ? cur.textContent.trim() : h1.textContent.trim().split(":")[0].trim();
 
     var crumb = head.querySelector(".breadcrumb");
     var cat = "";

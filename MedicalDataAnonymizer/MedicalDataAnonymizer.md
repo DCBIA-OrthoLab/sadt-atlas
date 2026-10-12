@@ -1,4 +1,4 @@
-# Medical Data Anonymizer — pipeline complet
+# Medical Data Anonymizer : pipeline complet
 
 Détection et remplacement d'entités sensibles dans des **documents texte**
 (DOCX, TXT, PDF, CSV, XML, ODT) par Microsoft Presidio. Point à poser d'emblée, parce
@@ -37,7 +37,7 @@ un seul fichier de 767 lignes, dont ~350 de feuilles de style Qt :
 [Medical_Data_Anonymizer_Module.py](Medical_Data_Anonymizer_Module/Medical_Data_Anonymizer_Module.py).
 
 `Medical_Data_Anonymizer_ModuleLogic` et `…Test` sont des classes vides (`pass`) : toute
-la logique vit dans le widget, donc **dans le thread principal de Slicer** — l'interface
+la logique vit dans le widget, donc **dans le thread principal de Slicer**, l'interface
 gèle pendant le traitement, seul `slicer.app.processEvents()` rafraîchit la barre de
 progression.
 
@@ -50,7 +50,7 @@ unique** avant analyse :
 | Format | Extraction | Ce qui est perdu au passage |
 |---|---|---|
 | `.docx` | `python-docx`, `"\n".join(p.text for p in doc.paragraphs)` | **tableaux**, en-têtes/pieds de page, notes, zones de texte, commentaires, métadonnées du fichier |
-| `.txt` | lecture brute UTF-8 | — |
+| `.txt` | lecture brute UTF-8 | : |
 | `.pdf` | `pdfplumber`, `page.extract_text()` ; en cas d'exception, seconde tentative via `extract_tables()` | images, PDF scannés (aucun OCR) → texte vide |
 | `.csv` | `csv.reader`, chaque ligne aplatie par `" ".join(row)` | **la structure en colonnes** |
 | `.xml` | `ElementTree` + `extract_text_from_xml()` récursif (texte + `tail`) | **balises et attributs** : les valeurs d'attributs ne sont jamais lues |
@@ -58,7 +58,7 @@ unique** avant analyse :
 
 La perte n'est pas qu'une question de fidélité : les documents de sortie sont
 **reconstruits à partir de cette chaîne**. Ce qui n'a pas été extrait n'est pas
-anonymisé, mais n'est pas non plus recopié — il disparaît. À l'inverse, un contenu
+anonymisé, mais n'est pas non plus recopié : il disparaît. À l'inverse, un contenu
 sensible situé dans une partie non extraite (un tableau DOCX, un attribut XML) n'est ni
 détecté ni recopié : pas de fuite, mais perte de données silencieuse.
 
@@ -78,7 +78,7 @@ anonymizer = AnonymizerEngine()
 ```
 
 `AnalyzerEngine()` sans argument utilise la configuration NLP par défaut de Presidio,
-c'est-à-dire **spaCy `en_core_web_lg`** — c'est le seul modèle que
+c'est-à-dire **spaCy `en_core_web_lg`**, c'est le seul modèle que
 `install_dependencies()` télécharge (`spacy.cli.download`,
 […py:411](Medical_Data_Anonymizer_Module/Medical_Data_Anonymizer_Module.py#L411)).
 
@@ -90,7 +90,7 @@ contrôle** (`PHONE_NUMBER`, `EMAIL_ADDRESS`, `US_SSN`, `MEDICAL_LICENSE`,
 **La langue est figée à l'anglais** : `analyzer.analyze(..., language='en')`
 ([…py:713](Medical_Data_Anonymizer_Module/Medical_Data_Anonymizer_Module.py#L713)),
 malgré le commentaire « with automatic language detection » et l'installation de
-`langdetect`, qui n'est **jamais importé** — dépendance morte. Un dossier de notes en
+`langdetect`, qui n'est **jamais importé**, dépendance morte. Un dossier de notes en
 français passera par un modèle anglais, avec le rappel qu'on imagine.
 
 **Seuil de confiance** : `score_threshold`, curseur 0.0–1.0, défaut **0.5**. Les
@@ -110,7 +110,7 @@ Douze cases à cocher, sept cochées par défaut
 | `LOCATION` | Addresses and Locations | ✔ |
 | `US_SSN` | Social Security Numbers | ✔ |
 | `MEDICAL_LICENSE` | Medical License Numbers | ✔ |
-| `US_DRIVER_LICENSE`, `CREDIT_CARD`, `US_BANK_NUMBER`, `IP_ADDRESS`, `URL` | — | ✘ |
+| `US_DRIVER_LICENSE`, `CREDIT_CARD`, `US_BANK_NUMBER`, `IP_ADDRESS`, `URL` | : | ✘ |
 
 Quatre méthodes, dans « Advanced Options »
 ([…py:720](Medical_Data_Anonymizer_Module/Medical_Data_Anonymizer_Module.py#L720)) :
@@ -130,13 +130,13 @@ en quelques secondes. À considérer comme un pseudonyme public, pas comme une p
 
 ## 5. Sorties et table de correspondance
 
-Écriture **à plat** dans le dossier de sortie — la hiérarchie de sous-dossiers de
+Écriture **à plat** dans le dossier de sortie : la hiérarchie de sous-dossiers de
 l'entrée n'est pas reproduite.
 
 | Entrée | Sortie | Remarque |
 |---|---|---|
 | `x.docx` | `x_anonymized.docx` | document reconstruit, un paragraphe par ligne, sans style |
-| `x.txt` | `x_anonymized.txt` | — |
+| `x.txt` | `x_anonymized.txt` | : |
 | `x.pdf` | `x_anonymized.pdf` | régénéré par `reportlab`, un unique bloc `Preformatted` |
 | `x.csv` | `x_anonymized.csv` | voir ci-dessous |
 | `x.xml` | `x_anonymized.xml` | **texte brut sous une extension `.xml`** : plus aucune balise, le commentaire du code l'assume (« XML anonymization is complex ») |
@@ -160,7 +160,7 @@ ressort inexploitable.
 
 Ce n'est **pas** une table de ré-identification des personnes : elle ne contient aucune
 correspondance entre un nom détecté et son remplacement. Et l'UUID est purement
-décoratif — il est généré ([…py:531](Medical_Data_Anonymizer_Module/Medical_Data_Anonymizer_Module.py#L531))
+décoratif, il est généré ([…py:531](Medical_Data_Anonymizer_Module/Medical_Data_Anonymizer_Module.py#L531))
 puis **jamais utilisé** : il n'apparaît ni dans le contenu, ni dans le nom du fichier de
 sortie. Il n'existe donc aucun mécanisme de pseudonymisation stable inter-documents.
 
@@ -191,7 +191,7 @@ Section la plus utile pour décider si un jeu de données peut être partagé.
 2. **Les noms de fichiers et de dossiers.** `Dupont_Jean_2019.docx` devient
    `Dupont_Jean_2019_anonymized.docx`. Le nom du patient survit intégralement dans le
    nom du fichier, et il est recopié tel quel dans `file_mappings.csv`. La hiérarchie
-   d'entrée, souvent nominative elle aussi (`.../Patients/Dupont_Jean/`), est aplatie —
+   d'entrée, souvent nominative elle aussi (`.../Patients/Dupont_Jean/`), est aplatie,
    et si deux sous-dossiers contiennent un fichier de même nom, **le second écrase
    silencieusement le premier**.
 
@@ -205,16 +205,16 @@ Section la plus utile pour décider si un jeu de données peut être partagé.
    passeport ou un ITIN ne sont pas cherchés.
 5. **Les identifiants indirects HIPAA** ne sont pas traités : âge supérieur à 89 ans,
    dates rares, professions, appartenance à un petit groupe. Presidio ne fait aucune
-   généralisation de dates — `DATE_TIME` est remplacé en bloc ou pas du tout.
+   généralisation de dates : `DATE_TIME` est remplacé en bloc ou pas du tout.
 6. **La langue.** Analyse figée en anglais (§3) : sur un corpus non anglophone, le
    rappel de `PERSON`/`LOCATION`/`DATE_TIME` s'effondre, sans le moindre avertissement.
-7. **Le seuil de 0.5** écarte par défaut toutes les détections moins sûres — typiquement
+7. **Le seuil de 0.5** écarte par défaut toutes les détections moins sûres : typiquement
    les noms rares, les noms non anglo-saxons et les formes abrégées.
 8. **Le contenu non extrait** (tableaux DOCX, attributs XML, PDF scannés, en-têtes et
    pieds de page) n'est pas analysé. Il ne fuite pas dans la sortie, mais si le
    destinataire reçoit **aussi** les originaux, l'anonymisation ne l'a pas couvert.
 
-**Défaillance silencieuse — le point le plus grave**
+**Défaillance silencieuse : le point le plus grave**
 
 9. `anonymize_text_presidio()` se termine par
    ([…py:748](Medical_Data_Anonymizer_Module/Medical_Data_Anonymizer_Module.py#L748)) :
@@ -292,18 +292,18 @@ précision) dans le dépôt, sur aucun corpus.
 
 Les briques utilisées sont documentées :
 
-- [Microsoft Presidio](https://microsoft.github.io/presidio/) — le moteur de détection
+- [Microsoft Presidio](https://microsoft.github.io/presidio/), le moteur de détection
   et d'anonymisation, avec la liste exacte de ses reconnaisseurs prédéfinis et de ses
-  opérateurs (`replace`, `redact`, `hash`, `mask`, `encrypt` — ce dernier, réversible
+  opérateurs (`replace`, `redact`, `hash`, `mask`, `encrypt`, ce dernier, réversible
   avec une clé, n'est pas proposé par le module).
-- [spaCy `en_core_web_lg`](https://spacy.io/models/en) — le modèle de NER anglais
+- [spaCy `en_core_web_lg`](https://spacy.io/models/en), le modèle de NER anglais
   utilisé par défaut.
-- [HIPAA Safe Harbor, 45 CFR §164.514(b)(2)](https://www.hhs.gov/hipaa/for-professionals/privacy/special-topics/de-identification/index.html) —
+- [HIPAA Safe Harbor, 45 CFR §164.514(b)(2)](https://www.hhs.gov/hipaa/for-professionals/privacy/special-topics/de-identification/index.html),
   les 18 catégories d'identifiants à retirer. Utile comme grille de lecture de la §7 :
   les noms de fichiers, les identifiants de dossier médical et les identifiants d'images
   y figurent, et ce module ne les traite pas.
 
-**Bibliographie complète : [SOURCES.md](SOURCES.md)** — recherche faite, résultat
+**Bibliographie complète : [SOURCES.md](SOURCES.md)**, recherche faite, résultat
 négatif sur le module lui-même. Le dossier contient la seule évaluation publiée de
 Presidio sur du texte clinique non structuré, et les liens vers les campagnes
 i2b2/n2c2 de dé-identification de texte, qui ne décrivent pas ce code mais en

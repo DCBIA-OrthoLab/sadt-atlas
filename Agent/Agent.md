@@ -1,9 +1,9 @@
-# Agent — pipeline complet
+# Agent : pipeline complet
 
 Assistant en langage naturel qui choisit un module de l'extension, en extrait les
 paramètres, construit la ligne de commande et la lance. Tout tourne en local :
 un LLM 8B servi par Ollama, plus un petit cross-encoder pour présélectionner les
-outils candidats. Aucun réseau de neurones médical n'est appelé ici — l'Agent ne
+outils candidats. Aucun réseau de neurones médical n'est appelé ici : l'Agent ne
 fait que du routage et du remplissage de formulaire.
 
 ## 1. Situation dans la chaîne
@@ -46,7 +46,7 @@ de Slicer ; le seul GPU sollicité l'est indirectement, par le serveur Ollama.
 
 ## 3. Les modèles
 
-### 3.1 Le LLM — qwen3:8b via Ollama
+### 3.1 Le LLM, qwen3:8b via Ollama
 
 Une seule constante, dupliquée aux deux bouts :
 `DEFAULT_MODEL = "qwen3:8b"` ([utils.py:21](Agent_CLI/Agent_CLI_utils/utils.py#L21))
@@ -60,7 +60,7 @@ réparation. Aucun modèle spécialisé, aucun fine-tuning.
 | Point | Valeur | Source |
 |---|---|---|
 | Moteur d'inférence | **Ollama** (donc llama.cpp en dessous), API HTTP locale | `import ollama`, port 11434 |
-| Format des poids | **GGUF** — imposé par Ollama, pas de checkpoint transformers | déduit du moteur |
+| Format des poids | **GGUF** : imposé par Ollama, pas de checkpoint transformers | déduit du moteur |
 | Téléchargement | `ollama pull qwen3:8b` depuis le registre ollama.com | [Agent.py:1266](Agent/Agent.py#L1266), et repli automatique dans `chat_with_auto_pull` |
 | Taille / quantification | tag par défaut : **5.2 Go, Q4_K_M, 8.19 G paramètres** | non déterminable depuis le dépôt : lu sur [ollama.com/library/qwen3](https://ollama.com/library/qwen3) |
 | CPU ou GPU | **décidé par Ollama, pas par le code** | voir ci-dessous |
@@ -68,7 +68,7 @@ réparation. Aucun modèle spécialisé, aucun fine-tuning.
 Le module ne passe jamais de directive de device. C'est le binaire Ollama qui
 décide, et le code en tire une conséquence explicite : sur Linux, un Ollama
 installé par **snap** est sandboxé, ne voit pas le GPU NVIDIA et retombe sur CPU
-— **80–90 s par réponse** pour un 8B, chiffre mesuré et inscrit dans le code
+, **80–90 s par réponse** pour un 8B, chiffre mesuré et inscrit dans le code
 ([Agent.py:1231](Agent/Agent.py#L1231)). Le module détecte `/snap/` dans le
 `realpath` du binaire et avertit, sans pouvoir corriger (le serveur snap tient
 déjà le port 11434, et le retirer demande sudo).
@@ -89,7 +89,7 @@ Deux réglages d'appel seulement, dans `chat_with_auto_pull`
 - `keep_alive="30m"` au lieu des 5 min par défaut, pour ne pas recharger 5 Go en
   VRAM entre deux messages ;
 - `format="json"` pour le routeur, l'extraction et la réparation (contrainte de
-  grammaire côté Ollama) — **pas** pour le mode consultant.
+  grammaire côté Ollama) : **pas** pour le mode consultant.
 
 Aucun `temperature`, `seed`, `num_ctx` ni `think` n'est passé. qwen3 étant un
 modèle à raisonnement hybride, le mode consultant peut donc laisser passer du
@@ -102,12 +102,12 @@ Si le modèle n'est pas présent, `chat_with_auto_pull` intercepte le message
 `not found`, lance `ollama.pull(model, stream=True)` en imprimant la progression,
 puis rejoue le chat. Toute autre erreur est relancée telle quelle.
 
-### 3.2 Le cross-encoder — ms-marco-MiniLM-L-6-v2
+### 3.2 Le cross-encoder : ms-marco-MiniLM-L-6-v2
 
 C'est le seul vrai réseau chargé dans le processus.
 `CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")`
 ([utils.py:53](Agent_CLI/Agent_CLI_utils/utils.py#L53)), via
-`sentence-transformers` — donc poids **transformers/safetensors** téléchargés
+`sentence-transformers`, donc poids **transformers/safetensors** téléchargés
 depuis le Hub Hugging Face et mis en cache dans `~/.cache/huggingface`.
 
 MiniLM 6 couches, 22,7 M paramètres, distillé de `MiniLM-L12-H384-uncased`,
@@ -129,7 +129,7 @@ amasss_cli) quelle que soit la question ([utils.py:90](Agent_CLI/Agent_CLI_utils
 
 Deux étages, et le LLM n'intervient qu'au second.
 
-**Étage 1 — présélection par cross-encoder.**
+**Étage 1, présélection par cross-encoder.**
 `cross_encoder_retrieve_candidates(manifest, prompt, k=3)` construit un document
 par outil :
 
@@ -142,11 +142,11 @@ return [s for _, s in ranked[:k]]
 
 23 paires scorées, tri décroissant, **top-3 en dur** (`k=3` n'est jamais
 paramétré). Le champ `priority` du manifeste (valeurs 1 à 23) n'est **jamais
-lu** — la ligne qui le lirait est commentée
+lu**, la ligne qui le lirait est commentée
 ([utils.py:216](Agent_CLI/Agent_CLI_utils/utils.py#L216)). Le bon outil qui
 sortirait 4ᵉ est définitivement perdu ; le LLM ne le verra jamais.
 
-**Étage 2 — choix par le LLM.** Le prompt système
+**Étage 2, choix par le LLM.** Le prompt système
 ([Agent_CLI.py:105](Agent_CLI/Agent_CLI.py#L105)) :
 
 ```
@@ -196,7 +196,7 @@ Un second appel LLM, un outil déjà choisi, dans `extract_parameters`
 
 **Masquage des paramètres techniques.** Les paramètres nommés `temp_fold`,
 `tmp_folder`, `temp_folder`, `log_path` ou `logPath` sont retirés de la spec
-avant de construire le prompt — inutile de demander au modèle d'inventer un
+avant de construire le prompt : inutile de demander au modèle d'inventer un
 dossier temporaire. Ils sont réinjectés après coup avec la valeur
 `input.temp_folder`, c'est-à-dire le `slicer.util.tempDirectory()` créé par le
 widget à chaque clic ([Agent_CLI.py:153](Agent_CLI/Agent_CLI.py#L153)), et
@@ -218,7 +218,7 @@ fichier », et surtout :
 
 Sortie imposée :
 `{"extracted": {...}, "confidence": 0.0-1.0, "missing_required": [...], "notes": "..."}`.
-Le `missing_required` produit par le modèle est ignoré — c'est le validateur qui
+Le `missing_required` produit par le modèle est ignoré : c'est le validateur qui
 fait foi.
 
 **La résolution des chemins est entièrement déléguée au LLM.** Le widget passe la
@@ -248,7 +248,7 @@ enchaîne six passes : required manquants, coercition de type
 `min`/`max`, paramètres hors spec. Deux détails utiles :
 
 - `encode: lower_str_bool` force la chaîne `"true"`/`"false"` en minuscules,
-  parce que plusieurs CLI comparent l'argument brut sans `.lower()` — `str(True)`
+  parce que plusieurs CLI comparent l'argument brut sans `.lower()` : `str(True)`
   donnerait `"True"` et ne matcherait jamais.
 - `_check_paths` ne vérifie **que** deux choses : que `Path(str(value))` ne lève
   pas (il ne lève quasiment jamais) et qu'un paramètre dont le nom contient
@@ -257,7 +257,7 @@ enchaîne six passes : required manquants, coercition de type
 
 Le résultat de la validation est presque entièrement jeté : `errors` et
 `warnings` ne remontent nulle part. Leur seul effet est
-`final_confidence = confidence * 0.6` si invalide — et cette confiance n'est
+`final_confidence = confidence * 0.6` si invalide, et cette confiance n'est
 lue par personne. Seuls `params` et `missing_required` survivent.
 
 ## 6. Construction et exécution de la commande
@@ -274,7 +274,7 @@ return [sys.executable, tool_path] + cli
 
 `sys.executable` est l'interpréteur du processus Agent_CLI, donc le Python de
 Slicer. Pour `cli_style: positional` (21 outils sur 23), les valeurs sont
-concaténées dans l'ordre de déclaration du manifeste — `positional_order` est
+concaténées dans l'ordre de déclaration du manifeste : `positional_order` est
 supporté mais **aucune entrée ne le renseigne**. Pour tout autre `cli_style`, on
 tombe dans la branche `--flag valeur`, en itérant sur `merged` : les paramètres
 hallucinés hors spec y sont donc bel et bien émis.
@@ -292,7 +292,7 @@ des manquants et les valeurs déjà connues, et attend un message de suivi (que
 l'historique de conversation permettra de raccrocher).
 
 `subprocess.run` est **synchrone et sur le thread GUI** : Slicer est gelé
-pendant toute la durée du job — ce qui, pour une segmentation AMASSS ou un
+pendant toute la durée du job, ce qui, pour une segmentation AMASSS ou un
 recalage AREG, se compte en dizaines de minutes.
 
 ## 7. La boucle de réparation
@@ -317,7 +317,7 @@ diagnostic par mots-clés, non-LLM : modèle Ollama absent, `ModuleNotFoundError
 `transformers>=4.53.0`, huggingface/transformers#43784), `Numpy is not available`
 (ABI numpy 2 contre les wheels torch), ou échec de connexion Ollama.
 
-## 8. Les modules adressables — et leur état réel
+## 8. Les modules adressables, et leur état réel
 
 Les 23 entrées de [manifest.yaml](Agent_CLI/manifest.yaml). La colonne de droite
 compare l'ordre positionnel du manifeste à la signature `argparse` réelle du
@@ -332,7 +332,7 @@ script cible, vérifiée fichier par fichier.
 | areg_ios | [AREG_IOS.py](AREG_IOS/AREG_IOS.py) | 6 / 7 requis | `suffix` absent → `log_path` lu comme suffixe |
 | autocrop3d | [AutoCrop3D_CLI.py](AutoCrop3D/Crop_Volumes_CLI/AutoCrop3D_CLI.py) | 5 / 6 | `suffix` absent → décalage |
 | automatrix | [Automatrix_CLI.py](Automatrix_CLI/Automatrix_CLI.py) | 7 / 9 | `suffix` et `matrix_name` absents |
-| batchdentalseg | [BATCHDENTALSEG.py](BATCHDENTALSEG/BATCHDENTALSEG.py) | `cli_style: ui_module` | **module Slicer scripté, aucun `__main__`** — injouable |
+| batchdentalseg | [BATCHDENTALSEG.py](BATCHDENTALSEG/BATCHDENTALSEG.py) | `cli_style: ui_module` | **module Slicer scripté, aucun `__main__`** : injouable |
 | clic | [CLIC.py](CLIC/CLIC.py) | `cli_style: ui_module` | idem, importe `slicer`, `qt`, `CondaSetUp` |
 | docshapeaxi | [DOCShapeAXI_CLI.py](DOCShapeAXI_CLI/DOCShapeAXI_CLI.py) | 8 / 8 | **signature correcte** |
 | flexreg | [FlexReg_CLI.py](FlexReg_CLI/FlexReg_CLI.py) | 21 / 23 | `shift_lr`, `shift_ap` absents |
@@ -375,7 +375,7 @@ pointe un chemin debuggable », soit `<Agent_CLI>/CLI files/ALI_CBCT.py`.
 Conséquence : **sans `AGENT_CLI_TOOLS_DIR`, l'Agent ne peut lancer aucun module.**
 `subprocess.run` ne lève pas (l'exécutable, `sys.executable`, existe) ; c'est
 Python qui sort en code 2 sur un fichier introuvable, ce qui déclenche la boucle
-de réparation — laquelle, en corrigeant des *paramètres*, ne peut structurellement
+de réparation, laquelle, en corrigeant des *paramètres*, ne peut structurellement
 rien y faire, et brûle deux allers-retours LLM.
 
 Et même chemins résolus, une partie des cibles échouerait : `DOCShapeAXI_CLI.py`
@@ -392,7 +392,7 @@ dans des environnements conda que leurs modules Slicer respectifs invoquent par
 | `Ask (Interactive)` | texte libre | **aucune** |
 
 En mode `Ask`, `build_candidates_block(..., include_parameters=True)` ajoute à
-chaque ligne `| parameters:<liste YAML brute de dicts>` — le repr Python de la
+chaque ligne `| parameters:<liste YAML brute de dicts>` : le repr Python de la
 structure du manifeste est injecté tel quel dans le prompt système d'un
 « expert medical image analysis consultant ». Aucun `format="json"`, la réponse
 est affichée après suppression des `*` et des `#`.
@@ -437,7 +437,7 @@ Ce qui n'existe pas :
   `input.temp_folder`. Les CLI qui ouvrent ce chemin en écriture échoueront.
 - **Aucune liste blanche d'exécutables.** `subprocess.run` prend la liste telle
   que construite. La protection réelle est que `tool_path` vient du manifeste,
-  pas du LLM — le modèle contrôle les *valeurs*, pas le binaire.
+  pas du LLM : le modèle contrôle les *valeurs*, pas le binaire.
 
 ## 11. Environnement
 
@@ -447,7 +447,7 @@ compte** :
 
 | Paquet | Raison du pin |
 |---|---|
-| `ollama` | client python seulement — pip ne fournit pas le serveur |
+| `ollama` | client python seulement : pip ne fournit pas le serveur |
 | `pyyaml` | lecture du manifeste |
 | `transformers<4.53.0` | régression `NameError: name 'nn' is not defined` dans `integrations/accelerate.py`, casse l'import du cross-encoder |
 | `numpy<2` | numpy ≥ 2 casse l'ABI des wheels torch pip (`RuntimeError: Numpy is not available`) |
@@ -495,7 +495,7 @@ contrairement au reste du dépôt.
 - **Détection de thème par échantillonnage de pixels** (`widget.grab()`,
   luminance du pixel (5,5)), parce que `QPalette` renvoie les couleurs du thème
   clair même en thème sombre dans Slicer ([Agent.py:656](Agent/Agent.py#L656)).
-  Fonctionne, mais dépend du moment du premier rendu — d'où le
+  Fonctionne, mais dépend du moment du premier rendu : d'où le
   `QTimer.singleShot(0, ...)` du `setup`.
 - **Code mort** : `AgentLogic.process()`, `build_tool_spec()` (et tout le support
   `patterns`/`defaults`), `ValidationReport`, `positional_order`, le champ
@@ -526,18 +526,18 @@ et de la littérature générale sur les LLM en dentisterie, sans rapport avec c
 code. Les seules références externes réelles sont celles des deux modèles
 utilisés, tous deux génériques et non entraînés pour ce domaine :
 
-- [Qwen3 sur Ollama](https://ollama.com/library/qwen3) — modèle de routage et
+- [Qwen3 sur Ollama](https://ollama.com/library/qwen3), modèle de routage et
   d'extraction
 - [cross-encoder/ms-marco-MiniLM-L-6-v2](https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-6-v2)
-  — reranker MS MARCO utilisé pour la présélection
+, reranker MS MARCO utilisé pour la présélection
 - [SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools)
 
 L'historique git du module tient en trois commits (`aa3330d` ADD: Add the new
 agentic module, `b463312`, `2a91e33`) : c'est un ajout récent, importé d'un dépôt
-`AI_Agent` séparé — d'où la désynchronisation entre le manifeste et les
+`AI_Agent` séparé, d'où la désynchronisation entre le manifeste et les
 signatures réelles des CLI de ce dépôt-ci.
 
-**Bibliographie complète : [SOURCES.md](SOURCES.md)** — recherche faite, résultat
+**Bibliographie complète : [SOURCES.md](SOURCES.md)**, recherche faite, résultat
 négatif sur le plan des publications, mais un **rapport NA-MIC Project Week PW45
 (Boston, 2026) signé par les auteurs du module** a été retrouvé et récupéré dans ce
 dossier, avec les papiers des deux modèles (Qwen3, MiniLM/MS MARCO) et de la méthode

@@ -1,4 +1,4 @@
-/* batchdentalseg-3d.js — la scene BatchDentalSeg, sur le socle scene3d.js.
+/* batchdentalseg-3d.js : la scene BatchDentalSeg, sur le socle scene3d.js.
 
    Ce que la scene doit faire comprendre, et qui la distingue d'AMASSS :
 
@@ -193,7 +193,7 @@
         }
         r.state = state;
         r.el.setAttribute("data-state", state);
-        if (r.num) { r.num.textContent = val == null ? "—" : String(val); }
+        if (r.num) { r.num.textContent = val == null ? "–" : String(val); }
         if (r.tag) { r.tag.textContent = strings[state] || ""; }
         if (part) { part.on = (state === "on" || state === "split"); }
       });
@@ -224,7 +224,7 @@
       /* Le nom d'une dent vit dans le `title` de sa cellule -- donc en HTML,
          donc traduisible et indexe, et pas dans ce fichier. */
       var cell = cellFor(code);
-      if (cell) { return (cell.getAttribute("title") || "").split("—")[0].trim(); }
+      if (cell) { return (cell.getAttribute("title") || "").split(":")[0].trim(); }
       return code;
     }
 
@@ -367,13 +367,13 @@
         raw && (raw.alpha = 0.82 * (1 - f));
         anat.forEach(function (p) { p.gen = f; });
         lutMix = 0; opaMix = 0;
-        say(stepName("predict") + " — " + Math.round(f * 100) + " %");
+        say(stepName("predict") + " · " + Math.round(f * 100) + " %");
       } else if (st.k === "labelmap") {
         raw && (raw.alpha = 0);
         anat.forEach(function (p) { p.gen = 1; });
         lutMix = f;
         opaMix = 0;
-        say(stepName("labelmap") + " — " + shown() + " "
+        say(stepName("labelmap") + " · " + shown() + " "
             + (strings.values || ""));
       } else {
         raw && (raw.alpha = 0);
@@ -444,7 +444,7 @@
         /* Etiquette de la table que la passe n'a pas produite : cette dent
            n'est pas dans cette bouche. On le dit plutot que d'en montrer une. */
         select(null);
-        var bits = [(cell.getAttribute("title") || "").split("—")[0].trim()];
+        var bits = [(cell.getAttribute("title") || "").split(":")[0].trim()];
         if (strings.label) { bits.push(strings.label + " " + value); }
         if (strings.notinscan) { bits.push(strings.notinscan); }
         say(bits.join(" · "));

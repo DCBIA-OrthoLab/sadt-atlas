@@ -1,4 +1,4 @@
-# GreedyReg — pipeline complet
+# GreedyReg : pipeline complet
 
 Recalage de CBCT T1/T2 en appelant le binaire **greedy** d'ITK-SNAP en sous-processus.
 Aucun réseau n'est entraîné ni appelé dans le chemin principal : le seul réseau du
@@ -30,12 +30,12 @@ La docstring de `GreedyRegLogic` l'affirme explicitement et c'est vérifié : au
 | `GreedyReg_CLI/bin/<plateforme>/greedy` | l'exécutable, **absent du dépôt**, téléchargé à la demande | natif |
 
 Point important pour un repreneur : il n'y a **pas d'environnement conda**. Le commentaire
-de [Logic.py:76](GreedyReg/GreedyReg_Method/Logic.py#L76) le dit — le CLI tourne dans le
+de [Logic.py:76](GreedyReg/GreedyReg_Method/Logic.py#L76) le dit, le CLI tourne dans le
 Python de Slicer, donc un `slicer.util.pip_install` fait depuis le widget est
 immédiatement visible du sous-processus. Pas de GPU non plus : greedy est CPU.
 
 Les deux premières lignes de [GreedyReg.py](GreedyReg/GreedyReg.py#L1) effacent le
-`__pycache__` du module à chaque import — reliquat de développement.
+`__pycache__` du module à chaque import : reliquat de développement.
 
 ## 3. Le binaire greedy : d'où il vient
 
@@ -150,7 +150,7 @@ Paramètres imposés par GreedyReg ([Logic.py:471](GreedyReg/GreedyReg_Method/Lo
 **Le calcul rigide** ([Logic.py:535](GreedyReg/GreedyReg_Method/Logic.py#L535)) est un
 Kabsch classique : centrage, `H = movingᵀ·fixed`, SVD, `R = Vᵀ·Uᵀ`, correction de
 réflexion si `det(R) < 0`, `t = c_fixed − R·c_moving`. La matrice obtenue va donc de
-**mobile vers fixe, en RAS** — exactement la convention d'un nœud de transformation
+**mobile vers fixe, en RAS** : exactement la convention d'un nœud de transformation
 Slicer, où elle est posée telle quelle.
 
 Le message de fin est honnête : *« Distant registration complete! Now run Automatic
@@ -185,8 +185,8 @@ greedy -d 3 -a \
 | `-i fixe mobile` | T1 puis T2 | ordre imposé : `-i <fixed> <moving>` |
 | `-o` | `<ID>_warp.mat` | matrice affine 4×4 (texte) |
 | `-n 100x100x50x25` | fixe | **4 niveaux** de pyramide multi-résolution, 100/100/50/25 itérations du plus grossier au plus fin (le défaut de greedy est `100x100`, 2 niveaux) |
-| `-e 0.5` | fixe | pas de temps — **sans effet en mode affine** : la doc greedy dit noir sur blanc « `-s` and `-e` have no effect » pour `-a`. Ligne morte |
-| `-search 100 10 20` | fixe | recherche aléatoire de 100 transformations rigides avant l'optimisation : σ_angle = 10°, σ_offset = 20 (voxels selon la prose de la doc, unités physiques selon son texte d'usage — l'ambiguïté est dans greedy, pas ici) |
+| `-e 0.5` | fixe | pas de temps, **sans effet en mode affine** : la doc greedy dit noir sur blanc « `-s` and `-e` have no effect » pour `-a`. Ligne morte |
+| `-search 100 10 20` | fixe | recherche aléatoire de 100 transformations rigides avant l'optimisation : σ_angle = 10°, σ_offset = 20 (voxels selon la prose de la doc, unités physiques selon son texte d'usage, l'ambiguïté est dans greedy, pas ici) |
 | `-dof 6` / `12` | combo « Rigid »/« Affine » | 6 = rigide, 12 = affine complet. `-dof 7` (rigide + échelle uniforme) n'est pas proposé |
 | `-ia` | toujours fourni | matrice d'initialisation. Jamais `-ia-identity`, jamais `-ia-image-centers` |
 | `-gm` | si masque | masque **du volume fixe** : les gradients de la métrique ne sont calculés que dedans |
@@ -220,7 +220,7 @@ segmentation multi-labels sont donc fusionnés en un seul masque. C'est le seul 
 réel de `nibabel`, avec l'application d'affine du batch distant.
 
 **Initialisation.** Sans fichier d'init, `writeIdentityInit()` écrit l'identité avec
-`matrix[0,3] = 0.001` — un micron de translation. Le commentaire explique le pourquoi :
+`matrix[0,3] = 0.001` : un micron de translation. Le commentaire explique le pourquoi :
 « so Greedy doesn't treat it as identity ». Ce comportement n'est documenté nulle part
 côté greedy ; c'est un contournement empirique, à considérer comme tel.
 
@@ -323,8 +323,8 @@ et la matrice renvoyée) avant de corriger.
 | Dépendance du CLI | `nibabel` seul, installé par `ensureNibabelInstalled()` après confirmation | [Logic.py:82](GreedyReg/GreedyReg_Method/Logic.py#L82) |
 | Dépendances du mode distant | `itk`, `dicom2nifti==2.6.2`, `pydicom==3.0.2`, `monai` (`1.3.2` si Python ≥ 3.10, sinon `0.7.0`) | [Logic.py:336](GreedyReg/GreedyReg_Method/Logic.py#L336) |
 | torch | **supposé déjà présent** par la chaîne NNUNet/PyTorch de l'extension, jamais installé ici | commentaire [Logic.py:331](GreedyReg/GreedyReg_Method/Logic.py#L331) |
-| GPU | inutile pour greedy ; utile pour ALI (`torch.cuda.empty_cache()` côté ALI) | — |
-| conda / WSL | **aucun**, contrairement à la plupart des modules du dépôt | — |
+| GPU | inutile pour greedy ; utile pour ALI (`torch.cuda.empty_cache()` côté ALI) | : |
+| conda / WSL | **aucun**, contrairement à la plupart des modules du dépôt | : |
 
 Les versions épinglées de `pydicom`/`dicom2nifti` ne sont pas cosmétiques : le commit
 `b25a83e` (« Keep pydicom 3 and dicom2nifti 2.6.2 so Slicer DICOM modules still load »)
@@ -344,7 +344,7 @@ indique qu'un autre choix casse les modules DICOM de Slicer.
 - **`-e 0.5` est un no-op** en mode affine. Confusion possible pour qui croit régler
   un pas d'optimisation.
 - **Bouton mort** : « Save Registered Volume » du panneau Distant lit
-  `self._distantResult`, qui n'est **jamais** assigné — il répondra toujours
+  `self._distantResult`, qui n'est **jamais** assigné, il répondra toujours
   « No result to save! ». Le mode distant ne produit d'ailleurs pas de volume.
 - **Cases à cocher trompeuses** dans le mode distant : les trois structures sont des
   cases indépendantes mais `_selectedDistantRegion()` en retourne une seule, par ordre
@@ -383,7 +383,7 @@ Le moteur est publié, le module ne l'est pas.
   n'utilise que le mode affine/rigide (`-a`), qui n'en est que l'étape d'initialisation.
 - **ALI_CBCT** :
   [Gillot et al., *Automatic landmark identification in cone-beam computed tomography*,
-  Orthodontics & Craniofacial Research, 2023](https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642) —
+  Orthodontics & Craniofacial Research, 2023](https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642),
   agents virtuels naviguant dans un espace volumétrique multi-échelle, erreur moyenne
   annoncée de 1.54 ± 0.87 mm sur 32 landmarks. Dépôt d'origine :
   [Maxlo24/ALI_CBCT](https://github.com/Maxlo24/ALI_CBCT).
@@ -392,7 +392,7 @@ Le moteur est publié, le module ne l'est pas.
   dont ce module est une transposition dans Slicer ; c'est la seule filiation
   revendiquable depuis le code.
 
-**Bibliographie complète : [SOURCES.md](SOURCES.md)** — références vérifiées,
+**Bibliographie complète : [SOURCES.md](SOURCES.md)**, références vérifiées,
 fichiers récupérés dans ce dossier (papier greedy, papier ALI_CBCT), et la
 distinction, détaillée, entre ce que le papier greedy décrit et ce que ce module
 exécute réellement.

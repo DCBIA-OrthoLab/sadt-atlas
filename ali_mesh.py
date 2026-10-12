@@ -123,12 +123,12 @@ def build_cbct():
 
 def build_ios():
     if not os.path.exists(ARCH):
-        print("  arcade de test absente (%s) — scene IOS ignoree" % ARCH)
+        print("  arcade de test absente (%s) : scene IOS ignoree" % ARCH)
         return
     arch = read_vtk(ARCH)
     labels = arch.GetPointData().GetArray("PredictedID")
     if labels is None:
-        print("  l'arcade n'a pas de tableau PredictedID — scene IOS ignoree")
+        print("  l'arcade n'a pas de tableau PredictedID : scene IOS ignoree")
         return
 
     # Une dent = une valeur du tableau. C'est exactement ce que lit ALI_IOS
@@ -184,7 +184,7 @@ def build_ios():
 
 
 if __name__ == "__main__":
-    print("— scene CBCT —")
+    print("== scene CBCT ==")
     build_cbct()
-    print("\n— scene IOS —")
+    print("\n== scene IOS ==")
     build_ios()

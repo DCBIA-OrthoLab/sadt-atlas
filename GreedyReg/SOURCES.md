@@ -1,9 +1,9 @@
-# GreedyReg — sources
+# GreedyReg : sources
 
 **Le module n'est publié nulle part.** Aucun article, aucun abstract, aucun rapport
 de Project Week ne porte sur GreedyReg. Ce qui est publié, c'est le **moteur** qu'il
-pilote — `greedy`, l'outil de Paul Yushkevich (PICSL, University of Pennsylvania,
-livré avec ITK-SNAP) — et le réseau qu'il emprunte pour le mode « Distant
+pilote, `greedy`, l'outil de Paul Yushkevich (PICSL, University of Pennsylvania,
+livré avec ITK-SNAP), et le réseau qu'il emprunte pour le mode « Distant
 Registration », ALI_CBCT. Ces deux travaux sont du **voisinage** : ils décrivent des
 briques, pas ce code, et la nuance est importante ici (voir plus bas : GreedyReg
 n'utilise aucune des méthodes que le papier greedy met en avant).
@@ -13,7 +13,7 @@ n'utilise aucune des méthodes que le papier greedy met en avant).
 | Fichier | Référence | Type | DOI / ID |
 |---|---|---|---|
 | `2019_Venet_greedy_diffeomorphic_registration.pdf` | Venet L., Pati S., Yushkevich P., Bakas S. *Accurate and Robust Alignment of Variable-Stained Histologic Images Using a General-Purpose Greedy Diffeomorphic Registration Tool.* arXiv:1904.11929, 2019, 3 p. | Preprint arXiv | [arXiv:1904.11929](https://arxiv.org/abs/1904.11929) |
-| `2023_Gillot_ALI_landmark_identification.xml` / `.txt` | Gillot M., Miranda F., Baquero B., Ruellas A., Gurgel M., Al Turkestani N., Anchling L., Hutin N., Biggs E., Yatabe M., Paniagua B., Fillion-Robin J.-C., Allemang D., Bianchi J., Cevidanes L., Prieto J.C. *Automatic landmark identification in cone-beam computed tomography.* Orthodontics & Craniofacial Research 26(4):560-567, 2023. | Article de revue, texte intégral JATS (Europe PMC) | [10.1111/ocr.12642](https://doi.org/10.1111/ocr.12642) — PMID 36811276, PMCID PMC10440369 |
+| `2023_Gillot_ALI_landmark_identification.xml` / `.txt` | Gillot M., Miranda F., Baquero B., Ruellas A., Gurgel M., Al Turkestani N., Anchling L., Hutin N., Biggs E., Yatabe M., Paniagua B., Fillion-Robin J.-C., Allemang D., Bianchi J., Cevidanes L., Prieto J.C. *Automatic landmark identification in cone-beam computed tomography.* Orthodontics & Craniofacial Research 26(4):560-567, 2023. | Article de revue, texte intégral JATS (Europe PMC) | [10.1111/ocr.12642](https://doi.org/10.1111/ocr.12642), PMID 36811276, PMCID PMC10440369 |
 
 ## À consulter en ligne (pas librement téléchargeable)
 
@@ -32,11 +32,11 @@ les briques.
   d'initialisation, puis l'estimation d'un champ de déformation. GreedyReg
   n'appelle jamais que la première : `greedy -a` avec `-dof 6` ou `-dof 12`, et
   `greedy -rf/-rm` pour le rééchantillonnage. Le champ de déformation, le
-  « greedy » du nom, la métrique NCC difféomorphe — rien de tout cela n'est
+  « greedy » du nom, la métrique NCC difféomorphe : rien de tout cela n'est
   exécuté. Citer ce papier pour décrire GreedyReg reviendrait à décrire une
   méthode que le module n'emploie pas.
 - **ITK-SNAP** (Yushkevich 2006, ci-dessus) : le module est une transposition dans
-  Slicer du panneau *Registration* d'ITK-SNAP — pré-alignement manuel, puis affine
+  Slicer du panneau *Registration* d'ITK-SNAP, pré-alignement manuel, puis affine
   par intensité avec masque. C'est la seule filiation revendiquable depuis le code,
   et elle est architecturale, pas méthodologique.
 - **ALI_CBCT** (Gillot 2023, récupéré) : agents virtuels naviguant dans un espace
@@ -56,7 +56,7 @@ les briques.
   ([10.1016/j.neuroimage.2010.09.025](https://doi.org/10.1016/j.neuroimage.2010.09.025)).
 - **Documentation et code** : [greedy.readthedocs.io](https://greedy.readthedocs.io/en/latest/reference.html),
   [sites.google.com/view/greedyreg](https://sites.google.com/view/greedyreg/about)
-  (le site officiel de greedy — attention à l'homonymie : ce n'est pas ce module),
+  (le site officiel de greedy, attention à l'homonymie : ce n'est pas ce module),
   [github.com/pyushkevich/greedy](https://github.com/pyushkevich/greedy).
 
 ### Ce qui a été cherché sans rien trouver

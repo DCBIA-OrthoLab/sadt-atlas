@@ -1,15 +1,15 @@
-# AREG_IOS — pipeline complet
+# AREG_IOS : pipeline complet
 
 Recalage longitudinal T1/T2 d'Intra Oral Scans. Même principe que
-[FlexReg.md](../FlexReg/FlexReg.md) — un ICP rigide restreint à une région stable — mais la
+[FlexReg.md](../FlexReg/FlexReg.md), un ICP rigide restreint à une région stable, mais la
 région est **prédite par un réseau** au lieu d'être dessinée par l'opérateur, et
 le traitement est **par lots de dossiers** au lieu d'être patient par patient.
 
 Deux modes coexistent dans le même CLI :
 
-- **Butterfly** — arcade supérieure, patch palatin prédit par un `MonaiUNetHRes`
+- **Butterfly** : arcade supérieure, patch palatin prédit par un `MonaiUNetHRes`
   multi-vues ;
-- **MGL** — arcade inférieure, bande géodésique autour de la ligne
+- **MGL** : arcade inférieure, bande géodésique autour de la ligne
   mucogingivale, construite à partir des 13 landmarks MG prédits par ALI_IOS.
   C'est le même code que la voie MGL de FlexReg, recopié dans le CLI.
 
@@ -58,7 +58,7 @@ conda run -n shapeaxi python -m AREG_IOS "<T1>" "<T2>" "<output>" "<model>" \
 ```
 
 Les valeurs sont ajoutées **dans l'ordre d'itération du dictionnaire** de
-paramètres — d'où les commentaires « Key order matters » dans
+paramètres : d'où les commentaires « Key order matters » dans
 [IOS.py](AREG/AREG_Method/IOS.py). Le module est trouvé parce que
 `give_pythonpath_windows()` ([AREG.py:3190](AREG/AREG.py#L3190)) pousse les
 `searchPaths` de Slicer dans le `PYTHONPATH` de l'environnement conda.
@@ -110,13 +110,13 @@ le point milieu. Résultat identique en nature : plan occlusal ≈ `z=0`,
 `+y` antérieur, `+x` côté gauche.
 
 Le repère est **direct avec x = gauche patient et y = antérieur**, donc
-`z = x × y` pointe vers l'inférieur pour un maxillaire — les 7 caméras placées
+`z = x × y` pointe vers l'inférieur pour un maxillaire : les 7 caméras placées
 en `z ≈ +0.9` regardent donc l'arcade **depuis la face occlusale**, côté palais.
 (Déduction géométrique à partir de la cible, pas une affirmation du code.)
 
 L'échec d'orientation **n'arrête pas la prédiction** : `NoSegmentationSurf` et
 `ToothNoExist` sont attrapées, un warning est écrit, et le réseau tourne sur le
-scan tel quel. Le message d'erreur dit « UR6, UR1, UL1 or UR6 » — coquille, il
+scan tel quel. Le message d'erreur dit « UR6, UR1, UL1 or UR6 » : coquille, il
 faut lire UL6.
 
 ### 3.3 Normalisation
@@ -124,7 +124,7 @@ faut lire UL6.
 `ScaleSurf()` ([transformation.py:181](AREG_IOS/AREG_IOS_utils/transformation.py#L181))
 recentre sur le centre de la bounding box et applique
 `scale = 1 / ||bounds_max − centre||`. Puis `ComputeNormals` (normales de
-points, `SplittingOff` — **indispensable**, sinon l'ordre et le nombre des
+points, `SplittingOff` : **indispensable**, sinon l'ordre et le nombre des
 vertex changent).
 
 Les trois tenseurs :
@@ -135,7 +135,7 @@ Les trois tenseurs :
 | `F` | triangles, colonne 0 du `GetPolys()` retirée | `(N_f, 3)` | int64 |
 | `CN` | normales encodées couleur : `(n·0.5+0.5)·255` puis `/255` | `(N_v, 3)` | float32 |
 
-Malgré son nom, `CN` (« color normal ») est bien une couleur **par vertex** —
+Malgré son nom, `CN` (« color normal ») est bien une couleur **par vertex**,
 `GetColorArray` ([utils.py:83](AREG_IOS/AREG_IOS_utils/utils.py#L83)) boucle sur
 les points, pas sur les cellules. L'aller-retour par des entiers 0–255 quantifie
 les normales sur 8 bits ; c'est volontaire, l'entraînement a vu la même chose.
@@ -144,16 +144,16 @@ les normales sur 8 bits ; c'est volontaire, l'entraînement a vu la même chose.
 mais l'array de labels est écrit sur la surface **brute**
 (`dataset.getUpperSurf(idx, time)`, lue indépendamment). Les deux ont le même
 ordre de vertex, donc l'indexation est valide, et l'ICP tourne dans les
-coordonnées du fichier d'entrée — pas dans le repère canonique.
+coordonnées du fichier d'entrée, pas dans le repère canonique.
 
-## 4. Le modèle — MonaiUNetHRes
+## 4. Le modèle : MonaiUNetHRes
 
 Fichier de poids : un `.ckpt` unique dans le dossier modèle, sélectionné par
 `getModel(..., extension="ckpt")` ([IOS.py:266](AREG/AREG_Method/IOS.py#L266)).
 Source : `AREG_model.zip`, release
 [HUTIN1/AREG v1.0.0](https://github.com/HUTIN1/AREG/releases/download/v1.0.0/AREG_model.zip)
 ([IOS.py:272](AREG/AREG_Method/IOS.py#L272)). Chargé par
-`torch.load(path)["state_dict"]` — checkpoint PyTorch Lightning.
+`torch.load(path)["state_dict"]` : checkpoint PyTorch Lightning.
 
 ### 4.1 Architecture
 
@@ -164,8 +164,8 @@ contient **le rendu et le réseau** :
 |---|---|
 | Backbone | `monai.networks.nets.UNet`, `spatial_dims=2` |
 | Canaux | `channels=(16, 32, 64, 128, 256)`, `strides=(2,2,2,2)`, `num_res_units=2` |
-| Entrée | `in_channels=4` — RGB des normales + 1 canal de profondeur |
-| Sortie | `out_channels=2` — fond / patch |
+| Entrée | `in_channels=4` : RGB des normales + 1 canal de profondeur |
+| Sortie | `out_channels=2` : fond / patch |
 | Enveloppe | `TimeDistributed` : replie l'axe des vues dans le batch, applique l'UNet, redéplie |
 | Perte (entraînement) | `monai.losses.DiceCELoss(include_background=False, to_onehot_y=True, softmax=True)` |
 
@@ -179,7 +179,7 @@ planter.
 
 ### 4.2 Le rendu multi-vues
 
-`setup_ico_verts()` ([net.py:114](AREG_IOS/AREG_IOS_utils/net.py#L114)) —
+`setup_ico_verts()` ([net.py:114](AREG_IOS/AREG_IOS_utils/net.py#L114)),
 **7 positions de caméra**, malgré le nom `ico_verts` ce n'est pas une
 icosphère :
 
@@ -209,10 +209,10 @@ juste avant.
 Pour chaque caméra, `render()` ([net.py:184](AREG_IOS/AREG_IOS_utils/net.py#L184))
 produit :
 
-- `images[..., 0:3]` — le rendu Phong de la texture `TexturesVertex(CN)`, donc
+- `images[..., 0:3]` : le rendu Phong de la texture `TexturesVertex(CN)`, donc
   les normales ;
-- `zbuf` — la carte de profondeur du rasterizer, concaténée en 4ᵉ canal ;
-- `pix_to_face` — pour chaque pixel, **l'indice de la face touchée**, ou `-1`
+- `zbuf` : la carte de profondeur du rasterizer, concaténée en 4ᵉ canal ;
+- `pix_to_face` : pour chaque pixel, **l'indice de la face touchée**, ou `-1`
   si le rayon ne touche rien.
 
 Formes finales : `X (1, 7, 4, 320, 320)`, `PF (1, 7, 1, 320, 320)`,
@@ -221,7 +221,7 @@ Formes finales : `X (1, 7, 4, 320, 320)`, `PF (1, 7, 1, 320, 320)`,
 `PF` est le pivot de tout le mécanisme : c'est le **lien pixel → face** qui
 permet de reprojeter une segmentation 2D sur le maillage sans jamais faire de
 lancer de rayon inverse. Le rasterizer est appelé deux fois (`self.renderer(...)`
-puis `self.renderer.rasterizer(...)`) — le second appel, sans `R`/`T`, refait
+puis `self.renderer.rasterizer(...)`) : le second appel, sans `R`/`T`, refait
 la rastérisation avec la caméra par défaut du rasterizer. Cela fonctionne
 parce que `MeshRenderer.__call__` a déjà poussé `R`/`T` dans les `kwargs` de la
 caméra, mais c'est du travail dupliqué à chaque vue.
@@ -243,7 +243,7 @@ V_labels_prediction[F[0, :, 0]] = P_faces
 Trois choses à comprendre :
 
 1. **Le masque de fond.** `x * (PF >= 0)` annule les logits des pixels vides.
-   Après softmax ils valent `(0.5, 0.5)` — pas 0. Ils contribuent donc un
+   Après softmax ils valent `(0.5, 0.5)`, pas 0. Ils contribuent donc un
    demi-vote aux deux classes, ce qui s'annule à l'`argmax` mais dilue les
    votes réels. Les faces d'indice `-1` (le fond) écrivent dans
    `P_faces[:, -1]`, c'est-à-dire **la dernière face du maillage**, qui reçoit
@@ -256,7 +256,7 @@ Trois choses à comprendre :
 3. **Le vote face → vertex est dégénéré.** `V_labels_prediction[F[0,:,0]] = P_faces`
    n'écrit que sur le **premier vertex de chaque triangle**. Un vertex qui n'est
    jamais en position 0 dans sa liste de faces reste à 0. Le patch sort donc
-   troué par construction — et c'est le post-traitement morphologique qui
+   troué par construction, et c'est le post-traitement morphologique qui
    répare, pas un raffinement cosmétique.
 
 Puis `torch.where(>= 1, 1, 0)`, `numpy_to_vtk`, array nommé **`Butterfly`**,
@@ -284,7 +284,7 @@ VTK par appel VTK, sur ~100 000 vertex : c'est le poste de calcul dominant aprè
 l'inférence. `NeighborLabel` utilise
 `max(neighbor_labels, key=neighbor_labels.count)`, quadratique.
 
-## 5. Le mode MGL — arcade inférieure
+## 5. Le mode MGL : arcade inférieure
 
 Le palais donne un plateau stable en haut ; la mandibule n'en a pas. Le
 substitut est la ligne mucogingivale. Ce mode est **le portage CLI de la voie C
@@ -332,12 +332,12 @@ autres. Garde-fou : si moins de 3 points survivraient, on garde tout.
 
 [mgl_patch.py:227](AREG_IOS/AREG_IOS_utils/mgl_patch.py#L227) :
 
-1. `SplineThroughLandmarks` — `vtkParametricSpline` ouverte,
+1. `SplineThroughLandmarks` : `vtkParametricSpline` ouverte,
    `SetUResolution(300)` (`DEFAULT_SAMPLES`) ;
-2. `SnapToSurface` — chaque échantillon est ramené sur le vertex le plus proche
+2. `SnapToSurface` : chaque échantillon est ramené sur le vertex le plus proche
    (`vtkPointLocator`), doublons supprimés. Une spline interpolée sort de la
    surface dans les concavités interdentaires ;
-3. `GrowBand` — **Dijkstra multi-source** sur le graphe d'arêtes, pondéré par la
+3. `GrowBand` : **Dijkstra multi-source** sur le graphe d'arêtes, pondéré par la
    longueur euclidienne réelle, implémenté au tas binaire (`heapq`), arrêt à
    `radius` mm. Distance **géodésique**, pas euclidienne : une bande vestibulaire
    ne peut pas ressortir en lingual là où la crête est plus mince que le rayon ;
@@ -370,7 +370,7 @@ un module partagé.
 
 `RunMGL()` ([AREG_IOS.py:111](AREG_IOS/AREG_IOS.py#L111)) : pour chaque paire
 basse, patch sur T1 **et** sur T2, ICP, écriture des deux. Si aucune paire ne
-passe, une `RuntimeError` est levée avec la première erreur — un run qui réussit
+passe, une `RuntimeError` est levée avec la première erreur : un run qui réussit
 en laissant le dossier de sortie vide envoyait l'utilisateur chercher au mauvais
 endroit.
 
@@ -460,7 +460,7 @@ par `nb_patients × 3` pour la barre de progression.
 | Bande MGL | géométrique, spline + Dijkstra | CLI, CPU |
 | Registration | ICP rigide VTK | CLI, CPU |
 
-## 9. FlexReg vs AREG_IOS — le tableau
+## 9. FlexReg vs AREG_IOS : le tableau
 
 Même sortie, mêmes arrays, mêmes ICP. La ligne de partage est : **qui décide de
 la forme du patch**.
@@ -476,14 +476,14 @@ la forme du patch**.
 | Aperçu temps réel | oui, numpy CPU, point-dans-polygone | non |
 | **Patch bas** | MGL : SVD pour le repère, hauteurs asymétriques interpolées, offsets, Dijkstra scipy | MGL : bande symétrique de hauteur constante, Dijkstra heapq |
 | Landmarks MG | ALI, édités et nettoyés dans le widget | ALI, nettoyés par `DropDoubtfulLandmarks` dans le CLI |
-| Patch alternatif | courbe dessinée à la souris (`type="curve"`) | — |
+| Patch alternatif | courbe dessinée à la souris (`type="curve"`) | : |
 | Array produit | `Butterfly` (fusion `Butterfly1..N`), `Bottom_MGL` | `Butterfly`, `Bottom_MGL` |
 | ICP | `vtkICP`, rigide, 1000 it., centroïdes | **identique** |
 | Flip LPS↔RAS | oui, explicite dans le CLI | **non** |
 | `.tfm` de sortie | toujours, par conjugaison + inversion | seulement en `Auto_IOS`, composé avec la matrice ASO |
 | Fichier d'entrée | **écrasé** en mode patch | jamais modifié |
 
-À retenir : AREG_IOS remplace **une seule étape** de FlexReg par un réseau — la
+À retenir : AREG_IOS remplace **une seule étape** de FlexReg par un réseau, la
 délimitation du patch palatin. Tout le reste est le même code ou son cousin
 direct.
 
@@ -579,7 +579,7 @@ Deux écarts entre le papier et le code de ce dépôt :
   que dans les commentaires.
 
 - [AREG (dépôt d'origine)](https://github.com/lucanchling/AREG)
-- [HUTIN1/AREG — release des poids](https://github.com/HUTIN1/AREG/releases/tag/v1.0.0)
+- [HUTIN1/AREG, release des poids](https://github.com/HUTIN1/AREG/releases/tag/v1.0.0)
 - [Automated Orientation and Registration of CBCT Scans, LNCS](https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5)
 - [SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools)
 - [Bridging the gap: enabling PyTorch3D and advanced dental imaging tools on Windows through WSL2](https://www.researchgate.net/publication/390709249_Bridging_the_gap_enabling_PyTorch3D_and_advanced_dental_imaging_tools_on_Windows_through_WSL2)

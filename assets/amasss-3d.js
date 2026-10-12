@@ -1,4 +1,4 @@
-/* amasss-3d.js — la scene AMASSS, sur le socle scene3d.js.
+/* amasss-3d.js : la scene AMASSS, sur le socle scene3d.js.
 
    Depuis le port sur scene3d, tout ce qui touche a l'interaction -- orbite,
    molette, PINCEMENT A DEUX DOIGTS, double-tape pour recadrer, designation

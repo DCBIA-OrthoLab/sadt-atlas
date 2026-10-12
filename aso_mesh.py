@@ -255,7 +255,7 @@ def main():
 
 
 # ---------------------------------------------------------------------------
-#  ASO_IOS — l'autre moteur
+#  ASO_IOS : l'autre moteur
 # ---------------------------------------------------------------------------
 IOS = webmesh.data("SlicerDownloads/ASO/ASO_IOS/")
 IOS_PATIENT = IOS + "Test_Files/Semi-Automated/Lower_new_9.vtk"
@@ -276,7 +276,7 @@ def build_ios():
     """
     for f in (IOS_PATIENT, IOS_GOLD, IOS_MATRIX, IOS_LM, IOS_LM_GOLD):
         if not os.path.exists(f):
-            print("  donnee IOS absente (%s) — scene ignoree" % os.path.basename(f))
+            print("  donnee IOS absente (%s) : scene ignoree" % os.path.basename(f))
             return
 
     def read(path):
@@ -394,5 +394,5 @@ def build_ios():
 
 if __name__ == "__main__":
     main()
-    print("\n— scene IOS —")
+    print("\n== scene IOS ==")
     build_ios()

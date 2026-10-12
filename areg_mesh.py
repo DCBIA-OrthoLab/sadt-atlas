@@ -131,7 +131,7 @@ def main():
     im = sitk.ReadImage(T1)
     origin = im.GetOrigin()
 
-    print("— surfaces —")
+    print("== surfaces ==")
     meshes = {}
     meshes["T1"] = surface(T1, BONE, SIGMA, SKULL_TRIS, origin)
     print("  T1   %6d triangles" % meshes["T1"].GetNumberOfPolys())
@@ -148,7 +148,7 @@ def main():
         bounds[code] = meshes["M_" + code].GetBounds()
         print("  %-5s %6d triangles (masque)" % (code, meshes["M_" + code].GetNumberOfPolys()))
 
-    print("\n— recalages —")
+    print("\n== recalages ==")
     regs = {}
     for code, rel in MATRICES.items():
         p = os.path.join(B, rel)

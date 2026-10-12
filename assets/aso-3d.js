@@ -1,4 +1,4 @@
-/* aso-3d.js — les scenes d'ASO, sur le socle scene3d.js.
+/* aso-3d.js : les scenes d'ASO, sur le socle scene3d.js.
 
    ASO tourne un scan pour l'amener dans le repere d'un patient de reference.
    Ce n'est pas une illustration : la matrice jouee est celle qu'ASO a
@@ -207,7 +207,7 @@
       var lbl = "";
       if (run && run.i < stages.length && stepwise) {
         var st = stages[run.i];
-        lbl = (run.i + 1) + "/" + stages.length + " " + stageName(run.i) + " — "
+        lbl = (run.i + 1) + "/" + stages.length + " " + stageName(run.i) + " · "
             + (st.deg > 0.005 ? st.deg.toFixed(2) + "\u00b0" : st.mm.toFixed(2) + " mm");
         chip(run.i);
       } else if (!run) {
@@ -226,7 +226,7 @@
 
     function stageName(i) {
       /* Le libelle seul : la pastille porte aussi la valeur dans un <code>,
-         et la reprendre dupliquait « 0.17 mm — 0.17 mm ». */
+         et la reprendre dupliquait « 0.17 mm, 0.17 mm ». */
       var n = fig.querySelectorAll(".v3d-stages [data-stage]");
       if (!n[i]) { return (stages[i] && stages[i].name) || ""; }
       var out = "";

@@ -4,13 +4,13 @@
     /opt/SlicerProd/Slicer-*/bin/PythonSlicer amasss_mesh.py
 
 Demande le Python de Slicer : VTK et SimpleITK ne sont pas dans le Python
-système. Rien d'autre n'en a besoin — ce script ne tourne qu'à la main, quand
+système. Rien d'autre n'en a besoin : ce script ne tourne qu'à la main, quand
 la segmentation source change, et non à chaque `build.py`.
 
 ENTRÉE   la prédiction AMASSS sur le scan de test **publié** (release GitHub
          AMASSS_CBCT v1.0.1), telle que le bouton « Test Files » la télécharge.
          Aucune donnée patient : la géométrie part dans un dépôt distant.
-SORTIE   assets/amasss-mesh.js — chargé par <script>, et non par fetch(),
+SORTIE   assets/amasss-mesh.js : chargé par <script>, et non par fetch(),
          parce que fetch() est bloqué en file:// et que le site doit s'ouvrir
          sans serveur. Même parti pris que search-index-*.js.
 
@@ -27,7 +27,7 @@ import webmesh
 try:
     import vtk
 except ImportError:
-    sys.exit("VTK introuvable — lance ce script avec PythonSlicer, pas python3.")
+    sys.exit("VTK introuvable : lance ce script avec PythonSlicer, pas python3.")
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -36,8 +36,8 @@ SRC = os.path.join(BASE, "MG_test_scan_Pred_MERGED.nii.gz")
 
 #: Le scan AVANT segmentation, pour l'animation « brut -> segmenté ». C'est le
 #: même volume, même grille, même repère : les deux surfaces se superposent
-#: sans recalage. Un simple seuil osseux — ce que n'importe qui obtient sans
-#: réseau — donne un bloc unique et anonyme. Tout l'intérêt de la comparaison
+#: sans recalage. Un simple seuil osseux : ce que n'importe qui obtient sans
+#: réseau, donne un bloc unique et anonyme. Tout l'intérêt de la comparaison
 #: est là : AMASSS ne fait pas apparaître de la matière, il la NOMME et la
 #: sépare.
 RAW = os.path.join(BASE, "MG_test_scan.nii.gz")
@@ -96,7 +96,7 @@ def extract(reader, label, target_tris):
     sm.NormalizeCoordinatesOn()
     sm.Update()
 
-    # La décimation se pilote en taux de réduction, pas en nombre de cibles —
+    # La décimation se pilote en taux de réduction, pas en nombre de cibles : 
     # et le taux doit se calculer sur ce qui entre vraiment dans le filtre,
     # c'est-à-dire APRÈS le retrait des éclats, sinon le budget annoncé n'est
     # pas celui qu'on obtient.
@@ -123,7 +123,7 @@ def extract(reader, label, target_tris):
 
 def extract_raw(reader, target_tris):
     """Isosurface continue du scan brut : le « avant ». Marching cubes
-    classique et non discret — on seuille des niveaux de gris, pas des
+    classique et non discret : on seuille des niveaux de gris, pas des
     étiquettes."""
     iso = webmesh.iso_surface(reader, RAW_THRESHOLD, RAW_SIGMA)
     mc = vtk.vtkTrivialProducer()
@@ -184,7 +184,7 @@ def main():
     for label, (code, target) in sorted(PARTS.items()):
         poly, raw, kept, dropped = extract(reader, label, target)
         if poly is None:
-            print("  %-5s absent de la segmentation — ignoré" % code)
+            print("  %-5s absent de la segmentation : ignoré" % code)
             continue
         meshes[code] = poly
         print("  %-5s %8d triangles bruts -> %6d  (%d eclats ecartes)"
@@ -291,7 +291,7 @@ def main():
 
     # --vtk <dossier> : écrire aussi les surfaces telles quelles, pour les
     # ouvrir dans Slicer et vérifier à la main ce que le site affiche. Ce ne
-    # sont pas les fichiers du site — le site ne lit que le .js — mais
+    # sont pas les fichiers du site, le site ne lit que le .js, mais
     # exactement la même géométrie, avant quantification.
     if "--vtk" in sys.argv:
         dest = sys.argv[sys.argv.index("--vtk") + 1]
@@ -307,7 +307,7 @@ def main():
     payload = {"span": span, "focus": focus, "anatomy": anatomy, "parts": parts}
     out = os.path.join(ROOT, "assets", "amasss-mesh.js")
     with open(out, "w", encoding="utf-8") as fh:
-        fh.write("/* Généré par amasss_mesh.py — ne pas éditer à la main.\n"
+        fh.write("/* Généré par amasss_mesh.py, ne pas éditer à la main.\n"
                  "   Source : prédiction AMASSS sur le scan de test publié\n"
                  "   (AMASSS_CBCT v1.0.1, MG_test_scan). Aucune donnée patient.\n"
                  "   Chargé par <script> et non par fetch() : le site doit\n"
@@ -315,7 +315,7 @@ def main():
         fh.write("window.AMASSS_MESH = ")
         json.dump(payload, fh, separators=(",", ":"))
         fh.write(";\n")
-    print("\n%s — %.0f Ko" % (out, os.path.getsize(out) / 1024))
+    print("\n%s : %.0f Ko" % (out, os.path.getsize(out) / 1024))
 
 
 if __name__ == "__main__":

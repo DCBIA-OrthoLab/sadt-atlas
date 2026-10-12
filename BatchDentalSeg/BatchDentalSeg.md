@@ -1,4 +1,4 @@
-# BatchDentalSeg — pipeline complet
+# BatchDentalSeg : pipeline complet
 
 Segmentation dento-maxillo-faciale de CT/CBCT, en lot. Le module n'est pas un
 réseau : c'est une **file d'attente et un chef d'orchestre** autour de
@@ -40,7 +40,7 @@ d'origine (Dot, Gajny, Fenioux, Pelletier) et l'ajout UoM (Tulissi).
 | [Resources/ML/](BATCHDENTALSEG/Resources/ML) | racine des poids ; contient en dépôt `Dataset111_453CT/.../dataset.json` et `plans.json` | |
 
 Tout tourne dans le **Python de Slicer**. `nnUNetv2_predict` est lancé comme
-**processus fils** (`QProcess`), un scan à la fois — contrairement à AMASSS, qui
+**processus fils** (`QProcess`), un scan à la fois : contrairement à AMASSS, qui
 appelle l'API Python nnU-Net en processus.
 
 `Resources/ML` n'est **pas** listé dans `MODULE_PYTHON_RESOURCES` de
@@ -54,7 +54,7 @@ le dossier est entièrement créé à l'exécution. Les `.pth` sont `.gitignore`
 `listVolumes()` ([Queue.py:28](BATCHDENTALSEG/BATCHDENTALSEGLib/Queue.py#L28))
 fait un `glob` **non récursif** sur quatre motifs : `*.nii`, `*.nii.gz`,
 `*.gipl`, `*.gipl.gz`. Les sous-dossiers ne sont pas visités, et **le NRRD n'est
-pas reconnu** — format par défaut de Slicer, et format que les autres modules du
+pas reconnu** : format par défaut de Slicer, et format que les autres modules du
 dépôt produisent couramment.
 
 `volumeStem()` retire le suffixe composé : `case01.nii.gz` → `case01` (un
@@ -78,7 +78,7 @@ dans la file.
 l'index revient dessus.
 
 `isChunkBoundary()` : tous les `chunkSize` scans (défaut 5), `_coolDown()` fait
-un nettoyage profond — suppression des nœuds orphelins, `torch.cuda.empty_cache()`
+un nettoyage profond, suppression des nœuds orphelins, `torch.cuda.empty_cache()`
 + `ipc_collect()`, `gc.collect()`.
 
 ### 3.3 Ce que voit le réseau
@@ -157,12 +157,12 @@ indisponible, une **seule** question est posée pour toute la file
 d'office.
 
 `nnUNet_raw`, `nnUNet_preprocessed` et `nnUNet_results` sont tous pointés sur le
-dossier du modèle — trois variables d'environnement de processus, écrites par
+dossier du modèle : trois variables d'environnement de processus, écrites par
 `SegmentationLogic._startInferenceProcess`. Comme `os.environ` est global, deux
 inférences concurrentes dans la même session Slicer se marcheraient dessus ;
 ici la file est strictement séquentielle, donc le problème ne se pose pas.
 
-### 4.3 Architecture et plan — ce qui est vérifiable
+### 4.3 Architecture et plan : ce qui est vérifiable
 
 Seul `Dataset111_453CT` (DentalSegmentator) a ses JSON dans le dépôt. Relevé de
 [plans.json](BATCHDENTALSEG/Resources/ML/Dataset111_453CT/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json) :
@@ -193,19 +193,19 @@ des dictionnaires codés en dur dans le widget (§4.4) et du README.
 est **la** table de référence : c'est elle qui décide des valeurs écrites dans le
 NIfTI de sortie.
 
-**DentalSegmentator et PediatricDentalsegmentator** — 5 labels identiques,
+**DentalSegmentator et PediatricDentalsegmentator**, 5 labels identiques,
 confirmés par le `dataset.json` du bundle 111 : 1 Upper Skull (maxillaire
 inclus), 2 Mandible, 3 Upper Teeth, 4 Lower Teeth, 5 Mandibular canal. Ce qui les
 distingue n'est donc **pas la sortie mais les données d'entraînement** : denture
 permanente (`453CT`, 7 institutions) contre denture mixte (`380CT`). Le code les
-traite de façon rigoureusement identique — même table de labels, mêmes couleurs,
+traite de façon rigoureusement identique : même table de labels, mêmes couleurs,
 même post-traitement ; seul `_modelBasePath` diffère.
 
-**NasoMaxillaDentSeg** — 6 labels, le maxillaire **détaché** du crâne :
+**NasoMaxillaDentSeg**, 6 labels, le maxillaire **détaché** du crâne :
 1 Upper Skull, 2 Mandible, **3 Maxilla**, 4 Upper Teeth, 5 Lower Teeth,
 6 Mandibular canal.
 
-**UniversalLabDentalsegmentator** — 55 labels : les 32 dents permanentes
+**UniversalLabDentalsegmentator**, 55 labels : les 32 dents permanentes
 numérotées une par une (1 = 3ᵉ molaire supérieure droite → 32 = 3ᵉ molaire
 inférieure droite, en tournant par l'arcade supérieure puis inférieure), puis
 20 dents temporaires (33 → 52), puis `Mandible` = 53, `Maxilla` = 54,
@@ -249,7 +249,7 @@ Optionnel, posé par *Retry failed* après confirmation explicite.
 d'origine par un simple décalage d'indices : la sortie est donc toujours sur la
 grille du scan tel qu'acquis.
 
-### 5.3 Garde mémoire — trois lignes de défense
+### 5.3 Garde mémoire : trois lignes de défense
 
 Le commentaire du code donne le cas réel : un scan a rempli 114 Go sur une
 machine de 125 Go, s'est fait tuer par l'OOM killer, et a laissé ses workers
@@ -277,7 +277,7 @@ marqué `failed` avec le motif, sans jamais démarrer nnU-Net.
 `_RAM_SAMPLE_MS = 3000` ms ; il faut `_RAM_CONSECUTIVE_HITS = 2` dépassements
 consécutifs pour tuer (un pic transitoire ne doit pas condamner un bon scan).
 
-**c) Reprise de la mémoire** : `_killInferenceTree()` tue **l'arbre complet** —
+**c) Reprise de la mémoire** : `_killInferenceTree()` tue **l'arbre complet**,
 `QProcess.kill()` n'atteint que l'enfant direct, or nnU-Net fait du
 multiprocessing. `_reclaimStrayProcesses()` balaie les processus dont la ligne
 de commande contient `nnunetv2_predict`, `nnunetv2/inference` ou `nnunet` et qui
@@ -305,7 +305,7 @@ bouton visible uniquement pour UniversalLab. Le réseau confond régulièrement
 gauche et droite ; la correction est purement géométrique :
 
 1. reconstruction du label map officiel (§5.1), puis coordonnée RAS *R* de
-   chaque voxel de premier plan **en numpy** (`m00·x + m01·y + m02·z + m03`) — la
+   chaque voxel de premier plan **en numpy** (`m00·x + m01·y + m02·z + m03`) : la
    version précédente appelait `vtkMatrix4x4.MultiplyPoint` une fois par voxel et
    par label ;
 2. **plan sagittal** = moyenne des centroïdes *R* des quatre incisives centrales
@@ -320,7 +320,7 @@ Le résultat va dans un nouveau nœud `<nom>_Mirrored`, l'original est conservé
 
 `_postProcessSegments()` ne fait que journaliser deux lignes ;
 `_keepLargestIsland()` et `_removeSmallIsland()` (qui utiliserait
-`_minimumIslandSize_mm3 = 60`) **ne sont appelées nulle part** — code mort hérité
+`_minimumIslandSize_mm3 = 60`) **ne sont appelées nulle part** : code mort hérité
 de DentalSegmentator amont. Aucun nettoyage morphologique n'est donc appliqué :
 ce qui sort est la sortie brute de nnU-Net, avec son propre post-traitement
 interne s'il est présent dans le bundle.
@@ -330,7 +330,7 @@ interne s'il est présent dans le bundle.
 `onInferenceFinished` écrit **systématiquement**, quels que soient les formats
 cochés, `<outputFolder>/<stem>_Segmentation.nii.gz` : carte de labels aux valeurs
 de `_get_active_label_map`, sur la géométrie (spacing, origine, `IJKToRAS`) du
-volume d'origine — non croppé si un crop a eu lieu. C'est ce fichier que
+volume d'origine, non croppé si un crop a eu lieu. C'est ce fichier que
 `expectedOutputPath()` cherche pour décider qu'un scan est déjà traité.
 
 Formats additionnels, cases à cocher, tous écrits dans le même dossier :
@@ -377,7 +377,7 @@ Installé **une fois par session**, au premier *Apply*, par
 ([SegmentationWidget.py:1651](BATCHDENTALSEG/BATCHDENTALSEGLib/SegmentationWidget.py#L1651)) :
 
 1. `pip install light-the-torch`, puis `python -m light_the_torch install torch
-   torchvision` — `ltt` choisit la roue CUDA correspondant au pilote détecté,
+   torchvision` : `ltt` choisit la roue CUDA correspondant au pilote détecté,
    **aucune version n'est épinglée** ;
 2. `pip install numexpr>=2.10.2` ;
 3. `pip install numpy<2.0 numexpr>=2.10.2 psutil`, via `PipRunner`, un `QProcess`
@@ -419,8 +419,8 @@ au prix d'« environ une heure par scan » selon le message de repli.
   | `Segment_5` | Lower Teeth | « Mandibular canal » |
   | `Segment_6` | Mandibular canal | « Maxilla » (avec espace final) |
 
-  Le correctif est de réordonner la liste — et les listes `colors` et `opacities`
-  qui l'accompagnent — sur `_get_active_label_map`, plutôt que de se contenter de
+  Le correctif est de réordonner la liste, et les listes `colors` et `opacities`
+  qui l'accompagnent, sur `_get_active_label_map`, plutôt que de se contenter de
   retirer l'espace.
 
   Or le renommage a lieu **avant** la pose des tags `LabelValue`, et
@@ -460,7 +460,7 @@ au prix d'« environ une heure par scan » selon le message de repli.
   correspondant n'est pas branché dans le layout batch).
 - **`Resources/ML` n'est pas installé par CMake** : en extension packagée, les
   `dataset.json` / `plans.json` du dépôt ne sont pas là, et l'estimation mémoire
-  a priori (§5.3) retourne `None` tant que les poids ne sont pas téléchargés —
+  a priori (§5.3) retourne `None` tant que les poids ne sont pas téléchargés,
   elle laisse alors passer le scan.
 
 ## 10. Littérature
@@ -472,7 +472,7 @@ au prix d'« environ une heure par scan » selon le message de repli.
 > Gajny L. *DentalSegmentator: robust open source deep learning-based CT and CBCT
 > image segmentation.* Journal of Dentistry 147:105130, 2024.
 > [doi:10.1016/j.jdent.2024.105130](https://doi.org/10.1016/j.jdent.2024.105130)
-> — PMID 38878813
+>, PMID 38878813
 
 nnU-Net v2 (v2.2 d'après la notice Zenodo des poids), **470 scans CT et CBCT** de
 7 institutions à l'entraînement, 5 structures, testé en hold-out sur 256 scans
@@ -480,7 +480,7 @@ nnU-Net v2 (v2.2 d'après la notice Zenodo des poids), **470 scans CT et CBCT** 
 externe. Le `dataset.json` livré ici annonce `numTraining = 453`, cohérent avec
 le corpus décrit. Sur ce modèle, code et papier concordent. Les poids sont aussi
 publiés en CC-BY-4.0 sur [Zenodo](https://zenodo.org/records/10829675)
-(DOI concept `10.5281/zenodo.10829674`) — mais ce module les prend depuis les
+(DOI concept `10.5281/zenodo.10829674`), mais ce module les prend depuis les
 releases GitHub, pas depuis Zenodo.
 
 Le socle méthodologique :
@@ -498,8 +498,8 @@ sont vérifiables nulle part dans le code : les `dataset.json` correspondants
 n'arrivent qu'avec le téléchargement des poids. À traiter comme des affirmations
 internes tant qu'une publication ne les couvre pas.
 
-- [gaudot/SlicerDentalSegmentator](https://github.com/gaudot/SlicerDentalSegmentator) — extension amont, et source des poids DentalSegmentator
-- [KitwareMedical/SlicerNNUnet](https://github.com/KitwareMedical/SlicerNNUnet) — l'extension `NNUNet` requise
+- [gaudot/SlicerDentalSegmentator](https://github.com/gaudot/SlicerDentalSegmentator), extension amont, et source des poids DentalSegmentator
+- [KitwareMedical/SlicerNNUnet](https://github.com/KitwareMedical/SlicerNNUnet), l'extension `NNUNet` requise
 - [MIC-DKFZ/nnUNet](https://github.com/MIC-DKFZ/nnUNet)
 - [SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools)
 

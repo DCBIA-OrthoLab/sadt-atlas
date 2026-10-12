@@ -1,6 +1,6 @@
-/* Genere par batchdentalseg_mesh.py — ne pas editer a la main.
+/* Genere par batchdentalseg_mesh.py, ne pas editer a la main.
    Source : une passe BatchDentalSeg (UniversalLabDentalsegmentator), lue dans
-   /home/luciacev/Documents/BatchSegUniversal/out, sur PreDentalSurgery — l'echantillon CBCTDentalSurgery publie par Slicer,
+   /home/luciacev/Documents/BatchSegUniversal/out, sur PreDentalSurgery, l'echantillon CBCTDentalSurgery publie par Slicer,
    celui que le bouton « Test Files » du module telecharge. Aucune donnee
    patient. 32 etiquette(s) produites, dont 29 dents.
    Charge par <script> et non par fetch() : le site doit s'ouvrir en file://. */

@@ -1,4 +1,4 @@
-# CNE — pipeline complet
+# CNE : pipeline complet
 
 **Avertissement de périmètre.** Contrairement à AutoCrop3D et AutoMatrix, CNE
 n'est pas un utilitaire géométrique : il ne touche ni volume, ni maillage, ni
@@ -52,11 +52,11 @@ L'instruction système est littéralement recopiée de MedX :
 |---|---|---|
 | [CNE.py](CNE/CNE.py) | widget : dépendances, téléchargement du modèle, lancement du CLI | Python de Slicer |
 | [CNE_CLI.py](CNE_CLI/CNE_CLI.py) | extraction de texte + inférence llama.cpp | Python de Slicer (`SlicerMacroBuildScriptedCLI`) |
-| [CNE.ui](CNE/Resources/UI/CNE.ui) | deux `ctkPathLineEdit` en mode `Dirs`, deux radios TMJ/Ortho | — |
-| [Resources/testfiles/](CNE/Resources/testfiles) | 4 notes d'exemple (2 TMJ, 2 Ortho), en clair dans le dépôt | — |
+| [CNE.ui](CNE/Resources/UI/CNE.ui) | deux `ctkPathLineEdit` en mode `Dirs`, deux radios TMJ/Ortho | : |
+| [Resources/testfiles/](CNE/Resources/testfiles) | 4 notes d'exemple (2 TMJ, 2 Ortho), en clair dans le dépôt | : |
 
 Pas de conda. Le CLI est un *scripted CLI*, donc lancé par `slicer.cli.run` dans
-le Python de Slicer — c'est dans cet interpréteur que `llama-cpp-python` est
+le Python de Slicer : c'est dans cet interpréteur que `llama-cpp-python` est
 installé et que le modèle est chargé en mémoire.
 
 ## 3. Dépendances, installées à la demande
@@ -74,7 +74,7 @@ demande confirmation avant `slicer.util.pip_install` :
 Deux points à connaître :
 
 - `install_function` ([CNE.py:44](CNE/CNE.py#L44)) force `CC=gcc` et `CXX=g++`
-  pendant l'installation puis restaure les valeurs d'origine — c'est pour le cas
+  pendant l'installation puis restaure les valeurs d'origine, c'est pour le cas
   où pip doit compiler `llama-cpp-python` depuis les sources. Sur Windows ces
   valeurs sont inutilisables.
 - L'index supplémentaire pointe explicitement vers les **wheels CPU**. Or le CLI
@@ -84,7 +84,7 @@ Deux points à connaître :
   7–8 B quantifié Q4 y coûte plusieurs dizaines de secondes par note.
 
 Le CLI re-teste les trois imports au démarrage et `sys.exit(1)` si l'un manque
-([CNE_CLI.py:99-115](CNE_CLI/CNE_CLI.py#L99)) — redondant, mais sans danger
+([CNE_CLI.py:99-115](CNE_CLI/CNE_CLI.py#L99)), redondant, mais sans danger
 puisque le CLI partage l'interpréteur du widget.
 
 ## 4. Les modèles
@@ -104,22 +104,22 @@ URL construite : `https://huggingface.co/{repo_id}/resolve/main/{fileName}`.
 **Le téléchargement Ortho est cassé.** Vérifié par l'API Hugging Face : le dépôt
 `dcbia/Meta-Llama-3.1-8B-Instruct-Ortho` ne contient que `.gitattributes` et
 `model-q4_k_m.gguf`. Le fichier `model-q4_0.gguf` demandé par le code n'existe
-pas — l'URL renvoie **HTTP 404**, l'URL en `q4_k_m` renvoie 200. `urlretrieve`
+pas : l'URL renvoie **HTTP 404**, l'URL en `q4_k_m` renvoie 200. `urlretrieve`
 lève, le fichier partiel est supprimé, et l'utilisateur voit « Download failed or
 was cancelled ». Le mode TMJ, lui, est correct (`qwen-ft-q4_k_m.gguf` → 200).
 
 Les deux dépôts Hugging Face n'ont **aucune model card** : ni licence, ni jeu
 d'entraînement, ni méthode de fine-tuning publiés. Architectures de base
 identifiables par les tags (Llama-3.1-8B-Instruct et Qwen2 7B), quantification
-Q4_K_M dans les deux cas. Ce qui distingue les deux modèles fine-tunés — corpus
-d'annotations, schéma de sortie appris, protocole — n'est **pas déterminable
+Q4_K_M dans les deux cas. Ce qui distingue les deux modèles fine-tunés, corpus
+d'annotations, schéma de sortie appris, protocole, n'est **pas déterminable
 depuis le dépôt ni depuis Hugging Face**.
 
 ## 5. Entrées et prétraitements
 
 `SUPPORTED_EXTENSIONS = (".txt", ".pdf", ".docx")`. Le balayage est
 **non récursif** : `glob.glob(os.path.join(notesFolder_input, f"*{ext}"))`
-([CNE_CLI.py:133](CNE_CLI/CNE_CLI.py#L133)) — contrairement à tous les autres
+([CNE_CLI.py:133](CNE_CLI/CNE_CLI.py#L133)), contrairement à tous les autres
 modules du dépôt qui utilisent `iglob(**, recursive=True)`. Un dossier de
 sous-dossiers par patient ne donnera rien.
 
@@ -134,7 +134,7 @@ Extraction du texte ([CNE_CLI.py:73](CNE_CLI/CNE_CLI.py#L73)) :
 `clean_text()` ([CNE_CLI.py:40](CNE_CLI/CNE_CLI.py#L40)) est le seul
 prétraitement, et il est motivé dans le code : normaliser ce qui varie entre
 exports PDF/Word mais n'apparaissait jamais dans les notes texte
-d'entraînement — apostrophes et guillemets typographiques vers ASCII, tiret
+d'entraînement, apostrophes et guillemets typographiques vers ASCII, tiret
 demi-cadratin et cadratin vers `-`, espace insécable vers espace, puis
 effondrement des lignes vides consécutives. Objectif explicite : que le modèle
 voie le même texte quel que soit le format source.
@@ -216,7 +216,7 @@ Extraction_<nom de la note sans extension>.txt
 ```
 
 Contenu : des lignes `clé : valeur`, ou la réponse brute du modèle en cas
-d'échec de parse. Pas de CSV, pas de json, pas d'agrégation par patient — le
+d'échec de parse. Pas de CSV, pas de json, pas d'agrégation par patient : le
 tableau de bord de MedX n'a pas été repris.
 
 Le dossier de sortie est créé par `os.makedirs(..., exist_ok=True)` côté widget
@@ -276,12 +276,12 @@ aucun dictionnaire de termes, aucune validation de schéma : ce que le modèle
   le modèle, ni sa version, ni la date. Deux exécutions avec des modèles
   différents produisent des fichiers indistinguables.
 - **PHI** : rien n'anonymise, rien n'avertit. Les notes sont lues en clair,
-  passent par un modèle local (donc pas d'exfiltration réseau — c'est le seul
+  passent par un modèle local (donc pas d'exfiltration réseau : c'est le seul
   garde-fou, et il est structurel plutôt que délibéré).
 - **Métadonnées du CLI restées au gabarit** :
   [CNE_CLI.xml](CNE_CLI/CNE_CLI.xml) décrit encore « Apply a Gaussian blur to an
   image », attribue le module à « Andras Lasso (PerkLab) », et ses `<index>`
-  valent 0, 2, 3, 4 — l'index 1 manque.
+  valent 0, 2, 3, 4, l'index 1 manque.
 - **`onCliProgress`** ([CNE.py:594](CNE/CNE.py#L594)) lit `caller.GetProgress()`
   et n'en fait rien ; elle n'est d'ailleurs connectée à aucun observateur. Code
   mort. L'avancement réel passe par les balises `<filter-progress>` du CLI, lues

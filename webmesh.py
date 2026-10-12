@@ -23,7 +23,7 @@ import base64, json, os, sys
 try:
     import vtk
 except ImportError:                                            # pragma: no cover
-    sys.exit("VTK introuvable — lance ce script avec PythonSlicer, pas python3.")
+    sys.exit("VTK introuvable : lance ce script avec PythonSlicer, pas python3.")
 
 
 def data(*rel):
@@ -130,7 +130,7 @@ def smooth_decimate(poly, target_tris, iterations=24, pass_band=.05):
     """Lisse puis décime vers un budget de triangles.
 
     Le taux se calcule sur ce qui entre VRAIMENT dans le décimateur, donc
-    après lissage — sinon le budget annoncé n'est pas celui qu'on obtient.
+    après lissage : sinon le budget annoncé n'est pas celui qu'on obtient.
     """
     sm = vtk.vtkWindowedSincPolyDataFilter()
     sm.SetInputData(poly)
@@ -287,4 +287,4 @@ def write(path, varname, payload, header):
         fh.write("window.%s = " % varname)
         json.dump(payload, fh, separators=(",", ":"))
         fh.write(";\n")
-    print("\n%s — %.0f Ko" % (path, os.path.getsize(path) / 1024))
+    print("\n%s : %.0f Ko" % (path, os.path.getsize(path) / 1024))

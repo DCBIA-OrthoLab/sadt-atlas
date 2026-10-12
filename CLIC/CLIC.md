@@ -1,4 +1,4 @@
-# CLIC — pipeline complet
+# CLIC : pipeline complet
 
 *Classification and Localization of Impacted Canines.* Segmentation d'instances
 2D coupe par coupe d'un CBCT par un **Mask R-CNN torchvision**, dont la classe
@@ -8,7 +8,7 @@ bicorticale, palatine**.
 Le nom du module promet deux tâches ; le code n'a **qu'un seul réseau**. Il n'y a
 ni réseau de classification séparé, ni réseau de localisation séparé, ni tête de
 régression de coordonnées. La classification, c'est le label d'instance
-(`pr["labels"]`) ; la localisation, c'est le masque (`pr["masks"]`) — les deux
+(`pr["labels"]`) ; la localisation, c'est le masque (`pr["masks"]`) : les deux
 sortent de la même passe Mask R-CNN. Tout ce qui suit part de là.
 
 ## 1. Situation dans la chaîne
@@ -32,7 +32,7 @@ dépend d'AMASSS, d'ASO ni d'ALI d'aucune façon.
 |---|---|---|
 | [CLIC/CLIC.py](CLIC/CLIC.py) | widget, 622 lignes dont ~230 de feuille de style sombre et ~50 de rustines conda | Python de Slicer |
 | [CLIC/runner/clic_runner.py](CLIC/runner/clic_runner.py) | **tout le traitement**, 110 lignes | env conda `clic_env`, GPU si disponible |
-| [CLIC/Resources/UI/CLIC.ui](CLIC/Resources/UI/CLIC.ui) | l'interface | — |
+| [CLIC/Resources/UI/CLIC.ui](CLIC/Resources/UI/CLIC.ui) | l'interface | : |
 
 Pas de CLI Slicer, pas de `.xml`, pas de `MedX_Method`-like : le widget écrit un
 JSON de paramètres dans `slicer.app.temporaryPath` et lance le runner comme un
@@ -46,7 +46,7 @@ Il instancie toujours `CondaSetUpCall()` ([CLIC.py:62](CLIC/CLIC.py#L62)), jamai
 `CondaSetUpCallWsl` : contrairement à MedX, DOCShapeAXI et les autres, **CLIC
 n'a pas de voie WSL**. Sous Windows il appellera le chemin Unix de SlicerConda,
 et l'ordre des arguments de `condaRunFilePython` diffère entre les deux classes
-(`(file, args, env)` côté Unix, `(file, env, args)` côté WSL) — la liste d'args
+(`(file, args, env)` côté Unix, `(file, env, args)` côté WSL) : la liste d'args
 partirait comme nom d'environnement. Le module est de fait Linux-only, malgré le
 README.
 
@@ -81,7 +81,7 @@ pr = model([t])[0]
 Autrement dit :
 
 - **découpage en coupes axiales** selon le 3ᵉ axe du tableau nibabel, dans
-  l'ordre de stockage du fichier — pas selon une orientation anatomique
+  l'ordre de stockage du fichier, pas selon une orientation anatomique
   recalculée. Aucune réorientation RAS/LPS n'est faite, le code ne regarde jamais
   `nii.affine` sauf pour le réécrire ;
 - **normalisation min-max par coupe** (`_norm`,
@@ -98,7 +98,7 @@ Le seul redimensionnement vient de torchvision lui-même : le
 `GeneralizedRCNNTransform` embarqué dans le modèle standardise par les moyennes
 ImageNet (`[0.485,0.456,0.406]` / `[0.229,0.224,0.225]`) et redimensionne pour
 que le petit côté vaille **800 px**, plafonné à **1333 px** sur le grand côté.
-C'est un défaut de torchvision, pas un choix inscrit dans le dépôt — un CBCT
+C'est un défaut de torchvision, pas un choix inscrit dans le dépôt : un CBCT
 512×512 est donc agrandi à 800×800 avant le backbone.
 
 ## 4. Le modèle
@@ -194,7 +194,7 @@ for mk, lb in zip((pr["masks"][keep] > .5).squeeze(1).cpu().numpy(),
 il n'y a ni lissage inter-coupes, ni composante connexe, ni vote majoritaire sur
 la pile. Deux coupes voisines peuvent porter deux classes différentes pour la
 même dent. Un repreneur qui veut « la classe du patient » doit l'agréger
-lui-même — le module ne la produit pas.
+lui-même : le module ne la produit pas.
 
 ## 5. Le cœur algorithmique
 
@@ -238,8 +238,8 @@ marqués par un attribut `_leg` pour être retirés au rafraîchissement suivant
 | Seuils 0.7 / 0.5 et report dans le volume | arithmétique | `clic_env` |
 | Couleurs et légende | Slicer | widget |
 
-Tout le contenu clinique — *est-ce une canine incluse, et de quel côté de la
-corticale* — sort du seul réseau. Il n'y a aucune vérification a posteriori.
+Tout le contenu clinique, *est-ce une canine incluse, et de quel côté de la
+corticale*, sort du seul réseau. Il n'y a aucune vérification a posteriori.
 
 ## 8. Environnement
 
@@ -257,7 +257,7 @@ Predict** : les deux `pip install` repartent, même quand tout est déjà en pla
 (pip rend la main vite mais interroge le réseau). `self._env_ready` est positionné
 et jamais relu.
 
-Le second `pip install` passe `"'numpy<2.0'"` — guillemets simples compris dans
+Le second `pip install` passe `"'numpy<2.0'"` : guillemets simples compris dans
 la chaîne. Selon la façon dont SlicerConda assemble la commande (`shell=True`
 avec une chaîne côté Unix), l'argument peut arriver correctement déquoté ou non.
 La détection d'échec, elle, cherche `"error"` ou `"failed"` dans la sortie
@@ -289,7 +289,7 @@ comme un comportement voulu.
   les tests `ln.startswith("[PROGRESS]")` et `ln.startswith("[SEG]")`
   ([CLIC.py:268](CLIC/CLIC.py#L268)) ne sont **jamais vrais**. Conséquences : la
   barre reste à zéro et la segmentation produite **n'est jamais chargée dans
-  Slicer** — elle est pourtant bien écrite sur disque. Le passage de `print` à
+  Slicer**, elle est pourtant bien écrite sur disque. Le passage de `print` à
   `logging` a cassé le protocole que décrit encore l'en-tête du runner
   ([clic_runner.py:12-16](CLIC/runner/clic_runner.py#L12)). Correctif minimal :
   parser avec `"[SEG]" in ln` et couper à partir du marqueur.
@@ -302,11 +302,11 @@ comme un comportement voulu.
   sous-processus.
 - **Sans dossier de sortie choisi, le runner plante.** Le widget écrit toujours
   la clé `"output_dir"` dans le JSON, à `None` si l'opérateur n'a rien choisi ;
-  `P.get("output_dir", inp.parent)` rend alors `None` — la valeur par défaut ne
-  s'applique pas, la clé existe — et `Path(None)` lève un `TypeError`. La case
+  `P.get("output_dir", inp.parent)` rend alors `None`, la valeur par défaut ne
+  s'applique pas, la clé existe, et `Path(None)` lève un `TypeError`. La case
   *Save Predictions in Input Folder* du `.ui` n'est **connectée à rien**.
 - **`self.output_dir` n'est pas converti en `str` pour le JSON** : c'est déjà une
-  chaîne côté `_browse`, mais `model_folder` aussi — cohérent, sauf que
+  chaîne côté `_browse`, mais `model_folder` aussi, cohérent, sauf que
   `input_path` est un `Path` converti explicitement. À surveiller en cas de refonte.
 - **La boucle d'attente bloque Slicer** : `_on_predict` tourne dans un
   `while not cancel_evt.wait(0.05)` avec `processEvents()`, le thread worker
@@ -325,7 +325,7 @@ comme un comportement voulu.
   `glob`, `subprocess`, `urllib.request`, `Optional`,
   [testing/test_CanineSegmentation.py](CLIC/testing/test_CanineSegmentation.py)
   (fichier vide), et l'import `torch` inutilisé de
-  [MedX_Dashboard.py](MedX_CLI/MedX_Dashboard/MedX_Dashboard.py) — mentionné ici
+  [MedX_Dashboard.py](MedX_CLI/MedX_Dashboard/MedX_Dashboard.py), mentionné ici
   parce que le même copier-coller traîne dans plusieurs modules.
 - `CLIC/__pycache__/CLIC.cpython-312.pyc` est versionné dans le dépôt.
 
@@ -334,7 +334,7 @@ comme un comportement voulu.
 **Aucun papier ne porte sur CLIC.** Le travail correspondant est annoncé sous le
 titre *Interpretable Deep Learning for the Detection and Classification of
 Impacted Canines and severity of root resorption* (Tulissi, Cevidanes, Prieto),
-présenté à la **NA-MIC Project Week 43 (Montréal, 2025)** — un projet en cours,
+présenté à la **NA-MIC Project Week 43 (Montréal, 2025)** : un projet en cours,
 pas une publication. Le code d'origine vient du dépôt personnel
 `ashmoy/maskRcnn`, d'où proviennent aussi les scans de test cités par le README
 (`MN138.nii`, `UM06.nii`).
@@ -348,13 +348,13 @@ pas une publication. Le code d'origine vient du dépôt personnel
   CBCT (U-Net/nnU-Net volumétrique), sans classification de la position
   corticale.
 
-La spécificité de CLIC — une classe *bicorticale* en plus du couple
-buccal/palatin, prédite coupe par coupe en 2D sur du CBCT — n'est décrite dans
+La spécificité de CLIC, une classe *bicorticale* en plus du couple
+buccal/palatin, prédite coupe par coupe en 2D sur du CBCT, n'est décrite dans
 aucun de ces papiers. Ne pas présenter leurs chiffres comme ceux de ce module.
 
 - [NA-MIC Project Week 43 (2025)](https://projectweek.na-mic.org/PW43_2025_Montreal/)
 - [Mask R-CNN (He et al., 2017)](https://arxiv.org/abs/1703.06870)
-- [torchvision — maskrcnn_resnet50_fpn](https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.maskrcnn_resnet50_fpn.html)
+- [torchvision, maskrcnn_resnet50_fpn](https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.maskrcnn_resnet50_fpn.html)
 - [Buccal or palatal? AI-based localization of impacted maxillary canines using panoramic radiographs (BMC Med Imaging, 2025)](https://link.springer.com/article/10.1186/s12880-025-02143-9)
 - [Deep learning-based 3D automatic segmentation of impacted canines in CBCT scans (BMC Oral Health, 2025)](https://link.springer.com/article/10.1186/s12903-025-07117-5)
 - [SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools)

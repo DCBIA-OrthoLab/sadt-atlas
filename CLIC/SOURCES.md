@@ -1,4 +1,4 @@
-# CLIC — sources
+# CLIC : sources
 
 **Aucune publication ne décrit CLIC.** Vérification faite : rien sur le nom du
 module, rien sous les noms de ses auteurs, aucun article, aucun preprint, aucun
@@ -10,8 +10,8 @@ References » est vide (« No response ») : les auteurs eux-mêmes n'y rattache
 aucune référence.
 
 Ce qui est documenté ailleurs, c'est le *problème*, pas ce code. La spécificité
-de CLIC — une classe **bicorticale** en plus du couple buccal/palatin, prédite
-coupe par coupe en 2D sur du CBCT par un Mask R-CNN — n'apparaît dans aucun des
+de CLIC : une classe **bicorticale** en plus du couple buccal/palatin, prédite
+coupe par coupe en 2D sur du CBCT par un Mask R-CNN, n'apparaît dans aucun des
 travaux voisins ci-dessous. Ne pas présenter leurs chiffres comme ceux du
 module.
 
@@ -19,13 +19,13 @@ module.
 
 | Fichier | Référence | Type | DOI / ID |
 |---|---|---|---|
-| `2025_Tulissi_NAMIC_PW43_impacted_canines.md` | Tulissi E, Cevidanes L, Prieto J, Bianchi J. « Interpretable Deep Learning for the Detection and Classification of Impacted Canines and severity of root resorption ». Page de projet, NA-MIC Project Week 43, Montréal, 2025. | rapport de projet — **seule source primaire** | [page du projet](https://projectweek.na-mic.org/PW43_2025_Montreal/Projects/InterpretableDeepLearningForTheDetectionAndClassificationOfImpactedCaninesAndSeverityOfRootResorption/) |
-| `2017_He_Mask_RCNN.pdf` | He K, Gkioxari G, Dollár P, Girshick R. « Mask R-CNN ». *arXiv*:1703.06870, 2017 (ICCV 2017). | article — architecture employée | [arXiv:1703.06870](https://arxiv.org/abs/1703.06870) |
-| `2026_Kahraman_buccal_palatal_panoramic_AI.xml` / `.txt` | Kahraman EN, Güldiken İN, Tekin A, Kanbak T, Yılancı H. « Buccal or palatal? AI-based localization of impacted maxillary canines using panoramic radiographs ». *BMC Medical Imaging*, 2026, 26(1), 36. | voisinage | [10.1186/s12880-025-02143-9](https://doi.org/10.1186/s12880-025-02143-9) — PMC12809956 |
-| `2025_Unal_3D_segmentation_impacted_canines.xml` / `.txt` | Ünal T, Kuran A, Gulsen IT, Kızılay FN, Gulsen E, Özüdoğru S, Gördeli K, Celik O, Uğurlu M, Bayrakdar İŞ, Orhan K. « Deep learning-based 3D automatic segmentation of impacted canines in CBCT scans ». *BMC Oral Health*, 2025, 25(1), 1927. | voisinage | [10.1186/s12903-025-07117-5](https://doi.org/10.1186/s12903-025-07117-5) — PMC12723826 |
-| `2024_Swaity_deep_learning_canine_segmentation.xml` / `.txt` | Swaity A, Elgarba BM, Morgan N, Ali S, Shujaat S, Borsci E, Chilvarquer I, Jacobs R. « Deep learning driven segmentation of maxillary impacted canine on cone beam computed tomography images ». *Scientific Reports*, 2024, 14(1), 369. | voisinage | [10.1038/s41598-023-49613-0](https://doi.org/10.1038/s41598-023-49613-0) — PMC10764895 |
-| `2024_Pirayesh_canine_root_resorption_CBCT.xml` / `.txt` | Pirayesh Z, Mohammad-Rahimi H, Motamedian SR, Amini Afshar S, Abbasi R, Rohban MH, Mahdian M, Ghazizadeh Ahsaie M, Iranparvar Alamdari M. « A hierarchical deep learning approach for diagnosing impacted canine-induced root resorption via cone-beam computed tomography ». *BMC Oral Health*, 2024, 24(1), 982. | voisinage | [10.1186/s12903-024-04718-4](https://doi.org/10.1186/s12903-024-04718-4) — PMC11344340 |
-| `2026_Helal_AI_canine_impaction_panoramic.xml` / `.txt` | Helal NM, Aljehani AF, Alomari SA, Mahmoud RA, Khalifa HM. « Artificial Intelligence-Assisted Detection of Canine Impaction, Localization, and Classification from Panoramic Images: A Diagnostic Accuracy Comparative Study with CBCT ». *Children*, 2026, 13(4), 507. | voisinage | [10.3390/children13040507](https://doi.org/10.3390/children13040507) — PMC13115521 |
+| `2025_Tulissi_NAMIC_PW43_impacted_canines.md` | Tulissi E, Cevidanes L, Prieto J, Bianchi J. « Interpretable Deep Learning for the Detection and Classification of Impacted Canines and severity of root resorption ». Page de projet, NA-MIC Project Week 43, Montréal, 2025. | rapport de projet, **seule source primaire** | [page du projet](https://projectweek.na-mic.org/PW43_2025_Montreal/Projects/InterpretableDeepLearningForTheDetectionAndClassificationOfImpactedCaninesAndSeverityOfRootResorption/) |
+| `2017_He_Mask_RCNN.pdf` | He K, Gkioxari G, Dollár P, Girshick R. « Mask R-CNN ». *arXiv*:1703.06870, 2017 (ICCV 2017). | article, architecture employée | [arXiv:1703.06870](https://arxiv.org/abs/1703.06870) |
+| `2026_Kahraman_buccal_palatal_panoramic_AI.xml` / `.txt` | Kahraman EN, Güldiken İN, Tekin A, Kanbak T, Yılancı H. « Buccal or palatal? AI-based localization of impacted maxillary canines using panoramic radiographs ». *BMC Medical Imaging*, 2026, 26(1), 36. | voisinage | [10.1186/s12880-025-02143-9](https://doi.org/10.1186/s12880-025-02143-9), PMC12809956 |
+| `2025_Unal_3D_segmentation_impacted_canines.xml` / `.txt` | Ünal T, Kuran A, Gulsen IT, Kızılay FN, Gulsen E, Özüdoğru S, Gördeli K, Celik O, Uğurlu M, Bayrakdar İŞ, Orhan K. « Deep learning-based 3D automatic segmentation of impacted canines in CBCT scans ». *BMC Oral Health*, 2025, 25(1), 1927. | voisinage | [10.1186/s12903-025-07117-5](https://doi.org/10.1186/s12903-025-07117-5), PMC12723826 |
+| `2024_Swaity_deep_learning_canine_segmentation.xml` / `.txt` | Swaity A, Elgarba BM, Morgan N, Ali S, Shujaat S, Borsci E, Chilvarquer I, Jacobs R. « Deep learning driven segmentation of maxillary impacted canine on cone beam computed tomography images ». *Scientific Reports*, 2024, 14(1), 369. | voisinage | [10.1038/s41598-023-49613-0](https://doi.org/10.1038/s41598-023-49613-0), PMC10764895 |
+| `2024_Pirayesh_canine_root_resorption_CBCT.xml` / `.txt` | Pirayesh Z, Mohammad-Rahimi H, Motamedian SR, Amini Afshar S, Abbasi R, Rohban MH, Mahdian M, Ghazizadeh Ahsaie M, Iranparvar Alamdari M. « A hierarchical deep learning approach for diagnosing impacted canine-induced root resorption via cone-beam computed tomography ». *BMC Oral Health*, 2024, 24(1), 982. | voisinage | [10.1186/s12903-024-04718-4](https://doi.org/10.1186/s12903-024-04718-4), PMC11344340 |
+| `2026_Helal_AI_canine_impaction_panoramic.xml` / `.txt` | Helal NM, Aljehani AF, Alomari SA, Mahmoud RA, Khalifa HM. « Artificial Intelligence-Assisted Detection of Canine Impaction, Localization, and Classification from Panoramic Images: A Diagnostic Accuracy Comparative Study with CBCT ». *Children*, 2026, 13(4), 507. | voisinage | [10.3390/children13040507](https://doi.org/10.3390/children13040507), PMC13115521 |
 
 Les XML sont le texte intégral JATS fourni par Europe PMC ; le `.txt` à côté en
 est la conversion lisible.
@@ -34,9 +34,9 @@ est la conversion lisible.
 
 | Référence | Où | DOI |
 |---|---|---|
-| Galdi M, Cannatà D, Celentano F, Rizzo L, Rossi D, Bocchino T, Martina S. « Development of a fully deep learning model to improve the reproducibility of sector classification systems for predicting unerupted maxillary canine likelihood of impaction ». *arXiv*:2511.20493, 2025. | [arXiv](https://arxiv.org/abs/2511.20493) — librement téléchargeable, non repris ici : porte sur la classification par secteurs **sur panoramique**, problème différent | — |
-| Salmanpour F, Akpınar M. « Performance of Chat Generative Pretrained Transformer-4.0 in determining labiolingual localization of maxillary impacted canines ». *AJODO*, 2025. | [éditeur](https://doi.org/10.1016/j.ajodo.2025.02.017) — payant | [10.1016/j.ajodo.2025.02.017](https://doi.org/10.1016/j.ajodo.2025.02.017) |
-| Torchvision, `maskrcnn_resnet50_fpn` — implémentation réellement utilisée par le module. | [documentation PyTorch](https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.maskrcnn_resnet50_fpn.html) | — |
+| Galdi M, Cannatà D, Celentano F, Rizzo L, Rossi D, Bocchino T, Martina S. « Development of a fully deep learning model to improve the reproducibility of sector classification systems for predicting unerupted maxillary canine likelihood of impaction ». *arXiv*:2511.20493, 2025. | [arXiv](https://arxiv.org/abs/2511.20493), librement téléchargeable, non repris ici : porte sur la classification par secteurs **sur panoramique**, problème différent |, |
+| Salmanpour F, Akpınar M. « Performance of Chat Generative Pretrained Transformer-4.0 in determining labiolingual localization of maxillary impacted canines ». *AJODO*, 2025. | [éditeur](https://doi.org/10.1016/j.ajodo.2025.02.017), payant | [10.1016/j.ajodo.2025.02.017](https://doi.org/10.1016/j.ajodo.2025.02.017) |
+| Torchvision, `maskrcnn_resnet50_fpn` : implémentation réellement utilisée par le module. | [documentation PyTorch](https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.maskrcnn_resnet50_fpn.html) |, |
 
 Autres pistes vérifiées, sans résultat :
 
@@ -67,7 +67,7 @@ Ces travaux **ne décrivent pas le code de CLIC**.
 - **Résorption radiculaire des dents adjacentes.** Pirayesh 2024 (*BMC Oral
   Health*) propose une approche hiérarchique de diagnostic de la résorption
   induite par une canine incluse sur CBCT. C'est exactement l'**extension**
-  annoncée par le projet PW43 ci-dessus — donc le voisin le plus proche du
+  annoncée par le projet PW43 ci-dessus, donc le voisin le plus proche du
   travail en cours, mais pas du code actuellement dans le dépôt : CLIC, tel que
   versionné, ne prédit aucune sévérité de résorption.
 - **L'architecture.** He 2017 décrit Mask R-CNN. Le module utilise

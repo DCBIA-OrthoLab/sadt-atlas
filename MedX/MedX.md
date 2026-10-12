@@ -1,4 +1,4 @@
-# MedX — pipeline complet
+# MedX : pipeline complet
 
 Extraction d'indicateurs cliniques TMD à partir de notes rédigées en langage
 naturel, par un LLM local, puis agrégation de la cohorte en une planche de
@@ -26,7 +26,7 @@ La voie Dashboard consomme la sortie de la voie Summarization (dossier de `.txt`
 mais rien ne les enchaîne : l'opérateur relance à la main.
 
 **Aucun appel réseau vers un LLM.** Pas d'endpoint, pas de clé d'API, pas
-d'`ollama`, pas d'`openai` — vérifié par grep sur tout `MedX/` et `MedX_CLI/`.
+d'`ollama`, pas d'`openai` : vérifié par grep sur tout `MedX/` et `MedX_CLI/`.
 Le seul trafic sortant est le téléchargement des poids depuis une release GitHub.
 
 ## 2. Fichiers en jeu
@@ -50,7 +50,7 @@ comme les autres modules, mais ignore l'entrée `"Process"` et appelle
 Le CLI Slicer `MedX_Summarize` déclaré dans
 [MedX_Summarize.xml](MedX_CLI/MedX_Summarize/MedX_Summarize.xml) ne sert donc
 qu'à faire installer le fichier au bon endroit et à lui donner un
-`slicer.modules.medx_summarize` — jamais exécuté comme CLI Slicer.
+`slicer.modules.medx_summarize` : jamais exécuté comme CLI Slicer.
 
 Le dashboard, lui, passe bien par `slicer.cli.run`
 ([MedX.py:938](MedX/MedX.py#L938)) : il tourne dans le Python de Slicer et exige
@@ -81,11 +81,11 @@ sous-dossiers, le dénominateur compte plus de fichiers que le CLI n'en traite.
 |---|---|---|
 | `.pdf` | `extract_text_from_pdf` | PyMuPDF (`fitz`), concaténation de `page.get_text()` |
 | `.docx` | `extract_text_from_word` | `python-docx`, un `\n` par paragraphe |
-| `.txt` | lecture directe | — |
+| `.txt` | lecture directe | : |
 
 `clean_text()` ne remplace que deux caractères : `’` → `'` et `–` → `-`.
 
-### 3.3 Découpage en chunks — la partie la plus travaillée
+### 3.3 Découpage en chunks : la partie la plus travaillée
 
 `split_text_by_paragraphs()` ([utils.py:83](MedX_CLI/MedX_CLI_utils/utils.py#L83))
 puis `create_chunks_from_paragraphs()` ([utils.py:128](MedX_CLI/MedX_CLI_utils/utils.py#L128)).
@@ -111,7 +111,7 @@ Règles, dans l'ordre :
    (`re.split(r'(?<=[.!?])\s+')`).
 
 **Taille de chunk : 3500 caractères**, passée par `generate_combined_summary`
-([MedX_Summarize.py:29](MedX_CLI/MedX_Summarize/MedX_Summarize.py#L29)) — la
+([MedX_Summarize.py:29](MedX_CLI/MedX_Summarize/MedX_Summarize.py#L29)), la
 valeur par défaut de `create_chunks_from_paragraphs` (1800) n'est jamais utilisée.
 3500 caractères ≈ 900 tokens BPE, sous la limite de 1024 du modèle, mais la
 tokenisation est de toute façon tronquée à `max_length=1024`.
@@ -129,7 +129,7 @@ model = BartForConditionalGeneration.from_pretrained(model_path)
 
 Rien d'autre. Pas de `peft`, pas de quantification, malgré `peft` et
 `bitsandbytes` dans la liste des paquets installés dans l'environnement
-([MedX.py:849](MedX/MedX.py#L849)) — ces deux-là, plus `evaluate` et
+([MedX.py:849](MedX/MedX.py#L849)), ces deux-là, plus `evaluate` et
 `scikit-learn`, sont des reliquats de l'entraînement.
 
 ### 4.2 Les poids
@@ -191,7 +191,7 @@ n'est fixée.
 
 BART n'est pas un modèle instruction-tuned : la phrase d'instruction est
 simplement préfixée au texte source. Elle n'a d'effet que si le fine-tune a été
-fait avec ce même préfixe — invérifiable depuis le dépôt.
+fait avec ce même préfixe : invérifiable depuis le dépôt.
 
 Ce que le réseau produit littéralement : **du texte libre**, une séquence
 décodée par `tokenizer.decode(..., skip_special_tokens=True)`. Le format
@@ -204,7 +204,7 @@ Il n'existe **aucune passe de validation** du couple clé/valeur côté CLI :
 ([utils.py:227](MedX_CLI/MedX_CLI_utils/utils.py#L227)) sont du **code mort**,
 jamais importés (le `__init__.py` ne les réexporte pas).
 
-## 5. Le cœur algorithmique — le dashboard
+## 5. Le cœur algorithmique : le dashboard
 
 Aucun apprentissage ici, que du parsing et du matplotlib.
 
@@ -220,7 +220,7 @@ crée un dict de **56 clés**, toutes typées `str`, toutes initialisées à `""
 du module, et le seul endroit du dépôt où il est écrit.
 
 `update_dictionary()` ([display_figure.py:69](MedX_CLI/MedX_CLI_utils/display_figure.py#L69))
-parcourt le résumé ligne à ligne, `line.split(":")` — une ligne qui ne donne pas
+parcourt le résumé ligne à ligne, `line.split(":")`, une ligne qui ne donne pas
 exactement deux morceaux est ignorée (donc toute valeur contenant un `:` est
 perdue). Les `;` de la valeur deviennent des `,`. Une clé hors des 56 est
 ignorée.
@@ -381,9 +381,9 @@ SlicerConda modifiée pour garder le `Popen` sous la main
   [dashboard_utils.py](MedX_CLI/MedX_CLI_utils/dashboard_utils.py#L18) et de
   [display_figure.py](MedX_CLI/MedX_CLI_utils/display_figure.py#L1) : ils
   mentionnent un dossier `Qwen1.5B_full_V3/predictions_500`. Les résumés qui ont
-  servi à mettre au point le dashboard — et le
+  servi à mettre au point le dashboard, et le
   [dashboard_full_dataframe.csv](MedX_CLI/dashboard_full_dataframe.csv) de 500
-  lignes versionné dans le dépôt — ont donc été produits par un **Qwen 1.5B**,
+  lignes versionné dans le dépôt : ont donc été produits par un **Qwen 1.5B**,
   pas par le BART distribué. Les deux formats de sortie sont supposés
   interchangeables ; rien ne le garantit.
 - **Code mort** : `extract_key_value_pairs`, `save_dict_to_csv`,
@@ -401,8 +401,8 @@ SlicerConda modifiée pour garder le `Popen` sous la main
 Le papier correspondant est **AI-Driven Multimodal TMJ Patient Modeling: From
 Unstructured Notes to Precision Treatment** (2025, Springer LNCS). Il décrit le
 fine-tuning de **BART** et de **DeepSeek-R1** sur **1 813 segments annotés issus
-de 500 dossiers TMD**, pour extraire **56 indicateurs cliniques** — le nombre
-exact de clés de `initialize_key_value_summary()` — et l'alimentation d'un
+de 500 dossiers TMD**, pour extraire **56 indicateurs cliniques**, le nombre
+exact de clés de `initialize_key_value_summary()`, et l'alimentation d'un
 dashboard patient et cohorte. Le papier conclut que BART bat DeepSeek sur la
 précision d'extraction des champs malgré un ROUGE légèrement inférieur ; c'est
 cohérent avec le fait que le module distribue un BART.

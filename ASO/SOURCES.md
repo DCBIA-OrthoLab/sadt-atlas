@@ -1,4 +1,4 @@
-# ASO — sources
+# ASO : sources
 
 **ASO_CBCT est publié**, dans un chapitre d'actes d'atelier MICCAI (LNCS 14242,
 2023) qu'il partage avec AREG_CBCT : le même texte décrit l'orientation (ASO)
@@ -14,15 +14,15 @@ alignement de 3 landmarks puis raffinement ICP) ; le pré-orienteur DenseNet,
 absent du papier, n'est effectivement plus branché. Attention en revanche au
 volet AREG du même chapitre : **il ne décrit plus le code de recalage** (une
 passe au lieu de deux, `itk-elastix` au lieu de SimpleElastix, AMASSS en nnU-Net
-v2 au lieu d'UNETR) — détail dans `../AREG_CBCT/SOURCES.md`.
+v2 au lieu d'UNETR), détail dans `../AREG_CBCT/SOURCES.md`.
 
 ## Récupéré dans ce dossier
 
 | Fichier | Référence | Type | DOI / ID |
 |---|---|---|---|
-| `2023_Gillot_ALI_CBCT_landmark_identification.xml` / `.txt` | Gillot M., Miranda F., Baquero B., Ruellas A., Gurgel M., Al Turkestani N., Anchling L., Hutin N., Biggs E., Yatabe M., Paniagua B., Fillion-Robin J.-C., Allemang D., Bianchi J., Cevidanes L., Prieto J.C. *Automatic landmark identification in cone-beam computed tomography.* Orthodontics & Craniofacial Research, 26(4):560-567, 2023. | Article de revue, texte intégral JATS (Europe PMC) + texte brut — CC-BY-NC-ND | [10.1111/ocr.12642](https://doi.org/10.1111/ocr.12642) — PMID 36811276, PMCID **PMC10440369** |
-| `2016_Ruellas_common_coordinate_system.pdf` | Ruellas A.C.O., Tonello C., Gomes L.R., Yatabe M.S., Macron L., Lopinto J., Goncalves J.R., Garib Carreira D.G., Alonso N., Souki B.Q., Coqueiro R.S., Cevidanes L.H.S. *Common 3-dimensional coordinate system for assessment of directional changes.* American Journal of Orthodontics and Dentofacial Orthopedics, 149(5):645-656, 2016. | Article de revue, version déposée (Repositório UNESP) | [10.1016/j.ajodo.2015.10.021](https://doi.org/10.1016/j.ajodo.2015.10.021) — PMID 27131246, PMCID PMC4959834 — [hdl 11449/161503](http://hdl.handle.net/11449/161503) |
-| `2024_Barone_VSP_ClasseIII_voxel_based.xml` / `.txt` | Barone S., Cevidanes L., Miranda F., Gurgel M.L., Anchling L., Hutin N., Bianchi J., Goncalves J.R., Giudice A. *Enhancing skeletal stability and Class III correction through active orthodontist engagement in virtual surgical planning: A voxel-based 3-dimensional analysis.* American Journal of Orthodontics and Dentofacial Orthopedics, 165(3):321-331, 2024. | Article de revue, texte intégral JATS (Europe PMC) + texte brut — CC-BY | [10.1016/j.ajodo.2023.09.016](https://doi.org/10.1016/j.ajodo.2023.09.016) — PMID 38010236, PMCID PMC10923113 |
+| `2023_Gillot_ALI_CBCT_landmark_identification.xml` / `.txt` | Gillot M., Miranda F., Baquero B., Ruellas A., Gurgel M., Al Turkestani N., Anchling L., Hutin N., Biggs E., Yatabe M., Paniagua B., Fillion-Robin J.-C., Allemang D., Bianchi J., Cevidanes L., Prieto J.C. *Automatic landmark identification in cone-beam computed tomography.* Orthodontics & Craniofacial Research, 26(4):560-567, 2023. | Article de revue, texte intégral JATS (Europe PMC) + texte brut, CC-BY-NC-ND | [10.1111/ocr.12642](https://doi.org/10.1111/ocr.12642), PMID 36811276, PMCID **PMC10440369** |
+| `2016_Ruellas_common_coordinate_system.pdf` | Ruellas A.C.O., Tonello C., Gomes L.R., Yatabe M.S., Macron L., Lopinto J., Goncalves J.R., Garib Carreira D.G., Alonso N., Souki B.Q., Coqueiro R.S., Cevidanes L.H.S. *Common 3-dimensional coordinate system for assessment of directional changes.* American Journal of Orthodontics and Dentofacial Orthopedics, 149(5):645-656, 2016. | Article de revue, version déposée (Repositório UNESP) | [10.1016/j.ajodo.2015.10.021](https://doi.org/10.1016/j.ajodo.2015.10.021), PMID 27131246, PMCID PMC4959834, [hdl 11449/161503](http://hdl.handle.net/11449/161503) |
+| `2024_Barone_VSP_ClasseIII_voxel_based.xml` / `.txt` | Barone S., Cevidanes L., Miranda F., Gurgel M.L., Anchling L., Hutin N., Bianchi J., Goncalves J.R., Giudice A. *Enhancing skeletal stability and Class III correction through active orthodontist engagement in virtual surgical planning: A voxel-based 3-dimensional analysis.* American Journal of Orthodontics and Dentofacial Orthopedics, 165(3):321-331, 2024. | Article de revue, texte intégral JATS (Europe PMC) + texte brut, CC-BY | [10.1016/j.ajodo.2023.09.016](https://doi.org/10.1016/j.ajodo.2023.09.016), PMID 38010236, PMCID PMC10923113 |
 
 ## À consulter en ligne (pas librement téléchargeable)
 
@@ -54,13 +54,13 @@ l'usage.
   des landmarks » des CBCT dans 3D Slicer. C'est ASO + AREG + AMASSS + ALI en
   conditions réelles, sur 17 patients de Classe III opérés.
 - Pages NA-MIC Project Week, sans DOI :
-  [PW38 2023 Gran Canaria — ASO_CBCT](https://projectweek.na-mic.org/PW38_2023_GranCanaria/Projects/ASO_CBCT/)
+  [PW38 2023 Gran Canaria, ASO_CBCT](https://projectweek.na-mic.org/PW38_2023_GranCanaria/Projects/ASO_CBCT/)
   (Anchling, Hutin, Gillot, Baquero, Bianchi, Ruellas, Miranda, Barone, Gurgel,
-  Yatabe, Al Turkestani, Joshi, Cevidanes, Prieto) — c'est là qu'est décrit le
+  Yatabe, Al Turkestani, Joshi, Cevidanes, Prieto), c'est là qu'est décrit le
   pré-orienteur « en cours de test » qui n'a jamais été branché ; et
-  [PW38 — Automatic Standardize Orientation IOS](https://projectweek.na-mic.org/PW38_2023_GranCanaria/Projects/AutomaticStandardizeOrientation_IOS/)
+  [PW38, Automatic Standardize Orientation IOS](https://projectweek.na-mic.org/PW38_2023_GranCanaria/Projects/AutomaticStandardizeOrientation_IOS/)
   (Hutin, Anchling, Gurgel, Miranda, Al Turkestani, Barone, Cevidanes, Prieto),
-  seule description écrite du pipeline ASO_IOS complet — pré-orientation par
+  seule description écrite du pipeline ASO_IOS complet, pré-orientation par
   molaires et incisive, ICP sur 3 centroïdes, landmarks ALI_IOS, mode occlusion.
 - Dépôts de code, sans DOI : [lucanchling/ASO](https://github.com/lucanchling/ASO),
   [DCBIA-OrthoLab/ASO](https://github.com/DCBIA-OrthoLab/ASO),
@@ -84,13 +84,13 @@ l'usage.
 ## Comment le texte intégral a été récupéré
 
 Le chapitre est payant chez Springer, mais le **manuscrit auteur** déposé au NIH
-est libre d'accès. Deux recettes échouent dessus et une marche — noté ici pour
+est libre d'accès. Deux recettes échouent dessus et une marche, noté ici pour
 éviter de refaire le tour :
 
 | Voie | Résultat sur ce PMCID |
 |---|---|
 | `pmc.ncbi.nlm.nih.gov/.../pdf/` | HTML anti-bot |
-| API BioC `pmcoa.cgi` | « No result can be found » — elle ne sert que l'*open access subset* |
+| API BioC `pmcoa.cgi` | « No result can be found » : elle ne sert que l'*open access subset* |
 | **`eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=<numéro>`** | **JATS complet, corps inclus** |
 
 ```

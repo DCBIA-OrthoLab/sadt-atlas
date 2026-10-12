@@ -1,4 +1,4 @@
-# AutoMatrix — pipeline complet
+# AutoMatrix : pipeline complet
 
 Application en lot d'une ou plusieurs transformations ITK à un dossier de
 volumes et de fichiers de landmarks. Aucun réseau, aucun conda, aucun GPU :
@@ -29,15 +29,15 @@ La case « From AReg » de l'UI code en dur la convention de nommage d'AREG_CBCT
 |---|---|---|
 | [AutoMatrix.py](AutoMatrix/AutoMatrix.py) | widget : sélecteurs, validation, mirror, barre de progression | Python de Slicer |
 | [applyMatrix.py](AutoMatrix/AutoMatrix_Method/applyMatrix.py) | `Automatrix_Method` : construit le dict de paramètres du CLI | idem |
-| [General_tools.py](AutoMatrix/AutoMatrix_Method/General_tools.py) | `search` et `GetPatients` — **copie** de celles du CLI, utilisée seulement pour compter | idem |
+| [General_tools.py](AutoMatrix/AutoMatrix_Method/General_tools.py) | `search` et `GetPatients` : **copie** de celles du CLI, utilisée seulement pour compter | idem |
 | [Automatrix_CLI.py](Automatrix_CLI/Automatrix_CLI.py) | tout le travail réel, 341 lignes | Python de Slicer, `SlicerMacroBuildScriptedCLI` |
 
 `AutoMatrixLogic.process()` ([AutoMatrix.py:1094](AutoMatrix/AutoMatrix.py#L1094))
 est un `pass` : la logique est entièrement dans `Automatrix_Method`. Pas de
-conda, pas de CUDA — vérifié par grep, aucune occurrence de `torch`, `conda` ou
+conda, pas de CUDA : vérifié par grep, aucune occurrence de `torch`, `conda` ou
 `.pth` dans AutoMatrix/ et Automatrix_CLI/.
 
-## 3. Formats de transformation lus — et ceux qui ne le sont pas
+## 3. Formats de transformation lus, et ceux qui ne le sont pas
 
 L'UI ([AutoMatrix.py:1012](AutoMatrix/AutoMatrix.py#L1012)) et le README
 annoncent `.npy`, `.h5`, `.tfm`, `.mat`, `.txt`. `GetPatients` les collecte tous.
@@ -70,10 +70,10 @@ et est sauté. C'est une régression introduite par le passage au CLI (commit
 Même chose pour « matrices texte » : ce n'est pas un format de matrice, c'est le
 format texte d'ITK.
 
-Une lecture réussie donne un `sitk.Transform` dont le type concret est conservé —
+Une lecture réussie donne un `sitk.Transform` dont le type concret est conservé :
 `isinstance(tfm, sitk.CompositeTransform)` fonctionne, vérifié.
 
-## 4. La convention de transformation — le point qui casse tout
+## 4. La convention de transformation : le point qui casse tout
 
 ### 4.1 Sens de la transformation
 
@@ -84,7 +84,7 @@ point physique de **sortie** vers le point physique d'**entrée** où aller
 Le code exploite cela des deux côtés, et c'est cohérent :
 
 - **Volumes** ([Automatrix_CLI.py:209](Automatrix_CLI/Automatrix_CLI.py#L209)) :
-  `resampler.SetTransform(transform)` — la transformation est passée telle
+  `resampler.SetTransform(transform)`, la transformation est passée telle
   quelle, le contenu se déplace de `T⁻¹`.
 - **Landmarks** ([Automatrix_CLI.py:176](Automatrix_CLI/Automatrix_CLI.py#L176)) :
   ```python
@@ -100,10 +100,10 @@ et c'est aussi le seul endroit où une inversion apparaît dans le code.
 
 `GetInverse()` peut lever `RuntimeError` (transformation non inversible :
 déplacement dense, B-spline). Le cas est attrapé et le fichier de landmarks est
-simplement sauté avec un warning — le volume correspondant, lui, aura été
+simplement sauté avec un warning : le volume correspondant, lui, aura été
 transformé. Les deux sorties peuvent donc se désynchroniser silencieusement.
 
-### 4.2 RAS / LPS : où se fait le flip — nulle part
+### 4.2 RAS / LPS : où se fait le flip, nulle part
 
 **Il n'y a aucun flip dans AutoMatrix.** C'est correct, et voici pourquoi :
 
@@ -122,8 +122,8 @@ transformé. Les deux sorties peuvent donc se désynchroniser silencieusement.
 
 Le fragile est que **le champ `coordinateSystem` n'est jamais lu**. FlexReg le
 fait ([FlexReg.py:2434](FlexReg/FlexReg.py#L2434)) ; AutoMatrix non. Un json
-déclarant `"coordinateSystem": "RAS"` — ce qu'écrivent des annotations plus
-anciennes ou d'autres outils — sera transformé avec x et y de signe opposé, sans
+déclarant `"coordinateSystem": "RAS"`, ce qu'écrivent des annotations plus
+anciennes ou d'autres outils, sera transformé avec x et y de signe opposé, sans
 message. Le fichier de sortie conservera d'ailleurs son `coordinateSystem: RAS`
 d'origine, puisque le json est relu et réécrit tel quel.
 
@@ -182,7 +182,7 @@ Un `.vtk` *structured points* (image, pas surface) passerait, lui, via VTKImageI
 |---|---|---|---|
 | `.nii`, `.nii.gz`, `.nrrd` | `sitk.ReadImage` | `ResampleImageFilter` | `sitk.WriteImage` |
 | `.mrk.json` | `json.load`, `markups[0]['controlPoints']` | `T⁻¹.TransformPoint` point par point | `json.dump(indent=2)` |
-| `.vtk .vtp .stl .off .obj` | — | — | — (échec silencieux) |
+| `.vtk .vtp .stl .off .obj` |, |, | : (échec silencieux) |
 
 Pour les landmarks, seul `markups[0]` est traité et seuls les points dont
 `positionStatus == 'defined'` sont bougés ; les autres sont laissés en place,
@@ -197,7 +197,7 @@ resampler.SetReferenceImage(reference)
 ```
 
 L'interpolateur vient de la case « Check this box if using segmentations »
-(`is_seg`). Voisin le plus proche pour une labelmap, linéaire sinon — correct, et
+(`is_seg`). Voisin le plus proche pour une labelmap, linéaire sinon : correct, et
 c'est l'utilisateur qui doit le déclarer, rien n'est détecté automatiquement.
 
 La grille de sortie est choisie ainsi
@@ -222,7 +222,7 @@ La grille de sortie est choisie ainsi
 
 La branche `reference is None` de `ResampleImage`
 ([Automatrix_CLI.py:215](Automatrix_CLI/Automatrix_CLI.py#L215)) est
-**inatteignable** — l'appelant passe toujours une référence. Elle est en plus
+**inatteignable**, l'appelant passe toujours une référence. Elle est en plus
 fausse : elle fait `new_origin = transform.TransformPoint(image.GetOrigin())`
 alors que la convention du resampler demanderait `T⁻¹`.
 
@@ -243,14 +243,14 @@ FixedParameters: 0 0 0
 
 Soit `diag(-1, 1, 1)` en LPS, centre à l'origine : une **réflexion par rapport au
 plan x_LPS = 0**. Comme x_LPS pointe vers la gauche du patient, c'est bien
-l'échange gauche/droite — mais par rapport au plan sagittal **de l'origine du
+l'échange gauche/droite, mais par rapport au plan sagittal **de l'origine du
 repère monde**, pas par rapport au plan sagittal du patient. Un patient non
 centré ressort translaté en plus d'être miroité, ce qu'un recalage ultérieur doit
 rattraper.
 
 Le déterminant vaut −1. Pour un volume, `ResampleImageFilter` s'en accommode sans
 problème. Pour un maillage, cela inverserait l'orientation des faces et les
-normales — question sans objet ici puisque les maillages ne sont plus traités.
+normales : question sans objet ici puisque les maillages ne sont plus traités.
 
 Le mode force `ComboBoxMatrix` en « File », le suffixe à `_mir`, et décoche
 `checkBoxMatrixName`.
@@ -314,7 +314,7 @@ Trois problèmes, tous vérifiables :
 3. **Elle n'est jamais prise** : `CheckBoxSuffixBased` (libellé « From AReg ») est
    masqué au `setup` par `self.ui.CheckBoxSuffixBased.setVisible(False)`
    ([AutoMatrix.py:296](AutoMatrix/AutoMatrix.py#L296)), donc `fromAreg` vaut
-   toujours `"False"`. Code mort — ce qui explique pourquoi 1 et 2 n'ont jamais
+   toujours `"False"`. Code mort : ce qui explique pourquoi 1 et 2 n'ont jamais
    été remarqués.
 
 Le nom `MAXReg_matrix.tfm` correspond quand même à la réalité d'AREG_CBCT, qui
@@ -374,7 +374,7 @@ paramètre `log_path` : `DisplayAutomatrix.isProgress`
 de `log_path`, mais **le CLI n'écrit jamais dans ce fichier**. L'avancement passe
 en réalité par la séquence `<filter-progress>0 / 2 / 0</filter-progress>` émise
 par le CLI après chaque scan ([Automatrix_CLI.py:314](Automatrix_CLI/Automatrix_CLI.py#L314))
-et le `if kwds["progress"] == 200` de `isProgress` — un protocole indirect, fragile,
+et le `if kwds["progress"] == 200` de `isProgress`, un protocole indirect, fragile,
 qui dépend d'un `time.sleep(0.2)` entre chaque impression.
 
 ## 12. Pièges et points fragiles
@@ -419,21 +419,21 @@ qui dépend d'un `time.sleep(0.2)` entre chaque impression.
 
 Aucun papier ne porte sur AutoMatrix : c'est un utilitaire d'application en lot
 écrit pour le laboratoire (Gaëlle Leroux, UoM/DCBIA). Le contenu scientifique est
-entièrement dans les modules qui *produisent* les matrices — AREG, ASO, MRI2CBCT,
-FlexReg — et se lit dans leurs fiches respectives.
+entièrement dans les modules qui *produisent* les matrices, AREG, ASO, MRI2CBCT,
+FlexReg, et se lit dans leurs fiches respectives.
 
 Pour la convention de transformation, la référence à jour est la documentation
 d'ITK / Slicer plutôt qu'un article :
 
-- [Transforms — Slicer user guide](https://slicer.readthedocs.io/en/latest/user_guide/modules/transforms.html)
+- [Transforms, Slicer user guide](https://slicer.readthedocs.io/en/latest/user_guide/modules/transforms.html)
   (sens fixed→moving, RAS de Slicer vs LPS d'ITK)
-- [Coordinate systems — Slicer developer guide](https://slicer.readthedocs.io/en/latest/user_guide/coordinate_systems.html)
-- [SimpleITK — Transforms and Resampling](https://simpleitk.readthedocs.io/en/master/link_ImageRegistrationMethod1_docs.html)
+- [Coordinate systems, Slicer developer guide](https://slicer.readthedocs.io/en/latest/user_guide/coordinate_systems.html)
+- [SimpleITK, Transforms and Resampling](https://simpleitk.readthedocs.io/en/master/link_ImageRegistrationMethod1_docs.html)
 - [SlicerAutomatedDentalTools](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools)
-- [DCBIA_Apply_matrix](https://github.com/GaelleLeroux/DCBIA_Apply_matrix) —
+- [DCBIA_Apply_matrix](https://github.com/GaelleLeroux/DCBIA_Apply_matrix),
   dépôt d'origine, qui héberge encore la matrice miroir et les jeux de test cités
   par le README
 
-**Bibliographie complète : [SOURCES.md](SOURCES.md)** — recherche faite, résultat
+**Bibliographie complète : [SOURCES.md](SOURCES.md)**, recherche faite, résultat
 négatif : aucun travail ne décrit AutoMatrix, et aucun ne le cite. Rien n'a été
 récupéré dans ce dossier, parce qu'il n'y a rien à récupérer.

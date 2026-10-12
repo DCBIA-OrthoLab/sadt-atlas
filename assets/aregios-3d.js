@@ -1,4 +1,4 @@
-/* aregios-3d.js — AREG_IOSCBCT : une arcade intra-orale sur un CBCT.
+/* aregios-3d.js, AREG_IOSCBCT : une arcade intra-orale sur un CBCT.
 
    Deux modalites qui n'ont rien en commun, un volume et une surface. La
    fiche resume l'appariement : « shared landmarks for the pre-alignment,
@@ -175,7 +175,7 @@
         var e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
         current = partial(new Float32Array(active.m), e);
         var rms = active.before + (active.after - active.before) * e;
-        say(label("align") + " — RMS " + rms.toFixed(2) + " mm");
+        say(label("align") + ", RMS " + rms.toFixed(2) + " mm");
         (active.keys || []).forEach(function (k) {
           marks.push({ p: active.cbct[k], c: [LM_CB[0]/255, LM_CB[1]/255, LM_CB[2]/255], s: 0.013 });
           marks.push({ p: apply(current, active.ios[k]),

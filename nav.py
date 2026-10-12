@@ -20,7 +20,7 @@ LANGS = ("en", "fr", "pt", "ko", "th")
 LANG_NAMES = {"en": "English", "fr": "Français", "pt": "Português", "ko": "한국어", "th": "ไทย"}
 
 # ─────────────────────────────────────────────────────────────
-#  THÈME — la seule variable à changer pour tester un style.
+#  THÈME : la seule variable à changer pour tester un style.
 #  None = la feuille de base seule. Sinon le nom d'un fichier de
 #  assets/themes/, sans l'extension. Relancer `python3 build.py`
 #  après modification : il repose le lien dans toutes les pages.
@@ -61,7 +61,7 @@ CATS = {
                      "th": "ข้อความและภาษา"},
 }
 
-# (dossier, catégorie) — l'ordre fait l'ordre d'affichage
+# (dossier, catégorie): l'ordre fait l'ordre d'affichage
 TOOLS = [
     ("FlexReg",               "registration"),
     ("AREG_IOS",              "registration"),
@@ -224,7 +224,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         if os.path.exists(os.path.join(ROOT, lang, r)):
             return f'      <li><a href="{up + r}"{cur}>{tool}</a></li>'
         return (f'      <li><a class="untranslated" href="{"../" * depth}en/{r}" '
-                f'hreflang="en" title="{tool} &mdash; not translated into '
+                f'hreflang="en" title="{tool}: not translated into '
                 f'{esc(LANG_NAMES[lang])} yet, this opens the English page"'
                 f'{cur}>{tool}</a></li>')
 
@@ -243,15 +243,15 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         # qu'un lien mort, et le lecteur voit que la langue existe sans tomber
         # sur une page absente.
         if not os.path.exists(os.path.join(ROOT, other, target)):
-            bits.append(f'<span class="none" title="{esc(LANG_NAMES[other])} '
-                        f'&mdash; not translated yet">{other.upper()}</span>')
+            bits.append(f'<span class="none" title="{esc(LANG_NAMES[other])}: '
+                        f'not translated yet">{other.upper()}</span>')
             continue
         bits.append(f'<a href="{"../" * depth}{other}/{target}" hreflang="{other}" '
                     f'title="{esc(LANG_NAMES[other])}">{other.upper()}</a>')
     out.append("      " + "".join(bits))
     out.append('    </div>')
 
-    # bascule Guide / Atlas — sur une page d'outil, on reste sur le même outil
+    # bascule Guide / Atlas: sur une page d'outil, on reste sur le même outil
     on_tool = current in {t for t, _ in TOOLS}
     sw = (("guide", f"guide/{current}.html" if on_tool else "guide/index.html"),
           ("atlas", f"{current}/{current}.html" if on_tool else "index.html"))
@@ -259,7 +259,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     for key, r in sw:
         on = ' aria-current="true"' if key == section else ""
         # Même règle que link() : la contrepartie n'existe pas forcément dans
-        # cette langue. Y pointer quand même donnait un lien mort — sur les
+        # cette langue. Y pointer quand même donnait un lien mort: sur les
         # pages thaïes dont le guide manque, c'était le seul lien cassé de la
         # barre. On renvoie vers l'anglais en le disant, comme pour les fiches.
         if os.path.exists(os.path.join(ROOT, lang, r)):
@@ -267,7 +267,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         else:
             href_ = "../" * depth + "en/" + r
             extra = (f' class="untranslated" hreflang="en"'
-                     f' title="{esc(ui[key])} &mdash; not translated into '
+                     f' title="{esc(ui[key])}: not translated into '
                      f'{esc(LANG_NAMES[lang])} yet, this opens the English page"')
         out.append(f'      <a href="{href_}"{extra}{on}><b>{esc(ui[key])}</b>'
                    f'<small>{esc(ui[key + "_hint"])}</small></a>')
@@ -301,7 +301,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
 
 # Description d'une ligne par outil. Sert aux cartes de l'accueil et à l'index
 # des guides, dans les deux langues. « atlas » décrit le mécanisme, « guide »
-# décrit l'usage — ce sont deux publics.
+# décrit l'usage: ce sont deux publics.
 BLURBS = {
  "FlexReg": {
    "atlas_fr": "recalage d'IOS avec patch construit à la main",
@@ -315,15 +315,15 @@ BLURBS = {
    "atlas_th": "ลงทะเบียนภาพ IOS ด้วยแพตช์ที่วาดเอง",
    "guide_th": "ลงทะเบียนภาพสแกนในช่องปากสองชุด โดยเลือกบริเวณที่คงที่เอง"},
  "AREG_IOS": {
-   "atlas_fr": "recalage d'IOS avec patch prédit — version automatique de FlexReg",
-   "atlas_en": "IOS registration with a predicted patch — the automatic FlexReg",
+   "atlas_fr": "recalage d'IOS avec patch prédit, version automatique de FlexReg",
+   "atlas_en": "IOS registration with a predicted patch, the automatic FlexReg",
    "guide_fr": "Recaler deux empreintes du même patient, sans rien dessiner",
    "guide_en": "Register two scans of the same patient, with nothing to draw",
-   "atlas_pt": "registro de IOS com patch predito — o FlexReg automático",
+   "atlas_pt": "registro de IOS com patch predito, o FlexReg automático",
    "guide_pt": "Registrar dois escaneamentos do mesmo paciente, sem desenhar nada",
-   "atlas_ko": "예측된 패치를 이용한 IOS 정합 — FlexReg의 자동판",
+   "atlas_ko": "예측된 패치를 이용한 IOS 정합, FlexReg의 자동판",
    "guide_ko": "아무것도 그리지 않고 같은 환자의 두 스캔을 정합합니다",
-   "atlas_th": "ลงทะเบียนภาพ IOS ด้วยแพตช์ที่ทำนาย — FlexReg แบบอัตโนมัติ",
+   "atlas_th": "ลงทะเบียนภาพ IOS ด้วยแพตช์ที่ทำนาย, FlexReg แบบอัตโนมัติ",
    "guide_th": "ลงทะเบียนภาพสแกนสองชุดของผู้ป่วยคนเดียวกัน โดยไม่ต้องวาดอะไร"},
  "AREG_CBCT": {
    "atlas_fr": "recalage de CBCT T1/T2",
@@ -502,15 +502,15 @@ BLURBS = {
    "atlas_th": "สรุปรายงาน (BART ที่ปรับแต่งแล้ว) และแดชบอร์ด",
    "guide_th": "สรุปรายงานทางคลินิกและสร้างแดชบอร์ดจากรายงานเหล่านั้น"},
  "MedicalDataAnonymizer": {
-   "atlas_fr": "dé-identification de documents texte — pas un anonymiseur DICOM",
-   "atlas_en": "text document de-identification — not a DICOM anonymiser",
+   "atlas_fr": "dé-identification de documents texte, pas un anonymiseur DICOM",
+   "atlas_en": "text document de-identification, not a DICOM anonymiser",
    "guide_fr": "Retirer les données personnelles d'un document texte",
    "guide_en": "Strip personal data from a text document",
-   "atlas_pt": "desidentificação de documentos de texto — não é um anonimizador DICOM",
+   "atlas_pt": "desidentificação de documentos de texto, não é um anonimizador DICOM",
    "guide_pt": "Remover dados pessoais de um documento de texto",
-   "atlas_ko": "텍스트 문서 비식별화 — DICOM 익명화 도구가 아님",
+   "atlas_ko": "텍스트 문서 비식별화, DICOM 익명화 도구가 아님",
    "guide_ko": "텍스트 문서에서 개인정보를 제거합니다",
-   "atlas_th": "ลบข้อมูลระบุตัวตนจากเอกสารข้อความ — ไม่ใช่เครื่องมือลบข้อมูล DICOM",
+   "atlas_th": "ลบข้อมูลระบุตัวตนจากเอกสารข้อความ, ไม่ใช่เครื่องมือลบข้อมูล DICOM",
    "guide_th": "ลบข้อมูลส่วนบุคคลออกจากเอกสารข้อความ"},
  "Agent": {
    "atlas_fr": "lancement des autres modules depuis du langage naturel",

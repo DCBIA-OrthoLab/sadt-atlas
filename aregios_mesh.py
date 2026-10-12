@@ -122,7 +122,7 @@ def main():
         if not os.path.exists(f):
             sys.exit("Fichier absent :\n  %s\nC'est le bouton « Test Files » d'AREG_IOSCBCT." % f)
 
-    print("— surfaces —")
+    print("== surfaces ==")
     meshes = {"CBCT": cbct_surface(CBCT, 34000)}
     print("  CBCT  %6d triangles (seuil %d, celui du code)"
           % (meshes["CBCT"].GetNumberOfPolys(), ISO))
@@ -130,7 +130,7 @@ def main():
         meshes["IOS_" + k] = read_vtk(p, 16000)
         print("  IOS %s %6d triangles" % (k, meshes["IOS_" + k].GetNumberOfPolys()))
 
-    print("\n— appariement et pre-alignement —")
+    print("\n== appariement et pre-alignement ==")
     arches = {}
     for k in ("L", "U"):
         ios, cb = landmarks(LM_IOS[k]), landmarks(LM_CBCT[k])

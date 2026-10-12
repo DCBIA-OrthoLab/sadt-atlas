@@ -1,9 +1,9 @@
-# AREG_CBCT — pipeline complet
+# AREG_CBCT : pipeline complet
 
 Recalage T1/T2 de CBCT sur une région de référence osseuse (base du crâne,
 mandibule ou maxillaire). Le recalage lui-même est **entièrement classique** :
 un elastix rigide, aucun réseau. Tout ce qui est appris dans la chaîne est en
-amont — segmentation des masques (AMASSS), landmarks d'orientation (ALI_CBCT).
+amont : segmentation des masques (AMASSS), landmarks d'orientation (ALI_CBCT).
 
 ## 1. Situation dans la chaîne
 
@@ -58,14 +58,14 @@ Slicer lui-même. **Aucun GPU n'est requis par AREG_CBCT** (AMASSS, lui, en veut
 
 `import slicer` dans [AREG_CBCT.py:6](AREG_CBCT/AREG_CBCT.py#L6) n'est jamais
 utilisé ; `LoadOnlyLandmarks`, `applyTransformLandmarks` et `WriteJson` sont
-importés et jamais appelés — restes du paramètre `reg_lm`, commenté dans
+importés et jamais appelés, restes du paramètre `reg_lm`, commenté dans
 [AREG_CBCT.xml](AREG_CBCT/AREG_CBCT.xml).
 
 ## 3. Les trois modes et la chaîne exacte
 
 Le mode est choisi par `CbModeType` ; `SwitchType()`
 ([AREG.py:930](AREG/AREG.py#L930)) instancie la classe correspondante. Les trois
-partagent la même fin de chaîne — centrage T2, AREG par région, AMASSS final — et
+partagent la même fin de chaîne, centrage T2, AREG par région, AMASSS final, et
 ne diffèrent que par l'amont :
 
 | Mode | Classe | Amont | Masques T1 |
@@ -87,7 +87,7 @@ entrée DICOM, `convertdicom2nifti` ([utils.py:720](AREG_CBCT/AREG_CBCT_utils/ut
 convertit un sous-dossier par patient via `sitk.ImageSeriesReader`, repli
 `dicom2nifti`, vers `<dossier>/NIFTI/<patient>.nii.gz`.
 
-**Appariement T1/T2** — `GetPatients`
+**Appariement T1/T2**, `GetPatients`
 ([utils.py:91](AREG_CBCT/AREG_CBCT_utils/utils.py#L91)). L'identifiant patient
 est ce qui reste du nom de fichier après une chaîne de `split()` sur une liste
 fixe de marqueurs (`_Scan`, `_Or`, `_MAND`, `_CB`, `_lm`, `_T2`, `_T1`, `_Cl`…).
@@ -104,7 +104,7 @@ Puis :
 Le T2 est lu avec `segmentationType=None` : **seul le fixe est masqué**, jamais
 le mobile.
 
-**Centrage de T2** — `pre_aso_cbct`. Malgré son nom et son paramètre
+**Centrage de T2** : `pre_aso_cbct`. Malgré son nom et son paramètre
 `model_folder` pointant sur `Models/Orientation/PreASO`, ce CLI **n'utilise
 aucun réseau** : il calcule `T = -centre_physique_de_l_image`
 ([PRE_ASO_CBCT.py:163](ASO_CBCT/PRE_ASO_CBCT/PRE_ASO_CBCT.py#L163)), resample
@@ -113,7 +113,7 @@ de direction par un `DenseNet` existait, commentée, et a été supprimée
 (commit `4296774`). Les arguments `model_folder` et `SmallFOV` sont **morts**,
 mais les poids PreASO sont toujours téléchargés.
 
-**Masquage du fixe** — `MaskedImage`
+**Masquage du fixe**, `MaskedImage`
 ([utils.py:584](AREG_CBCT/AREG_CBCT_utils/utils.py#L584)) :
 
 ```python
@@ -127,7 +127,7 @@ sitk.WriteImage(sitk.Cast(fixed_image_masked, sitk.sitkInt16),
 `sitk.Mask` (tout voxel non nul est conservé). Le fichier temporaire porte
 **toujours le même nom** : le dossier temporaire est unique pour la totalité du
 batch ([CBCT.py:306](AREG/AREG_Method/CBCT.py#L306)), donc chaque patient écrase
-le précédent — sans conséquence en séquentiel, fatal si le CLI était parallélisé.
+le précédent, sans conséquence en séquentiel, fatal si le CLI était parallélisé.
 
 `SegLabel` est en pratique toujours `None` : le combo `LabelSelectcomboBox` est
 masqué en dur ([AREG.py:548](AREG/AREG.py#L548)) et `SegmentationLabels` reste
@@ -135,7 +135,7 @@ masqué en dur ([AREG.py:548](AREG/AREG.py#L548)) et `SegmentationLabels` reste
 ([CBCT.py:177](AREG/AREG_Method/CBCT.py#L177)), qui lisait les labels présents
 dans le masque, n'est appelé nulle part : **code mort**.
 
-## 5. Le cœur algorithmique — le recalage
+## 5. Le cœur algorithmique : le recalage
 
 Tout est dans `VoxelBasedRegistration`
 ([utils.py:598](AREG_CBCT/AREG_CBCT_utils/utils.py#L598)) :
@@ -182,17 +182,17 @@ avec `None` partout. Le seul « coarse to fine » restant est la pyramide à 3
 niveaux ; le pré-alignement grossier est assuré par le centrage PRE_ASO de T2 et
 par `AutomaticTransformInitialization`.
 
-**Récupération de la matrice** — `MatrixRetrieval`
+**Récupération de la matrice**, `MatrixRetrieval`
 ([utils.py:830](AREG_CBCT/AREG_CBCT_utils/utils.py#L830)) lit
 `TransformParameters` : 3 angles puis 3 translations, reversés dans un
 `sitk.Euler3DTransform`. `ComputeFinalMatrix`
 ([utils.py:851](AREG_CBCT/AREG_CBCT_utils/utils.py#L851)) compose la liste
-(rotations multipliées, translations **additionnées**) — avec une liste d'un
+(rotations multipliées, translations **additionnées**), avec une liste d'un
 seul élément, c'est une recopie. Le code de composition n'est donc jamais
 exercé, et l'addition des translations ne serait de toute façon valide que si
 les rotations intermédiaires étaient l'identité.
 
-**Resampling** — `ResampleImage`
+**Resampling**, `ResampleImage`
 ([utils.py:472](AREG_CBCT/AREG_CBCT_utils/utils.py#L472)) : interpolation
 linéaire, `DefaultPixelValue = 0`, et `SetReferenceImage(image)` où `image` est
 **le mobile lui-même**. Le volume recalé conserve donc la grille de T2 (taille,
@@ -200,7 +200,7 @@ spacing, origine), pas celle de T1. Sortie castée en `int16`.
 
 ## 6. Ce qui tourne en amont : arguments exacts
 
-**AMASSS — masques de recalage** ([CBCT.py:456](AREG/AREG_Method/CBCT.py#L456)) :
+**AMASSS, masques de recalage** ([CBCT.py:456](AREG/AREG_Method/CBCT.py#L456)) :
 
 ```python
 {"inputVolume": <dossier T1>,                  # ou <dossier T1>Or
@@ -214,13 +214,13 @@ spacing, origine), pas celle de T1. Sortie castée en `int16`.
 ```
 
 Le nom écrit est `<base>_seg_<STRUCT>.<ext>`
-([AMASSS_CLI.py:600](AMASSS_CLI/AMASSS_CLI.py#L600)) — donc `P1_T1_seg_MANDMASK.nii.gz`,
+([AMASSS_CLI.py:600](AMASSS_CLI/AMASSS_CLI.py#L600)), donc `P1_T1_seg_MANDMASK.nii.gz`,
 que la seconde passe de `GetPatients` retrouve par le mot-clé `mand`. AMASSS est
 aujourd'hui un **nnU-Net v2** appelé en process
 ([AMASSS_CLI.py:54](AMASSS_CLI/AMASSS_CLI.py#L54)), avec un modèle distinct
 par groupe (`FF`, `SKIN`, `CBMASK`, `MANDMASK`, `MAXMASK`).
 
-**AMASSS — segmentations finales.** Deux steps, `inputVolume = <dossier T1>`
+**AMASSS : segmentations finales.** Deux steps, `inputVolume = <dossier T1>`
 puis `inputVolume = <dossier de sortie>`, `genVtk=True`, `merge` selon la case
 « Merge Segmentations », `save_in_folder=True` en mode Semi et `False` ailleurs.
 Le second parcourt récursivement l'arborescence `<Region>/<patient>_OutReg/` et
@@ -296,13 +296,13 @@ et ce qu'ils permettent (`CATALOGUE`, [Review.py:568](AREG/AREG_Method/Review.py
 ([AREG.py:1936](AREG/AREG.py#L1936)) pose `ReviewPause=True` sur les steps dont
 le `ReviewId` est coché. À la fin d'un CLI, `enterReviewPause`
 ([AREG.py:1949](AREG/AREG.py#L1949)) renvoie `True` et diffère `beginReview` par
-`QTimer.singleShot(0, ...)` — obligatoire : on est dans un callback d'observateur
+`QTimer.singleShot(0, ...)`, obligatoire : on est dans un callback d'observateur
 VTK, où la boucle Qt ne tourne pas et où charger un volume remplirait le pipe de
 stdout que Slicer ne draine plus.
 
 `ReviewSession.build` ([Review.py:118](AREG/AREG_Method/Review.py#L118)) construit
 la file : un item par patient trouvé dans `ReviewFolder`, restreint aux patients
-de **ce** run (`runPatientIds()` lit le dossier T1 d'entrée — un dossier de sortie
+de **ce** run (`runPatientIds()` lit le dossier T1 d'entrée, un dossier de sortie
 réutilisé contient les résultats de mois de travail). Pour AREG, `ReviewFolder`
 est scopé à `<output>/<Région>` : sinon la pause de la mandibule afficherait aussi
 la base du crâne, et le déplacement de l'opérateur serait replié dans la première
@@ -314,7 +314,7 @@ poignées d'interaction ([Review.py:366](AREG/AREG_Method/Review.py#L366)). À l
 sortie, `_saveAdjustment` ([Review.py:457](AREG/AREG_Method/Review.py#L457))
 convertit le déplacement RAS en LPS (`flip @ ras @ flip`), l'inverse, et écrit
 `sitk.CompositeTransform([original, nudge.GetInverse()])` **dans le .tfm
-existant** — ce qui vient après applique une seule matrice par patient et ne sait
+existant**, ce qui vient après applique une seule matrice par patient et ne sait
 pas chaîner. Le scan est ensuite durci et réécrit sur place
 ([Review.py:510](AREG/AREG_Method/Review.py#L510)). Si la matrice est l'identité
 à 1e-9 près, rien n'est écrit.
@@ -328,7 +328,7 @@ pas chaîner. Le scan est ensuite durci et réécrit sur place
   Le bouton n'apparaît que s'il existe une étape corrigeable en arrière.
 - *Go back* ([AREG.py:2138](AREG/AREG.py#L2138)) : `previousCorrectableStep()`
   ([AREG.py:2052](AREG/AREG.py#L2052)) remonte `executed_steps` jusqu'au dernier
-  step de type `LANDMARKS` ou `REGISTRATION` — les étapes en lecture seule sont
+  step de type `LANDMARKS` ou `REGISTRATION`, les étapes en lecture seule sont
   sautées. Les steps intermédiaires sont **rejoués uniquement pour les patients
   marqués** : `restrictStepToPatients` ([Review.py:727](AREG/AREG_Method/Review.py#L727))
   crée un dossier temporaire ne contenant que ces patients, en **liens
@@ -387,7 +387,7 @@ mot-clé `TIMEPOINT-SUFFIX`. La note de référence est au-dessus de `GetPatient
 patient est le reste du nom après découpe d'une liste fixe de marqueurs, et les
 seuls points temporels de cette liste sont `_T1` et `_T2`. Un `P001_T3.nii.gz`
 garde l'id `P001_T3`, ne s'apparie avec rien, et la paire est **silencieusement
-ignorée** — pas d'exception. Le point temporel réel ne vient pas du nom mais de
+ignorée**, pas d'exception. Le point temporel réel ne vient pas du nom mais de
 l'argument `time_point`, c'est-à-dire du dossier ; seule l'extraction de l'id est
 en cause. Les sites, dans le périmètre AREG :
 
@@ -430,7 +430,7 @@ le même écart s'applique au recalage IRM↔CBCT.
 
 Hypothèse à tester plutôt qu'à croire : si le module donne malgré tout des
 résultats corrects en pratique, c'est vraisemblablement parce que les volumes
-arrivent déjà proches de l'origine — PRE_ASO recentre le T2 et ASO oriente le T1 —
+arrivent déjà proches de l'origine, PRE_ASO recentre le T2 et ASO oriente le T1,
 de sorte que `c ≈ 0` et que `(I − R)·c` reste petit. Cela rend le résultat
 dépendant d'un centrage préalable qui n'est garanti nulle part. Mesurer l'écart
 sur un cas réel avant de conclure.
@@ -471,14 +471,14 @@ sur un cas réel avant de conclure.
 Le papier de référence est **Anchling, Hutin, Huang, Barone, Roberts, Miranda,
 Gurgel, Al Turkestani, Tinawi, Bianchi, Yatabe, Ruellas, Prieto, Cevidanes,
 « Automated Orientation and Registration of Cone-Beam Computed Tomography
-Scans », LNCS 14242, 2023, p. 43-58** —
+Scans », LNCS 14242, 2023, p. 43-58**,
 [Springer](https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5),
 [PMC11104011](https://pmc.ncbi.nlm.nih.gov/articles/PMC11104011/).
 Précision annoncée : < 3° et < 2 mm par rapport aux experts, moins de 5 min par cas.
 
 **Le code diverge du papier sur trois points vérifiés :**
 
-1. le papier décrit un recalage en deux temps — « VBR entre les images complètes,
+1. le papier décrit un recalage en deux temps : « VBR entre les images complètes,
    puis avec l'image masquée comme étape de raffinement », 10 000 itérations sur
    la passe masquée. Le code n'a plus qu'une passe masquée à 1500 itérations ;
 2. le papier annonce **SimpleElastix** ; le code utilise `itk-elastix`
@@ -486,7 +486,7 @@ Précision annoncée : < 3° et < 2 mm par rapport aux experts, moins de 5 min p
 3. le papier obtient les masques par **AMASSS / UNETR MONAI** ; AMASSS est
    aujourd'hui un **nnU-Net v2**.
 
-Sur la question de fond — superposition voxel-based sur la base du crâne — la
+Sur la question de fond, superposition voxel-based sur la base du crâne, la
 référence historique du laboratoire est Cevidanes et al., *Superimposition of 3D
 cone-beam CT models of orthognathic surgery patients* (2005,
 [PubMed 16227481](https://pubmed.ncbi.nlm.nih.gov/16227481/)).
@@ -495,7 +495,7 @@ cone-beam CT models of orthognathic surgery patients* (2005,
 [Accuracy and Reproducibility of Voxel Based Superimposition…, PLOS One 2011](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0016520),
 qui n'est **pas** du laboratoire : il est de Nada, Maal, Kuijpers-Jagtman et al.
 (Radboud UMC, Nimègue). C'est une validation indépendante de la méthode, ce qui
-lui donne plus de poids, pas moins — mais l'attribuer au groupe serait une
+lui donne plus de poids, pas moins, mais l'attribuer au groupe serait une
 erreur.
 
 Dépôts : [lucanchling/AREG](https://github.com/lucanchling/AREG),

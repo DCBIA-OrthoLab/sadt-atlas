@@ -1,4 +1,4 @@
-# CNE — sources
+# CNE : sources
 
 Outil **non publié**. Après vérification, aucune publication ne décrit CNE, ni
 les deux modèles fine-tunés qu'il télécharge. L'acronyme *Clinical Notes
@@ -26,9 +26,9 @@ suivante) et sont listés ici parce qu'ils ont été téléchargés.
 
 | Fichier | Référence | Type | DOI / ID |
 |---|---|---|---|
-| `2024_Wiest_privacy_preserving_LLM.xml` / `.txt` | Wiest IC, Ferber D, Zhu J, van Treeck M, Meyer SK, Juglan R, Carrero ZI, Paech D, Kleesiek J, Ebert MP, Truhn D, Kather JN. *Privacy-preserving large language models for structured medical information retrieval.* npj Digit Med 2024;7:257. | Article (open access) | [10.1038/s41746-024-01233-2](https://doi.org/10.1038/s41746-024-01233-2) — PMC11415382 |
-| `2026_Panchal_LLM_deidentification_EHR.xml` / `.txt` | Panchal O, Chang NW, Zhao ZR, Ramesh Nadar D, Dai HJ, Jonnagaddala J. *Benchmarking large language models for de-identification of electronic health record notes.* BMJ Health Care Inform 2026;33(1):e101894. | Article (open access) | [10.1136/bmjhci-2025-101894](https://doi.org/10.1136/bmjhci-2025-101894) — PMC13410914 |
-| `2025_Doremus_moderate_LM_deidentification.xml` / `.txt` | Dorémus O, Russon D, Contrand B, Guerra-Adames A, Avalos-Fernandez M, Gil-Jardiné C, Lagarde E. *Harnessing Moderate-Sized Language Models for Reliable Patient Data Deidentification in Emergency Department Records: Algorithm Development, Validation, and Implementation Study.* JMIR AI 2025;4:e57828. | Article (open access) | [10.2196/57828](https://doi.org/10.2196/57828) — PMC12223680 |
+| `2024_Wiest_privacy_preserving_LLM.xml` / `.txt` | Wiest IC, Ferber D, Zhu J, van Treeck M, Meyer SK, Juglan R, Carrero ZI, Paech D, Kleesiek J, Ebert MP, Truhn D, Kather JN. *Privacy-preserving large language models for structured medical information retrieval.* npj Digit Med 2024;7:257. | Article (open access) | [10.1038/s41746-024-01233-2](https://doi.org/10.1038/s41746-024-01233-2), PMC11415382 |
+| `2026_Panchal_LLM_deidentification_EHR.xml` / `.txt` | Panchal O, Chang NW, Zhao ZR, Ramesh Nadar D, Dai HJ, Jonnagaddala J. *Benchmarking large language models for de-identification of electronic health record notes.* BMJ Health Care Inform 2026;33(1):e101894. | Article (open access) | [10.1136/bmjhci-2025-101894](https://doi.org/10.1136/bmjhci-2025-101894), PMC13410914 |
+| `2025_Doremus_moderate_LM_deidentification.xml` / `.txt` | Dorémus O, Russon D, Contrand B, Guerra-Adames A, Avalos-Fernandez M, Gil-Jardiné C, Lagarde E. *Harnessing Moderate-Sized Language Models for Reliable Patient Data Deidentification in Emergency Department Records: Algorithm Development, Validation, and Implementation Study.* JMIR AI 2025;4:e57828. | Article (open access) | [10.2196/57828](https://doi.org/10.2196/57828), PMC12223680 |
 
 Les `.txt` sont la conversion lisible du JATS ; le `.xml` est la source.
 
@@ -49,8 +49,8 @@ Aucune référence de ce type : il n'y a pas d'article payant à signaler non pl
 
 **Aucun de ces travaux ne porte sur CNE.** Ils ne partagent ni les auteurs, ni
 les modèles, ni le corpus. Ils sont réunis ici parce qu'ils décrivent le même
-geste technique — faire tourner un LLM à poids ouverts *sur place*, sans envoyer
-le texte du patient à un service tiers, pour en extraire des champs structurés —
+geste technique : faire tourner un LLM à poids ouverts *sur place*, sans envoyer
+le texte du patient à un service tiers, pour en extraire des champs structurés,
 et permettent de juger ce que CNE fait, faute de texte sur CNE lui-même.
 
 - **Wiest 2024** (fichier ci-dessus) : le travail le plus proche du geste de CNE.
@@ -60,7 +60,7 @@ et permettent de juger ce que CNE fait, faute de texte sur CNE lui-même.
   auteurs.
 - **Panchal 2026** et **Dorémus 2025** (fichiers ci-dessus) : la dé-identification
   de notes cliniques par LLM, respectivement en benchmark et en déploiement réel
-  aux urgences. CNE ne dé-identifie rien — c'est précisément la question que ces
+  aux urgences. CNE ne dé-identifie rien : c'est précisément la question que ces
   deux articles posent et que le dépôt ne traite pas.
 - Nahm WJ, Yin ES, Milam EC, Weed JG. *Local Deployment of Open-Weight Language
   Models in Dermatology: Viewpoint on Privacy, Equity, and Practical

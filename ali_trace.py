@@ -134,7 +134,7 @@ def main():
     }
     with open(OUT, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, separators=(",", ":"))
-    print("\n%s — %.0f Ko" % (OUT, os.path.getsize(OUT) / 1024))
+    print("\n%s : %.0f Ko" % (OUT, os.path.getsize(OUT) / 1024))
 
 
 if __name__ == "__main__":

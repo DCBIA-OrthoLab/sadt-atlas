@@ -334,7 +334,7 @@ def main():
             sys.exit("Fichier absent :\n  %s" % f)
 
     M = read_mirror(MIRROR_TFM)
-    print("— la matrice miroir de VFACE —")
+    print("== la matrice miroir de VFACE ==")
     print("  diag %s, translation %.2f mm, determinant %.0f"
           % ([int(M[k][k]) for k in range(3)], np.linalg.norm(M[:3, 3]),
              np.linalg.det(M[:3, :3])))
@@ -346,7 +346,7 @@ def main():
     raw = surface_from_volume(ORIENTED_SCAN, BONE, SIGMA, MIRROR_TRIS)
     mirror = surface_from_volume(MIRROR_SCAN, BONE, SIGMA, MIRROR_TRIS)
 
-    print("\n— les trois matrices qu'AREG a ecrites, ET DANS QUEL SENS —")
+    print("\n== les trois matrices qu'AREG a ecrites, ET DANS QUEL SENS ==")
     # elastix ecrit la transformation du FIXE vers le MOBILE : c'est son
     # INVERSE qui amene le mobile sur le fixe. Le premier jet de cette scene
     # appliquait la matrice telle quelle, et le miroir tournait a l'envers --
@@ -375,7 +375,7 @@ def main():
         r["gap_after"] = round(float(best), 2)
 
     # ---- les cartes, et le repere de celle du maxillaire ----
-    print("\n— les trois cartes ModelDistance —")
+    print("\n== les trois cartes ModelDistance ==")
     heat_cb = read_heat("merged")
     to_cb = {"CB": np.eye(4)}
 
@@ -428,7 +428,7 @@ def main():
               "Distance %6.2f .. %6.2f mm"
               % (r["code"], r["zone"], full, mesh.GetNumberOfPolys(), dropped,
                  vals.min(), vals.max()))
-        print("       (plage de la surface pleine : %.2f .. %.2f — rien n'est extrapole)"
+        print("       (plage de la surface pleine : %.2f .. %.2f : rien n'est extrapole)"
               % rng)
 
     print("\n  echelles divergentes : %s"
@@ -445,7 +445,7 @@ def main():
     meshes["PLANE"] = plane_at_x0(meshes["H_CB"].GetBounds())
 
     # ---- l'orientation, et son sens mesure ----
-    print("\n— l'orientation de SEMI_ASO —")
+    print("\n== l'orientation de SEMI_ASO ==")
     Or = affine_of(ORIENT_TFM)
     or_deg = float(np.degrees(np.arccos(
         max(-1.0, min(1.0, (np.trace(Or[:3, :3]) - 1) / 2)))))
@@ -467,7 +467,7 @@ def main():
         print("  scan centre absent, l'etape d'orientation restera declarative")
 
     # ---- les reperes qu'ALI a predits ----
-    print("\n— les reperes predits par ALI —")
+    print("\n== les reperes predits par ALI ==")
     lms = {}
     for key, fn in LM_FILES.items():
         got = read_landmarks(LM_DIR + fn)
@@ -478,7 +478,7 @@ def main():
         flat_t1.update(d)
 
     # ---- les reperes miroites, et leur convergence par recalage ----
-    print("\n— les reperes miroites, et ce que le recalage leur fait —")
+    print("\n== les reperes miroites, et ce que le recalage leur fait ==")
     mir_lm = read_lm_dir(LM_MIR_DIR % "CB")
     for r in REGIONS:
         src = read_lm_dir(LM_MIR_DIR % ("MAX" if r["code"] == "MAX" else "CB"))

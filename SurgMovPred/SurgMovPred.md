@@ -1,4 +1,4 @@
-# SurgMovPred — pipeline complet
+# SurgMovPred : pipeline complet
 
 Prédiction des mouvements chirurgicaux d'une chirurgie orthognathique à partir d'un
 **tableur de mesures céphalométriques**. Aucun réseau de neurones, aucune image, aucun
@@ -31,7 +31,7 @@ arguments `notesFolder_input` / `notesFolder_output`
 |---|---|---|
 | [SurgMovPred/SurgMovPred.py](SurgMovPred/SurgMovPred.py) | widget : 3 sélecteurs de dossier, téléchargement des modèles et des fichiers de test, installation des dépendances, ~400 lignes de QSS | Python de Slicer |
 | [SurgMovPred_CLI/SurgMovPred_CLI.py](SurgMovPred_CLI/SurgMovPred_CLI.py) | tout le traitement : lecture, nettoyage des noms de colonnes, `predict`, écriture | Python de Slicer (CLI scripté) |
-| [Resources/UI/SurgMovPred.ui](SurgMovPred/Resources/UI/SurgMovPred.ui) | 3 champs (`inputFolderLineEdit`, `modelFolderLineEdit`, `outputFolderLineEdit`) + 4 boutons | — |
+| [Resources/UI/SurgMovPred.ui](SurgMovPred/Resources/UI/SurgMovPred.ui) | 3 champs (`inputFolderLineEdit`, `modelFolderLineEdit`, `outputFolderLineEdit`) + 4 boutons | : |
 
 Trois paramètres positionnels seulement (`inputFolder`, `modelPath`, `outputFolder`,
 [SurgMovPred_CLI.xml](SurgMovPred_CLI/SurgMovPred_CLI.xml)) : rien n'est réglable,
@@ -44,7 +44,7 @@ ni seuil, ni sélection de cibles, ni option de classe squelettique.
 `*.csv`, `*.xlsx`, `*.ods` du dossier (extension en minuscules **et** en majuscules),
 les lit (`read_csv`, `read_excel`, `read_excel(engine='odf')`) et les **concatène**
 (`pd.concat(..., ignore_index=True)`). Pas de récursion dans les sous-dossiers. Pour un
-classeur Excel, seule la **première feuille** est lue — le fichier de test officiel en
+classeur Excel, seule la **première feuille** est lue : le fichier de test officiel en
 contient sept (`all_data`, `demographics`, `Invivo_ceph`, `surgical_mov`, `dolp_ceph_T0`,
 `dolp_ceph_T1`, `dolp_ceph_total`), et c'est `all_data` qui est en première position.
 
@@ -53,7 +53,7 @@ contient sept (`all_data`, `demographics`, `Invivo_ceph`, `surgical_mov`, `dolp_
 pour retomber sur l'orthographe utilisée à l'entraînement :
 
 1. suppression de `"`, `\`, `[`, `]` ;
-2. tout caractère hors `[0-9a-zA-Z_']` devient `_` — **l'apostrophe est délibérément
+2. tout caractère hors `[0-9a-zA-Z_']` devient `_`, **l'apostrophe est délibérément
    conservée** (commentaire du code : pour `Jarabak's` et `SM_A'_CP`) ;
 3. écrasement des `_` répétés, suppression aux extrémités ;
 4. `"total"` → `"Total"` ;
@@ -94,7 +94,7 @@ https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/S
 `load_all_model_packages()` fait un `Path.glob("**/stacking_package.pkl")` récursif et
 indexe par `package['target_name']` : pointer le sélecteur sur `all_models/` charge les
 112 modèles, pointer sur un sous-dossier n'en charge qu'un. L'aide du CLI mentionne des
-dossiers `saved_models/class_1`, `saved_models/class_None` — **cette hiérarchie par
+dossiers `saved_models/class_1`, `saved_models/class_None` : **cette hiérarchie par
 classe squelettique n'existe pas dans l'archive publiée**, qui est plate.
 
 ### 4.1 Contenu d'un paquet
@@ -146,7 +146,7 @@ Quatre familles, reconstituées depuis `features_names` et recoupées avec la fe
 
 | Famille | Nombre | Exemples |
 |---|---|---|
-| Positions de points par rapport aux trois plans de référence — **FH** (horizontale de Francfort), **MSP** (plan sagittal médian), **CP** (plan coronal) | ~76 | `SM_A_FH`, `SM_GoL_MSP`, `SM_PNS_CP`, `SM_CoR_FH` |
+| Positions de points par rapport aux trois plans de référence : **FH** (horizontale de Francfort), **MSP** (plan sagittal médian), **CP** (plan coronal) | ~76 | `SM_A_FH`, `SM_GoL_MSP`, `SM_PNS_CP`, `SM_CoR_FH` |
 | Points de tissus mous, marqués par l'apostrophe | ~20 | `SM_N'_FH`, `SM_Sn'_MSP`, `SM_ULip'_FH`, `SM_Pg'_MSP` |
 | Mesures céphalométriques 2D classiques | ~12 | `SNA`, `SM_ANB_signed`, `SM_Witts`, `LAFH`, `Jarabak's_ratio`, `UAFH_LAFH`, `FMA_MP_FH_Ang_2D`, `IMPA_L1_MP_Ang_2D`, `U1_to_SN_Ang_2D`, `SM_Mx_Width`, `SM_Mn_Width`, `OP_to_FH_Ang_2D` |
 | Mesures occlusales/dentaires, en deux jeux suffixés `_T0` et `_Total` | 2 × ~18 | `MxMn_Overjet_R_T0` / `MxMn_Overjet_R_Total`, `MxMn_Molar_Relationship_L_T0`, `Mn_Gonions_to_Midline_Distances_R_Total` |
@@ -154,7 +154,7 @@ Quatre familles, reconstituées depuis `features_names` et recoupées avec la fe
 Ce que les deux jeux `_T0` / `_Total` signifient exactement n'est documenté nulle part
 dans le dépôt. Le nommage (`T0` = avant, `Total` = variation totale) et le fait qu'ils
 soient tous deux en **entrée** suggèrent que le modèle reçoit l'état pré-chirurgical
-*et* le résultat occlusal visé, pour en déduire les déplacements osseux à réaliser —
+*et* le résultat occlusal visé, pour en déduire les déplacements osseux à réaliser :
 c'est une **déduction**, pas une affirmation du code.
 
 Les colonnes `Gender`, `Surg`, `Genio`, `3piece`, `assymetry`, `Skl_Cl_2` du fichier de
@@ -169,7 +169,7 @@ Composantes, d'après les noms de cibles : `P-/A+` (postérieur négatif / anté
 positif), `R-/L+` (droite négatif / gauche positif), `Down+` (vertical, bas positif),
 et `Total`. Les trois premières sont donc les composantes signées d'un vecteur de
 déplacement dans le repère céphalométrique (CP, MSP, FH), la quatrième très
-probablement sa norme — **déduit du nommage, l'unité (mm) n'est écrite nulle part**.
+probablement sa norme : **déduit du nommage, l'unité (mm) n'est écrite nulle part**.
 
 Les 28 structures :
 
@@ -177,7 +177,7 @@ Les 28 structures :
 |---|---|
 | Maxillaire, `Mx_ALL_*` (10) | APoint, ANS, PNS, U3CanineTip L/R, U6MesialCuspTip L/R, UpperIncisorTip L/R, UpperIncisorTipMidpoint |
 | Mandibule, `Mn_ALL_*` (17) | BPoint, Gnathion, Menton, Pogonion, Gonion L/R, ChinSideCut L/R, MandibleBackCut L/R, L3CanineTip L/R, L6MesialCuspTip L/R, LowerIncisorTip L/R, LowerIncisorTipMidpoint |
-| Génioplastie, `Mn_MB_Genioplasty` (1) | — |
+| Génioplastie, `Mn_MB_Genioplasty` (1) | : |
 
 `ALL` désigne le segment osseux entier (maxillaire ou mandibule mobilisés en bloc),
 `MB` le segment de génioplastie. On prédit donc le déplacement **de points repères
@@ -199,7 +199,7 @@ for target_name, pack in packages.items():
 ```
 
 Aucune post-correction, aucun bornage, aucune cohérence inter-cibles, aucun intervalle
-de confiance — le `GaussianProcessRegressor` sait produire un écart-type, il n'est pas
+de confiance : le `GaussianProcessRegressor` sait produire un écart-type, il n'est pas
 demandé. Chaque cible est traitée indépendamment, et un `try/except` par cible : une
 cible qui plante n'interrompt pas les autres, sa colonne disparaît simplement.
 
@@ -222,7 +222,7 @@ Les noms de colonnes sont les `target_name` bruts des paquets, donc avec `/` et 
 **Il n'y a aucune réapplication du résultat.** Rien ne construit de matrice, ne déplace
 un maillage, ne crée un nœud Slicer, n'ouvre une vue : la prédiction s'arrête au
 tableur. La question « comment la prédiction est-elle réappliquée pour produire un
-résultat visualisable » n'a pas de réponse dans ce dépôt — c'est à l'opérateur de
+résultat visualisable » n'a pas de réponse dans ce dépôt : c'est à l'opérateur de
 reporter les valeurs dans son logiciel de planification.
 
 ## 7. Ce qui est prédit vs ce qui est calculé
@@ -232,7 +232,7 @@ reporter les valeurs dans son logiciel de planification.
 | Nettoyage des noms de colonnes, détection de l'ID | déterministe (regex) | CLI |
 | Standardisation | `StandardScaler` appris | CLI |
 | Prédiction des 112 déplacements | **appris** : stacking ElasticNetCV + LightGBM + GP, méta `LinearRegression` | CLI, CPU |
-| Consolidation en une transformation de segment | **inexistant** | — |
+| Consolidation en une transformation de segment | **inexistant** | : |
 
 Le dernier point mérite d'être souligné pour un repreneur : les 10 points du maxillaire
 sont prédits par 40 modèles indépendants. Rien ne garantit que les déplacements prédits
@@ -249,9 +249,9 @@ Apply :
 | Élément | Valeur |
 |---|---|
 | Paquets | `pandas`, `joblib`, `openpyxl`, `scikit-learn`, `lightgbm` |
-| Absent de la liste | `odfpy` — pourtant nécessaire à `read_excel(engine='odf')` pour les `.ods` annoncés |
+| Absent de la liste | `odfpy` : pourtant nécessaire à `read_excel(engine='odf')` pour les `.ods` annoncés |
 | numpy | `slicer.util.pip_install("numpy==2.4.0")` **inconditionnel**, à chaque Apply |
-| macOS | `ensure_mac_openmp()` télécharge `libomp.dylib` depuis `mac.r-project.org` et le dépose dans le dossier `cli-modules` de Slicer, puis le charge en `RTLD_GLOBAL` — LightGBM en a besoin |
+| macOS | `ensure_mac_openmp()` télécharge `libomp.dylib` depuis `mac.r-project.org` et le dépose dans le dossier `cli-modules` de Slicer, puis le charge en `RTLD_GLOBAL` : LightGBM en a besoin |
 | Compilation | `CC=gcc` / `CXX=g++` forcés pendant les `pip_install`, restaurés ensuite |
 
 L'installation se fait sans conda, sans GPU, sans torch.
@@ -271,7 +271,7 @@ before being shipped »).
 - **Bouton « test files » inopérant** : `DownloadTestFiles()`
   ([SurgMovPred.py:763](SurgMovPred/SurgMovPred.py#L763)) télécharge bien `TestFiles.zip`,
   mais ne renseigne les champs d'entrée/sortie que
-  `if os.path.exists(.../V_FACE/DefaultList)` — un reste de copier-coller du module
+  `if os.path.exists(.../V_FACE/DefaultList)`, un reste de copier-coller du module
   VFACE. Sans les données de test de VFACE, l'archive est téléchargée puis ignorée.
 - **`.ods` annoncé, `odfpy` non installé** par `check_dependencies` (il l'est en
   revanche par le module Anonymizer, ce qui peut masquer le problème sur un poste où
@@ -281,7 +281,7 @@ before being shipped »).
   juste une colonne en moins. Un tableur mal nommé peut produire un
   `predictions_outputs.xlsx` avec zéro colonne de prédiction et aucun échec.
 - **Concaténation aveugle des fichiers d'entrée** : deux tableurs de colonnes
-  différentes donnent des `NaN`, et `model.predict` sur des `NaN` lève — l'erreur est
+  différentes donnent des `NaN`, et `model.predict` sur des `NaN` lève, l'erreur est
   attrapée par cible, donc le résultat est partiel sans que rien ne soit très visible.
 - **Une seule feuille Excel lue.** Un classeur dont la première feuille n'est pas celle
   des données produit un résultat vide.
@@ -302,16 +302,16 @@ n'apparaît même pas dans le README de l'extension.
 Le contexte publié, à ne pas confondre avec la description de ce code :
 
 - [Machine-learning-based approach for predicting postoperative skeletal changes for
-  orthognathic surgical planning (PubMed 35132764)](https://pubmed.ncbi.nlm.nih.gov/35132764/) —
+  orthognathic surgical planning (PubMed 35132764)](https://pubmed.ncbi.nlm.nih.gov/35132764/),
   le problème posé est le même (prédire les déplacements squelettiques post-opératoires
   à partir de mesures pré-opératoires), mais rien n'indique que ce soit le travail
   derrière ces poids.
 - [Oliveira, Cevidanes, Bianchi et al., *Artificial intelligence as a prediction tool
-  for orthognathic surgery assessment*, Orthodontics & Craniofacial Research, 2024](https://onlinelibrary.wiley.com/doi/10.1111/ocr.12805) —
+  for orthognathic surgery assessment*, Orthodontics & Craniofacial Research, 2024](https://onlinelibrary.wiley.com/doi/10.1111/ocr.12805),
   même équipe (UNC/Pacific), mais cible différente : prédire le *besoin* de chirurgie
   à partir de téléradiographies de profil, pas les mouvements.
 - [Prediction of orthognathic surgery plan from 3D cephalometric analysis via deep
-  learning (PMC10024836)](https://pmc.ncbi.nlm.nih.gov/articles/PMC10024836/) — même
+  learning (PMC10024836)](https://pmc.ncbi.nlm.nih.gov/articles/PMC10024836/), même
   objectif, approche par apprentissage profond ; SurgMovPred, lui, est un modèle
   tabulaire classique.
 
@@ -320,5 +320,5 @@ Les outils sous-jacents, eux, sont documentés :
 et [LightGBM](https://lightgbm.readthedocs.io/).
 
 Bibliographie détaillée, fichiers récupérés et liens à visiter :
-[SOURCES.md](SOURCES.md) — dont la page NA-MIC Project Week 45 (Boston, 2026)
+[SOURCES.md](SOURCES.md), dont la page NA-MIC Project Week 45 (Boston, 2026)
 consacrée à ce module, seule source primaire retrouvée.

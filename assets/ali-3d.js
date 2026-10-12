@@ -1,4 +1,4 @@
-/* ali-3d.js — les deux scenes d'ALI, sur le socle scene3d.js.
+/* ali-3d.js : les deux scenes d'ALI, sur le socle scene3d.js.
 
    ALI n'est pas un algorithme, c'est un aiguillage : « a dispatch widget that
    chooses between two backends with no shared code ». Une seule animation ne
@@ -8,7 +8,7 @@
    CBCT  un agent par repere marche dans le volume. Le reseau ne dit PAS ou
          est le point : il classe six directions et l'agent fait UN voxel.
          La trajectoire jouee est celle relevee par ali_trace.py dans
-         `position_mem` — le chemin reellement parcouru, pas une reconstitution.
+         `position_mem` : le chemin reellement parcouru, pas une reconstitution.
 
    IOS   une camera par dent, un rendu 224x224 par camera, une segmentation
          par pixel, puis pixel -> face -> sommets -> moyenne -> accrochage.

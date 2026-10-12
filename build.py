@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""sadt-atlas — génère l'index de recherche et la page des constats.
+"""sadt-atlas : génère l'index de recherche et la page des constats.
 
 À relancer après toute modification des pages :  python3 build.py
 Ne modifie aucune page existante ; écrit assets/search-index.js et constats.html.
@@ -180,7 +180,7 @@ def build_lang(lang):
             constats.append({
                 "kind": c["kind"], "tool": tool, "cat": cat, "page": title,
                 "url": rel + ("#" + c["section"] if c["section"] else ""),
-                "title": constat_label(clean(c["title"]), txt) or "—",
+                "title": constat_label(clean(c["title"]), txt) or "?",
                 "text": txt[:520],
             })
 
@@ -195,7 +195,7 @@ def build_lang(lang):
     n = len(open(os.path.join(ROOT, "assets", f"search-index-{lang}.js"), encoding="utf-8").read())
     print(f"{lang} : index {len(index)} sections, {n/1024:.0f} Ko", end="")
     from collections import Counter
-    print(" — constats", dict(Counter(c["kind"] for c in constats)))
+    print(" · constats", dict(Counter(c["kind"] for c in constats)))
     return index, constats
 
 
@@ -300,7 +300,7 @@ def write_constats(lang, constats):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title} — SADT Atlas</title>
+<title>{title} · SADT Atlas</title>
 <link rel="stylesheet" href="../assets/style.css">
 <script src="../assets/site.js"></script>
 </head>
@@ -399,32 +399,32 @@ PAPERS_UI = {
         "self": "Sur {tool} lui-même",
         "around": "Autour de la méthode",
         "free": "texte intégral libre",
-        "biblio": "La bibliographie complète de l'outil — ce qui a été trouvé, et ce qui a "
-                  "été cherché sans rien trouver — est dans "
+        "biblio": "La bibliographie complète de l'outil, ce qui a été trouvé, et ce qui a "
+                  "été cherché sans rien trouver, est dans "
                   "<a href=\"{href}\">ses sources</a>."},
  "en": {"h2": "Further reading",
         "self": "On {tool} itself",
         "around": "Around the method",
         "free": "free full text",
-        "biblio": "The tool's full bibliography — what was found, and what was looked for "
-                  "without success — is in <a href=\"{href}\">its sources</a>."},
+        "biblio": "The tool's full bibliography, what was found, and what was looked for "
+                  "without success, is in <a href=\"{href}\">its sources</a>."},
  "pt": {"h2": "Para saber mais",
         "self": "Sobre o próprio {tool}",
         "around": "Em torno do método",
         "free": "texto completo gratuito",
-        "biblio": "A bibliografia completa da ferramenta — o que foi encontrado, e o que foi "
-                  "procurado sem sucesso — está em <a href=\"{href}\">suas fontes</a>."},
+        "biblio": "A bibliografia completa da ferramenta, o que foi encontrado, e o que foi "
+                  "procurado sem sucesso, está em <a href=\"{href}\">suas fontes</a>."},
  "ko": {"h2": "더 읽을거리",
         "self": "{tool} 자체에 관한 문헌",
         "around": "방법론 관련 문헌",
         "free": "무료 전문",
-        "biblio": "이 도구의 전체 참고문헌 — 찾아낸 것과 찾아봤지만 없었던 것 — 은 "
+        "biblio": "이 도구의 전체 참고문헌(찾아낸 것과 찾아봤지만 없었던 것)은 "
                   "<a href=\"{href}\">출처 페이지</a>에 있습니다."},
  "th": {"h2": "อ่านเพิ่มเติม",
         "self": "เกี่ยวกับ {tool} โดยตรง",
         "around": "เกี่ยวกับวิธีการ",
         "free": "ฉบับเต็มอ่านฟรี",
-        "biblio": "บรรณานุกรมทั้งหมดของเครื่องมือนี้ — ทั้งสิ่งที่พบ และสิ่งที่ค้นแล้วไม่พบ — "
+        "biblio": "บรรณานุกรมทั้งหมดของเครื่องมือนี้ (ทั้งสิ่งที่พบ และสิ่งที่ค้นแล้วไม่พบ) "
                   "อยู่ใน<a href=\"{href}\">หน้าแหล่งอ้างอิง</a>"},
 }
 
@@ -449,7 +449,7 @@ def papers_block(lang, tool):
             if e.get("free"):
                 extra = f' <a href="{e["free"]}">{ui["free"]}</a>.'
             lines.append(
-                f'        <li><strong>{html.escape(e["ref"], quote=False)}</strong> — '
+                f'        <li><strong>{html.escape(e["ref"], quote=False)}</strong>: '
                 f'<a href="{e["url"]}"><em>{title}</em></a>. {e[lang]}{extra}</li>')
         lines.append("      </ul>")
         return lines
@@ -611,19 +611,19 @@ def write_landing():
 
 GUIDE_INTRO = {
  "fr": ("Guide d'utilisation",
-        "Ce que fait chaque outil, ce qu'il faut lui donner, ce qu'il rend — sans entrer "
+        "Ce que fait chaque outil, ce qu'il faut lui donner, ce qu'il rend, sans entrer "
         "dans le code. Pour comprendre les mécanismes internes, passez à l'Atlas."),
  "en": ("User guide",
-        "What each tool does, what to feed it, what it returns — without going into the "
+        "What each tool does, what to feed it, what it returns, without going into the "
         "code. For the internal mechanisms, switch to the Atlas."),
  "pt": ("Guia de uso",
-        "O que cada ferramenta faz, o que fornecer a ela, o que ela devolve — sem entrar no "
+        "O que cada ferramenta faz, o que fornecer a ela, o que ela devolve, sem entrar no "
         "código. Para os mecanismos internos, passe para o Atlas."),
  "ko": ("사용 가이드",
-        "각 도구가 무엇을 하는지, 무엇을 넣어야 하는지, 무엇을 돌려주는지 — 코드는 다루지 "
+        "각 도구가 무엇을 하는지, 무엇을 넣어야 하는지, 무엇을 돌려주는지, 코드는 다루지 "
         "않습니다. 내부 동작이 궁금하다면 아틀라스로 넘어가십시오."),
  "th": ("คู่มือการใช้งาน",
-        "เครื่องมือแต่ละตัวทำอะไร ต้องป้อนอะไรให้ และได้อะไรกลับมา — โดยไม่ลงรายละเอียดโค้ด "
+        "เครื่องมือแต่ละตัวทำอะไร ต้องป้อนอะไรให้ และได้อะไรกลับมา, โดยไม่ลงรายละเอียดโค้ด "
         "หากต้องการเข้าใจกลไกภายใน ให้ไปที่แอตลาส"),
 }
 
@@ -645,8 +645,8 @@ GUIDE_ABOUT = {
  "fr": """      <h2 id="pour-qui">À qui s'adresse ce guide</h2>
       <p>À qui ouvre SlicerAutomatedDentalTools dans 3D Slicer et veut s'en servir :
       cliniciens, chercheurs, étudiants. Il ne suppose de savoir ni lire du code, ni ce
-      qu'est un réseau de neurones. Si c'est le fonctionnement interne qui vous intéresse —
-      quel modèle est appelé, à quel moment, sur quelles données — c'est
+      qu'est un réseau de neurones. Si c'est le fonctionnement interne qui vous intéresse,
+      quel modèle est appelé, à quel moment, sur quelles données, c'est
       l'<a href="../index.html">Atlas</a> qu'il vous faut : les deux sections couvrent les
       mêmes {n} modules, chacune par un bout opposé.</p>
 
@@ -659,19 +659,19 @@ GUIDE_ABOUT = {
       <p>Ce guide a été écrit en lisant le code de chaque module, pas sa documentation. Il
       dit donc ce que l'outil fait réellement quand vous cliquez, y compris quand c'est
       gênant : <strong>{warn} avertissements et {bug} bugs</strong> sont signalés à
-      l'endroit précis où vous risquez de tomber dessus. Rien n'est corrigé ici — le but
+      l'endroit précis où vous risquez de tomber dessus. Rien n'est corrigé ici : le but
       est que vous n'y perdiez pas une journée.</p>
 
       <h2 id="plan">Ce que vous trouverez sur chaque page</h2>
       <p>Toutes suivent le même plan, pour que vous sachiez où regarder sans tout relire :</p>
       <ul>
-        <li><strong>Quand s'en servir</strong> — à quel problème l'outil répond, et les cas
+        <li><strong>Quand s'en servir</strong> : à quel problème l'outil répond, et les cas
         où il ne sert à rien.</li>
-        <li><strong>Ce qu'il vous faut, ce que vous obtenez</strong> — les entrées
+        <li><strong>Ce qu'il vous faut, ce que vous obtenez</strong> : les entrées
         attendues, leur format, et ce qui ressort à la fin.</li>
-        <li><strong>Marche à suivre</strong> — les étapes dans l'ordre, champ par champ.</li>
-        <li><strong>Si ça coince</strong> — les échecs fréquents et ce qui les provoque.</li>
-        <li><strong>Pour aller plus loin</strong> — les publications derrière l'outil quand
+        <li><strong>Marche à suivre</strong> : les étapes dans l'ordre, champ par champ.</li>
+        <li><strong>Si ça coince</strong> : les échecs fréquents et ce qui les provoque.</li>
+        <li><strong>Pour aller plus loin</strong> : les publications derrière l'outil quand
         il y en a, et le renvoi vers la fiche Atlas.</li>
       </ul>
 
@@ -696,8 +696,8 @@ GUIDE_ABOUT = {
  "en": """      <h2 id="pour-qui">Who this guide is for</h2>
       <p>Anyone who opens SlicerAutomatedDentalTools in 3D Slicer and wants to use it:
       clinicians, researchers, students. It assumes no ability to read code and no idea
-      what a neural network is. If what you want is the inner workings — which model is
-      called, when, on what data — you want the <a href="../index.html">Atlas</a> instead:
+      what a neural network is. If what you want is the inner workings, which model is
+      called, when, on what data, you want the <a href="../index.html">Atlas</a> instead:
       both sections cover the same {n} modules, each from the opposite end.</p>
 
       <h2 id="pourquoi">Why it exists</h2>
@@ -708,20 +708,20 @@ GUIDE_ABOUT = {
       <p>This guide was written by reading each module's code, not its documentation. So it
       says what the tool actually does when you click, including when that is inconvenient:
       <strong>{warn} warnings and {bug} bugs</strong> are flagged at the exact point where
-      you are likely to hit them. Nothing is fixed here — the point is that you do not lose
+      you are likely to hit them. Nothing is fixed here: the point is that you do not lose
       a day to it.</p>
 
       <h2 id="plan">What every page contains</h2>
       <p>They all follow the same plan, so you know where to look without rereading:</p>
       <ul>
-        <li><strong>When to use it</strong> — which problem the tool answers, and the cases
+        <li><strong>When to use it</strong>, which problem the tool answers, and the cases
         where it is of no help.</li>
-        <li><strong>What you need, what you get</strong> — the expected inputs, their
+        <li><strong>What you need, what you get</strong>: the expected inputs, their
         format, and what comes out at the end.</li>
-        <li><strong>Step by step</strong> — the steps in order, field by field.</li>
-        <li><strong>When it goes wrong</strong> — the common failures and what causes
+        <li><strong>Step by step</strong>: the steps in order, field by field.</li>
+        <li><strong>When it goes wrong</strong>: the common failures and what causes
         them.</li>
-        <li><strong>Further reading</strong> — the publications behind the tool where there
+        <li><strong>Further reading</strong>: the publications behind the tool where there
         are any, and the pointer to the Atlas page.</li>
       </ul>
 
@@ -746,8 +746,8 @@ GUIDE_ABOUT = {
  "pt": """      <h2 id="pour-qui">Para quem é este guia</h2>
       <p>Para quem abre o SlicerAutomatedDentalTools no 3D Slicer e quer usá-lo:
       clínicos, pesquisadores, estudantes. Ele não pressupõe saber ler código nem saber o
-      que é uma rede neural. Se o que interessa é o funcionamento interno — qual modelo é
-      chamado, quando, sobre quais dados — é o <a href="../index.html">Atlas</a> que você
+      que é uma rede neural. Se o que interessa é o funcionamento interno, qual modelo é
+      chamado, quando, sobre quais dados, é o <a href="../index.html">Atlas</a> que você
       procura: as duas seções cobrem os mesmos {n} módulos, cada uma por uma ponta.</p>
 
       <h2 id="pourquoi">Por que ele existe</h2>
@@ -759,20 +759,20 @@ GUIDE_ABOUT = {
       <p>Este guia foi escrito lendo o código de cada módulo, não a sua documentação. Ele
       diz, portanto, o que a ferramenta faz de fato quando você clica, inclusive quando isso
       incomoda: <strong>{warn} avisos e {bug} bugs</strong> são assinalados no ponto exato
-      em que você corre o risco de tropeçar neles. Nada é corrigido aqui — o objetivo é que
+      em que você corre o risco de tropeçar neles. Nada é corrigido aqui: o objetivo é que
       você não perca um dia com isso.</p>
 
       <h2 id="plan">O que você encontra em cada página</h2>
       <p>Todas seguem o mesmo plano, para que você saiba onde olhar sem reler tudo:</p>
       <ul>
-        <li><strong>Quando usar</strong> — a que problema a ferramenta responde, e os casos
+        <li><strong>Quando usar</strong>: a que problema a ferramenta responde, e os casos
         em que ela não serve para nada.</li>
-        <li><strong>O que você precisa, o que você obtém</strong> — as entradas esperadas,
+        <li><strong>O que você precisa, o que você obtém</strong>: as entradas esperadas,
         o formato delas, e o que sai no fim.</li>
-        <li><strong>Passo a passo</strong> — as etapas em ordem, campo por campo.</li>
-        <li><strong>Se algo der errado</strong> — as falhas frequentes e o que as
+        <li><strong>Passo a passo</strong>: as etapas em ordem, campo por campo.</li>
+        <li><strong>Se algo der errado</strong>: as falhas frequentes e o que as
         provoca.</li>
-        <li><strong>Para saber mais</strong> — as publicações por trás da ferramenta, quando
+        <li><strong>Para saber mais</strong>: as publicações por trás da ferramenta, quando
         existem, e o link para a página do Atlas.</li>
       </ul>
 
@@ -795,9 +795,9 @@ GUIDE_ABOUT = {
       </ul>
 """,
  "ko": """      <h2 id="pour-qui">이 가이드의 대상</h2>
-      <p>3D Slicer에서 SlicerAutomatedDentalTools를 열고 사용하려는 모든 분 — 임상의,
-      연구자, 학생 — 을 위한 가이드입니다. 코드를 읽을 줄 알거나 신경망이 무엇인지 알 필요는
-      없습니다. 내부 동작 — 어떤 모델이 언제, 어떤 데이터로 호출되는지 — 이 궁금하다면
+      <p>3D Slicer에서 SlicerAutomatedDentalTools를 열고 사용하려는 모든 분(임상의,
+      연구자, 학생)을 위한 가이드입니다. 코드를 읽을 줄 알거나 신경망이 무엇인지 알 필요는
+      없습니다. 내부 동작(어떤 모델이 언제, 어떤 데이터로 호출되는지)이 궁금하다면
       <a href="../index.html">아틀라스</a>를 보십시오. 두 섹션은 같은 {n}개 모듈을 서로
       반대쪽에서 다룹니다.</p>
 
@@ -809,19 +809,19 @@ GUIDE_ABOUT = {
       <p>이 가이드는 각 모듈의 문서가 아니라 코드를 읽고 작성했습니다. 따라서 클릭했을 때
       도구가 실제로 무엇을 하는지, 불편한 부분까지 그대로 적었습니다.
       <strong>경고 {warn}건과 버그 {bug}건</strong>을 실제로 부딪히기 쉬운 바로 그 지점에
-      표시해 두었습니다. 여기서 고친 것은 없습니다 — 그 때문에 하루를 허비하지 않게 하는 것이
+      표시해 두었습니다. 여기서 고친 것은 없습니다: 그 때문에 하루를 허비하지 않게 하는 것이
       목적입니다.</p>
 
       <h2 id="plan">각 페이지의 구성</h2>
       <p>모든 페이지가 같은 구성을 따르므로 전부 다시 읽지 않고도 찾을 곳을 알 수 있습니다.</p>
       <ul>
-        <li><strong>언제 쓰는가</strong> — 도구가 해결하는 문제와, 쓸모가 없는
+        <li><strong>언제 쓰는가</strong>: 도구가 해결하는 문제와, 쓸모가 없는
         경우.</li>
-        <li><strong>필요한 것, 얻는 것</strong> — 필요한 입력과 그 형식, 그리고 최종
+        <li><strong>필요한 것, 얻는 것</strong>: 필요한 입력과 그 형식, 그리고 최종
         결과물.</li>
-        <li><strong>사용 절차</strong> — 순서대로, 항목 하나하나.</li>
-        <li><strong>문제가 생기면</strong> — 자주 일어나는 실패와 그 원인.</li>
-        <li><strong>더 읽을거리</strong> — 도구의 바탕이 된 논문(있는 경우)과 아틀라스
+        <li><strong>사용 절차</strong>: 순서대로, 항목 하나하나.</li>
+        <li><strong>문제가 생기면</strong>: 자주 일어나는 실패와 그 원인.</li>
+        <li><strong>더 읽을거리</strong>: 도구의 바탕이 된 논문(있는 경우)과 아틀라스
         페이지로 가는 링크.</li>
       </ul>
 
@@ -846,7 +846,7 @@ GUIDE_ABOUT = {
  "th": """      <h2 id="pour-qui">คู่มือนี้เขียนให้ใคร</h2>
       <p>สำหรับทุกคนที่เปิด SlicerAutomatedDentalTools ใน 3D Slicer แล้วต้องการใช้งาน
       ไม่ว่าจะเป็นทันตแพทย์ นักวิจัย หรือนักศึกษา ไม่จำเป็นต้องอ่านโค้ดเป็น หรือรู้ว่าโครงข่ายประสาทเทียมคืออะไร
-      หากสิ่งที่สนใจคือการทำงานภายใน — โมเดลใดถูกเรียก เมื่อใด กับข้อมูลใด — ให้ดูที่
+      หากสิ่งที่สนใจคือการทำงานภายใน (โมเดลใดถูกเรียก เมื่อใด กับข้อมูลใด) ให้ดูที่
       <a href="../index.html">แอตลาส</a> แทน ทั้งสองส่วนครอบคลุม {n} โมดูลเดียวกัน
       แต่มองจากคนละด้าน</p>
 
@@ -856,18 +856,18 @@ GUIDE_ABOUT = {
       ที่บทความตีพิมพ์อธิบายไว้ เพราะบทความบรรยายเวอร์ชันที่โค้ดไม่ได้รันแล้ว</p>
       <p>คู่มือนี้เขียนจากการอ่านโค้ดของแต่ละโมดูล ไม่ใช่จากเอกสาร จึงบอกสิ่งที่เครื่องมือทำจริง
       เมื่อคุณคลิก รวมถึงเรื่องที่ไม่สะดวกด้วย: <strong>คำเตือน {warn} รายการและบั๊ก {bug} รายการ</strong>
-      ถูกระบุไว้ตรงจุดที่คุณมีโอกาสเจอ ที่นี่ไม่ได้แก้ไขอะไร — เป้าหมายคือไม่ให้คุณเสียเวลาทั้งวัน
+      ถูกระบุไว้ตรงจุดที่คุณมีโอกาสเจอ ที่นี่ไม่ได้แก้ไขอะไร, เป้าหมายคือไม่ให้คุณเสียเวลาทั้งวัน
       กับเรื่องเหล่านี้</p>
 
       <h2 id="plan">ในแต่ละหน้ามีอะไรบ้าง</h2>
       <p>ทุกหน้าใช้โครงสร้างเดียวกัน เพื่อให้รู้ว่าต้องดูตรงไหนโดยไม่ต้องอ่านใหม่ทั้งหมด</p>
       <ul>
-        <li><strong>ใช้เมื่อใด</strong> — เครื่องมือแก้ปัญหาอะไร และกรณีที่ใช้ไม่ได้ผล</li>
-        <li><strong>สิ่งที่ต้องใช้ สิ่งที่จะได้</strong> — อินพุตที่ต้องการ รูปแบบไฟล์
+        <li><strong>ใช้เมื่อใด</strong>: เครื่องมือแก้ปัญหาอะไร และกรณีที่ใช้ไม่ได้ผล</li>
+        <li><strong>สิ่งที่ต้องใช้ สิ่งที่จะได้</strong>: อินพุตที่ต้องการ รูปแบบไฟล์
         และผลลัพธ์ที่ได้ในตอนท้าย</li>
-        <li><strong>ขั้นตอน</strong> — ขั้นตอนตามลำดับ ทีละช่อง</li>
-        <li><strong>หากเกิดปัญหา</strong> — ความล้มเหลวที่พบบ่อยและสาเหตุ</li>
-        <li><strong>อ่านเพิ่มเติม</strong> — บทความเบื้องหลังเครื่องมือ (ถ้ามี)
+        <li><strong>ขั้นตอน</strong>: ขั้นตอนตามลำดับ ทีละช่อง</li>
+        <li><strong>หากเกิดปัญหา</strong>: ความล้มเหลวที่พบบ่อยและสาเหตุ</li>
+        <li><strong>อ่านเพิ่มเติม</strong>: บทความเบื้องหลังเครื่องมือ (ถ้ามี)
         และลิงก์ไปยังหน้าแอตลาส</li>
       </ul>
 
@@ -917,7 +917,7 @@ def write_guide_index(lang):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{nav.esc(title)} — SADT Atlas</title>
+<title>{nav.esc(title)} · SADT Atlas</title>
 <link rel="stylesheet" href="../../assets/style.css">
 <script src="../../assets/site.js"></script>
 </head>
@@ -958,7 +958,7 @@ def sync_theme(name="__use_nav__"):
     if name == "__use_nav__":
         name = getattr(nav, "THEME", None)
     if name and name not in nav.THEMES:
-        raise SystemExit(f"THEME inconnu : {name!r} — attendus {nav.THEMES} ou None")
+        raise SystemExit(f"THEME inconnu : {name!r}, attendus {nav.THEMES} ou None")
     n = 0
     for dp, dirs, fs in os.walk(ROOT):
         dirs[:] = [d for d in dirs if d != ".git" and not d.startswith(".")]
@@ -977,11 +977,11 @@ def sync_theme(name="__use_nav__"):
             if new != s:
                 open(path, "w", encoding="utf-8").write(new)
                 n += 1
-    print(f"thème : {name or 'aucun (feuille de base seule)'} — {n} pages mises à jour")
+    print(f"thème : {name or 'aucun (feuille de base seule)'}, {n} pages mises à jour")
 
 
 def theme_from_argv():
-    """--theme <nom> | --theme none  — surcharge nav.THEME le temps d'un run."""
+    """--theme <nom> | --theme none, surcharge nav.THEME le temps d'un run."""
     import sys
     if "--theme" not in sys.argv:
         return "__use_nav__"
@@ -992,7 +992,7 @@ def theme_from_argv():
     if v in ("none", "aucun", "default"):
         return None
     if v not in nav.THEMES:
-        raise SystemExit(f"thème inconnu : {v!r} — disponibles : {', '.join(nav.THEMES)}, none")
+        raise SystemExit(f"thème inconnu : {v!r}, disponibles : {', '.join(nav.THEMES)}, none")
     return v
 
 

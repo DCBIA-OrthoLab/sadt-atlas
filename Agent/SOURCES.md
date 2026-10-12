@@ -1,9 +1,9 @@
-# Agent — sources
+# Agent : sources
 
 **Non publié.** Aucun article ne porte sur ce module ni sur son approche. Il existe
 en revanche une trace officielle qu'il fallait trouver : un **rapport de projet
 NA-MIC Project Week** (PW45, Boston, 2026) signé par ses auteurs, récupéré ici. Il
-décrit le module dans son intention, pas dans son état — il annonce `llama3:latest`
+décrit le module dans son intention, pas dans son état : il annonce `llama3:latest`
 là où le code fixe `qwen3:8b`, et son « prochain pas » (intégration du LLM,
 déploiement dans Slicer) est déjà fait dans le dépôt. Les autres références utiles
 sont purement techniques : le modèle servi par Ollama, le cross-encoder de
@@ -35,11 +35,11 @@ Aucun de ces travaux **ne décrit ce module**.
 
 - **MS MARCO** (Bajaj, récupéré) : le reranker a été entraîné à classer des
   passages web pour des requêtes Bing. Ici on lui donne des fiches de modules
-  Slicer et des prompts d'opérateur — un domaine et un registre pour lesquels il
+  Slicer et des prompts d'opérateur : un domaine et un registre pour lesquels il
   n'a **pas** été entraîné, et dont aucune évaluation n'existe dans le dépôt.
 - **Qwen3** (récupéré) : rapport technique du modèle générique. Ni le prompt
   système du module, ni son format de sortie JSON contraint, ni sa boucle de
-  réparation n'y figurent — et aucun `temperature`, `seed`, `num_ctx` ni `think`
+  réparation n'y figurent, et aucun `temperature`, `seed`, `num_ctx` ni `think`
   n'est passé par le code.
 - **Ollama** et **llama.cpp**, le serveur et le moteur d'inférence effectivement
   utilisés : aucune publication. [ollama.com](https://ollama.com) ·
@@ -49,7 +49,7 @@ Aucun de ces travaux **ne décrit ce module**.
   45e NA-MIC Project Week, Boston, 2026
   ([lien](https://projectweek.na-mic.org/PW45_2026_Boston/Projects/InteractiveWorkflowReplayAndStepBackNavigationForSlicerAgent/)).
   Il porte sur [puxuntu/Slicer_agent](https://github.com/puxuntu/Slicer_agent),
-  un agent qui génère et exécute du Python dans la scène Slicer — **un autre code,
+  un agent qui génère et exécute du Python dans la scène Slicer, **un autre code,
   une autre équipe, présenté à la même semaine**. À ne pas confondre avec ce
   module, qui appelle des CLI de l'extension et n'écrit aucun code.
 - **LLM dans ce laboratoire, autre tâche** : Gaydamour A. *et al.*, Cevidanes L.,

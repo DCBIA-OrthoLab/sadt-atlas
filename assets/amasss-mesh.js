@@ -1,4 +1,4 @@
-/* Généré par amasss_mesh.py — ne pas éditer à la main.
+/* Généré par amasss_mesh.py, ne pas éditer à la main.
    Source : prédiction AMASSS sur le scan de test publié
    (AMASSS_CBCT v1.0.1, MG_test_scan). Aucune donnée patient.
    Chargé par <script> et non par fetch() : le site doit

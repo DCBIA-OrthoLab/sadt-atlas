@@ -1,4 +1,4 @@
-# MRI2CBCT — sources
+# MRI2CBCT : sources
 
 **Partiellement publié, et publié en décalage avec le code.** Deux textes portent
 bien sur ce module : le papier de méthode (Leroux *et al.*, CLIP 2024, payant) et
@@ -18,12 +18,12 @@ Mattes**.
 
 | Fichier | Référence | Type | DOI / ID |
 |---|---|---|---|
-| `2025_Caleme_MR2CBCT_TMJ_case_series.xml` / `.txt` | Caleme E.D., Cevidanes L., Mattos C., Miranda F., Gurgel M., Barone S., Gaydamour A., Tulissi E., Claret J., Leroux G., Moro A., Gonçalves J., Ruellas A., Zupelari-Gonçalves P., Morettin-Zupelari M., Hsu N., Wolford L., Prieto J., Bianchi J. *Aligning MRI and CBCT for Advanced TMJ Diagnostics: Case Series Using AI-Powered Registration in Dentistry and Orthodontics.* Seminars in Orthodontics, juillet 2025. | Article de revue — **manuscrit auteur NIHMS**, libre à la lecture dans PMC (récupéré via les E-utilities NCBI ; le `fullTextXML` d'Europe PMC renvoie vide pour ce PMCID) | [10.1053/j.sodo.2025.07.001](https://doi.org/10.1053/j.sodo.2025.07.001) — PMID 40857450, PMCID **PMC12360114** |
+| `2025_Caleme_MR2CBCT_TMJ_case_series.xml` / `.txt` | Caleme E.D., Cevidanes L., Mattos C., Miranda F., Gurgel M., Barone S., Gaydamour A., Tulissi E., Claret J., Leroux G., Moro A., Gonçalves J., Ruellas A., Zupelari-Gonçalves P., Morettin-Zupelari M., Hsu N., Wolford L., Prieto J., Bianchi J. *Aligning MRI and CBCT for Advanced TMJ Diagnostics: Case Series Using AI-Powered Registration in Dentistry and Orthodontics.* Seminars in Orthodontics, juillet 2025. | Article de revue, **manuscrit auteur NIHMS**, libre à la lecture dans PMC (récupéré via les E-utilities NCBI ; le `fullTextXML` d'Europe PMC renvoie vide pour ce PMCID) | [10.1053/j.sodo.2025.07.001](https://doi.org/10.1053/j.sodo.2025.07.001), PMID 40857450, PMCID **PMC12360114** |
 | `2025_NAMIC_PW43_automated_cbct_mri_registration.md` | Gaydamour A., Cevidanes L., Leroux G., Prieto J., Pieper S., Tulissi E. *Automated CBCT-MRI Registration Advances Temporomandibular Degenerative Joint Disease Diagnosis.* 43e NA-MIC Project Week, Montréal, 2025. | Rapport de projet NA-MIC | [projectweek.na-mic.org/PW43_2025_Montreal](https://projectweek.na-mic.org/PW43_2025_Montreal/Projects/AutomatedCbctMriRegistrationAdvancesTemporomandibularDegenerativeJointDiseaseDiagnosis/) |
 | `2026_NAMIC_PW45_MR2CBCT_restoring_extending.md` | Caleme E.D., Cevidanes L., Dumont P., Buisson A., Pieper S., Leroux G., Prieto J., Gaydamour A., Lasso A. *MR2CBCT: Restoring and Extending Automated CBCT-MRI Registration for TMJ Analysis.* 45e NA-MIC Project Week, Boston, 2026. | Rapport de projet NA-MIC | [projectweek.na-mic.org/PW45_2026_Boston](https://projectweek.na-mic.org/PW45_2026_Boston/Projects/Mr2CbctRestoringAndExtendingAutomatedCbctMriRegistrationForTmjAnalysis/) |
 | `2010_Klein_elastix_registration_toolbox.pdf` | Klein S., Staring M., Murphy K., Viergever M.A., Pluim J.P.W. *elastix: A Toolbox for Intensity-Based Medical Image Registration.* IEEE Transactions on Medical Imaging 29(1):196-205, 2010. | Article de revue, **version auteur** déposée par M. Staring sur elastix.lumc.nl | [10.1109/TMI.2009.2035616](https://doi.org/10.1109/TMI.2009.2035616) |
-| `2020_Isensee_nnUNet_automated_design.pdf` | Isensee F., Jaeger P.F., Kohl S.A.A., Petersen J., Maier-Hein K.H. *Automated Design of Deep Learning Methods for Biomedical Image Segmentation.* arXiv:1904.08128v2, 2020, 55 p. — version soumise de l'article Nature Methods. | Preprint arXiv | [arXiv:1904.08128](https://arxiv.org/abs/1904.08128) |
-| `2016_AlSaleh_MRI_CBCT_TMJ_systematic_review.xml` / `.txt` | Al-Saleh M.A.Q., Alsufyani N.A., Saltaji H., Jaremko J.L., Major P.W. *MRI and CBCT image registration of temporomandibular joint: a systematic review.* Journal of Otolaryngology – Head & Neck Surgery 45:30, 2016. | Revue systématique, texte intégral JATS (Europe PMC, CC-BY) | [10.1186/s40463-016-0144-4](https://doi.org/10.1186/s40463-016-0144-4) — PMCID PMC4863319 |
+| `2020_Isensee_nnUNet_automated_design.pdf` | Isensee F., Jaeger P.F., Kohl S.A.A., Petersen J., Maier-Hein K.H. *Automated Design of Deep Learning Methods for Biomedical Image Segmentation.* arXiv:1904.08128v2, 2020, 55 p.  : version soumise de l'article Nature Methods. | Preprint arXiv | [arXiv:1904.08128](https://arxiv.org/abs/1904.08128) |
+| `2016_AlSaleh_MRI_CBCT_TMJ_systematic_review.xml` / `.txt` | Al-Saleh M.A.Q., Alsufyani N.A., Saltaji H., Jaremko J.L., Major P.W. *MRI and CBCT image registration of temporomandibular joint: a systematic review.* Journal of Otolaryngology – Head & Neck Surgery 45:30, 2016. | Revue systématique, texte intégral JATS (Europe PMC, CC-BY) | [10.1186/s40463-016-0144-4](https://doi.org/10.1186/s40463-016-0144-4), PMCID PMC4863319 |
 | `2017_AlSaleh_3D_TMJ_MRI_CBCT_registration.pdf` | Al-Saleh M.A.Q., Punithakumar K., Lagravère M.O., Boulanger P., Jaremko J.L., Major P.W. *Three-Dimensional Assessment of Temporomandibular Joint Using MRI-CBCT Image Registration.* PLOS ONE 12(1):e0169555, 2017. | Article de revue, PDF éditeur (CC-BY) | [10.1371/journal.pone.0169555](https://doi.org/10.1371/journal.pone.0169555) |
 
 ## À consulter en ligne (pas librement téléchargeable)
@@ -40,13 +40,13 @@ Mattes**.
 Travaux proches qui **ne décrivent pas ce module**.
 
 - **Al-Saleh 2016 et 2017** (récupérés ci-dessus) : équipe de l'Université de
-  l'Alberta, sans lien avec DCBIA. Ils posent le problème — recalage IRM/CBCT de
-  l'ATM, ses écueils, l'état de l'art avant ce module — et servent de point de
+  l'Alberta, sans lien avec DCBIA. Ils posent le problème, recalage IRM/CBCT de
+  l'ATM, ses écueils, l'état de l'art avant ce module, et servent de point de
   comparaison, pas de description du code.
 - **elastix** (Klein 2010, récupéré) : décrit la bibliothèque de recalage, pas son
   usage ici. Le module passe par le *wrapper* Python **ITKElastix**
   (`itk.ElastixRegistrationMethod`) avec le *parameter map* `rigid` par défaut,
-  une seule résolution et aucune transformation initiale — un point de
+  une seule résolution et aucune transformation initiale : un point de
   paramétrage que le papier ne couvre évidemment pas. Seconde citation usuelle
   d'elastix, non récupérée ici : Shamonin D.P. *et al.*, *Fast parallel image
   registration on CPU and GPU…*, Front. Neuroinform. 7:50, 2014
@@ -57,10 +57,10 @@ Travaux proches qui **ne décrivent pas ce module**.
   documentés nulle part**, publication comprise.
 - **Modules amont de l'extension**, cités par Caleme 2025 comme préparation des
   entrées mais jamais appelés depuis le code de MRI2CBCT :
-  ASO/AREG — Anchling L. *et al.*, *Automated Orientation and Registration of
+  ASO/AREG, Anchling L. *et al.*, *Automated Orientation and Registration of
   Cone-Beam Computed Tomography Scans*, CLIP 2023, LNCS
   ([PMC11104011](https://pmc.ncbi.nlm.nih.gov/articles/PMC11104011/)) ;
-  AMASSS — Gillot M. *et al.*, PLOS ONE 17(9):e0275033, 2022
+  AMASSS, Gillot M. *et al.*, PLOS ONE 17(9):e0275033, 2022
   ([10.1371/journal.pone.0275033](https://doi.org/10.1371/journal.pone.0275033)).
 - **TorchReg** ([github.com/codingfisch/torchreg](https://github.com/codingfisch/torchreg)) :
   la voie d'approximation du papier CLIP 2024 et du rapport PW43, abandonnée
@@ -77,4 +77,4 @@ G. Leroux, J. Claret, A. Gaydamour et E. Caleme, dépouillées une à une ;
 recherche web d'un abstract ou poster AADOCR/IADR ou AAO sur ce recalage.
 **Rien d'autre.** Deep Blue (deepblue.lib.umich.edu), le dépôt institutionnel de
 l'University of Michigan, n'a pas pu être interrogé : il est derrière Cloudflare
-et refuse toute requête automatique — **à vérifier à la main**.
+et refuse toute requête automatique, **à vérifier à la main**.

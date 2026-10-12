@@ -51,29 +51,29 @@ PAPERS = {
     "title": "Assessment of different techniques for 3D superimposition of serial "
              "digital maxillary dental casts on palatal structures",
     "fr": "Compare les zones du palais utilisables comme référence et ce que "
-          "chacune vaut en reproductibilité — utile pour décider où dessiner.",
+          "chacune vaut en reproductibilité, utile pour décider où dessiner.",
     "en": "Compares the palatal regions usable as a reference and how "
-          "reproducible each one is — useful when deciding where to draw.",
+          "reproducible each one is, useful when deciding where to draw.",
     "pt": "Compara as regiões do palato utilizáveis como referência e a "
-          "reprodutibilidade de cada uma — útil para decidir onde desenhar.",
+          "reprodutibilidade de cada uma, útil para decidir onde desenhar.",
     "ko": "기준으로 쓸 수 있는 구개 영역들과 각 영역의 재현성을 비교합니다. 어디를 "
           "그릴지 정할 때 유용합니다.",
-    "th": "เปรียบเทียบบริเวณเพดานปากที่ใช้เป็นจุดอ้างอิงได้ และความสามารถในการทำซ้ำของแต่ละบริเวณ — "
+    "th": "เปรียบเทียบบริเวณเพดานปากที่ใช้เป็นจุดอ้างอิงได้ และความสามารถในการทำซ้ำของแต่ละบริเวณ, "
           "มีประโยชน์เมื่อต้องตัดสินใจว่าจะวาดตรงไหน"},
    {"url": "https://doi.org/10.1111/ocr.12309",
     "ref": "Garib et al., Orthod Craniofac Res 2019",
     "title": "Superimposition of maxillary digital models using the palatal "
              "rugae: does ageing affect the reliability?",
     "fr": "Les rugae palatines comme repère, et l'effet de la croissance sur "
-          "leur stabilité — à lire avant de recaler des patients en croissance.",
-    "en": "Palatal rugae as a landmark, and how growth affects their stability — "
+          "leur stabilité, à lire avant de recaler des patients en croissance.",
+    "en": "Palatal rugae as a landmark, and how growth affects their stability, "
           "worth reading before registering growing patients.",
     "pt": "As rugosidades palatinas como landmark e o efeito do crescimento sobre a "
-          "estabilidade delas — vale a leitura antes de fazer o registro de pacientes "
+          "estabilidade delas, vale a leitura antes de fazer o registro de pacientes "
           "em crescimento.",
     "ko": "랜드마크로서의 구개주름과 성장이 그 안정성에 미치는 영향을 다룹니다. 성장기 "
           "환자를 정합하기 전에 읽어 볼 만합니다.",
-    "th": "รอยย่นเพดานปากในฐานะ landmark และผลของการเจริญเติบโตต่อความมั่นคงของรอยย่น — "
+    "th": "รอยย่นเพดานปากในฐานะ landmark และผลของการเจริญเติบโตต่อความมั่นคงของรอยย่น, "
           "ควรอ่านก่อนทำการลงทะเบียนภาพในผู้ป่วยที่ยังเจริญเติบโต"},
   ]},
 
@@ -262,18 +262,18 @@ PAPERS = {
     "ref": "Aliaga-Del Castillo et al., Orthod Craniofac Res 2022",
     "title": "Comparison and reproducibility of three methods for maxillary "
              "digital dental model registration in open bite patients",
-    "fr": "Trois méthodes de recalage comparées sur des patients en béance — le "
+    "fr": "Trois méthodes de recalage comparées sur des patients en béance, le "
           "cas où le choix de la zone compte le plus.",
-    "en": "Three registration methods compared on open-bite patients — the case "
+    "en": "Three registration methods compared on open-bite patients, the case "
           "where the choice of region matters most.",
-    "pt": "Três métodos de registro comparados em pacientes com mordida aberta — o caso "
+    "pt": "Três métodos de registro comparados em pacientes com mordida aberta, o caso "
           "em que a escolha da região mais pesa.",
     "ko": "개방교합 환자에서 세 가지 정합 방법을 비교합니다. 영역 선택이 가장 중요한 "
           "경우입니다.",
-    "th": "เปรียบเทียบวิธีการลงทะเบียนภาพสามวิธีในผู้ป่วยสบฟันเปิด — กรณีที่การเลือกบริเวณมีผลมากที่สุด"},
+    "th": "เปรียบเทียบวิธีการลงทะเบียนภาพสามวิธีในผู้ป่วยสบฟันเปิด, กรณีที่การเลือกบริเวณมีผลมากที่สุด"},
    {"url": "https://projectweek.na-mic.org/PW36_2022_Virtual/Projects/ALIDDM/",
     "ref": "NA-MIC Project Week 36, 2022",
-    "title": "ALIIOS — Automatic Landmarks Identification for Intra Oral Scans",
+    "title": "ALIIOS, Automatic Landmarks Identification for Intra Oral Scans",
     "fr": "ALI_IOS, le réseau qui fournit les landmarks mucogingivaux, n'a aucune "
           "publication : cette page de projet en est la seule description publique.",
     "en": "ALI_IOS, the network that supplies the mucogingival landmarks, has no "
@@ -443,7 +443,7 @@ PAPERS = {
           "และโมดูลนี้ยืมคำศัพท์บางส่วนมาใช้"},
    {"url": "https://greedy.readthedocs.io/en/latest/reference.html",
     "ref": "Documentation de greedy",
-    "title": "greedy — command reference",
+    "title": "greedy, command reference",
     "fr": "La liste complète des options du moteur, si vous voulez savoir ce que "
           "recouvre un réglage de l'interface.",
     "en": "The engine's full option list, if you want to know what a setting in "
@@ -522,19 +522,19 @@ PAPERS = {
  "BatchDentalSeg": {
   "note": {
    "fr": "Le modèle d'origine est publié et documenté. Les trois variantes "
-         "ajoutées ensuite — pédiatrique, <em>universal labelling</em>, "
-         "naso-maxillaire — ne le sont pas : ni jeu d'entraînement, ni évaluation.",
+         "ajoutées ensuite, pédiatrique, <em>universal labelling</em>, "
+         "naso-maxillaire, ne le sont pas : ni jeu d'entraînement, ni évaluation.",
    "en": "The original model is published and documented. The three variants "
-         "added later — pediatric, <em>universal labelling</em>, naso-maxillary — "
+         "added later, pediatric, <em>universal labelling</em>, naso-maxillary, "
          "are not: no training set, no evaluation.",
    "pt": "O modelo original é publicado e documentado. As três variantes adicionadas "
-         "depois — pediátrica, <em>universal labelling</em>, nasomaxilar — não são: não "
+         "depois, pediátrica, <em>universal labelling</em>, nasomaxilar, não são: não "
          "há conjunto de treinamento nem avaliação.",
    "ko": "원래 모델은 논문으로 발표되어 문서화되어 있습니다. 나중에 추가된 세 가지 "
          "변형(소아용, <em>universal labelling</em>, 비상악)은 그렇지 않습니다. 학습 "
          "데이터셋도, 평가도 없습니다.",
-   "th": "แบบจำลองดั้งเดิมได้รับการตีพิมพ์และมีเอกสารประกอบ ส่วนสามรุ่นที่เพิ่มเข้ามาภายหลัง — สำหรับเด็ก, "
-         "<em>universal labelling</em>, จมูกและขากรรไกรบน — ไม่มี: ไม่มีชุดข้อมูลฝึก "
+   "th": "แบบจำลองดั้งเดิมได้รับการตีพิมพ์และมีเอกสารประกอบ ส่วนสามรุ่นที่เพิ่มเข้ามาภายหลัง (สำหรับเด็ก, "
+         "<em>universal labelling</em>, จมูกและขากรรไกรบน) ไม่มี: ไม่มีชุดข้อมูลฝึก "
          "และไม่มีการประเมินผล"},
   "self": [
    {"url": "https://doi.org/10.1016/j.jdent.2024.105130",
@@ -567,15 +567,15 @@ PAPERS = {
     "title": "Automated Cone Beam Computed Tomography Segmentation of Multiple "
              "Impacted Teeth With or Without Association to Rare Diseases: "
              "Evaluation of Four Deep Learning-Based Methods",
-    "fr": "Une évaluation indépendante sur des cas difficiles — dents incluses "
-          "multiples — qui situe ce que le modèle tient et où il lâche.",
-    "en": "An independent evaluation on hard cases — multiple impacted teeth — "
+    "fr": "Une évaluation indépendante sur des cas difficiles, dents incluses "
+          "multiples, qui situe ce que le modèle tient et où il lâche.",
+    "en": "An independent evaluation on hard cases, multiple impacted teeth, "
           "showing where the model holds and where it gives way.",
-    "pt": "Uma avaliação independente em casos difíceis — múltiplos dentes impactados — "
+    "pt": "Uma avaliação independente em casos difíceis, múltiplos dentes impactados, "
           "que mostra onde o modelo se sustenta e onde falha.",
     "ko": "어려운 증례(다수의 매복치)에 대한 독립적인 평가입니다. 모델이 어디서 버티고 "
           "어디서 무너지는지 보여 줍니다.",
-    "th": "การประเมินอิสระในกรณียาก — ฟันคุดหลายซี่ — ที่แสดงว่าแบบจำลองทำงานได้ดีตรงไหน "
+    "th": "การประเมินอิสระในกรณียาก (ฟันคุดหลายซี่) ที่แสดงว่าแบบจำลองทำงานได้ดีตรงไหน "
           "และล้มเหลวตรงไหน"},
   ]},
 
@@ -661,14 +661,14 @@ PAPERS = {
     "title": "Prevalence of mandibular asymmetry in different skeletal sagittal "
              "patterns: A systematic review",
     "fr": "Prévalence de l'asymétrie mandibulaire selon le schéma squelettique "
-          "sagittal — pour situer un patient par rapport à une population.",
-    "en": "Prevalence of mandibular asymmetry across sagittal skeletal patterns — "
+          "sagittal, pour situer un patient par rapport à une population.",
+    "en": "Prevalence of mandibular asymmetry across sagittal skeletal patterns, "
           "to place a patient against a population.",
     "pt": "Prevalência da assimetria mandibular nos diferentes padrões esqueléticos "
-          "sagitais — para situar um paciente em relação a uma população.",
+          "sagitais, para situar um paciente em relação a uma população.",
     "ko": "시상 골격 유형별 하악 비대칭의 유병률입니다. 환자를 모집단과 비교해 위치시킬 "
           "때 참고합니다.",
-    "th": "ความชุกของความไม่สมมาตรของขากรรไกรล่างในรูปแบบโครงกระดูกแนวซาจิตทัลต่าง ๆ — "
+    "th": "ความชุกของความไม่สมมาตรของขากรรไกรล่างในรูปแบบโครงกระดูกแนวซาจิตทัลต่าง ๆ, "
           "เพื่อระบุตำแหน่งของผู้ป่วยเทียบกับประชากร"},
    {"url": "https://doi.org/10.1093/ejo/cjag012",
     "ref": "Peng et al., European Journal of Orthodontics 2026",
@@ -729,15 +729,15 @@ PAPERS = {
     "ref": "Selvaraju et al., ICCV 2017",
     "title": "Grad-CAM: Visual Explanations from Deep Networks via Gradient-based "
              "Localization",
-    "fr": "La méthode derrière les cartes de chaleur que le module affiche — et "
+    "fr": "La méthode derrière les cartes de chaleur que le module affiche, et "
           "ses limites, qu'il vaut mieux connaître avant de les interpréter.",
-    "en": "The method behind the heat maps the module displays — and its limits, "
+    "en": "The method behind the heat maps the module displays, and its limits, "
           "worth knowing before interpreting them.",
-    "pt": "O método por trás dos mapas de calor que o módulo exibe — e seus limites, "
+    "pt": "O método por trás dos mapas de calor que o módulo exibe, e seus limites, "
           "que vale conhecer antes de interpretá-los.",
     "ko": "모듈이 표시하는 히트맵의 바탕이 되는 방법과 그 한계를 다룹니다. 히트맵을 "
           "해석하기 전에 알아 두는 것이 좋습니다.",
-    "th": "วิธีเบื้องหลังแผนที่ความร้อน (heat map) ที่โมดูลแสดง — และข้อจำกัดของวิธีนี้ "
+    "th": "วิธีเบื้องหลังแผนที่ความร้อน (heat map) ที่โมดูลแสดง, และข้อจำกัดของวิธีนี้ "
           "ซึ่งควรทราบก่อนตีความ"},
   ]},
 
@@ -898,14 +898,14 @@ PAPERS = {
              "Patterns of Condylar Remodelling After Orthognathic Surgery in "
              "Skeletal Class III Patients",
     "fr": "Un travail du laboratoire où ce recadrage en série sert d'étape "
-          "préparatoire — un exemple de ce à quoi le module est utile.",
-    "en": "A lab study where this batch cropping is a preparation step — an "
+          "préparatoire, un exemple de ce à quoi le module est utile.",
+    "en": "A lab study where this batch cropping is a preparation step, an "
           "example of what the module is good for.",
     "pt": "Um estudo do laboratório em que esse recorte em lote é uma etapa de "
-          "preparação — um exemplo da utilidade do módulo.",
+          "preparação, um exemplo da utilidade do módulo.",
     "ko": "이 일괄 자르기를 준비 단계로 사용한 연구실의 연구입니다. 이 모듈의 쓰임새를 "
           "보여 주는 예입니다.",
-    "th": "งานวิจัยของห้องปฏิบัติการที่ใช้การครอปภาพแบบกลุ่มนี้เป็นขั้นเตรียมข้อมูล — "
+    "th": "งานวิจัยของห้องปฏิบัติการที่ใช้การครอปภาพแบบกลุ่มนี้เป็นขั้นเตรียมข้อมูล, "
           "ตัวอย่างของประโยชน์ของโมดูล"},
   ]},
 
@@ -981,18 +981,18 @@ PAPERS = {
     "ref": "Wiest et al., npj Digital Medicine 2024",
     "title": "Privacy-preserving large language models for structured medical "
              "information retrieval",
-    "fr": "Exactement l'usage visé — extraire des champs structurés d'un compte "
-          "rendu avec un modèle qui tourne en local — et ce que ça donne "
+    "fr": "Exactement l'usage visé, extraire des champs structurés d'un compte "
+          "rendu avec un modèle qui tourne en local, et ce que ça donne "
           "réellement.",
-    "en": "Exactly the intended use — pulling structured fields out of a report "
-          "with a locally-run model — and what it actually achieves.",
-    "pt": "Exatamente o uso pretendido — extrair campos estruturados de um relatório "
-          "com um modelo executado localmente — e o que isso de fato alcança.",
+    "en": "Exactly the intended use, pulling structured fields out of a report "
+          "with a locally-run model, and what it actually achieves.",
+    "pt": "Exatamente o uso pretendido, extrair campos estruturados de um relatório "
+          "com um modelo executado localmente, e o que isso de fato alcança.",
     "ko": "이 모듈이 의도한 용도, 즉 로컬에서 실행하는 모델로 보고서에서 구조화된 "
           "항목을 추출하는 일을 정확히 다루며, 실제로 어느 정도의 성과를 내는지 보여 "
           "줍니다.",
-    "th": "ตรงกับการใช้งานที่ตั้งใจไว้ทุกประการ — "
-          "การดึงข้อมูลที่มีโครงสร้างออกจากรายงานด้วยแบบจำลองที่ทำงานบนเครื่อง — และผลที่ได้จริง"},
+    "th": "ตรงกับการใช้งานที่ตั้งใจไว้ทุกประการ ("
+          "การดึงข้อมูลที่มีโครงสร้างออกจากรายงานด้วยแบบจำลองที่ทำงานบนเครื่อง) และผลที่ได้จริง"},
    {"url": "https://doi.org/10.1136/bmjhci-2025-101894",
     "ref": "Panchal et al., BMJ Health & Care Informatics 2026",
     "title": "Benchmarking large language models for de-identification of "
@@ -1045,14 +1045,14 @@ PAPERS = {
     "title": "BART: Denoising Sequence-to-Sequence Pre-training for Natural "
              "Language Generation, Translation, and Comprehension",
     "fr": "Le modèle amont que MedX affine. Explique ce que le résumé sait faire "
-          "— et qu'il reformule, donc qu'il peut inventer.",
+          ", et qu'il reformule, donc qu'il peut inventer.",
     "en": "The upstream model MedX fine-tunes. Explains what the summariser can "
-          "do — and that it rephrases, so it can invent.",
+          "do, and that it rephrases, so it can invent.",
     "pt": "O modelo de base que o MedX ajusta (fine-tune). Explica o que o sumarizador "
-          "consegue fazer — e que ele reformula, portanto pode inventar.",
+          "consegue fazer, e que ele reformula, portanto pode inventar.",
     "ko": "MedX가 미세조정하는 원본 모델입니다. 요약기가 무엇을 할 수 있는지, 그리고 "
           "문장을 바꿔 쓰기 때문에 없는 내용을 지어낼 수 있다는 점을 설명합니다.",
-    "th": "แบบจำลองต้นทางที่ MedX นำมาปรับแต่ง อธิบายว่าตัวสรุปความทำอะไรได้ — "
+    "th": "แบบจำลองต้นทางที่ MedX นำมาปรับแต่ง อธิบายว่าตัวสรุปความทำอะไรได้, "
           "และเนื่องจากมันเรียบเรียงใหม่ จึงอาจแต่งเนื้อหาขึ้นเองได้"},
    {"url": "https://doi.org/10.1053/j.sodo.2021.05.004",
     "ref": "Bianchi et al., Seminars in Orthodontics 2021",
@@ -1071,18 +1071,18 @@ PAPERS = {
   "note": {
    "fr": "Pas de publication : le module assemble des briques existantes "
          "(Presidio, spaCy). Ce qui mérite d'être lu, c'est ce que ces briques "
-         "laissent passer — une anonymisation automatique n'est jamais complète.",
+         "laissent passer : une anonymisation automatique n'est jamais complète.",
    "en": "No publication: the module assembles existing pieces (Presidio, spaCy). "
-         "What is worth reading is what those pieces let through — automatic "
+         "What is worth reading is what those pieces let through: automatic "
          "anonymisation is never complete.",
    "pt": "Não há publicação: o módulo combina componentes existentes (Presidio, spaCy). "
-         "O que vale a pena ler é o que esses componentes deixam passar — a "
+         "O que vale a pena ler é o que esses componentes deixam passar: a "
          "anonimização automática nunca é completa.",
    "ko": "논문은 없습니다. 이 모듈은 기존 구성 요소(Presidio, spaCy)를 조합합니다. 읽어 "
          "볼 가치가 있는 것은 이 구성 요소들이 놓치는 부분입니다. 자동 익명화는 결코 "
          "완전하지 않습니다.",
    "th": "ไม่มีงานตีพิมพ์: โมดูลนี้ประกอบจากส่วนประกอบที่มีอยู่แล้ว (Presidio, spaCy) "
-         "สิ่งที่ควรอ่านคือข้อมูลที่ส่วนประกอบเหล่านี้ปล่อยหลุดไป — การทำให้ข้อมูลนิรนามโดยอัตโนมัติไม่มีวันสมบูรณ์"},
+         "สิ่งที่ควรอ่านคือข้อมูลที่ส่วนประกอบเหล่านี้ปล่อยหลุดไป, การทำให้ข้อมูลนิรนามโดยอัตโนมัติไม่มีวันสมบูรณ์"},
   "self": [],
   "around": [
    {"url": "https://doi.org/10.25259/SNI_459_2025",

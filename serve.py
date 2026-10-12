@@ -70,7 +70,7 @@ class Allow:
             self.port = port
         for num, line in bad:
             log(f"conf ligne {num} ignorée, ni IP ni CIDR : {line!r}")
-        log(f"liste blanche {'chargée' if first else 'rechargée'} — {len(nets)} entrées")
+        log(f"liste blanche {'chargée' if first else 'rechargée'}, {len(nets)} entrées")
         if changed_port:
             log(f"le port est passé à {port} : redémarrer serve.py pour l'appliquer")
 
@@ -105,7 +105,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
         self.wfile.write(
-            f"403 — {peer} n'est pas dans la liste blanche de SADT Atlas.\n"
+            f"403, {peer} n'est pas dans la liste blanche de SADT Atlas.\n"
             f"Ajoute cette adresse dans serve.conf puis enregistre : "
             f"la regle prend effet aussitot.\n".encode("utf-8"))
         return False
@@ -141,7 +141,7 @@ def main():
     if not os.path.exists(args.conf):
         modele = os.path.join(ROOT, "serve.conf.example")
         if args.conf == os.path.join(ROOT, "serve.conf") and os.path.exists(modele):
-            log("serve.conf absent — repli sur serve.conf.example : "
+            log("serve.conf absent, repli sur serve.conf.example : "
                 "la machine elle-même et le tailnet seulement.")
             log("Pour ouvrir à d'autres adresses : cp serve.conf.example serve.conf")
             args.conf = modele
@@ -153,7 +153,7 @@ def main():
     srv = ThreadingHTTPServer(("0.0.0.0", port), Handler)
 
     log(f"SADT Atlas servi depuis {ROOT}")
-    log(f"écoute sur 0.0.0.0:{port} — conf : {args.conf}")
+    log(f"écoute sur 0.0.0.0:{port}, conf : {args.conf}")
     for label, addr in adresses(port):
         log(f"   {label:12s} {addr}")
     try:

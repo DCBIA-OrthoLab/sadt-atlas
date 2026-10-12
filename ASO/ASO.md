@@ -1,4 +1,4 @@
-# ASO — pipeline complet
+# ASO : pipeline complet
 
 Mise en orientation standardisée de CBCT et d'Intra Oral Scans. ASO ne segmente
 rien et ne recale pas deux temps entre eux : il cherche **une rotation rigide qui
@@ -52,7 +52,7 @@ même si le module n'est finalement pas lancé par `slicer.cli.run` (voir §5.1)
 Aucun de ces CLI ne tourne dans l'environnement conda : tous passent par
 `slicer.cli.run`, donc dans le Python de Slicer. Seul `dentalmodelseg` passe par
 `conda run -n shapeaxi` ([ASO.py:1417](ASO/ASO.py#L1417)). **Aucun CLI d'ASO
-n'exige CUDA** — c'est du VTK et du SimpleITK.
+n'exige CUDA** : c'est du VTK et du SimpleITK.
 
 ## 3. Le principe géométrique commun
 
@@ -66,7 +66,7 @@ donnant deux orientations différentes.
 
 Dans les deux backends l'estimation suit le même schéma en deux temps :
 
-1. **Une initialisation à 3 points** — une translation puis deux rotations
+1. **Une initialisation à 3 points** : une translation puis deux rotations
    d'axes construits à la main, jamais un Procrustes/Kabsch en moindres carrés ;
 2. **un `vtkIterativeClosestPointTransform` en mode `RigidBody`** sur les nuages
    de points d'ancrage, pour raffiner.
@@ -89,7 +89,7 @@ points **par plus proche voisin** et non par étiquette.
 Le mode automatique n'est donc que le mode semi précédé d'une fabrication des
 landmarks manquants ([CBCT.py:489](ASO/ASO_Method/CBCT.py#L489)).
 
-### 4.2 PRE_ASO_CBCT — recentrage, plus de réseau
+### 4.2 PRE_ASO_CBCT : recentrage, plus de réseau
 
 Malgré son nom et ses six arguments, ce CLI ne fait plus qu'une chose
 ([PRE_ASO_CBCT.py:163](ASO_CBCT/PRE_ASO_CBCT/PRE_ASO_CBCT.py#L163)) :
@@ -119,18 +119,18 @@ poids `PreASOModels.zip` sont toujours téléchargés et validés
 rien.
 
 Sortie : le volume recentré sous son nom d'origine, et
-`<nom sans extension>.tfm` contenant la translation `T` — **non inversée**, alors
+`<nom sans extension>.tfm` contenant la translation `T`, **non inversée**, alors
 que c'est `translation.GetInverse()` qui a été appliquée au volume.
 
 `convertdicom2nifti` ([utils.py:504](ASO_CBCT/ASO_CBCT_utils/utils.py#L504)) tente
 `sitk.ImageSeriesReader` puis retombe sur `dicom2nifti`. Ce repli est cassé :
 il appelle `search(output_folder, "nii.gz")`, or `search`
 ([utils.py:189](ASO_CBCT/ASO_CBCT_utils/utils.py#L189)) est déclaré
-`def search(self, path, *args)` — le premier argument est absorbé par `self`,
+`def search(self, path, *args)`, le premier argument est absorbé par `self`,
 `args` est vide, le dict retourné est vide et l'accès `["nii.gz"]` lève un
 `KeyError`.
 
-### 4.3 ALI_CBCT — le fournisseur de landmarks
+### 4.3 ALI_CBCT : le fournisseur de landmarks
 
 Appelé sur le dossier temporaire, en entrée comme en sortie, avec des constantes
 codées en dur ([CBCT.py:515](ASO/ASO_Method/CBCT.py#L515)) : `spacing="[1,0.3]"`,
@@ -147,9 +147,9 @@ Les poids sont des `<Landmark>_Net*.pth` téléchargés un par landmark depuis
 C'est la raison d'être de `MergeJson`
 ([utils.py:65](ASO_CBCT/ASO_CBCT_utils/utils.py#L65)), premier appel de
 SEMI_ASO_CBCT : recoller les jsons par groupe en un `<patient>_lm_MERGED.mrk.json`
-— **et supprimer les fichiers sources** (`os.remove`).
+, **et supprimer les fichiers sources** (`os.remove`).
 
-### 4.4 SEMI_ASO_CBCT — l'orientation
+### 4.4 SEMI_ASO_CBCT : l'orientation
 
 **a) Élagage des landmarks aberrants.** `GetLandmarkToRemove`
 ([utils.py:413](ASO_CBCT/ASO_CBCT_utils/utils.py#L413)) compare la **matrice
@@ -172,7 +172,7 @@ minimise la distance moyenne finale. Bornes : `n(n-1)(n-2)` triplets distincts o
 
 1. translation amenant `A_source` sur `A_target` ;
 2. rotation d'axe `cross(v2, v1)` et d'angle `arccos` du produit scalaire, où
-   `v1 = abs(B - A)` côté source et `v2 = abs(B - A)` côté cible — les
+   `v1 = abs(B - A)` côté source et `v2 = abs(B - A)` côté cible : les
    **valeurs absolues** composante par composante, ce qui replie les deux vecteurs
    dans l'octant positif et n'est pas l'angle entre les vecteurs réels ;
 3. troisième rotation dont l'**axe est `abs(B - A)` lui-même**, pas un produit
@@ -182,7 +182,7 @@ minimise la distance moyenne finale. Bornes : `n(n-1)(n-2)` triplets distincts o
 `RotationMatrix` ([utils.py:921](ASO_CBCT/ASO_CBCT_utils/utils.py#L921)) est la
 formule de Rodrigues par quaternion, identique à celle de FlexReg et d'ASO_IOS.
 Point crucial : `TransformMatrix = RotationTransformMatrix  # @ TranslationTransformMatrix`
-— la translation de l'étape 1 est **volontairement exclue** de la matrice
+, la translation de l'étape 1 est **volontairement exclue** de la matrice
 retournée. Elle sert à calculer les rotations, pas à déplacer le volume.
 
 **d) L'ICP.** `ICP_Transform` ([utils.py:620](ASO_CBCT/ASO_CBCT_utils/utils.py#L620))
@@ -204,7 +204,7 @@ TransformSITK = TransformSITK.GetInverse()
 ```
 
 **Le résultat final est donc une rotation pure autour de l'origine du monde.**
-C'est cohérent parce que PRE_ASO_CBCT a centré le volume sur cette origine — et
+C'est cohérent parce que PRE_ASO_CBCT a centré le volume sur cette origine, et
 c'est précisément ce qui manque au mode semi.
 
 `ResampleImage` ([utils.py:835](ASO_CBCT/ASO_CBCT_utils/utils.py#L835)) fait
@@ -227,7 +227,7 @@ un dossier de sortie non vide ne réécrit rien** et se termine en succès.
 
 ## 5. ASO_IOS
 
-### 5.1 Mode automatique — centroïdes de couronnes
+### 5.1 Mode automatique : centroïdes de couronnes
 
 **a) Bypass de la segmentation.** `__BypassCrownseg__`
 ([IOS.py:196](ASO/ASO_Method/IOS.py#L196)) ouvre chaque maillage et cherche un
@@ -254,8 +254,8 @@ architecture et poids `latest` non déterminables depuis ce dépôt.
 Le `dentalmodelseg_path` calculé dans `Process` est mort : `run_conda_tool`
 ([ASO.py:1417](ASO/ASO.py#L1417)) le remplace par le résultat d'un
 `which dentalmodelseg` dans l'environnement. La branche `if os.path.isfile(path_input)`
-([IOS.py:266](ASO/ASO_Method/IOS.py#L266)) est morte elle aussi — `path_input` est
-toujours un dossier créé par `os.makedirs` — et référence un `self.input` qui
+([IOS.py:266](ASO/ASO_Method/IOS.py#L266)) est morte elle aussi, `path_input` est
+toujours un dossier créé par `os.makedirs`, et référence un `self.input` qui
 n'existe pas. `path_preor` est créé et jamais utilisé.
 
 L'exécution est **synchrone et bloquante** : `run_conda_tool` boucle sur
@@ -263,7 +263,7 @@ L'exécution est **synchrone et bloquante** : `run_conda_tool` boucle sur
 en relisant le log, puis retire l'étape de la file avant que `onPredictButton` ne
 lance `slicer.cli.run` sur la suivante.
 
-**c) `PrePreAso` — l'orientation**, le cœur
+**c) `PrePreAso`, l'orientation**, le cœur
 ([pre_icp.py:103](ASO_IOS/ASO_IOS_utils/pre_icp.py#L103)). `organizeLandmark` ([pre_icp.py:43](ASO_IOS/ASO_IOS_utils/pre_icp.py#L43)) trie les
 3 ou 4 dents choisies en `(gauche, milieu(x), droite)` en exploitant la
 numérotation universelle : sur l'arcade haute (1–16) le numéro croît de la droite
@@ -278,7 +278,7 @@ sont moyennés entre eux → on retombe toujours sur **trois points**.
 droite→gauche, `direction = cross(normal, perpen)`. Puis :
 
 1. rotation d'axe `cross(normal_source, normal_target)` et d'angle
-   `arccos(dot)` — le plan des trois centroïdes du scan est amené sur celui du gold ;
+   `arccos(dot)` : le plan des trois centroïdes du scan est amené sur celui du gold ;
 2. `direction_source` est tournée par cette matrice, puis une seconde rotation
    d'axe `cross(direction_source, direction_target)` fixe le roulis dans ce plan ;
 3. translation faisant coïncider les **barycentres** des deux triplets.
@@ -291,25 +291,25 @@ maillage transformé.
 appliquée aux deux maillages avant l'enchaînement : **l'ICP ne voit que les 3 ou
 4 centroïdes**, jamais la géométrie des couronnes. `InitIcp`
 ([icp.py:136](ASO_IOS/ASO_IOS_utils/icp.py#L136)) est la transposition en classe du
-`InitICP` d'ASO_CBCT — mêmes `abs()`, même axe de roulis, même
+`InitICP` d'ASO_CBCT, mêmes `abs()`, même axe de roulis, même
 `FindOptimalLandmarks` à 2500 tirages. `vtkICP` est le même
 `vtkIterativeClosestPointTransform` rigide, mais à **100 itérations** au lieu de
 1000, et sa translation n'est pas écrasée.
 
 Détail révélateur : `InitIcp.__call__` fait `np.save` de `source` et `target` dans
 `ASO_IOS_utils/cache/`, et `FindOptimalLandmarks` **recharge le `.npy` à chaque
-itération** au lieu de copier le dict en mémoire — contournement d'une mutation,
+itération** au lieu de copier le dict en mémoire, contournement d'une mutation,
 au prix d'une écriture dans l'arborescence installée du module (les deux `.npy`
 ont été versionnés puis retirés, commit `a334a10`).
 
 La matrice finale est `output_icp["matrix"] @ matrix` : ICP après PrePreAso.
 
-### 5.2 Mode semi — landmarks fournis
+### 5.2 Mode semi : landmarks fournis
 
 [SEMI_ASO_IOS.py](ASO_IOS/SEMI_ASO_IOS/SEMI_ASO_IOS.py). Même machinerie, `option`
 devient `SelectKey(liste_de_landmarks)` ([icp.py:480](ASO_IOS/ASO_IOS_utils/icp.py#L480)) :
 un simple filtre de clés sur les dictionnaires de landmarks. Plus de `PrePreAso`,
-plus de segmentation — `InitIcp` puis `vtkICP` sur les landmarks nommés.
+plus de segmentation : `InitIcp` puis `vtkICP` sur les landmarks nommés.
 
 Les noms de landmarks sont fabriqués par produit cartésien dans l'UI :
 `{dent}{repère}` avec repère ∈ `O, MB, DB` (occlusaux) ou `CB, CL, OIP, R, RIP`
@@ -342,7 +342,7 @@ silencieusement traité comme mandibulaire.
 | `<nom>Error.txt` | `WritefileError` | dans le sous-dossier `Error/` du dossier de sortie |
 
 Avec le suffixe par défaut `Or` et le `_Seg` ajouté par la segmentation, un fichier
-`P01_U.vtk` ressort en `P01_U_SegOr.vtk` — le nom qu'attend AREG_IOS.
+`P01_U.vtk` ressort en `P01_U_SegOr.vtk` : le nom qu'attend AREG_IOS.
 
 `saveMatrixAsTfm` ([utils.py:300](ASO_IOS/ASO_IOS_utils/utils.py#L300)) inverse la
 matrice (convention ITK fixed → moving) et l'écrit en `AffineTransform`. **Aucune
@@ -372,7 +372,7 @@ contient les classes dont `FlexReg_Method/util.py` reprend `vtkTeeth`,
 Conséquence pratique : FlexReg produit un repère **canonique et reproductible**
 (plan occlusal ≈ z=0, +y antérieur), ce qui lui permet ensuite de raisonner en 2D
 dans le plan XY. ASO_IOS produit une orientation **relative à un patient de
-référence** — aucune garantie que le plan occlusal tombe sur z=0, et pas de
+référence** : aucune garantie que le plan occlusal tombe sur z=0, et pas de
 raffinement ICP dans FlexReg là où ASO en ajoute un.
 
 ## 7. Ce qui est prédit vs ce qui est calculé
@@ -429,12 +429,12 @@ wheel dont le tag ne correspond pas au torch présent produit un `undefined symb
 - **Le mode semi-CBCT est cassé en l'état.**
   [SEMI_ASO_CBCT.py:113](ASO_CBCT/SEMI_ASO_CBCT/SEMI_ASO_CBCT.py#L113) exige
   `data["tfm"]`, introduit par le commit `1bfb51f` en même temps que la sortie de
-  matrice. Ce `.tfm` n'existe que parce que PRE_ASO_CBCT l'écrit — or le mode semi
+  matrice. Ce `.tfm` n'existe que parce que PRE_ASO_CBCT l'écrit, or le mode semi
   ne lance pas PRE_ASO_CBCT et travaille sur le dossier brut de l'utilisateur.
   Résultat : `KeyError` sur tout patient dont le dossier ne contient pas déjà un
   `.tfm`, capturé et journalisé en « missing required files », le patient étant
   compté en échec sans interrompre les autres. Le mode ne fonctionne donc que si
-  un `.tfm` traîne à côté du scan — typiquement après un passage préalable en
+  un `.tfm` traîne à côté du scan, typiquement après un passage préalable en
   mode Fully, puisque
   [PRE_ASO_CBCT.py:217](ASO_CBCT/PRE_ASO_CBCT/PRE_ASO_CBCT.py#L217) écrit le sien
   dans le dossier du scan. Vérifié : `GetPatients`
@@ -461,7 +461,7 @@ wheel dont le tag ne correspond pas au torch présent produit un `undefined symb
   avait déjà mis de travers.
 - **Les `abs()` de `InitICP`.** Les vecteurs sont repliés dans l'octant positif
   avant le calcul d'angle, dans les deux backends. Le triplet retenu étant celui
-  qui minimise l'erreur *mesurée*, la recherche compense — mais il n'y a rien à
+  qui minimise l'erreur *mesurée*, la recherche compense, mais il n'y a rien à
   conclure de la géométrie de l'étape prise isolément.
 - **Rien n'est réécrit si le fichier existe.** Les trois sorties CBCT sont gardées
   par `if not os.path.exists`. Une seconde passe après correction d'un paramètre
@@ -503,7 +503,7 @@ tomography** (Gillot et al., *Orthodontics & Craniofacial Research*, 2023).
 **ASO_IOS n'a pas de papier propre.** Le texte publié le plus proche est
 *AReg IOS: Automatic Registration on IntraOral Scans* (Hutin, Anchling, Cevidanes
 et al., LNCS 2023), qui décrit l'alignement initial par centroïdes de dents
-communs — c'est-à-dire exactement `PrePreAso`. Le reste (choix des dents par
+communs, c'est-à-dire exactement `PrePreAso`. Le reste (choix des dents par
 l'opérateur, raffinement ICP sur 3 centroïdes, mode occlusion) est un
 développement interne non publié.
 

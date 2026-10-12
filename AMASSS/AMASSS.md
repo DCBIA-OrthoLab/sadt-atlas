@@ -1,4 +1,4 @@
-# AMASSS — pipeline complet
+# AMASSS : pipeline complet
 
 Segmentation automatique multi-structures de CBCT crânio-faciaux. Une structure
 anatomique = un réseau binaire. Le backend est **nnU-Net v2**, appelé par l'API
@@ -32,7 +32,7 @@ résolution (§4).
 |---|---|---|
 | [AMASSS/AMASSS.py](AMASSS/AMASSS.py) | widget Slicer, 1654 lignes dont ~450 de feuilles de style clair/sombre | Python de Slicer |
 | [AMASSS_CLI/AMASSS_CLI.py](AMASSS_CLI/AMASSS_CLI.py) | toute la logique : découverte des modèles, inférence, assemblage des sorties | Python de Slicer, via `slicer.cli.run` |
-| [AMASSS_CLI/AMASSS_CLI.xml](AMASSS_CLI/AMASSS_CLI.xml) | déclaration des **12 paramètres positionnels** | — |
+| [AMASSS_CLI/AMASSS_CLI.xml](AMASSS_CLI/AMASSS_CLI.xml) | déclaration des **12 paramètres positionnels** | : |
 
 Le CLI **n'est pas** lancé dans un environnement conda : `slicer.cli.run` le
 démarre dans le Python de Slicer, et depuis le portage de septembre 2026
@@ -62,11 +62,11 @@ XML**, il est silencieusement jeté. Voir §9.
 ### 3.1 Découverte des fichiers
 
 `main()` accepte un fichier ou un dossier, parcouru en **`os.walk` récursif**
-([AMASSS_CLI.py:676](AMASSS_CLI/AMASSS_CLI.py#L676)) — nécessaire parce qu'AREG
+([AMASSS_CLI.py:676](AMASSS_CLI/AMASSS_CLI.py#L676)), nécessaire parce qu'AREG
 écrit ses scans recalés dans `<output>/<Region>/<patient>_OutReg/`. Extensions
 retenues : `.nii`, `.nii.gz`, `.nrrd`, `.nrrd.gz`. Deux filtres : tout nom
 contenant `MASK` est ignoré, et si `isSegmentInput` est faux, tout nom contenant
-`_<prediction_ID>_` l'est aussi — c'est la sortie d'un passage précédent, la
+`_<prediction_ID>_` l'est aussi, c'est la sortie d'un passage précédent, la
 re-segmenter donnerait un masque vide.
 
 Le widget, lui, compte les fichiers avec une liste d'extensions **différente**
@@ -82,7 +82,7 @@ copie chaque scan dans un dossier unique `<temp>/nnunet_input/` sous le nom
 Un `.nii.gz` est copié tel quel ; **tout le reste est relu et réécrit par
 SimpleITK**. Ce n'est pas cosmétique : la version antérieure faisait un
 `shutil.copy` d'un NRRD vers un nom `.nii.gz`, et le lecteur de nnU-Net choisit
-son format sur l'extension — le NRRD, format par défaut de Slicer, était donc en
+son format sur l'extension, le NRRD, format par défaut de Slicer, était donc en
 pratique cassé. Le type de voxel est laissé intact, nnU-Net castant en float32
 lui-même.
 
@@ -91,7 +91,7 @@ lui-même.
 Aucune normalisation d'intensité, aucun fenêtrage, aucun resampling **n'est
 écrit dans ce dépôt**. `CorrectHisto()`
 ([AMASSS_CLI.py:271](AMASSS_CLI/AMASSS_CLI.py#L271)) subsiste, corps vidé : elle
-lit l'image, la caste en float32 et la retourne — ni percentiles, ni clipping, ni
+lit l'image, la caste en float32 et la retourne, ni percentiles, ni clipping, ni
 écriture, malgré sa signature `(min_porcent, max_porcent, i_min, i_max)`. **Elle
 n'est appelée nulle part** : code mort.
 
@@ -119,7 +119,7 @@ les autres. La découverte a lieu **une seule fois pour tout le run**.
 
 Téléchargement : le bouton *Download latest models* ouvre simplement un
 navigateur ([AMASSS.py:738](AMASSS/AMASSS.py#L738)) sur `MODEL_LINK`, la page
-[releases/tag/AMASSS_CBCT](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/tag/AMASSS_CBCT) —
+[releases/tag/AMASSS_CBCT](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/tag/AMASSS_CBCT),
 **aucun téléchargement automatique** côté AMASSS. L'archive est
 [AMASSS_Models.zip](https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/AMASSS_CBCT/AMASSS_Models.zip),
 que AREG ([CBCT.py:124](AREG/AREG_Method/CBCT.py#L124),
@@ -162,7 +162,7 @@ convolutionnel que nnU-Net configure lui-même, sans blocs résiduels ; les
 `batch_size = 2`, `use_mask_for_norm = [false]` partout.
 
 **Chaque modèle est binaire.** Les `dataset.json` ne déclarent que
-`{background: 0, <une structure>: 1}` — et pour les six modèles full-FOV le nom
+`{background: 0, <une structure>: 1}`, et pour les six modèles full-FOV le nom
 du label est resté `"Skin"` par copier-coller, y compris pour `MAND` ou `CB`. Ce
 nom n'est jamais lu : la sortie est binarisée par `(arr > 0)`
 ([AMASSS_CLI.py:586](AMASSS_CLI/AMASSS_CLI.py#L586)) et c'est le CLI qui attribue
@@ -185,13 +185,13 @@ les sorties fusionnées, et `LABEL_COLORS` donne la couleur des surfaces :
 
 Codes **sans modèle dans le bundle** : `RC` (canal radiculaire), `TEETH`, `MCAN`.
 Les deux derniers sont désactivés dans l'UI (`UNAVAILABLE_MODELS`) ; `RC` non, il
-est même dans `DEFAULT_SELECT` ([AMASSS.py:256](AMASSS/AMASSS.py#L256)) — coché
+est même dans `DEFAULT_SELECT` ([AMASSS.py:256](AMASSS/AMASSS.py#L256)), coché
 par défaut, il finit dans `missing_structures` avec un `logger.warning`.
 
 `LABELS["SMALL"]` (`MAND:1, RC:2, MAX:4`), `MODELS_GROUP`
-([AMASSS_CLI.py:256](AMASSS_CLI/AMASSS_CLI.py#L256)) — qui décrivait les modèles
+([AMASSS_CLI.py:256](AMASSS_CLI/AMASSS_CLI.py#L256)), qui décrivait les modèles
 multi-classes de l'ancienne version, `FF` sortant MAND/CB/UAW/MAX/CV en un seul
-réseau — et `NTRANSLATE` ne sont plus lus nulle part : **code mort**.
+réseau, et `NTRANSLATE` ne sont plus lus nulle part : **code mort**.
 
 ### 4.4 L'inférence
 
@@ -285,7 +285,7 @@ par scan : lecture de `p_<NNN>.nii.gz` dans chaque dossier `pred_<STRUCT>`
 recopie **explicitement** spacing, direction et origine du scan de référence,
 puis passe par `MatchReferenceGeometry()`
 ([AMASSS_CLI.py:502](AMASSS_CLI/AMASSS_CLI.py#L502)), qui ne resample (plus
-proche voisin) que si la géométrie diffère — no-op dans le cas normal. La version
+proche voisin) que si la géométrie diffère, no-op dans le cas normal. La version
 antérieure écrivait un volume temporaire et le relisait pour forcer la géométrie :
 deux allers-retours gzip d'un CBCT complet par structure, pour rien.
 
@@ -294,10 +294,10 @@ deux allers-retours gzip d'un CBCT complet par structure, pour rien.
 Aucun remplissage de trous, aucune sélection de composante connexe, aucune
 morphologie n'est appliquée. Deux fonctions subsistent, **appelées nulle part** :
 
-- `CleanArray()` ([AMASSS_CLI.py:422](AMASSS_CLI/AMASSS_CLI.py#L422)) — dilatation
+- `CleanArray()` ([AMASSS_CLI.py:422](AMASSS_CLI/AMASSS_CLI.py#L422)), dilatation
   binaire de rayon `r`, `BinaryFillhole`, érosion de rayon `r`, puis
   `cc3d.connected_components` et conservation de la plus grosse composante ;
-- `CropSkin()` ([AMASSS_CLI.py:489](AMASSS_CLI/AMASSS_CLI.py#L489)) — remplissage,
+- `CropSkin()` ([AMASSS_CLI.py:489](AMASSS_CLI/AMASSS_CLI.py#L489)), remplissage,
   érosion d'épaisseur `thickness`, différence des deux pour ne garder que la
   coque, puis plus grosse composante.
 
@@ -314,14 +314,14 @@ existe). `cc3d` reste importé pour ces deux fonctions mortes, et `Write()`
 depuis `SaveSeg` quand `genVtk` est vrai. Par label : écriture d'un NRRD
 temporaire `<temp>/temp.nrrd` du masque binaire, `vtkNrrdReader` →
 `vtkDiscreteMarchingCubes` avec `GenerateValues(1, 1, 1)` (un seul contour de
-valeur 1 — d'où le passage par un masque binaire plutôt que par la carte de
+valeur 1, d'où le passage par un masque binaire plutôt que par la carte de
 labels) → `vtkSmoothPolyDataFilter` à `vtk_smooth` itérations (5 partout dans le
 dépôt) → `vtkUnsignedCharArray` « Colors », **une couleur constante par cellule**
 tirée de `LABEL_COLORS`.
 
 Deux modes, choisis sur le suffixe `_MERGED` du nom de fichier : en **merged**,
 boucle sur `np.unique(arr)` et concaténation par `vtkAppendPolyData` en **un
-seul** `.vtk` ; en **séparé**, `struct = base.split('_')[-1]` — le code de
+seul** `.vtk` ; en **séparé**, `struct = base.split('_')[-1]`, le code de
 structure est **re-extrait du nom de fichier** pour retrouver la couleur.
 
 Les maillages sont écrits **dans le système de coordonnées de l'image**, sans
@@ -329,7 +329,7 @@ flip LPS/RAS : ce sont des `vtkPolyData` issus des indices du NRRD.
 
 ## 6. Post-traitements et sorties
 
-Nommage — `base` = nom du scan sans extension, `ext` = extension d'origine :
+Nommage, `base` = nom du scan sans extension, `ext` = extension d'origine :
 
 | Mode | Fichier | Contenu |
 |---|---|---|
@@ -342,7 +342,7 @@ Nommage — `base` = nom du scan sans extension, `ext` = extension d'origine :
 `<output_folder>`.
 
 Le dossier temporaire est **effacé puis recréé au démarrage et à la fin**.
-`nnunet_input` est supprimé dès la fin des inférences, avant l'assemblage —
+`nnunet_input` est supprimé dès la fin des inférences, avant l'assemblage :
 sinon un batch garderait une copie NIfTI complète de chaque CBCT jusqu'au bout ;
 les prédictions d'un scan sont supprimées au fil de l'assemblage.
 
@@ -366,7 +366,7 @@ après fermeture de la scène.
 | Binarisation + fusion par labels | géométrique trivial (`np.where`) | CLI |
 | Recalage de géométrie sur le scan | ITK, plus proche voisin, no-op en pratique | CLI |
 | Surfaces VTK | marching cubes + lissage laplacien | CLI |
-| Nettoyage morphologique | **supprimé du pipeline** (code mort) | — |
+| Nettoyage morphologique | **supprimé du pipeline** (code mort) | : |
 
 ## 8. Environnement
 
@@ -398,7 +398,7 @@ ALI_IOS), AMASSS n'utilise aucun environnement externe.
 
 - **`highDefinition` / « small FOV » ne fait plus rien de ce qu'il prétend.**
   La case `smallFOVCheckBox` bascule la liste des structures proposées vers
-  `GROUPS_HD_SEG` ([AMASSS.py:747](AMASSS/AMASSS.py#L747)) — mandibule,
+  `GROUPS_HD_SEG` ([AMASSS.py:747](AMASSS/AMASSS.py#L747)), mandibule,
   maxillaire, dents, canal radiculaire, canal mandibulaire, dont trois n'ont pas
   de modèle. Le flag `param["highDefinition"]` **n'est pas déclaré dans le XML**,
   `slicer.cli.run` le jette, et le CLI n'a de toute façon plus aucun chemin
@@ -407,7 +407,7 @@ ALI_IOS), AMASSS n'utilise aucun environnement externe.
 - **`isDCMInput` est lu puis ignoré** : `dicom2nifti` est importé en tête de
   fichier et jamais utilisé, aucune conversion DICOM → NIfTI n'existe dans le
   CLI, alors que l'UI propose « DICOM Files » comme type d'entrée. Une entrée
-  DICOM ne produit rien — aucun fichier n'a d'extension reconnue.
+  DICOM ne produit rien : aucun fichier n'a d'extension reconnue.
 - **`RC` coché par défaut sans modèle disponible** : `DEFAULT_SELECT` inclut
   « Root canal », le bundle publié n'a pas de dossier `RC`. Échec silencieux.
 - **Écrasement du dossier temporaire.** `temp_fold` est `rmtree` sans condition
@@ -426,7 +426,7 @@ ALI_IOS), AMASSS n'utilise aucun environnement externe.
 - **`cleanup()` du widget** ([AMASSS.py:1348](AMASSS/AMASSS.py#L1348)) fait
   `shutil.rmtree(os.path.join("..", "temp"))` : chemin relatif au répertoire
   courant de Slicer, sans rapport avec `temp_fold`. L'exception est avalée.
-- **Code mort à connaître** — CLI : `CorrectHisto`, `CleanArray`, `CropSkin`,
+- **Code mort à connaître**, CLI : `CorrectHisto`, `CleanArray`, `CropSkin`,
   `Write`, `MODELS_GROUP`, `LABELS["SMALL"]`, `NTRANSLATE`. Widget :
   `GetSegGroup`, `createProgressDialog`, `UpdateRunBtn` (qui lirait
   `self.scan_ready`, **jamais défini** → `AttributeError`), `self.center_all`,
@@ -442,7 +442,7 @@ AMASSS est publié, une fois :
 > segmentation of cone-beam computed tomography scans using 3D UNETR.*
 > PLOS ONE 17(10):e0275033, 2022.
 > [doi:10.1371/journal.pone.0275033](https://doi.org/10.1371/journal.pone.0275033)
-> — PMID 36223330, [PMC9555672](https://pmc.ncbi.nlm.nih.gov/articles/PMC9555672/)
+>, PMID 36223330, [PMC9555672](https://pmc.ncbi.nlm.nih.gov/articles/PMC9555672/)
 
 **Le code a divergé du papier, complètement.** Le papier décrit un **UNETR**
 (encodeur transformer + décodeur convolutionnel, bibliothèque MONAI) : patches
@@ -452,11 +452,11 @@ resampling isotrope **0,4 mm** et ajustement de contraste par histogramme cumul�
 aux percentiles 1 % / 99 %. Dice rapportés : peau 0,971, mandibule 0,962,
 maxillaire 0,853, base du crâne 0,788, vertèbre cervicale 0,760.
 
-C'est ce que faisait la version historique du CLI — `Create_UNETR(...)`,
+C'est ce que faisait la version historique du CLI, `Create_UNETR(...)`,
 `sliding_window_inference(input_img, [128,128,128], nbr_GPU_worker, net,
 overlap=precision/100, sw_device=DEVICE, ...)`, `CorrectHisto` +
 `ScaleIntensityd(0,1)` + `Spacingd(pixdim=[0.4,0.4,0.4])` ou `[0.16,0.16,0.32]`
-en haute définition, puis `CleanArray`/`CropSkin` — lisible dans le dépôt
+en haute définition, puis `CleanArray`/`CropSkin`, lisible dans le dépôt
 jusqu'au commit `61bbb15` « ENH: AMASSS with nnunet ». Le spacing haute
 définition et le `precision` de l'UI étaient des paramètres du code, pas du
 papier ; un `Create_SwinUNETR(feature_size=48)` y coexistait, commenté.

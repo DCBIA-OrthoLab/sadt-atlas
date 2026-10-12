@@ -42,7 +42,7 @@ def manifest():
         try:
             mod = importlib.import_module(name)
         except Exception as exc:
-            print("  !! %s : import impossible (%s) — ses entrees seront absentes"
+            print("  !! %s : import impossible (%s), ses entrees seront absentes"
                   % (name, type(exc).__name__))
             continue
         for key, val in vars(mod).items():
@@ -88,7 +88,7 @@ def main():
         sys.exit("Manifeste vide : aucun generateur n'a pu etre importe. "
                  "Lance ce script avec PythonSlicer, pas avec python3 nu.")
 
-    print("\n— ce que les generateurs lisent —")
+    print("\n== ce que les generateurs lisent ==")
     total = files = 0
     for rel in sorted(man):
         sz, n = size_of(os.path.join(HOME_DATA, rel))
@@ -98,7 +98,7 @@ def main():
     print("\n  TOTAL %d fichiers, %.2f Go" % (files, total / 1e9))
 
     if not go:
-        print("\n  (essai a blanc — relance avec --go pour copier vers %s)" % dest)
+        print("\n  (essai a blanc : relance avec --go pour copier vers %s)" % dest)
         return
 
     # GARDE-FOU. Si le disque ne s'est pas monte, son point de montage est un
@@ -116,7 +116,7 @@ def main():
                  "Monte le disque (il est dans /etc/fstab) puis relance." % parent)
 
     free = shutil.disk_usage(parent).free
-    print("\n  destination %s — %.1f Go libres" % (dest, free / 1e9))
+    print("\n  destination %s, %.1f Go libres" % (dest, free / 1e9))
     if free < total * 1.1:
         sys.exit("Pas assez de place : il faut %.1f Go, il en reste %.1f."
                  % (total / 1e9, free / 1e9))
@@ -137,7 +137,7 @@ def main():
 
     with open(os.path.join(dest, "MANIFESTE.txt"), "w", encoding="utf-8") as f:
         f.write("Entrees des generateurs de sadt-atlas.\n")
-        f.write("Genere par sync_data.py — ne pas editer a la main.\n\n")
+        f.write("Genere par sync_data.py, ne pas editer a la main.\n\n")
         f.write("Pour s'en servir a la place de ~/Documents :\n")
         f.write("  export SADT_ATLAS_DATA=%s\n\n" % dest)
         for rel in sorted(man):

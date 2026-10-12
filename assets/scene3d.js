@@ -1,4 +1,4 @@
-/* scene3d.js — le socle WebGL2 commun aux visualiseurs du site.
+/* scene3d.js : le socle WebGL2 commun aux visualiseurs du site.
 
    Pourquoi pas three.js : son GLTFLoader passe par fetch(), bloque en
    file://, et le site doit s'ouvrir sans serveur. Il faudrait lui passer les
@@ -89,7 +89,7 @@
   ].join("\n");
 
   /* Un marqueur : point, trace ou cible. Pas de maillage, juste des
-     triangles engendres a la volee — un agent n'a pas de geometrie. */
+     triangles engendres a la volee : un agent n'a pas de geometrie. */
   var MARK_VERT = [
     "#version 300 es",
     "in vec2 aCorner; in vec3 aCentre; in vec4 aStyle;",  /* rgb + taille */
@@ -188,7 +188,7 @@
   /* Le NIfTI a l'axe Z vers le haut ; GL veut Y. (x,y,z) -> (x, z, -y).
      Toute conversion de centre doit appliquer EXACTEMENT le meme
      redressement, sinon la camera vise une piece et la scene en montre une
-     autre. `Scene3D.up()` est la pour ca — ne le refais pas a la main. */
+     autre. `Scene3D.up()` est la pour ca : ne le refais pas a la main. */
   var MODEL = new Float32Array([1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1]);
 
   var IDENTITY = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
@@ -606,7 +606,7 @@
 
   /* Le medaillon : une seconde passe dans un coin de la meme toile, depuis
      la camera de la piece visee. C'est le rendu 224x224 d'ALI_IOS, avec sa
-     vraie texture — les normales, pas une couleur. */
+     vraie texture : les normales, pas une couleur. */
   Scene3D.prototype.drawInset = function (box, eye, target, only) {
     var gl = this.gl, w = this.canvas.width, h = this.canvas.height;
     var x = Math.round(box.x * w), y = Math.round(box.y * h);
@@ -647,7 +647,7 @@
     this.running = true;
     requestAnimationFrame(function step(now) {
       var dt = self.lastT ? (now - self.lastT) : 16.7;
-      /* Une horloge qui n'avance pas — onglet suspendu, rendu instrumente —
+      /* Une horloge qui n'avance pas, onglet suspendu, rendu instrumente,
          ne doit pas figer l'animation : on compte une image nominale. */
       if (!(dt > 0)) { dt = 16.7; }
       if (dt > 64) { dt = 64; }

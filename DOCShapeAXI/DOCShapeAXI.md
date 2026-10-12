@@ -1,4 +1,4 @@
-# DOCShapeAXI — pipeline complet
+# DOCShapeAXI : pipeline complet
 
 *Dental Oral and Craniofacial Shape Analysis eXplainability and Interpretability.*
 Classification de maillages `.vtk` par un réseau **à deux branches** (nuage de
@@ -7,8 +7,8 @@ systématiquement d'une passe **Grad-CAM** dont le résultat est écrit comme
 scalaire par point sur le maillage.
 
 Un seul geste utilisateur : choisir un type de données, un dossier d'entrée, un
-dossier de sortie. Le reste — quel checkpoint, quelle architecture, combien de
-classes — est déduit du type de données.
+dossier de sortie. Le reste, quel checkpoint, quelle architecture, combien de
+classes, est déduit du type de données.
 
 ## 1. Situation dans la chaîne
 
@@ -36,7 +36,7 @@ version installée peut télécharger des poids publiés après elle.
 |---|---|---|
 | [DOCShapeAXI/DOCShapeAXI.py](DOCShapeAXI/DOCShapeAXI.py) | widget : conda, choix du modèle, barre de progression, ~180 lignes de style sombre | Python de Slicer |
 | [DOCShapeAXI_CLI.py](DOCShapeAXI_CLI/DOCShapeAXI_CLI.py) | **prédiction + explicabilité**, 307 lignes | env conda `shapeaxi`, GPU si dispo |
-| [model_path.json](DOCShapeAXI_CLI/model_path.json) | 5 checkpoints et leurs URLs | — |
+| [model_path.json](DOCShapeAXI_CLI/model_path.json) | 5 checkpoints et leurs URLs | : |
 | [install_pytorch.py](DOCShapeAXI/DOCShapeAXI_utils/install_pytorch.py) | choix de la wheel pytorch3d selon le torch installé, puis `shapeaxi>=2.0.2` | env conda |
 
 Le gros du travail est dans le paquet pip `shapeaxi`, hors dépôt. Les détails
@@ -69,7 +69,7 @@ pas traiter.
 3. facteur d'échelle `1 / ||bounds_max - centre||`, appliqué uniformément.
 
 Le maillage tient donc dans la sphère unité, indépendamment de sa taille réelle.
-**Toute information d'échelle absolue est perdue** — un petit condyle et un gros
+**Toute information d'échelle absolue est perdue** : un petit condyle et un gros
 condyle de même forme sont identiques pour le réseau.
 
 Point à connaître : `saxi_predict` lit `model.hparams.scale_factor` (0.0507 dans
@@ -102,7 +102,7 @@ maillages de tailles différentes passent sans souci.
 ### 4.1 La table de décision
 
 `find_model_name()` / `find_nn_type()`
-([DOCShapeAXI.py:1012](DOCShapeAXI/DOCShapeAXI.py#L1012)) — le mot-clé testé est
+([DOCShapeAXI.py:1012](DOCShapeAXI/DOCShapeAXI.py#L1012)), le mot-clé testé est
 un **token** du libellé du combo (`self.data_type.split(' ')`) :
 
 | Data type (combo) | Token | Tâche | `model` | `nn` | `num_classes` |
@@ -132,7 +132,7 @@ ShapeAXI original. `SaxiMHAFBClassification` (*MHA Fly-By*) a **deux branches
 fusionnées tardivement**. Valeurs confirmées par les `hyper_parameters` du
 checkpoint `condyles_4_class.ckpt` :
 
-**Branche A — nuage de points.**
+**Branche A : nuage de points.**
 
 - `sample_points_from_meshes(X_mesh, 4096)` (pytorch3d) : échantillonnage
   uniforme de **4096 points** sur la surface ;
@@ -146,7 +146,7 @@ checkpoint `condyles_4_class.ckpt` :
   `Linear(256→64) → tanh → Linear(64→1) → sigmoid`, normalisée puis somme
   pondérée) qui **réduit les 128 tokens à un vecteur de 256**.
 
-**Branche B — multi-vues.**
+**Branche B : multi-vues.**
 
 - caméras aux sommets d'un **icosaèdre subdivisé** (`subdivision_level=2`,
   `radius=1.35`). Le buffer `ico_verts` du checkpoint a la forme `(42, 3)` :
@@ -171,7 +171,7 @@ Le rendu est refait à chaque passe : il n'y a pas de cache d'images.
 ### 4.3 Ce que le réseau sort littéralement, et comment on en tire une classe
 
 ```python
-x = model(X_pc, X_views)                       # (1, num_classes) — logits bruts
+x = model(X_pc, X_views)                       # (1, num_classes), logits bruts
 if args.nn == 'SaxiMHAFBClassification':
     x = softmax(x).detach()
     x = torch.argmax(x, dim=1, keepdim=True)   # l'entier de classe
@@ -196,7 +196,7 @@ régression existe sur le même jeu airway.
 ## 5. Le mécanisme d'explicabilité
 
 C'est la partie la plus spécifique du module, et elle tourne **systématiquement**
-après la prédiction — ni option, ni case à cocher
+après la prédiction, ni option, ni case à cocher
 (`saxi_gradcam`, [DOCShapeAXI_CLI.py:126](DOCShapeAXI_CLI/DOCShapeAXI_CLI.py#L126)).
 
 **a) La couche ciblée.**
@@ -227,7 +227,7 @@ et 99**, puis remise affine dans **[-1, 1]**. L'écrêtage par percentiles évit
 qu'un pixel aberrant écrase toute la dynamique ; la sortie est donc signée, pas
 une probabilité.
 
-**d) Reprojection sur le maillage** (`gradcam_process`, dans `shapeaxi`) — le
+**d) Reprojection sur le maillage** (`gradcam_process`, dans `shapeaxi`), le
 cœur du mécanisme :
 
 ```python
@@ -329,7 +329,7 @@ classes différentes.
 | GPU | pas obligatoire (`torch.device('cuda' if …)`) mais `LayerGradCam(..., device_ids=[0])` suppose un GPU 0 | [DOCShapeAXI_CLI.py:148](DOCShapeAXI_CLI/DOCShapeAXI_CLI.py#L148) |
 
 L'ordre d'installation est contraint : `shapeaxi` déclare `pytorch3d`, absent de
-PyPI, donc pip échoue si on le demande dans un env nu — d'où la création de l'env
+PyPI, donc pip échoue si on le demande dans un env nu, d'où la création de l'env
 avec `torch` seul, puis `install_pytorch` qui lit la version de torch pour choisir
 la wheel, puis `shapeaxi`. `verify_gpu()` va jusqu'à exécuter un `knn_points` réel
 sur le GPU : une wheel qui importe mais ne contient pas les kernels de
@@ -354,7 +354,7 @@ donc aussi la rustine ci-dessus.
   Le CLI fait `model(X_pc, X_views)` et utilise le retour comme un tenseur
   ([DOCShapeAXI_CLI.py:227](DOCShapeAXI_CLI/DOCShapeAXI_CLI.py#L227)) : sur 2.0.2
   c'est un `TypeError` (3 arguments positionnels). Et les checkpoints publiés
-  portent `out_classes`, que le `__init__` de 2.0.2 ne lit plus — le
+  portent `out_classes`, que le `__init__` de 2.0.2 ne lit plus : le
   `load_from_checkpoint` échouerait avant même le forward. Autrement dit :
   **ce module attend une version épinglée `shapeaxi<2` que le script
   d'installation n'installe pas**. Soit épingler, soit porter le CLI vers la
@@ -384,7 +384,7 @@ donc aussi la rustine ci-dessus.
   `UnitSurfTransform` transmet son `scale_factor`, le prétraitement changera sans
   que rien ne bouge dans ce dépôt.
 - **Aucune confiance n'est reportée** : seule la classe `argmax` sort. Pour un
-  outil dont le nom contient « explainability », c'est l'angle mort — la carte de
+  outil dont le nom contient « explainability », c'est l'angle mort : la carte de
   saillance dit *où* le réseau a regardé, jamais *à quel point il hésitait*.
 - **La saillance ne couvre qu'une des deux branches** (cf. §5a). Une décision
   prise majoritairement sur la géométrie du nuage de points produira une carte
@@ -400,7 +400,7 @@ donc aussi la rustine ci-dessus.
 - `check_input_parameters` ([DOCShapeAXI.py:469](DOCShapeAXI/DOCShapeAXI.py#L469))
   teste deux fois la même condition, la branche `else` (« Unknown error ») est
   inatteignable.
-- `count_num_subjects` ne compte que les `.vtk` du premier niveau — cohérent avec
+- `count_num_subjects` ne compte que les `.vtk` du premier niveau : cohérent avec
   `csv_edit`, mais aucun des deux n'est récursif.
 - `DOCShapeAXI/__pycache__/DOCShapeAXI.cpython-312.pyc` est versionné.
 
@@ -410,9 +410,9 @@ Trois références, à ne pas confondre :
 
 **1. Le cadre.** *ShapeAXI: Shape Analysis Explainability and Interpretability*,
 Prieto, Miranda, Gurgel, Anchling, Hutin, Barone, Al Turkestani, Aliaga, Yatabe,
-Bianchi, Cevidanes — **Proc. SPIE Medical Imaging, avril 2024**,
+Bianchi, Cevidanes, **Proc. SPIE Medical Imaging, avril 2024**,
 DOI [10.1117/12.3007053](https://doi.org/10.1117/12.3007053). Il rapporte 79.78 %
-sur les condyles et 81.58 % sur la sévérité des fentes — précisément deux des
+sur les condyles et 81.58 % sur la sévérité des fentes : précisément deux des
 trois jeux supportés ici.
 
 **Le code diverge du papier.** Le papier décrit un rendu multi-vues sur
@@ -426,7 +426,7 @@ Hypertrophy-related Upper Airway Obstruction using 3D Shape Analysis*, Mattos et
 al., **J Dent 2025**. Celui-là décrit exactement l'architecture du code :
 branche multi-vues EfficientNet-B0 pré-entraînée ImageNet + attention
 multi-têtes, branche nuage de points de **4096 points** à attention KNN, et
-explicabilité par « SurfGradCAM » — le mécanisme du §5. Les trois tâches
+explicabilité par « SurfGradCAM », le mécanisme du §5. Les trois tâches
 (4 classes, binaire, régression du ratio d'obstruction) correspondent aux trois
 checkpoints `airways_*`. AUC 0.77–0.94, R = 0.854 pour le ratio.
 
@@ -441,7 +441,7 @@ l'expérience « cleft severity » du papier SPIE.
 - [ShapeAXI (dépôt)](https://github.com/DCBIA-OrthoLab/ShapeAXI)
 - [DOC-ShapeAXI (dépôt d'origine)](https://github.com/lucieDLE/DOC-ShapeAXI)
 - [Grad-CAM (Selvaraju et al., 2016)](https://arxiv.org/abs/1610.02391)
-- [Captum — LayerGradCam](https://captum.ai/api/layer.html#gradcam)
+- [Captum, LayerGradCam](https://captum.ai/api/layer.html#gradcam)
 
 Bibliographie complète, fichiers récupérés et liens éditeur : [SOURCES.md](SOURCES.md).
 Elle corrige un point ci-dessus : le jeu *Alveolar Bone Defect in Cleft* a bien

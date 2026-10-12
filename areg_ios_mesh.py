@@ -124,7 +124,7 @@ def main():
 
     t1, t2, t2r, t1r = read(T1), read(T2), read(T2REG), read(T1REG)
 
-    print("— la transformation, retrouvee sur les sommets —")
+    print("== la transformation, retrouvee sur les sommets ==")
     p2, p2r = points(t2), points(t2r)
     if len(p2) != len(p2r):
         sys.exit("T2 et T2 recale n'ont pas le meme nombre de sommets.")
@@ -140,7 +140,7 @@ def main():
     d1 = float(np.abs(points(t1) - points(t1r)).max())
     print("  le T1 a bouge de %.2e mm (0 attendu : c'est la reference)" % d1)
 
-    print("\n— le patch —")
+    print("\n== le patch ==")
     m2 = patch_mask(t2r)
     m1 = patch_mask(t1r)
     if m2 is None or m1 is None:
@@ -152,7 +152,7 @@ def main():
     g1 = gap(t2, t1, M, m2)
     print("  ecart moyen sur le patch : %.2f -> %.2f mm" % (g0, g1))
 
-    print("\n— maillages —")
+    print("\n== maillages ==")
     meshes = {
         "T1": webmesh.smooth_decimate(t1, 22000, iterations=8),
         "T2": webmesh.smooth_decimate(t2, 22000, iterations=8),
