@@ -235,6 +235,63 @@
       <code>CB</code> / <code>MAND</code> / <code>MAX</code> โดย <code>TranslateModels</code> การเลือกสอง
       บริเวณจะเริ่ม<strong>การลงทะเบียนภาพสองครั้งที่เป็นอิสระต่อกัน</strong> แต่ละครั้งมีโฟลเดอร์เอาต์พุตของตนเอง</p>
 
+      <h3 id="arbre-appels">ลำดับการเรียกของโหมด Orientation &amp; Registration ทีละขั้น</h3>
+
+      <div class="pipe">
+        <p class="pipe-seed"><code>T1</code> และ <code>T2</code> &mdash; CBCT สองภาพของผู้ป่วยคนเดียวกัน</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>การเตรียม &mdash; มีเฉพาะในโหมดนี้</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO</a> จัดให้ T1 กลับมาอยู่กลางภาพ &mdash; ไม่มีโครงข่าย เป็นการเลื่อนตำแหน่ง</span>
+                <span class="pipe-out"><code>&lt;โฟลเดอร์ T1&gt;Or</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> วาง landmark สำหรับการจัดแนว <span class="badge predit">ทำนาย</span></span>
+                <span class="pipe-out"><code>CBCT.py:756</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> จัดแนว T1 เข้ากับมาตรฐานอ้างอิง</span>
+                <span class="pipe-out"><code>&lt;โฟลเดอร์ T1&gt;Or</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="reg">
+          <h4>การแบ่งส่วน &mdash; ขอบเขตที่การลงทะเบียนภาพจะได้เห็น</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> ทำนาย <code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code> บน T1 ที่จัดแนวแล้ว <span class="badge predit">ทำนาย</span></span>
+                <span class="pipe-out"><code>&lt;base&gt;_seg_&lt;STRUCT&gt;.nii.gz</code> วางข้างภาพสแกน</span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>การลงทะเบียนภาพ &mdash; หนึ่งครั้งต่อหนึ่งบริเวณที่เลือก</h4>
+          <ol>
+            <li><span class="pipe-act">จัดให้ T2 ที่เคลื่อนได้มาอยู่กลางภาพ</span>
+                <span class="pipe-out"><code>T2_Center</code></span></li>
+            <li><span class="pipe-act">ปิดบัง T1 ที่ตรึงไว้ &mdash; <strong>elastix ไม่เคยเห็นสิ่งใดนอกขอบเขตนั้น</strong></span>
+                <span class="pipe-out"><code>fixed_image_masked</code></span></li>
+            <li><span class="pipe-act">elastix หนึ่งรอบ: Mattes mutual information, พีระมิด 3 ระดับ, ระดับละ 1500 รอบ</span>
+                <span class="pipe-out">การแปลงแบบแข็งเกร็งหนึ่งชุด</span></li>
+            <li><span class="pipe-act"><code>MatrixRetrieval</code> แปลงมันเป็น <code>Euler3DTransform</code></span>
+                <span class="pipe-out"><code>&lt;pat&gt;_&lt;REG&gt;Reg_matrix.tfm</code></span></li>
+            <li><span class="pipe-act">สุ่มตัวอย่าง T2 ใหม่ &mdash; บนกริด<em>ของตัวมันเอง</em> ไม่ใช่กริดของ T1</span>
+                <span class="pipe-out"><code>Registered/&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="viz">
+          <h4>ปิดท้าย</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> ทำงานอีกครั้งเพื่อการแบ่งส่วนสุดท้าย สองรอบ &mdash; บนโฟลเดอร์ขาเข้า แล้วไล่ลงไปในต้นไม้ขาออกแบบเรียกซ้ำ &mdash; ด้วย <code>genVtk=True</code></span>
+                <span class="pipe-out"><code>&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">ขั้นที่ 4 ถึง 10 คือส่วนท้ายที่ทั้งสามโหมดใช้ร่วมกัน อีกสองโหมดต่างกันเฉพาะช่วงต้นน้ำ
+        <strong>Fully-Automated</strong> ข้ามขั้นที่ 1&ndash;3 และปล่อยให้ AMASSS ทำนายมาสก์บน T1
+        ตามที่ให้มา ส่วน <strong>Semi-Automated</strong> ข้ามขั้นที่ 1&ndash;4 ทั้งหมด
+        และรับมาสก์จากช่อง &ldquo;T1 Masks&rdquo; ที่ผู้ใช้กรอก
+        การเลือกบริเวณอ้างอิงสองแห่งจะทำให้เกิดการลงทะเบียนภาพสองชุดที่เป็นอิสระต่อกัน
+        แต่ละชุดมีโฟลเดอร์ขาออกของตัวเอง</p>
+      </div>
+
       <h2 id="entrees">4. อินพุต การจับคู่ และการเตรียมข้อมูล</h2>
 
       <p><strong>รูปแบบไฟล์</strong> <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code> สำหรับ

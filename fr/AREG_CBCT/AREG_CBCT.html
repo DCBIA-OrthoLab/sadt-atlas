@@ -235,6 +235,63 @@
       <code>CB</code> / <code>MAND</code> / <code>MAX</code> par <code>TranslateModels</code>. Cocher deux
       régions lance <strong>deux recalages indépendants</strong>, chacun avec son dossier de sortie.</p>
 
+      <h3 id="arbre-appels">La chaîne du mode Orientation &amp; Registration, étape par étape</h3>
+
+      <div class="pipe">
+        <p class="pipe-seed"><code>T1</code> et <code>T2</code> &mdash; deux CBCT du même patient</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>Préparation &mdash; ce mode seulement</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO</a> recentre le T1 &mdash; aucun réseau, une translation</span>
+                <span class="pipe-out"><code>&lt;dossier T1&gt;Or</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> place les landmarks d&rsquo;orientation <span class="badge predit">prédit</span></span>
+                <span class="pipe-out"><code>CBCT.py:756</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> oriente le T1 sur l&rsquo;étalon</span>
+                <span class="pipe-out"><code>&lt;dossier T1&gt;Or</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="reg">
+          <h4>Segmentation &mdash; ce que le recalage aura le droit de voir</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> prédit <code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code> sur le T1 orienté <span class="badge predit">prédit</span></span>
+                <span class="pipe-out"><code>&lt;base&gt;_seg_&lt;STRUCT&gt;.nii.gz</code>, à côté des scans</span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>Recalage &mdash; une fois par région cochée</h4>
+          <ol>
+            <li><span class="pipe-act">centrer le T2 mobile</span>
+                <span class="pipe-out"><code>T2_Center</code></span></li>
+            <li><span class="pipe-act">masquer le T1 fixe &mdash; <strong>elastix ne voit jamais rien au-delà</strong></span>
+                <span class="pipe-out"><code>fixed_image_masked</code></span></li>
+            <li><span class="pipe-act">une passe elastix : information mutuelle de Mattes, 3 niveaux de pyramide, 1500 itérations chacun</span>
+                <span class="pipe-out">une transformation rigide</span></li>
+            <li><span class="pipe-act"><code>MatrixRetrieval</code> la convertit en <code>Euler3DTransform</code></span>
+                <span class="pipe-out"><code>&lt;pat&gt;_&lt;REG&gt;Reg_matrix.tfm</code></span></li>
+            <li><span class="pipe-act">rééchantillonner le T2 &mdash; sur <em>sa propre</em> grille, pas celle du T1</span>
+                <span class="pipe-out"><code>Registered/&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="viz">
+          <h4>Fin</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> repasse pour les segmentations finales, deux fois &mdash; sur le dossier d&rsquo;entrée, puis récursivement sur l&rsquo;arbre de sortie &mdash; avec <code>genVtk=True</code></span>
+                <span class="pipe-out"><code>&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">Les étapes 4 à 10 sont la queue commune aux trois modes. Les deux autres ne
+        diffèrent qu&rsquo;en amont : <strong>Fully-Automated</strong> saute 1&ndash;3 et laisse
+        AMASSS prédire les masques sur le T1 tel qu&rsquo;il est fourni ;
+        <strong>Semi-Automated</strong> saute 1&ndash;4 entièrement et prend les masques dans le
+        champ &laquo;&nbsp;T1 Masks&nbsp;&raquo; de l&rsquo;opérateur. Cocher deux régions de
+        référence lance deux recalages indépendants, chacun avec son dossier de sortie.</p>
+      </div>
+
       <h2 id="entrees">4. Entrées, appariement, prétraitements</h2>
 
       <p><strong>Formats.</strong> <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>. En

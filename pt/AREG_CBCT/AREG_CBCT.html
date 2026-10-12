@@ -235,6 +235,63 @@
       <code>CB</code> / <code>MAND</code> / <code>MAX</code> por <code>TranslateModels</code>. Marcar duas
       regiões lança <strong>dois registros independentes</strong>, cada um com sua própria pasta de saída.</p>
 
+      <h3 id="arbre-appels">A cadeia do modo Orientation &amp; Registration, passo a passo</h3>
+
+      <div class="pipe">
+        <p class="pipe-seed"><code>T1</code> e <code>T2</code> &mdash; dois CBCT do mesmo paciente</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>Preparação &mdash; apenas neste modo</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO</a> recentra o T1 &mdash; sem rede, uma translação</span>
+                <span class="pipe-out"><code>&lt;pasta T1&gt;Or</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> coloca os landmarks de orientação <span class="badge predit">predito</span></span>
+                <span class="pipe-out"><code>CBCT.py:756</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> orienta o T1 sobre o padrão de referência</span>
+                <span class="pipe-out"><code>&lt;pasta T1&gt;Or</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="reg">
+          <h4>Segmentação &mdash; o que o registro terá permissão de ver</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> prediz <code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code> no T1 orientado <span class="badge predit">predito</span></span>
+                <span class="pipe-out"><code>&lt;base&gt;_seg_&lt;STRUCT&gt;.nii.gz</code>, ao lado dos exames</span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>Registro &mdash; uma vez por região marcada</h4>
+          <ol>
+            <li><span class="pipe-act">centrar o T2 móvel</span>
+                <span class="pipe-out"><code>T2_Center</code></span></li>
+            <li><span class="pipe-act">mascarar o T1 fixo &mdash; <strong>o elastix nunca vê nada fora disso</strong></span>
+                <span class="pipe-out"><code>fixed_image_masked</code></span></li>
+            <li><span class="pipe-act">uma passagem do elastix: informação mútua de Mattes, 3 níveis de pirâmide, 1500 iterações cada</span>
+                <span class="pipe-out">uma transformação rígida</span></li>
+            <li><span class="pipe-act"><code>MatrixRetrieval</code> a converte em <code>Euler3DTransform</code></span>
+                <span class="pipe-out"><code>&lt;pat&gt;_&lt;REG&gt;Reg_matrix.tfm</code></span></li>
+            <li><span class="pipe-act">reamostrar o T2 &mdash; na <em>sua própria</em> grade, não na do T1</span>
+                <span class="pipe-out"><code>Registered/&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="viz">
+          <h4>Final</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> roda de novo para as segmentações finais, duas vezes &mdash; na pasta de entrada, depois recursivamente na árvore de saída &mdash; com <code>genVtk=True</code></span>
+                <span class="pipe-out"><code>&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">As etapas 4 a 10 são a cauda comum aos três modos. Os outros dois diferem apenas
+        a montante: <strong>Fully-Automated</strong> salta 1&ndash;3 e deixa o AMASSS predizer as
+        máscaras no T1 tal como fornecido; <strong>Semi-Automated</strong> salta 1&ndash;4 por
+        completo e toma as máscaras do campo &ldquo;T1 Masks&rdquo; do operador. Marcar duas
+        regiões de referência lança dois registros independentes, cada um com a sua própria
+        pasta de saída.</p>
+      </div>
+
       <h2 id="entrees">4. Entradas, pareamento, pré-processamento</h2>
 
       <p><strong>Formatos.</strong> <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>. Para

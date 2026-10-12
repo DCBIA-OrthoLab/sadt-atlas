@@ -235,6 +235,62 @@
       <code>CB</code> / <code>MAND</code> / <code>MAX</code>로 변환된다(<code>TranslateModels</code>). 두 부위를 체크하면
       <strong>독립된 정합 두 번</strong>이 실행되고, 각각 별도의 출력 폴더를 갖는다.</p>
 
+      <h3 id="arbre-appels">Orientation &amp; Registration 모드의 호출 사슬, 단계별로</h3>
+
+      <div class="pipe">
+        <p class="pipe-seed"><code>T1</code>과 <code>T2</code> &mdash; 같은 환자의 CBCT 두 장</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>준비 &mdash; 이 모드에만 있는 단계</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO</a>가 T1을 다시 중심에 놓습니다 &mdash; 신경망 없이, 평행이동 하나</span>
+                <span class="pipe-out"><code>&lt;T1 폴더&gt;Or</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a>가 정렬용 랜드마크를 찍습니다 <span class="badge predit">예측</span></span>
+                <span class="pipe-out"><code>CBCT.py:756</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a>가 T1을 기준 표준에 맞춰 정렬합니다</span>
+                <span class="pipe-out"><code>&lt;T1 폴더&gt;Or</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="reg">
+          <h4>분할 &mdash; 정합이 보게 될 범위</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a>가 정렬된 T1에서 <code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code>를 예측합니다 <span class="badge predit">예측</span></span>
+                <span class="pipe-out"><code>&lt;base&gt;_seg_&lt;STRUCT&gt;.nii.gz</code>, 스캔 옆에</span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>정합 &mdash; 체크된 영역마다 한 번</h4>
+          <ol>
+            <li><span class="pipe-act">움직이는 T2를 중심에 놓습니다</span>
+                <span class="pipe-out"><code>T2_Center</code></span></li>
+            <li><span class="pipe-act">고정된 T1에 마스크를 씌웁니다 &mdash; <strong>elastix는 그 밖을 결코 보지 않습니다</strong></span>
+                <span class="pipe-out"><code>fixed_image_masked</code></span></li>
+            <li><span class="pipe-act">elastix 한 번: Mattes 상호정보량, 피라미드 3단계, 각 1500회 반복</span>
+                <span class="pipe-out">강체 변환 하나</span></li>
+            <li><span class="pipe-act"><code>MatrixRetrieval</code>이 그것을 <code>Euler3DTransform</code>으로 바꿉니다</span>
+                <span class="pipe-out"><code>&lt;pat&gt;_&lt;REG&gt;Reg_matrix.tfm</code></span></li>
+            <li><span class="pipe-act">T2를 재샘플링합니다 &mdash; T1의 격자가 아니라 <em>자기 자신의</em> 격자 위에서</span>
+                <span class="pipe-out"><code>Registered/&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="viz">
+          <h4>마무리</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a>가 최종 분할을 위해 다시 두 번 돌아갑니다 &mdash; 입력 폴더에, 그다음 출력 트리를 재귀적으로 &mdash; <code>genVtk=True</code>로</span>
+                <span class="pipe-out"><code>&lt;Region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">4단계부터 10단계까지는 세 모드가 공유하는 꼬리입니다. 나머지 두 모드는 앞쪽만
+        다릅니다. <strong>Fully-Automated</strong>는 1&ndash;3단계를 건너뛰고 AMASSS가 주어진
+        그대로의 T1에서 마스크를 예측하게 하고, <strong>Semi-Automated</strong>는 1&ndash;4단계를
+        모두 건너뛰고 조작자의 &ldquo;T1 Masks&rdquo; 칸에서 마스크를 받습니다. 기준 영역을 두 개
+        체크하면 서로 독립된 정합이 두 번 돌고, 각각 자기 출력 폴더를 갖습니다.</p>
+      </div>
+
       <h2 id="entrees">4. 입력, 짝짓기, 전처리</h2>
 
       <p><strong>형식.</strong> <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>.
