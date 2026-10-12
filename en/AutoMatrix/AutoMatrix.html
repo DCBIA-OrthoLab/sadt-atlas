@@ -102,7 +102,7 @@
             <tr>
               <td><code>SEMI_ASO_CBCT.py:111</code></td>
               <td><code>&lt;patient&gt;_&lt;add_name&gt;_transform.tfm</code></td>
-              <td><strong><code>sitk.CompositeTransform</code></strong> (<code>utils.py:802</code>)</td>
+              <td><strong><code>sitk.CompositeTransform</code></strong> (<code>utils.py:732</code>)</td>
             </tr>
             <tr>
               <td><code>AREG_MRI.py:218</code></td>
@@ -146,14 +146,14 @@
         </table>
       </div>
 
-      <p><code>AutoMatrixLogic.process()</code> (<code>AutoMatrix.py:1094</code>)
+      <p><code>AutoMatrixLogic.process()</code> (<code>AutoMatrix.py:888</code>)
       is a <code>pass</code>: the logic lives entirely in <code>Automatrix_Method</code>. No
       conda, no CUDA — verified by grep, no occurrence of <code>torch</code>, <code>conda</code> or
       <code>.pth</code> in AutoMatrix/ and Automatrix_CLI/.</p>
 
       <h2 id="formats">3. Transformation formats read — and those that aren't</h2>
 
-      <p>The UI (<code>AutoMatrix.py:1012</code>) and the README
+      <p>The UI (<code>AutoMatrix.py:829</code>) and the README
       advertise <code>.npy</code>, <code>.h5</code>, <code>.tfm</code>, <code>.mat</code>, <code>.txt</code>. <code>GetPatients</code> collects all of them.
       The CLI then does, with no distinction
       (<code>Automatrix_CLI.py:258</code>):</p>
@@ -352,7 +352,7 @@ image = sitk.ReadImage(scan)     # everything else</code></pre>
         <code>vtkPolyData</code> written as <code>.vtk</code> fails with
         <code>sitk::ERROR: Unable to determine ImageIO reader</code>. Same for <code>.stl</code>, <code>.obj</code>,
         <code>.off</code>, <code>.vtp</code>. The exception is caught
-        (<code>Automatrix_CLI.py:310</code>), logged as
+        (<code>Automatrix_CLI.py:284</code>), logged as
         <code>ERROR processing ...</code>, and the file is skipped. Yet the UI still offers
         them, <code>CheckGoodEntre</code> validates them, the progress counter counts them, and
         <code>README.md:422</code> still advertises IOS support.</p>
@@ -533,7 +533,7 @@ FixedParameters: 0 0 0</code></pre>
         <div class="callout-title">Confirmed bug</div>
         <p><strong>Duplicated code that has already diverged.</strong> <code>GetPatients</code> exists in
         two copies that are identical but for one token: the CLI version strips a leading
-        <code>_SegOr</code>, <code>General_tools.py:249</code> does not. And it's the
+        <code>_SegOr</code>, <code>General_tools.py:11</code> does not. And it's the
         <code>General_tools</code> copy that feeds
         <code>NbScan</code>, so the progress bar's denominator can differ from the
         number of files actually processed.</p>
@@ -563,7 +563,7 @@ matrix_path = os.path.join(args.matrix_lineEdit, subdir,
           <code>Upper = ["Upper", "_U", "U_", "Maxilla", "Mx"]</code>. Here <code>_L</code> points to
           Maxilla and <code>_U</code> to Mandible.</li>
           <li><strong><code>matrix_lineEdit</code> does not exist</strong> in the CLI's <code>argparse</code>
-          (<code>Automatrix_CLI.py:329</code>: the
+          (<code>Automatrix_CLI.py:294</code>: the
           arguments are <code>input_patient, input_matrix, reference_file, suffix,
           matrix_name, fromAreg, output_folder, log_path, is_seg</code>). This branch
           therefore raises <code>AttributeError</code> as soon as it's taken.</li>
@@ -642,7 +642,7 @@ out_file      = outpath.split(extension_scan)[0] + out_suffix + extension_scan</
         (<code>Progress.py:39</code>) checks the mtime
         of <code>log_path</code>, but <strong>the CLI never writes to that file</strong>. Progress
         actually flows through the <code>&lt;filter-progress&gt;0 / 2 / 0&lt;/filter-progress&gt;</code> sequence emitted
-        by the CLI after each scan (<code>Automatrix_CLI.py:314</code>)
+        by the CLI after each scan (<code>Automatrix_CLI.py:287</code>)
         and the <code>if kwds["progress"] == 200</code> in <code>isProgress</code> — an indirect,
         fragile protocol that depends on a <code>time.sleep(0.2)</code> between each print.</p>
       </div>
@@ -658,8 +658,8 @@ out_file      = outpath.split(extension_scan)[0] + out_suffix + extension_scan</
           <li><strong>The landmarks' <code>coordinateSystem</code> is never read</strong> (<a href="#ras-lps">§4.2</a>).</li>
           <li><strong>No composition</strong>: N matrices for one patient give N files, not a chain (<a href="#composition">§4.3</a>).</li>
           <li><strong>Outputs overwritten</strong> if <code>checkBoxMatrixName</code> is unchecked with several matrices (<a href="#sorties">§9</a>).</li>
-          <li><strong><code>OnEndProcess</code> divides by <code>self.nb_scans</code></strong> (<code>AutoMatrix.py:953</code>) with no guard: an empty input folder causes a <code>ZeroDivisionError</code> at the end of processing.</li>
-          <li><strong><code>CheckGoodEntre</code> is logically wrong</strong> (<code>AutoMatrix.py:1013</code>): the extension test is <code>len(dico['.vtk'])==0 and len(dico['.vtp']) and len(dico['.stl']) and …</code>, where only the first term is a comparison. The rest are integers evaluated as booleans, so the "Folder empty or wrong type" warning only fires in an unlikely conjunction. A genuinely empty folder passes validation.</li>
+          <li><strong><code>OnEndProcess</code> divides by <code>self.nb_scans</code></strong> (<code>AutoMatrix.py:745</code>) with no guard: an empty input folder causes a <code>ZeroDivisionError</code> at the end of processing.</li>
+          <li><strong><code>CheckGoodEntre</code> is logically wrong</strong> (<code>AutoMatrix.py:790</code>): the extension test is <code>len(dico['.vtk'])==0 and len(dico['.vtp']) and len(dico['.stl']) and …</code>, where only the first term is a comparison. The rest are integers evaluated as booleans, so the "Folder empty or wrong type" warning only fires in an unlikely conjunction. A genuinely empty folder passes validation.</li>
           <li><strong><code>onPredictButton</code> does not stop on error</strong>: <code>TestProcess</code> returns a tuple <code>(ok, out)</code>, so the <code>isinstance(error, str)</code> check at <code>AutoMatrix.py:748</code> is always false, and processing starts even with empty fields.</li>
           <li><strong><code>.split(extension_scan)[0]</code></strong> cuts at the <strong>first</strong> occurrence: a path whose folder contains the same substring as the extension would be truncated.</li>
           <li><strong>Non-<code>defined</code> landmarks</strong> left in the old coordinate frame, mixed with transformed points in the same file (<a href="#types-donnees">§5</a>).</li>
