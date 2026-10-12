@@ -162,20 +162,52 @@
         O modo Semi pula as etapas 1–4 e 6.</figcaption>
       </figure>
 
-      <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>Módulo</th><th>Entrada</th><th>Saída</th><th>Papel</th></tr></thead>
-        <tbody>
-          <tr><td>1</td><td><code>MRI2CBCT_resample_cbct_mri</code></td><td>CBCT bruta</td><td><code>&lt;out&gt;/CBCT Resampled/CBCT</code></td><td>reamostragem isotrópica <code>spacing=[0.3,0.3,0.3]</code>, <code>center=True</code></td></tr>
-          <tr><td>2</td><td><code>PRE_ASO_CBCT</code></td><td>↑</td><td><code>&lt;out&gt;/PRE ASO CBCT</code></td><td>pré-orientação da CBCT (modelos <code>PreASO</code>)</td></tr>
-          <tr><td>3</td><td><code>ALI_CBCT</code></td><td>↑</td><td>idem</td><td>landmarks de orientação (<code>N S Ba RPo…</code> ou <code>IF ANS PNS UR1O UR6O UL6O</code> conforme a referência)</td></tr>
-          <tr><td>4</td><td><code>SEMI_ASO_CBCT</code></td><td>↑</td><td><code>&lt;out&gt;/Oriented CBCT</code></td><td>orientação final sobre um arquivo gold, sufixo <code>Or</code></td></tr>
-          <tr><td>5</td><td><code>CrownSegmentationcli</code></td><td>IOS bruto</td><td><code>&lt;out&gt;/Seg IOS</code></td><td><code>Universal_ID</code>, <code>model=latest</code>, <code>suffix=Seg</code></td></tr>
-          <tr><td>6</td><td><code>PRE_ASO_IOS</code></td><td>↑</td><td><code>&lt;out&gt;/PRE ASO IOS</code></td><td>orientação do IOS sobre o gold, dentes <code>UR6,UR4,UL4,UL6</code>, sufixo <code>Or</code></td></tr>
-          <tr><td>7</td><td><code>ALI_CBCT</code> (2ª passagem)</td><td><code>Oriented CBCT</code></td><td><code>&lt;out&gt;/CBCT Landmarks</code></td><td><strong>os 12 landmarks de registro</strong></td></tr>
-          <tr><td>8</td><td><code>ALI_IOS</code></td><td><code>PRE ASO IOS</code></td><td><code>&lt;out&gt;/IOS Landmarks</code></td><td><strong>os mesmos 12 landmarks, lado IOS</strong></td></tr>
-          <tr><td>9</td><td><code>AREG_IOSCBCT</code></td><td>tudo o que está acima</td><td><code>&lt;out&gt;/Registered IOS</code></td><td>transformação por landmarks + ICP</td></tr>
-        </tbody>
-      </table></div>
+      <div class="pipe" data-numbering="manual">
+        <p class="pipe-seed">um CBCT bruto <em>e</em> um escaneamento intraoral bruto &mdash; duas modalidades,
+        preparadas separadamente, postas em contato apenas no final</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>Caminho CBCT</h4>
+          <ol>
+            <li data-n="1"><span class="pipe-act"><code>MRI2CBCT_resample_cbct_mri</code> faz a reamostragem isotrópica &mdash; <code>spacing=[0.3,0.3,0.3]</code>, <code>center=True</code></span>
+                <span class="pipe-out"><code>&lt;out&gt;/CBCT Resampled/CBCT</code></span></li>
+            <li data-n="2"><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO_CBCT</a> faz a pré-orientação, com os modelos <code>PreASO</code> <span class="badge predit">predito</span></span>
+                <span class="pipe-out"><code>&lt;out&gt;/PRE ASO CBCT</code></span></li>
+            <li data-n="3"><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> coloca os landmarks de orientação &mdash; <code>N S Ba RPo…</code> ou <code>IF ANS PNS UR1O UR6O UL6O</code>, conforme a referência <span class="badge predit">predito</span></span>
+                <span class="pipe-out">a mesma pasta</span></li>
+            <li data-n="4"><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO_CBCT</a> o orienta sobre um arquivo gold, sufixo <code>Or</code></span>
+                <span class="pipe-out"><code>&lt;out&gt;/Oriented CBCT</code></span></li>
+            <li data-n="7"><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> roda uma segunda vez, para os 12 landmarks comuns <span class="badge predit">predito</span></span>
+                <span class="pipe-out">o ponto oclusal de cada dente</span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="mirror">
+          <h4>Caminho IOS</h4>
+          <ol>
+            <li data-n="5"><span class="pipe-act"><code>CrownSegmentationcli</code> rotula as coroas &mdash; <code>Universal_ID</code>, <code>model=latest</code>, <code>suffix=Seg</code> <span class="badge predit">predito</span></span>
+                <span class="pipe-out"><code>&lt;out&gt;/Seg IOS</code></span></li>
+            <li data-n="6"><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#mode-auto-ios">PRE_ASO_IOS</a> faz a pré-orientação da malha sobre um arquivo gold</span>
+                <span class="pipe-out">o arco orientado</span></li>
+            <li data-n="8"><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-ios">ALI_IOS</a> coloca os mesmos 12 landmarks &mdash; <code>lm_type='O'</code>, <code>image_size=224</code>, <code>blur_radius=0</code>, <code>faces_per_pixel=1</code> <span class="badge predit">predito</span></span>
+                <span class="pipe-out"><code>IOSCBCT.py:335</code>, <code>:839</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="reg">
+          <h4>Onde os dois caminhos se encontram</h4>
+          <ol>
+            <li data-n="9"><span class="pipe-act"><strong>AREG_IOSCBCT</strong> em si: Procrustes, depois ICP, sobre os 12 landmarks emparelhados &mdash; <span class="badge calcule">calculado</span>, sem rede alguma</span>
+                <span class="pipe-out">o arco, no referencial do CBCT</span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">Cada caixa acima, exceto a última, contém uma rede; a CLI final não contém
+        nenhuma &mdash; é geometria pura. <strong>O modo Semi salta as etapas 1&ndash;4 e
+        6</strong>, tomando um CBCT já orientado e um arco já orientado. Os números são os do
+        próprio módulo, e é por isso que se entrelaçam: os dois caminhos avançam separados, e
+        uma contagem contínua sugeriria uma ordem que não existe.</p>
+      </div>
 
       <p>O modo Semi pula 1–4 e 6: ele segmenta o IOS e depois executa diretamente as duas etapas <a href="../ALI/ALI.html">ALI</a> e o registro. Seu
       <code>IOS_folder</code> aponta para <code>&lt;out&gt;/Seg IOS/liste_csv_file_Seg</code>, a subpasta que o
