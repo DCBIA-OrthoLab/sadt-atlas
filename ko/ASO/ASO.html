@@ -440,6 +440,37 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
       <p>세 쓰기 모두 <code>if not os.path.exists(...)</code>로 보호된다. <strong>비어 있지 않은
       출력 폴더에 다시 실행하면 아무것도 다시 쓰지 않으며</strong> 그래도 성공으로 끝난다.</p>
 
+      <h3 id="arbre-cbct">ASO_CBCT 호출 사슬, 단계별로</h3>
+
+      <div class="pipe">
+        <p class="pipe-seed"><code>T1</code> &mdash; 어떤 자세의 CBCT든</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>자동 모드</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="#pre-aso-cbct">PRE_ASO_CBCT</a>가 스캔을 다시 중심에 놓습니다 <span class="badge calcule">계산</span> &mdash; 여기에는 더 이상 신경망이 없습니다</span>
+                <span class="pipe-out">평행이동 하나, <code>.tfm</code>으로 기록</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a>가 정렬용 랜드마크를 예측합니다 <span class="badge predit">예측</span></span>
+                <span class="pipe-out"><code>.mrk.json</code>, LPS</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="#semi-aso-cbct">SEMI_ASO_CBCT</a>가 그 랜드마크를 기준 표준의 랜드마크에 맞춥니다. 랜드마크 3점 초기화에 이어 강체 <code>vtkIterativeClosestPointTransform</code>, 1000회 반복 <span class="badge calcule">계산</span></span>
+                <span class="pipe-out"><code>&lt;pat&gt;_&lt;suffix&gt;_transform.tfm</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>반자동 모드</h4>
+          <ol>
+            <li><span class="pipe-act">조작자가 랜드마크를 제공합니다 &mdash; 1단계와 2단계는 건너뛰고, 3단계는 그대로입니다</span>
+                <span class="pipe-out">같은 <code>.tfm</code></span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">3단계를 지나면 정중시상면이 x&nbsp;=&nbsp;0에 놓입니다. 하류의 모든 모듈이 의지하는
+        조건이 바로 이것입니다 &mdash; <a href="../VFACE/VFACE.html">VFACE</a>는 정확히 그 평면을
+        기준으로 거울상을 만들고, <a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a>는 이 사슬
+        자체를 자기 앞단으로 호출합니다. 행렬은 <a href="#cbct-maths">§4.5</a>에 적혀 있습니다.</p>
+      </div>
+
       <h3 id="cbct-maths">4.5 방향 정렬을 식으로 쓰면</h3>
 
       <p>여기까지는 코드를 말로 풀어 쓴 것이다. 같은 내용을 산술로 적어 둔다. ASO의
@@ -671,6 +702,38 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
         </svg>
         <figcaption>ASO_IOS: 두 모드의 유일한 구조적 차이는 중심점을 공급하는 신경망 기반 분할(<span class="badge predit">신경망</span>)이 앞단에 있는지 여부다. 방향 정렬 자체는 3점에 대한 같은 ICP다.</figcaption>
       </figure>
+
+      <h3 id="arbre-ios">ASO_IOS 호출 사슬, 단계별로</h3>
+
+      <div class="pipe">
+        <p class="pipe-seed">구강 스캔 &mdash; 표면 메시이고, 볼륨은 없습니다</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>자동 모드 &mdash; 치관 중심점</h4>
+          <ol>
+            <li><span class="pipe-act"><code>__BypassCrownseg__</code>가 <code>PredictedID</code>, <code>UniversalID</code> 또는 <code>Universal_ID</code> 배열을 찾습니다 &mdash; 이미 분할된 메시는 신경망을 건너뜁니다</span>
+                <span class="pipe-out"><code>&lt;name&gt;_Seg</code>로 복사</span></li>
+            <li><span class="pipe-act"><code>DentalModelSeg</code>가 <code>conda run -n shapeaxi</code>를 통해 치관에 라벨을 붙입니다 <span class="badge predit">예측</span></span>
+                <span class="pipe-out">임시 폴더의 <code>&lt;name&gt;_Seg.vtk</code></span></li>
+            <li><span class="pipe-act">라벨이 붙은 각 치관의 중심점이 랜드마크가 됩니다 <span class="badge calcule">계산</span></span>
+                <span class="pipe-out">치아마다 한 점</span></li>
+            <li><span class="pipe-act"><code>PRE_ASO_IOS</code>, 이어서 기준 표준의 중심점에 대한 강체 ICP <span class="badge calcule">계산</span></span>
+                <span class="pipe-out">정렬된 메시와 그 <code>.tfm</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>Semi 모드 &mdash; 제공된 랜드마크</h4>
+          <ol>
+            <li><span class="pipe-act"><code>SelectKey</code>가 랜드마크 딕셔너리를 이름으로 걸러내고, <code>InitIcp</code>와 <code>vtkICP</code>가 그 이름들만으로 돌아갑니다 &mdash; 분할도 없고 <code>PrePreAso</code>도 없습니다 <span class="badge calcule">계산</span></span>
+                <span class="pipe-out">같은 <code>.tfm</code></span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note"><a href="../FlexReg/FlexReg.html">FlexReg</a>와 달리 ASO는 입력 메시를 덮어쓰지 않습니다.
+        <code>overwrite = "0"</code>, <code>suffix = "Seg"</code>이므로 분할 결과는 임시 폴더에
+        떨어집니다.</p>
+      </div>
 
       <h3 id="occlusion">5.3 Occlusion(교합)</h3>
 

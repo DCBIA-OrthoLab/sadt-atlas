@@ -385,7 +385,7 @@ img_trans = ResampleImage(img, translation.GetInverse())</code></pre>
         <li>การหมุนรอบแกน <code>cross(v2, v1)</code> ด้วยมุม <code>arccos</code> ของผลคูณจุด
         โดยที่ <code>v1 = abs(B - A)</code> ฝั่งต้นทาง และ
         <code>v2 = abs(B - A)</code> ฝั่งเป้าหมาย — <strong>เป็นค่าสัมบูรณ์รายองค์ประกอบ</strong>
-        ซึ่งพับเวกเตอร์ทั้งสองเข้าสู่ออกแทนต์บวก และ<strong>ไม่ใช่</strong>มุมระหว่าง
+        ซึ่งพับเวกเตอร์ทั้งสองเข้าสู่ออกแทนต์บวก และไม่ใช่มุมระหว่าง
         เวกเตอร์จริง;</li>
         <li>การหมุนครั้งที่สาม ซึ่ง<strong>แกนคือ <code>abs(B - A)</code> ตัวมันเอง</strong>
         ไม่ใช่ผลคูณไขว้: เป็นการกลิ้งรอบแกนที่เพิ่งจัดให้ตรงไป โดยคำนวณมุมจาก <code>C</code></li>
@@ -439,6 +439,38 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
 
       <p>การเขียนทั้งสามครั้งถูกคุมด้วย <code>if not os.path.exists(...)</code>: <strong>การรันซ้ำ
       บนโฟลเดอร์เอาต์พุตที่ไม่ว่างจะไม่เขียนทับอะไรเลย</strong> และยังจบลงด้วยสถานะสำเร็จ</p>
+
+      <h3 id="arbre-cbct">ลำดับการเรียกของ ASO_CBCT ทีละขั้น</h3>
+
+      <div class="pipe">
+        <p class="pipe-seed"><code>T1</code> &mdash; CBCT ในท่าใดก็ได้</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>โหมดอัตโนมัติ</h4>
+          <ol>
+            <li><span class="pipe-act"><a class="pipe-mod" href="#pre-aso-cbct">PRE_ASO_CBCT</a> จัดให้ภาพสแกนกลับมาอยู่กลางภาพ <span class="badge calcule">คำนวณ</span> &mdash; ตรงนี้ไม่มีโครงข่ายอีกแล้ว</span>
+                <span class="pipe-out">การเลื่อนตำแหน่งหนึ่งชุด เขียนออกมาเป็น <code>.tfm</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> ทำนาย landmark สำหรับการจัดแนว <span class="badge predit">ทำนาย</span></span>
+                <span class="pipe-out"><code>.mrk.json</code>, LPS</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="#semi-aso-cbct">SEMI_ASO_CBCT</a> ปรับ landmark เหล่านั้นให้เข้ากับของมาตรฐานอ้างอิง: เริ่มต้นด้วย landmark 3 จุด แล้วต่อด้วย <code>vtkIterativeClosestPointTransform</code> แบบแข็งเกร็ง 1000 รอบ <span class="badge calcule">คำนวณ</span></span>
+                <span class="pipe-out"><code>&lt;pat&gt;_&lt;suffix&gt;_transform.tfm</code></span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>โหมดกึ่งอัตโนมัติ</h4>
+          <ol>
+            <li><span class="pipe-act">ผู้ใช้เป็นผู้ให้ landmark &mdash; ข้ามขั้นที่ 1 และ 2 ส่วนขั้นที่ 3 ไม่เปลี่ยน</span>
+                <span class="pipe-out"><code>.tfm</code> ชุดเดียวกัน</span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">หลังขั้นที่ 3 ระนาบกึ่งกลางซากิตตัลจะวางอยู่บน x&nbsp;=&nbsp;0
+        นั่นคือเงื่อนไขที่โมดูลปลายน้ำทุกตัวพึ่งพา &mdash;
+        <a href="../VFACE/VFACE.html">VFACE</a> สะท้อนภาพรอบระนาบนั้นพอดี และ
+        <a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a> เรียกลำดับนี้เองเป็นต้นน้ำของตัวมัน
+        เมทริกซ์เขียนไว้ใน <a href="#cbct-maths">§4.5</a></p>
+      </div>
 
       <h3 id="cbct-maths">4.5 การจัดแนว เขียนออกมาเป็นสมการ</h3>
 
@@ -669,6 +701,38 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
         </svg>
         <figcaption>ASO_IOS: the only structural difference between the two modes is the presence, upstream, of a network-based segmentation (<span class="badge predit">network</span>) that supplies the centroids — the orientation itself is the same ICP on 3 points.</figcaption>
       </figure>
+
+      <h3 id="arbre-ios">ลำดับการเรียกของ ASO_IOS ทีละขั้น</h3>
+
+      <div class="pipe">
+        <p class="pipe-seed">ภาพสแกนในช่องปาก &mdash; เป็นเมชพื้นผิว ไม่มีปริมาตร</p>
+
+        <section class="pipe-phase" data-kind="prep">
+          <h4>โหมดอัตโนมัติ &mdash; จุดศูนย์กลางของตัวฟัน</h4>
+          <ol>
+            <li><span class="pipe-act"><code>__BypassCrownseg__</code> มองหาอาร์เรย์ <code>PredictedID</code>, <code>UniversalID</code> หรือ <code>Universal_ID</code> &mdash; เมชที่แบ่งส่วนไว้แล้วจะข้ามโครงข่ายไป</span>
+                <span class="pipe-out">คัดลอกเป็น <code>&lt;name&gt;_Seg</code></span></li>
+            <li><span class="pipe-act"><code>DentalModelSeg</code> ติดป้ายตัวฟันผ่าน <code>conda run -n shapeaxi</code> <span class="badge predit">ทำนาย</span></span>
+                <span class="pipe-out"><code>&lt;name&gt;_Seg.vtk</code> ในโฟลเดอร์ชั่วคราว</span></li>
+            <li><span class="pipe-act">จุดศูนย์กลางของตัวฟันที่ติดป้ายแต่ละซี่กลายเป็น landmark <span class="badge calcule">คำนวณ</span></span>
+                <span class="pipe-out">หนึ่งจุดต่อหนึ่งซี่</span></li>
+            <li><span class="pipe-act"><code>PRE_ASO_IOS</code> แล้วต่อด้วย ICP แบบแข็งเกร็งบนจุดศูนย์กลางของมาตรฐานอ้างอิง <span class="badge calcule">คำนวณ</span></span>
+                <span class="pipe-out">เมชที่จัดแนวแล้วพร้อม <code>.tfm</code> ของมัน</span></li>
+          </ol>
+        </section>
+
+        <section class="pipe-phase" data-kind="measure">
+          <h4>โหมด Semi &mdash; landmark ที่ให้มา</h4>
+          <ol>
+            <li><span class="pipe-act"><code>SelectKey</code> กรองพจนานุกรม landmark ตามชื่อ แล้ว <code>InitIcp</code> กับ <code>vtkICP</code> ทำงานบนชื่อเหล่านั้นเท่านั้น &mdash; ไม่มีการแบ่งส่วน ไม่มี <code>PrePreAso</code> <span class="badge calcule">คำนวณ</span></span>
+                <span class="pipe-out"><code>.tfm</code> ชุดเดียวกัน</span></li>
+          </ol>
+        </section>
+
+        <p class="pipe-note">ต่างจาก <a href="../FlexReg/FlexReg.html">FlexReg</a> ตรงที่ ASO ไม่เขียนทับเมชขาเข้า:
+        <code>overwrite = "0"</code> และ <code>suffix = "Seg"</code>
+        ผลการแบ่งส่วนจึงไปอยู่ในโฟลเดอร์ชั่วคราว</p>
+      </div>
 
       <h3 id="occlusion">5.3 Occlusion</h3>
 
