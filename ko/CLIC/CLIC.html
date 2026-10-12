@@ -492,27 +492,35 @@ nib.save(nib.Nifti1Image(seg.astype(np.int16), nii.affine, nii.header), out_path
 
       <h3 id="rustine-conda">conda 패치</h3>
 
-      <p><code>CLICWidget.__init__</code>(<code>CLIC/CLIC.py:62</code>–<code>112</code>)는
-      SlicerConda의 <code>getCondaExecutable</code>과 <code>getCondaPath</code>를 실행 중에 패치한다:</p>
+      <p><code>CLICWidget.__init__</code>는 SlicerConda의
+      <code>getCondaExecutable</code>을 실행 중에 패치한다:</p>
 
       <ol>
         <li>경로에 중복된 <code>/bin/bin/</code>을 고친다;</li>
+        <li>그 파일이 실제로 디스크에 있으면 그대로 돌려준다;</li>
         <li>그렇지 않으면 <code>shutil.which("conda")</code>;</li>
-        <li>그것도 아니면 <strong>하드코딩된 <code>/home/luciacev/anaconda3/bin/conda</code></strong>.</li>
+        <li>그것도 아니면 원래 경로를 유지하고 경고를 남긴다.</li>
       </ol>
 
-      <p>그리고 <code>fixed_getCondaPath</code>는 <strong><code>/home/luciacev/anaconda3</code> 폴더가
-      존재하기만 하면 이를 반환한다</strong>. 사용자가 설정한 경로를 고려하기도 전이다.
-      특정 개발 머신 한 대의 경로가 저장소에 버전 관리되어 들어가 있고,
-      SlicerConda 설정보다 우선한다. 의도된 동작이 아니라 기술 부채로
-      다뤄야 한다.</p>
+      <p>이 패치가 있는 이유는, 5.13 나이틀리에 실린 SlicerConda가
+      <strong>머신 전체에 conda 경로를 하나만</strong> 두고, 그것이 아직 디스크에 있는지
+      확인하지 않은 채 돌려주기 때문이다. 다른 Slicer 설치가 그 값을 덮어쓰면 이 모듈은
+      거기에 없는 conda를 실행하게 된다. 코드가 그렇게 적고 있고, 무엇이 이 패치를
+      불필요하게 만드는지도 적고 있다 &mdash; 5.12 릴리스에 이미 들어 있는 가지는 경로를
+      설치별로 두고 <code>executableExists()</code>로 지킨다. 나이틀리가 그 버전을 싣는
+      순간 이 패치는 빠져야 한다.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">함정</div>
-        <p><code>fixed_getCondaPath</code>는 머신에 <code>/home/luciacev/anaconda3</code> 폴더가
-        존재하기만 하면 이를 반환한다. 사용자의 SlicerConda 설정을 보기도 전이다.
-        개발 머신의 경로가 버전 관리되어 들어가 있고
-        우선권을 가진다.</p>
+      <div class="callout ok">
+        <div class="callout-title">이 페이지를 쓴 뒤 고쳐짐</div>
+        <p>2026년 9월로 기록된 이 조사는 여기에 결함 하나를 적어 두었다.
+        <code>fixed_getCondaPath</code>가 머신에 <code>/home/luciacev/anaconda3</code> 폴더가
+        있기만 하면, 사용자의 SlicerConda 설정을 보기도 전에 그것을 돌려주었다는 것이다.
+        개발 머신의 경로가 버전 관리에 들어가 우선권을 가졌다.
+        <strong>2026-10-12에 다시 확인: 사라졌다.</strong>
+        <code>fixed_getCondaPath</code>는 더 이상 존재하지 않고,
+        <code>CLIC/CLIC.py</code>에 하드코딩된 경로도 남아 있지 않다. 위의
+        <code>getCondaExecutable</code> 패치만 남았고, 그것은 <code>shutil.which</code>로
+        물러난다.</p>
       </div>
 
       <h2 id="pieges">9. 함정과 취약 지점</h2>

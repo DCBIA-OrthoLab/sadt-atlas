@@ -490,27 +490,35 @@ nib.save(nib.Nifti1Image(seg.astype(np.int16), nii.affine, nii.header), out_path
 
       <h3 id="rustine-conda">La rustine conda</h3>
 
-      <p><code>CLICWidget.__init__</code> (<code>CLIC/CLIC.py:62</code>–<code>112</code>)
-      remplace à chaud <code>getCondaExecutable</code> et <code>getCondaPath</code> de SlicerConda :</p>
+      <p><code>CLICWidget.__init__</code> remplace à chaud
+      <code>getCondaExecutable</code> de SlicerConda :</p>
 
       <ol>
         <li>corrige un <code>/bin/bin/</code> dupliqué dans le chemin ;</li>
+        <li>le renvoie si le fichier est réellement sur le disque ;</li>
         <li>sinon, <code>shutil.which("conda")</code> ;</li>
-        <li>sinon, <strong><code>/home/luciacev/anaconda3/bin/conda</code> en dur</strong>.</li>
+        <li>sinon, garde le chemin d'origine et journalise un avertissement.</li>
       </ol>
 
-      <p>Et <code>fixed_getCondaPath</code> retourne <strong><code>/home/luciacev/anaconda3</code> dès que ce dossier
-      existe</strong>, avant même de considérer le chemin configuré par l'utilisateur. Un
-      chemin d'une machine de développement précise est donc versionné dans le dépôt et
-      prioritaire sur la configuration SlicerConda. À traiter comme une dette, pas
-      comme un comportement voulu.</p>
+      <p>La rustine existe parce que le SlicerConda livré avec la nightly 5.13 garde
+      <strong>un seul chemin conda pour toute la machine</strong> et le rend sans vérifier
+      qu'il est encore sur le disque : une autre installation de Slicer l'écrase, et ce
+      module lance alors un conda qui n'est pas là. Le code le dit, et dit aussi ce qui la
+      rendra inutile &mdash; la branche déjà présente dans la version 5.12 indexe le chemin
+      par installation et le garde avec <code>executableExists()</code>. Elle doit sauter
+      dès que la nightly portera cette version.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Piège</div>
-        <p><code>fixed_getCondaPath</code> renvoie <code>/home/luciacev/anaconda3</code> dès que ce dossier existe
-        sur la machine, avant même de regarder la configuration SlicerConda de
-        l'utilisateur — un chemin de machine de développement est versionné et
-        prioritaire.</p>
+      <div class="callout ok">
+        <div class="callout-title">Corrigé depuis la rédaction de cette fiche</div>
+        <p>Ce relevé, daté de septembre 2026, consignait ici un défaut :
+        <code>fixed_getCondaPath</code> renvoyait <code>/home/luciacev/anaconda3</code> dès
+        que ce dossier existait sur la machine, avant même de regarder la configuration
+        SlicerConda de l'utilisateur — un chemin de machine de développement, versionné et
+        prioritaire. <strong>Revérifié le 2026-10-12 : il a disparu.</strong>
+        <code>fixed_getCondaPath</code> n'existe plus, et aucun chemin en dur ne subsiste
+        dans <code>CLIC/CLIC.py</code>. Il ne reste que la rustine de
+        <code>getCondaExecutable</code> ci-dessus, qui retombe sur
+        <code>shutil.which</code>.</p>
       </div>
 
       <h2 id="pieges">9. Pièges et points fragiles</h2>

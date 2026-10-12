@@ -495,27 +495,34 @@ nib.save(nib.Nifti1Image(seg.astype(np.int16), nii.affine, nii.header), out_path
 
       <h3 id="rustine-conda">The conda patch</h3>
 
-      <p><code>CLICWidget.__init__</code> (<code>CLIC/CLIC.py:62</code>–<code>112</code>)
-      hot-patches SlicerConda's <code>getCondaExecutable</code> and <code>getCondaPath</code>:</p>
+      <p><code>CLICWidget.__init__</code> hot-patches SlicerConda's
+      <code>getCondaExecutable</code>:</p>
 
       <ol>
         <li>fixes a duplicated <code>/bin/bin/</code> in the path;</li>
+        <li>returns it if the file is actually on disk;</li>
         <li>otherwise, <code>shutil.which("conda")</code>;</li>
-        <li>otherwise, <strong>hardcoded <code>/home/luciacev/anaconda3/bin/conda</code></strong>.</li>
+        <li>otherwise, keeps the original path and logs a warning.</li>
       </ol>
 
-      <p>And <code>fixed_getCondaPath</code> returns <strong><code>/home/luciacev/anaconda3</code> as soon as
-      this folder exists</strong>, even before considering the user-configured path. A
-      path from one specific development machine is thus versioned in the
-      repository and takes priority over the SlicerConda configuration. To be
-      treated as debt, not as intended behavior.</p>
+      <p>The patch exists because the SlicerConda shipped with the 5.13 nightly keeps
+      <strong>one conda path for the whole machine</strong> and hands it out without
+      checking it is still on disk: another Slicer installation overwrites it, and this
+      module then runs a conda that is not there. The code says so, and says what makes it
+      redundant &mdash; the branch already in the 5.12 release keys the path per
+      installation and guards it with <code>executableExists()</code>. It is meant to be
+      dropped once the nightly carries that version.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall</div>
-        <p><code>fixed_getCondaPath</code> returns <code>/home/luciacev/anaconda3</code> as soon as this
-        folder exists on the machine, even before looking at the user's SlicerConda
-        configuration — a development-machine path is versioned and takes
-        priority.</p>
+      <div class="callout ok">
+        <div class="callout-title">Corrected since this page was written</div>
+        <p>This survey, dated September 2026, recorded a defect here:
+        <code>fixed_getCondaPath</code> returned <code>/home/luciacev/anaconda3</code> as
+        soon as that folder existed on the machine, before even looking at the user's
+        SlicerConda configuration — a development-machine path, versioned and taking
+        priority. <strong>Checked again on 2026-10-12: it is gone.</strong>
+        <code>fixed_getCondaPath</code> no longer exists, and no hardcoded path remains in
+        <code>CLIC/CLIC.py</code>. Only the <code>getCondaExecutable</code> patch above is
+        left, and it falls back on <code>shutil.which</code>.</p>
       </div>
 
       <h2 id="pieges">9. Pitfalls and fragile points</h2>
