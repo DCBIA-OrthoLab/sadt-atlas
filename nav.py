@@ -85,6 +85,13 @@ TOOLS = [
     ("Agent",                 "text"),
 ]
 
+# Code partagé : ce n'est pas un outil. Aucune interface, aucun pipeline,
+# aucun modèle -- seulement du code que les outils importent. Il n'apparaît donc
+# que dans l'Atlas, qui s'adresse à qui lit le code, et jamais dans le Guide,
+# qui s'adresse à qui utilise les outils. Hors de TOOLS à dessein : l'index des
+# guides itère TOOLS et y fabriquerait une carte vers une page inexistante.
+SHARED = ["ADTLib"]
+
 # ordre de lecture conseillé (pour précédent/suivant)
 READING = ["FlexReg", "ALI", "AMASSS", "ASO", "AREG_IOS", "AREG_CBCT", "AREG_IOSCBCT",
            "GreedyReg", "MRI2CBCT", "BatchDentalSeg", "VFACE", "DOCShapeAXI", "CLIC",
@@ -99,6 +106,7 @@ UI = {
         "guide_hint":"pour utiliser les outils",
         "atlas_hint":"comment ça marche dans le code",
         "cross":     "Transverse",
+        "shared":    "Code partagé",
         "findings":  "Constats",
         "glossary":  "Glossaire",
         "home":      "Accueil",
@@ -113,6 +121,7 @@ UI = {
         "guide_hint":"how to use the tools",
         "atlas_hint":"how it works in the code",
         "cross":     "Cross-cutting",
+        "shared":    "Shared code",
         "findings":  "Findings",
         "glossary":  "Glossary",
         "home":      "Home",
@@ -127,6 +136,7 @@ UI = {
         "guide_hint":"como usar as ferramentas",
         "atlas_hint":"como funciona no código",
         "cross":     "Transversal",
+        "shared":    "Código compartilhado",
         "findings":  "Constatações",
         "glossary":  "Glossário",
         "home":      "Início",
@@ -141,6 +151,7 @@ UI = {
         "guide_hint":"도구 사용법",
         "atlas_hint":"코드 속 동작 원리",
         "cross":     "공통 주제",
+        "shared":    "공통 코드",
         "findings":  "발견 사항",
         "glossary":  "용어집",
         "home":      "홈",
@@ -155,6 +166,7 @@ UI = {
         "guide_hint":"วิธีใช้เครื่องมือ",
         "atlas_hint":"การทำงานภายในโค้ด",
         "cross":     "หัวข้อร่วม",
+        "shared":    "โค้ดร่วม",
         "findings":  "ข้อค้นพบ",
         "glossary":  "อภิธานศัพท์",
         "home":      "หน้าแรก",
@@ -241,12 +253,23 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
 
     # bascule Guide / Atlas — sur une page d'outil, on reste sur le même outil
     on_tool = current in {t for t, _ in TOOLS}
-    sw = (("guide", f"{up}guide/{current}.html" if on_tool else f"{up}guide/index.html"),
-          ("atlas", f"{up}{current}/{current}.html" if on_tool else f"{up}index.html"))
+    sw = (("guide", f"guide/{current}.html" if on_tool else "guide/index.html"),
+          ("atlas", f"{current}/{current}.html" if on_tool else "index.html"))
     out.append('    <div class="sec-switch">')
-    for key, path in sw:
+    for key, r in sw:
         on = ' aria-current="true"' if key == section else ""
-        out.append(f'      <a href="{path}"{on}><b>{esc(ui[key])}</b>'
+        # Même règle que link() : la contrepartie n'existe pas forcément dans
+        # cette langue. Y pointer quand même donnait un lien mort — sur les
+        # pages thaïes dont le guide manque, c'était le seul lien cassé de la
+        # barre. On renvoie vers l'anglais en le disant, comme pour les fiches.
+        if os.path.exists(os.path.join(ROOT, lang, r)):
+            href_, extra = up + r, ""
+        else:
+            href_ = "../" * depth + "en/" + r
+            extra = (f' class="untranslated" hreflang="en"'
+                     f' title="{esc(ui[key])} &mdash; not translated into '
+                     f'{esc(LANG_NAMES[lang])} yet, this opens the English page"')
+        out.append(f'      <a href="{href_}"{extra}{on}><b>{esc(ui[key])}</b>'
                    f'<small>{esc(ui[key + "_hint"])}</small></a>')
     out.append('    </div>')
 
@@ -256,6 +279,13 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
             continue
         out.append(f'    <div class="nav-group"><h4>{esc(labels[lang])}</h4><ul>')
         for t in tools:
+            cur = ' aria-current="page"' if t == current else ""
+            out.append(link(t, cur))
+        out.append("    </ul></div>")
+
+    if section == "atlas" and SHARED:
+        out.append(f'    <div class="nav-group"><h4>{esc(ui["shared"])}</h4><ul>')
+        for t in SHARED:
             cur = ' aria-current="page"' if t == current else ""
             out.append(link(t, cur))
         out.append("    </ul></div>")

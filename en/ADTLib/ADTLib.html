@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADTLib — SADT Atlas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/themes/labo.css">
+<script src="../../assets/site.js"></script>
+</head>
+<body data-cat="utilitaires">
+<div class="layout">
+<nav class="sidebar">
+    <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
+    <div class="lang-switch">
+      <span class="cur">EN</span><span class="none" title="Français &mdash; not translated yet">FR</span><span class="none" title="Português &mdash; not translated yet">PT</span><span class="none" title="한국어 &mdash; not translated yet">KO</span><span class="none" title="ไทย &mdash; not translated yet">TH</span>
+    </div>
+    <div class="sec-switch">
+      <a href="../guide/index.html"><b>Guide</b><small>how to use the tools</small></a>
+      <a href="../index.html" aria-current="true"><b>Atlas</b><small>how it works in the code</small></a>
+    </div>
+    <div class="nav-group"><h4>Registration</h4><ul>
+      <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
+      <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
+      <li><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></li>
+      <li><a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a></li>
+      <li><a href="../GreedyReg/GreedyReg.html">GreedyReg</a></li>
+      <li><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Segmentation</h4><ul>
+      <li><a href="../AMASSS/AMASSS.html">AMASSS</a></li>
+      <li><a href="../BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Landmarks &amp; orientation</h4><ul>
+      <li><a href="../ALI/ALI.html">ALI</a></li>
+      <li><a href="../ASO/ASO.html">ASO</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Analysis</h4><ul>
+      <li><a href="../VFACE/VFACE.html">VFACE</a></li>
+      <li><a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></li>
+      <li><a href="../CLIC/CLIC.html">CLIC</a></li>
+      <li><a href="../SurgMovPred/SurgMovPred.html">SurgMovPred</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Utilities</h4><ul>
+      <li><a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a></li>
+      <li><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Text &amp; language</h4><ul>
+      <li><a href="../CNE/CNE.html">CNE</a></li>
+      <li><a href="../MedX/MedX.html">MedX</a></li>
+      <li><a href="../MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></li>
+      <li><a href="../Agent/Agent.html">Agent</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Shared code</h4><ul>
+      <li><a href="../ADTLib/ADTLib.html" aria-current="page">ADTLib</a></li>
+    </ul></div>
+    <div class="nav-group"><h4>Cross-cutting</h4><ul>
+      <li><a href="../findings.html">Findings</a></li>
+      <li><a href="../glossary.html">Glossary</a></li>
+    </ul></div>
+  </nav>
+  <div class="main">
+    <article class="content">
+
+      <header class="page-head">
+        <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Shared code</div>
+        <h1>ADTLib</h1>
+        <p class="lede">Not a tool: no interface, no pipeline, no model. ADTLib is the code the twenty modules import, and almost every one of its files exists because the same function had been copied between two and fifteen times. Each module header records how many copies it replaced and what the copies had started to disagree about — that count is the point of this page.</p>
+      </header>
+
+      <div class="callout note">
+        <div class="callout-title">Note</div>
+        <p>This page describes <code>ADT/ADTLib</code> on <code>upstream/main</code>, and it is the
+        only page of this atlas that documents code no user ever opens. It is here because
+        module behaviour now depends on it: a reader chasing what AREG does with a surface
+        ends up in <code>ADTLib/io/surface.py</code>, not in <code>AREG/</code>.</p>
+      </div>
+
+      <h2 id="situation">1. Where it sits</h2>
+
+      <p>Under everything, and inside no pipeline. ADTLib is declared first in the
+      extension's <code>CMakeLists.txt</code> — <em>"Shared code, declared before the modules
+      that import it"</em> — and the twenty tool directories import from it. It has no
+      <code>Process</code> of its own, nothing to run, and nothing to download.</p>
+
+      <p>Its own measure of itself, from the module headers: <strong>twenty-one modules, about
+      3 300 lines, replacing copies that together ran to several thousand</strong>. The header
+      of <code>theming.py</code> alone accounts for 1 926 lines of duplicate, and
+      <code>env/conda.py</code> for 656 across forty functions.</p>
+
+      <h2 id="import">2. How a module reaches it</h2>
+
+      <p>Slicer puts each extension's <code>qt-scripted-modules</code> directory on
+      <code>sys.path</code>, so a plain <code>import ADTLib</code> works from any module of
+      the extension and from a scripted CLI. A third route matters more than it looks:
+      once the modules publish Slicer's module search paths into the shapeaxi Conda
+      environment, <code>ADTLib</code> is importable <em>there too</em>. That is what
+      <code>ADTLib.env.install_pytorch</code> relies on — it is never imported by a widget,
+      it is run as <code>python -m ADTLib.env.install_pytorch</code> by the Conda
+      interpreter.</p>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong><code>ADTLib/__init__.py</code> and <code>io/__init__.py</code> must stay
+        free of imports.</strong> They run in the lean Conda environment too, which has
+        neither vtk, nor qt, nor slicer. A single import of one of those at package level
+        would break <em>every</em> submodule import on that route. Submodules that need them
+        import them themselves. <code>package_root()</code> exists for the same reason: it
+        returns the directory that has to be on <code>PYTHONPATH</code> for the Conda side
+        to find the package.</p>
+      </div>
+
+      <h2 id="contrat">3. The shared contract</h2>
+
+      <p>Three modules carry what the tools promise each other, rather than what they
+      compute.</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Module</th><th>What it replaced</th><th>What it settles</th></tr></thead>
+        <tbody>
+          <tr><td><code>method.py</code></td><td>six <code>Method(ABC)</code> declarations, 934 lines mostly contract rather than code</td><td>a core (<code>Process</code>, <code>TestProcess</code>, <code>NumberScan</code>, <code>search</code>) plus three mixins — landmarks, checkboxes, DICOM — because the six did <em>not</em> overlap at random: measured side by side, three clusters stood out sharply</td></tr>
+          <tr><td><code>requests.py</code></td><td>nothing; it names what was never written down</td><td><strong>473 <code>kwargs["..."]</code> accesses with no list anywhere.</strong> Each family now declares its fields, an unknown key is rejected <em>at construction</em>, and a missing one is <code>MISSING</code> — raising the same <code>KeyError</code> as before, at the same place, rather than becoming a silent empty value</td></tr>
+          <tr><td><code>progress_protocol.py</code></td><td>three undocumented conventions on one channel</td><td>see below</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="callout bug">
+        <div class="callout-title">Defect confirmed in the code</div>
+        <p><strong>Slicer multiplies <code>&lt;filter-progress&gt;</code> by a hundred, and
+        that factor is written down nowhere.</strong> It produced three conventions in one
+        repository: a CLI printing the fraction <code>0.42</code> makes 42 appear and the bar
+        advances — the intended use; a CLI printing the integer <code>2</code> makes 200
+        appear, which no bar can represent, so the interfaces compare against
+        <code>200</code> to learn that one more patient is done, and the CLI sends it as a
+        pulse <code>0 → 2 → 0</code> because Slicer only notifies the widget when the value
+        <em>changes</em>; and AMASSS, receiving both, guessed at run time which one it held
+        (<code>if progress &gt; 1: progress /= 100</code>). The three are now named, with the
+        constants carrying the value <strong>as the interface sees it</strong>, since that is
+        where the comparison happens.</p>
+      </div>
+
+      <h2 id="environnement">4. The environment</h2>
+
+      <p>Four modules, and the only part of ADTLib that reaches outside the process.</p>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Module</th><th>What it replaced</th></tr></thead>
+        <tbody>
+          <tr><td><code>env/conda.py</code></td><td>six copies of each function — <strong>forty functions, 656 lines</strong> — drifted into three shapes, one still holding an unreachable <code>return</code> in <code>check_lib_wsl</code> that read two names nothing had bound</td></tr>
+          <tr><td><code>env/deps.py</code></td><td>nine copies of <code>check_lib_installed</code> under <strong>three incompatible answers to the same question</strong>: AREG and FlexReg wrote <code>if required_version: pass</code>, true as soon as the library was installed at all — the constraint was decoration</td></tr>
+          <tr><td><code>env/cuda.py</code></td><td>the architecture-list problem: a torch wheel carries compiled kernels for a fixed list of architectures</td></tr>
+          <tr><td><code>env/install_pytorch.py</code></td><td>the pytorch3d wheel tag, <strong>computed from the installed torch rather than left to pip</strong></td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="callout warn">
+        <div class="callout-title">Pitfall</div>
+        <p><strong>A pytorch3d wheel whose tag does not match the installed torch crashes
+        with <code>undefined symbol</code> on import</strong>, not at install time. The tag
+        <code>0.7.9+pt2110cu128</code> means torch 2.11.0 and CUDA 12.8; the index is
+        <code>ImageMindAnalytics.github.io/pytorch3d-wheels</code>, because PyPI publishes no
+        wheel for modern combinations and the historical fbaipublicfiles index stopped at
+        Python 3.9 / torch 2.0. torch is installed here too, since computing the tag from
+        whatever torch happens to be present only works if that torch has a wheel at all:
+        <code>condaCreateEnv(["torch&gt;=2.8,&lt;2.13", …])</code> resolved to
+        <code>2.12.1+cu130</code> on 2026-09-16, a combination the index does not publish.</p>
+      </div>
+
+      <h2 id="io">5. Reading, writing, naming</h2>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Module</th><th>Copies replaced</th><th>What was decided</th></tr></thead>
+        <tbody>
+          <tr><td><code>io/fs.py</code></td><td><code>search</code> in <strong>fifteen copies, six variants</strong></td><td>six were a <code>search(self, …)</code> method and three the same thing as a free function — identical byte for byte once <code>self</code> is removed. The only two substantive differences became parameters</td></tr>
+          <tr><td><code>io/landmarks.py</code></td><td><code>LoadJsonLandmarks</code> ×3 strictly identical, <code>WriteJson</code> ×2</td><td>the variants that genuinely diverge — ASO_CBCT's, ALI_CBCT's, ALI_IOS's — <strong>stay where they are</strong></td></tr>
+          <tr><td><code>io/surface.py</code></td><td><code>ReadSurf</code> ×5, <code>WriteSurf</code> ×4</td><td>unlike the rest, <strong>these had diverged</strong>; the differences were measured before one was kept</td></tr>
+          <tr><td><code>labels.py</code></td><td><code>GetLabelSurface</code> and <code>isLabelSurface</code> ×5</td><td>methods of five <code>vtkTeeth</code> classes that were themselves copies, across <code>ASO_IOS_utils</code>, <code>FlexReg_utils</code>, <code>FlexReg_Method</code> ×2 and <code>AREG_IOS_utils</code></td></tr>
+          <tr><td><code>naming.py</code></td><td>six sites chaining <strong>fourteen <code>.split(...)[0]</code> calls in the same order</strong></td><td>the order is load-bearing: a longer marker must be cut before a shorter one it contains, or <code>_Scanreg</code> loses its tail to <code>_Scan</code> and two files stop pairing</td></tr>
+          <tr><td><code>geometry.py</code></td><td>two to four <strong>strictly identical</strong> copies each</td><td>measured line by line across <code>AREG_IOS_utils</code>, <code>ASO_IOS_utils</code>, <code>FlexReg_Method</code>, <code>ASO_CBCT_utils</code>; the genuinely divergent ones (FlexReg's <code>RotationMatrix</code>, ALI_IOS's <code>TransformSurf</code>) stay out</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="reste">6. The rest</h2>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Module</th><th>What it carries</th></tr></thead>
+        <tbody>
+          <tr><td><code>logging_setup.py</code></td><td><strong>151 files carried the same ten lines</strong>, each setting <code>propagate = False</code> and attaching its own StreamHandler — which is exactly what made the extension's logging impossible to steer: raising a level or sending a run to a file meant editing all of them</td></tr>
+          <tr><td><code>theming.py</code></td><td>eleven copies of the recursive pass and nine of <code>applyDarkModeStyles</code>, <strong>1 926 lines</strong>, already drifting — an inert <code>!important</code> here, and one copy missing the <code>hasattr</code> guard that keeps the recursion off a parent widget</td></tr>
+          <tr><td><code>testdata.py</code></td><td>seven copies of <code>DownloadUnzip</code> with <strong>three distinct ways of being wrong, all three reproduced</strong>: among them, not everything published is a zip — ALI's CBCT entry points at <code>MG_test_scan.nii.gz</code> and went straight into <code>zipfile.ZipFile</code></td></tr>
+          <tr><td><code>model_registry.py</code></td><td>the <strong>release bases</strong> only. It deliberately does not say <em>which</em> models a tool offers: that selection belongs to the tool, which is why the <code>getModelUrl</code> dictionaries stay put</td></tr>
+          <tr><td><code>format.py</code></td><td>pure functions, standard library only — imported by the whole extension, so it may not depend on anything</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 id="tests">7. What the tests pin down</h2>
+
+      <p>ADTLib ships <strong>22 tests</strong> in <code>ADT/Testing/Python/</code>, up from two.
+      They are the closest thing to a specification this shared layer has, and several were
+      written because grepping was not enough.</p>
+
+      <p><code>test_pip_requirements.py</code> says why in its own header: every
+      <code>(library, version)</code> pair the repository hands to pip must parse, because
+      <code>f'{lib}=={version}'</code> is correct only while every entry carries a bare
+      version — and three modules had quietly gained a constraint with an operator, producing
+      <code>dicom2nifti==&gt;=2.6.2</code>, which pip refuses outright. <strong>The defect is
+      invisible on a machine that already has the library</strong>, so no amount of running
+      the module locally shows it. The test walks the source rather than a hand-written list,
+      so a list that gains a constraint tomorrow is covered without anyone remembering.</p>
+
+      <p>The others name behaviours the tool pages describe:
+      <code>test_ali_cbct_bounds.py</code>, <code>test_ali_cbct_budget.py</code>,
+      <code>test_ali_progress_contract.py</code>,
+      <code>test_aso_cbct_report_is_not_landmarks.py</code>,
+      <code>test_aso_ios_landmark_intersection.py</code>,
+      <code>test_areg_review_skips_the_report.py</code>,
+      <code>test_output_folder_survives_mode_switch.py</code>, plus the unit tests of the
+      shared modules themselves — <code>test_fs</code>, <code>test_labels</code>,
+      <code>test_naming</code>, <code>test_surface</code>, <code>test_requests</code>,
+      <code>test_progress_protocol</code>, <code>test_deps</code>,
+      <code>test_cuda_channel</code>, <code>test_context_managers</code>,
+      <code>test_button_style</code>.</p>
+
+      <div class="callout ok">
+        <div class="callout-title">Verified</div>
+        <p>Run under a plain <code>PythonSlicer</code>, the suite reports <strong>188 tests
+        and 4 errors</strong>. The four are <code>ModuleNotFoundError: torch</code> in the
+        ALI_CBCT tests, which reach <code>ADTLib/env/cuda.py</code>'s
+        <code>preferred_device()</code> at import time. They are a property of the
+        environment, not of the code: no torch, no device probe.</p>
+      </div>
+
+      <h2 id="lire">8. Reading this layer</h2>
+
+      <p>Two habits make it legible. First, <strong>every module header states what it
+      replaced and what the copies disagreed about</strong> — that is where the reasoning
+      lives, not in this page. Second, the line that recurs across those headers is what
+      was <em>left out</em>: the variants that genuinely diverge stay in their tool.
+      <code>TestScan</code> and <code>TestModel</code> are not in <code>method.py</code>
+      because their arities plainly differ from one tool to the next — up to four arguments
+      in AREG — and <code>getModelUrl</code> returns a per-tool selection. Lifting them
+      would have meant inventing a contract none of the six actually honoured.</p>
+
+      <footer class="footer">
+        <a href="../index.html">← All pages</a> ·
+        Source: <code>ADT/ADTLib/</code> on <code>upstream/main</code>
+      </footer>
+
+    </article>
+    <aside class="toc"></aside>
+  </div>
+</div>
+</body>
+</html>
