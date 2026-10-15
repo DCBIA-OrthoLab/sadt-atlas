@@ -2,7 +2,9 @@
 """sadt-atlas : génère l'index de recherche et la page des constats.
 
 À relancer après toute modification des pages :  python3 build.py
-Ne modifie aucune page existante ; écrit assets/search-index.js et constats.html.
+Ne modifie aucune page existante ; écrit, par langue,
+assets/search-index-<lang>.js, assets/constats-<lang>.json et la page des
+constats : constats.html en français, findings.html dans les autres langues.
 """
 import os, re, json, html
 from html.parser import HTMLParser
