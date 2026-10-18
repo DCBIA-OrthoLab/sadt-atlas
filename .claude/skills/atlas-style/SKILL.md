@@ -9,6 +9,30 @@ Site statique, sans build CSS, sans dépendance. Une seule feuille :
 `assets/style.css`, liée en relatif par une centaine de pages. Les surcouches de
 `assets/themes/` ne redéfinissent que des tokens et quelques règles de forme.
 
+## Le registre du squelette
+
+La feuille de base suit le langage visuel d'Apple (HIG, plus les patterns web
+mesurés sur apple.com). Les quatre règles qui tiennent tout le reste sont
+répétées en tête de `assets/style.css` ; en abrégé :
+
+1. **Fond binaire.** Très clair ou presque noir, jamais un gris moyen. En
+   sombre, une surface s'élève en s'éclaircissant, pas en portant une ombre.
+2. **La profondeur vient de la lumière, pas des cadres.** Un filet d'un pixel,
+   ou rien. Aucun liseré de couleur sur le flanc d'un bloc.
+3. **Des groupes, pas des boîtes empilées.** Des lignes apparentées partagent
+   UN bloc arrondi, séparées par des filets. Jamais une boîte dans une boîte.
+4. **Pas d'étiquette en CAPITALES.** Petit + majuscules + interlettrage large,
+   c'est la signature du gabarit générique, et c'est ce qui faisait dire du
+   site qu'il avait l'air généré. Un titre de section est en casse ordinaire,
+   c'est sa taille qui le classe.
+
+La couleur appartient au contenu : `--accent` dit la famille d'outils et ne
+sert qu'aux liens et à ce qui porte l'information. Le chrome reste neutre.
+
+Le skill `apple-ui` (installé dans `~/.claude/skills/`) porte le détail :
+`references/field-notes/principles.md` et `anti-patterns.md` d'abord, puis
+`apple-web/site-patterns.md` pour le gabarit de documentation.
+
 ## Les quatre contraintes non négociables
 
 1. **Hors ligne.** Aucun CDN, aucune police distante, aucun `@import` réseau. Le
@@ -61,6 +85,13 @@ un thème sombre par défaut (`ardoise`, `labo`) ajoute en plus un bloc
 | Sémantique | `--warn-*`, `--bug-*`, `--ok-*`, `--info-*` (chacun `-bg`, `-br`, `-tx`) |
 | Mesure | `--measure` (76ch, 68ch dans le Guide), `--sidebar-w`, `--toc-w`, `--mbar-h` |
 | Profondeur | `--shadow-sm`, `--shadow-md` |
+| Rayons | `--radius` (pré, figure, callout), `--radius-group` (un groupe de lignes, une carte), `--radius-sm` (pastille de code, champ, entrée de nav), `--radius-pill` (bouton, puce, filtre) |
+| Mouvement | `--ease` (la courbe des feuilles d'iOS) |
+
+**Les quatre rayons se déclarent ensemble.** Un thème qui n'en redéfinit qu'un
+laisse les autres à la valeur de la base : un thème carré gardait des groupes
+arrondis à 18 px et des pilules entières. Aucun rayon n'est écrit en dur dans
+la feuille, justement pour qu'un thème puisse tous les atteindre.
 
 Les ombres sont des tokens comme les autres : un thème sombre doit les
 redéfinir (une ombre noire ne se voit pas sur du noir, `labo` y met un halo
@@ -77,10 +108,24 @@ une couleur figée, sinon le thème et le mode sombre décrochent.
 ## Composants existants
 
 Avant d'en inventer un, vérifie qu'il n'existe pas : `.callout` (+ `.warn`,
-`.bug`, `.ok`), `.badge` (+ `.predit`, `.calcule`, `.cli`, `.paper`, `.k-*`),
+`.bug`, `.ok`), `.badge` (+ `.predit`, `.calcule`, `.cli`, `.paper`),
 `.card` / `.card-grid`, `.io-card` / `.io-grid`, `.steps`, `.deep-link`,
-`.video-box`, `figure.diagram`, `figure.shot`, `.table-wrap`, `.constat`,
-`.chip`, `.pager`, `.gloss`.
+`.video-box`, `figure.diagram`, `figure.shot`, `.table-wrap`,
+`#constat-list` / `.constat` / `.constat-kind`, `.chip`, `.pager`, `.gloss`,
+`.sec-switch` / `.sec-hint`, `.lang-switch`, `.landing .choices`, `.meta-row`.
+
+Trois d'entre eux ne sont pas ce que leur nom suggère :
+
+- **`.badge` n'est pas une étiquette cadrée** : c'est une pastille de couleur
+  (`::after`, remis en tête par `order`) suivie d'un mot. Jamais la couleur
+  seule. Les variantes `.cli` et `.neutral` nomment une chose plutôt qu'elles
+  ne signalent un état : elles n'ont pas de pastille.
+- **`.constat` n'est pas une carte** : c'est une ligne de `#constat-list`, qui
+  est le groupe. Trois cent soixante et onze cartes à liseré, c'était la page
+  la plus bruyante du site.
+- **`.table-wrap` est nu** : ni fond, ni cadre, ni rayon. Le tableau repose
+  déjà sur la surface de la page ; un filet appuyé sous la tête et des filets
+  légers entre les lignes suffisent.
 
 ## Pièges connus, déjà payés
 
@@ -102,6 +147,45 @@ Avant d'en inventer un, vérifie qu'il n'existe pas : `.callout` (+ `.warn`,
   disparaît au profit de `.mbar`. Toute barre fixe ajoutée doit se placer dans
   cet empilement de `z-index` : mbar 70, thème 75, tiroir 65, voile 60,
   recherche 60, page-bar 40, filtres 20.
+- **Une piste de grille bornée par `--measure` réclame sa largeur maximale**
+  quelle que soit la place offerte : `minmax(0, min(100%, var(--measure)))`,
+  pas `minmax(0, var(--measure))`.
+- **Chrome sans tête plafonne la fenêtre à 500 px CSS.** Une capture demandée
+  à 390 px rend en fait 500 px et se fait recadrer : le contenu paraît coupé
+  alors qu'il ne déborde pas. Pour un vrai 390, `--force-device-scale-factor=2`
+  avec une fenêtre de 780. Et pour forcer le thème de couleurs,
+  `--blink-settings=preferredColorScheme=0` (sombre) ou `=1` (clair) : **toute
+  autre valeur est ignorée**, la page rend en clair, et on croit à un bug du
+  thème.
+
+## Le contrat d'un thème
+
+Un thème est une surcouche de tokens plus quelques règles de forme. Ce qu'il
+doit honorer, vérifié sur les six :
+
+- **Les quatre rayons**, ensemble (voir Tokens).
+- **Les groupes, pas les anciennes boîtes.** La liste à viser est la même
+  partout : `.card, .io-grid, .deep-link, .video-box, .formula, figure.diagram,
+  #constat-list, .toc-m, .viewer3d .v3d-parts, .landing .choices`. Un thème
+  les remplit (`labo`, `signal`), les pose en relief (`clinique`), les cerne
+  (`ardoise`, `carnet`) ou les aplatit sous un filet (`papier`), mais il les
+  traite ensemble, sinon la page se lit comme deux grammaires cousues.
+- **Un tableau cerné veut une marge intérieure.** `.table-wrap` est nu dans la
+  base ; dès qu'un thème lui donne un cadre ou une ombre, il lui faut un
+  `padding`, sinon le texte touche le trait.
+- **`.main` porte la surface de lecture** (`--bg-elev`). Deux thèmes doivent la
+  reprendre : `carnet` la remet à `transparent`, sans quoi elle recouvre le
+  quadrillage qui est tout le thème ; `clinique` la met à `--bg` pour que ses
+  cartes blanches se détachent.
+- **En sombre, `--shadow-sm` est un liseré clair**, pas une ombre : une ombre
+  noire ne se voit pas sur du noir. Un thème qui redéfinit ses ombres sombres
+  en ombres portées perd l'élévation de ses surfaces.
+- **Un thème sombre par défaut doit redéfinir TOUTE la palette dans son bloc
+  `:root[data-theme="light"]`**, pas seulement `--accent`. `ardoise` n'avait que
+  lui : sur une fiche de segmentation le lien tombait à 2,3 contre 1, et un
+  callout ouvrait un rectangle brun foncé au milieu d'une page blanche.
+- **Se relire dans le mode inverse.** Les quatre thèmes clairs en sombre, les
+  deux sombres via la bascule. C'est là que les blocs oubliés se voient.
 
 ## Le visualiseur 3D (AMASSS)
 
@@ -181,13 +265,26 @@ google-chrome --headless --disable-gpu --hide-scrollbars \
 
 Trois gabarits à regarder à chaque fois : une fiche Atlas dense (tableaux +
 schéma + callouts), la page `findings.html` (grille large), et une fiche en
-390 px de large (tiroir, tableaux qui défilent).
+390 px de large (tiroir, tableaux qui défilent). Attention aux deux pièges de
+Chrome sans tête, plus haut : le plancher de 500 px, et les valeurs de
+`preferredColorScheme`.
+
+Pour essayer un thème sans réécrire les trois cent trente pages, poser son
+`<link>` dans une copie jetable de la page plutôt que de lancer
+`build.py --theme` :
+
+```bash
+sed 's|<script src=|<link rel="stylesheet" href="../../assets/themes/labo.css">\n<script src=|' \
+  en/AREG_CBCT/AREG_CBCT.html > en/AREG_CBCT/.essai.html
+# capture, puis rm en/AREG_CBCT/.essai.html
+```
 
 ## Les skills de design intégrées
 
 `artifact-design`, `dataviz`, `artifact-diagramming` et `artifact-capabilities`
 sont fournies par Claude Code lui-même : elles sont disponibles sans rien
-installer. Elles visent les artifacts publiés ; **leurs conseils de polices
+installer. `apple-ui` est installée à part, dans `~/.claude/skills/` : c'est
+elle qui porte le registre du squelette décrit en tête. Elles visent les artifacts publiés ; **leurs conseils de polices
 distantes et de CDN ne s'appliquent pas ici** (contrainte 1). Ce qui se
 transpose : l'échelle typographique, les règles de contraste, et pour `dataviz`
 le choix des couleurs catégorielles, la palette d'accents ci-dessus en est
