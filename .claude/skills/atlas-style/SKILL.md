@@ -87,6 +87,7 @@ un thème sombre par défaut (`ardoise`, `labo`) ajoute en plus un bloc
 | Profondeur | `--shadow-sm`, `--shadow-md` |
 | Rayons | `--radius` (pré, figure, callout), `--radius-group` (un groupe de lignes, une carte), `--radius-sm` (pastille de code, champ, entrée de nav), `--radius-pill` (bouton, puce, filtre) |
 | Mouvement | `--ease` (la courbe des feuilles d'iOS) |
+| Curseur segmenté | `--thumb`, `--thumb-ink`, `--thumb-shadow` (la case lue de `.sec-switch`) |
 
 **Les quatre rayons se déclarent ensemble.** Un thème qui n'en redéfinit qu'un
 laisse les autres à la valeur de la base : un thème carré gardait des groupes
@@ -180,6 +181,16 @@ doit honorer, vérifié sur les six :
 - **En sombre, `--shadow-sm` est un liseré clair**, pas une ombre : une ombre
   noire ne se voit pas sur du noir. Un thème qui redéfinit ses ombres sombres
   en ombres portées perd l'élévation de ses surfaces.
+- **Une couleur écrite dans une règle de composant est hors d'atteinte d'un
+  thème.** Le curseur de `.sec-switch` valait `#48484a` en dur dans un bloc
+  `@media (prefers-color-scheme: dark)` de la base : spécificité `0,3,1`,
+  contre `0,2,1` pour la règle d'un thème, qui perdait donc en sombre. Trois
+  thèmes sur six voyaient leur curseur remplacé par ce gris. La règle passe
+  par `--thumb` / `--thumb-ink` / `--thumb-shadow`, et un thème les pose dans
+  ses blocs de tokens plutôt que d'écrire une règle de plus.
+- **Un token posé sur `:root` seul se fait battre en sombre.** Les blocs
+  sombres de la base ont une spécificité de `0,1,1`. Tout token qu'un thème
+  veut changer va dans **chacun** de ses blocs, pas seulement le premier.
 - **Un thème sombre par défaut doit redéfinir TOUTE la palette dans son bloc
   `:root[data-theme="light"]`**, pas seulement `--accent`. `ardoise` n'avait que
   lui : sur une fiche de segmentation le lien tombait à 2,3 contre 1, et un
