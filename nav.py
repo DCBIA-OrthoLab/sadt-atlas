@@ -33,7 +33,7 @@ LANG_NAMES = {"en": "English", "fr": "Français", "pt": "Português", "ko": "한
 #      THEME = "carnet"      papier millimétré, encre, sérif, vermillon
 #      THEME = "signal"      contemporain : grande typo, formes pleines, aéré
 # ─────────────────────────────────────────────────────────────
-THEME = "labo"
+THEME = None
 
 THEMES = ("ardoise", "papier", "clinique", "labo", "carnet", "signal")
 
@@ -255,7 +255,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     on_tool = current in {t for t, _ in TOOLS}
     sw = (("guide", f"guide/{current}.html" if on_tool else "guide/index.html"),
           ("atlas", f"{current}/{current}.html" if on_tool else "index.html"))
-    out.append('    <div class="sec-switch">')
+    out.append('    <div class="sec-switch" role="group">')
     for key, r in sw:
         on = ' aria-current="true"' if key == section else ""
         # Même règle que link() : la contrepartie n'existe pas forcément dans
@@ -269,9 +269,12 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
             extra = (f' class="untranslated" hreflang="en"'
                      f' title="{esc(ui[key])}: not translated into '
                      f'{esc(LANG_NAMES[lang])} yet, this opens the English page"')
-        out.append(f'      <a href="{href_}"{extra}{on}><b>{esc(ui[key])}</b>'
-                   f'<small>{esc(ui[key + "_hint"])}</small></a>')
+        out.append(f'      <a href="{href_}"{extra}{on}>{esc(ui[key])}</a>')
     out.append('    </div>')
+    # La phrase d'orientation ne se repete pas dans chaque segment : elle suit
+    # le controle, et ne decrit que la section ou l'on est. Deux legendes dans
+    # deux cases bordees se lisaient comme deux objets, pas comme un choix.
+    out.append(f'    <p class="sec-hint">{esc(ui[section + "_hint"])}</p>')
 
     for cat, labels in CATS.items():
         tools = [t for t, c in TOOLS if c == cat]

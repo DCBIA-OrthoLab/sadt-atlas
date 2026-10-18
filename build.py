@@ -279,7 +279,8 @@ def write_constats(lang, constats):
         rows.append(
             f'<article class="constat" data-kind="{c["kind"]}" data-tool="{html.escape(c["tool"])}">'
             f'<div class="constat-head">'
-            f'<span class="badge k-{c["kind"]}">{kl[c["kind"]]}</span> '
+            f'<span class="constat-kind"><span class="dot k-{c["kind"]}"></span>'
+            f'{kl[c["kind"]]}</span> '
             f'<a class="constat-tool" href="{html.escape(c["url"])}">{html.escape(c["tool"])}</a>'
             f'<span class="constat-title">{html.escape(c["title"])}</span>'
             f'</div>'
@@ -640,18 +641,17 @@ LANDING = """<!doctype html>
 <div class="landing">
   <h1>SADT Atlas</h1>
   <p>How each SlicerAutomatedDentalTools module works.</p>
-  <div class="choices">
+  <nav class="choices" aria-label="Language">
     <a href="en/guide/index.html" hreflang="en"><b>English</b><small>Guide and Atlas</small></a>
     <a href="fr/guide/index.html" hreflang="fr"><b>Français</b><small>Guide et Atlas</small></a>
     <a href="pt/guide/index.html" hreflang="pt"><b>Português</b><small>Guia e Atlas</small></a>
     <a href="ko/guide/index.html" hreflang="ko"><b>한국어</b><small>가이드와 아틀라스</small></a>
     <a href="th/guide/index.html" hreflang="th"><b>ไทย</b><small>คู่มือและแอตลาส</small></a>
-  </div>
+  </nav>
 </div>
 </body>
 </html>
 """
-
 
 def write_landing():
     open(os.path.join(ROOT, "index.html"), "w", encoding="utf-8").write(LANDING)
