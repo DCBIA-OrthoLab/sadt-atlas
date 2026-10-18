@@ -6,7 +6,7 @@ Ne modifie aucune page existante ; écrit, par langue,
 assets/search-index-<lang>.js, assets/constats-<lang>.json et la page des
 constats : constats.html en français, findings.html dans les autres langues.
 """
-import os, re, json, html
+import os, re, json, html, unicodedata
 from html.parser import HTMLParser
 
 import nav
@@ -139,9 +139,22 @@ class Page(HTMLParser):
         self._add(d)
 
 
+def clip(s, limit):
+    """Une coupe en plein mot n'est pas une fin : on recule jusqu'a la derniere
+    espace. Le thai n'en met pas entre les mots, d'ou le repli sur la coupe
+    nette quand reculer couterait trop."""
+    if len(s) <= limit:
+        return s
+    cut = s[:limit].rstrip()
+    sp = cut.rfind(" ")
+    if sp > limit * 0.7:
+        cut = cut[:sp]
+    return cut.rstrip(" ,;:(") + "…"
+
+
 def clean(s, limit=None):
     s = re.sub(r"\s+", " ", s).strip()
-    return s[:limit].rstrip() + "…" if limit and len(s) > limit else s
+    return clip(s, limit) if limit else s
 
 
 def walk(lang):
@@ -173,7 +186,7 @@ def build_lang(lang):
                 "u": rel + ("#" + s["id"] if s["id"] else ""),
                 "p": title, "t": tool, "c": cat,
                 "s": clean(s["title"]) or "Introduction",
-                "x": body[:600],
+                "x": clip(body, 600),
             })
         for c in p.callouts:
             txt = clean(" ".join(c["text"]))
@@ -182,8 +195,8 @@ def build_lang(lang):
             constats.append({
                 "kind": c["kind"], "tool": tool, "cat": cat, "page": title,
                 "url": rel + ("#" + c["section"] if c["section"] else ""),
-                "title": constat_label(clean(c["title"]), txt) or "?",
-                "text": txt[:520],
+                "title": constat_title(clean(c["title"])),
+                "text": clean(txt, 520),
             })
 
     os.makedirs(os.path.join(ROOT, "assets"), exist_ok=True)
@@ -213,20 +226,50 @@ GENERIC_TITLES = {
 }
 
 
-def deaccent(s):
-    import unicodedata
-    return "".join(c for c in unicodedata.normalize("NFD", s.lower())
-                   if unicodedata.category(c) != "Mn").strip(" :.")
+def title_key(s):
+    """Clé de comparaison d'un titre, toutes écritures confondues.
+
+    NFD seul ne suffit pas : il éclate une syllabe coréenne en jamos qui ne se
+    recomposent jamais, et il détache les voyelles thaïes, que le filtre des
+    marques emporte ensuite, « บั๊กที่ยืนยันแล้ว » devenant « บกทยนยนแลว ».
+    On ne retire donc que les diacritiques latins, U+0300 à U+036F, le temps
+    d'assimiler « confirmé » à « confirme », puis on recompose en NFC."""
+    d = unicodedata.normalize("NFD", s.lower())
+    d = "".join(c for c in d if not ("\u0300" <= c <= "\u036f"
+                                     and unicodedata.category(c) == "Mn"))
+    return unicodedata.normalize("NFC", d).strip(" :.")
 
 
-def constat_label(title, text):
-    """Un titre générique n'apprend rien sur une page qui en agrège 250 :
-    on lui substitue la première phrase du corps."""
-    if deaccent(title) not in GENERIC_TITLES:
-        return title
-    m = re.split(r"(?<=[.!?])\s+", text.strip())
-    first = m[0] if m else text
-    return clean(first, 110) or title
+GENERIC_KEYS = {title_key(t) for t in GENERIC_TITLES}
+
+
+def recapitalise(s):
+    """Un titre amputé de son préfixe commence en minuscule. On lui rend sa
+    capitale, sauf quand le premier mot est un identifiant : vtkICP.__call__
+    s'écrit comme le code l'écrit, pas comme une phrase."""
+    first = s.split(" ", 1)[0]
+    if not first[:1].isalpha() or any(c in first for c in "._(0123456789"):
+        return s
+    return s[:1].upper() + s[1:]
+
+
+def constat_title(title):
+    """Un titre générique n'apprend rien : « Défaut confirmé » est déjà dit par
+    la pastille à gauche de la ligne. On a longtemps promu la première phrase
+    du corps à sa place, mais le corps l'imprimait ensuite en entier : la
+    moitié des constats se lisaient deux fois. Et sa médiane fait 117 signes,
+    c'est une phrase, pas un intitulé. On la laisse donc au corps, et la ligne
+    n'a pas de titre."""
+    if title_key(title) in GENERIC_KEYS:
+        return ""
+    # « Défaut confirmé : entrée DICOM ignorée » dit deux fois le genre, une
+    # fois dans la pastille et une fois dans son propre titre. On ne garde
+    # que ce que le titre apporte.
+    for sep in (":", "\uff1a"):
+        head, found, tail = title.partition(sep)
+        if found and tail.strip() and title_key(head) in GENERIC_KEYS:
+            return recapitalise(tail.strip())
+    return title
 
 
 KIND_LABEL = {
@@ -272,17 +315,19 @@ def write_constats(lang, constats):
     tools = sorted({c["tool"] for c in constats})
     counts = {k: sum(1 for c in constats if c["kind"] == k) for k in KIND_ORDER}
     order = {k: i for i, k in enumerate(KIND_ORDER)}
-    constats = sorted(constats, key=lambda c: (order[c["kind"]], c["tool"], c["title"]))
+    constats = sorted(constats, key=lambda c: (order[c["kind"]], c["tool"], c["title"] or c["text"]))
 
     rows = []
     for c in constats:
+        titre = (f'<span class="constat-title">{html.escape(c["title"])}</span>'
+                 if c["title"] else "")
         rows.append(
             f'<article class="constat" data-kind="{c["kind"]}" data-tool="{html.escape(c["tool"])}">'
             f'<div class="constat-head">'
             f'<span class="constat-kind"><span class="dot k-{c["kind"]}"></span>'
             f'{kl[c["kind"]]}</span> '
             f'<a class="constat-tool" href="{html.escape(c["url"])}">{html.escape(c["tool"])}</a>'
-            f'<span class="constat-title">{html.escape(c["title"])}</span>'
+            f'{titre}'
             f'</div>'
             f'<p class="constat-text">{html.escape(c["text"])}</p>'
             f'</article>'
