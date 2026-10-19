@@ -94,6 +94,16 @@ laisse les autres à la valeur de la base : un thème carré gardait des groupes
 arrondis à 18 px et des pilules entières. Aucun rayon n'est écrit en dur dans
 la feuille, justement pour qu'un thème puisse tous les atteindre.
 
+**`--text-faint` n'est pas de l'ornement.** Il porte les liens de la table
+des matières, le fil d'Ariane, les légendes de figure, le pied de page et le
+contexte des résultats de recherche : 53 règles. Il doit donc tenir **4,5:1**
+sur les trois surfaces, `--bg`, `--bg-elev` et `--bg-sunken`, pas seulement
+sur la première. Mesurés avant correction, les six thèmes allaient de 2,96
+(`carnet` clair) à 4,2 : seule la base passait. Le calcul se refait en
+quelques lignes, il suffit de pousser la clarté HSL jusqu'au seuil, teinte et
+saturation gardées, sinon le thème change de couleur en changeant de
+contraste.
+
 Les ombres sont des tokens comme les autres : un thème sombre doit les
 redéfinir (une ombre noire ne se voit pas sur du noir, `labo` y met un halo
 coloré), et un thème plat peut les mettre à `none` (`ardoise`).
@@ -170,6 +180,12 @@ Trois d'entre eux ne sont pas ce que leur nom suggère :
 - **Une piste de grille bornée par `--measure` réclame sa largeur maximale**
   quelle que soit la place offerte : `minmax(0, min(100%, var(--measure)))`,
   pas `minmax(0, var(--measure))`.
+- **Un champ de saisie sous 16 px fait zoomer Safari iOS** à la mise au
+  point, et la page ne revient jamais à son échelle : on tape sa recherche
+  sur une mise en page décalée, le champ hors cadre. Les trois champs du site
+  passent donc à `font-size: 16px` sous `@media (pointer: coarse), (max-width:
+  820px)`. En pixels, pas en rem : c'est un seuil du navigateur, pas une
+  mesure typographique. Le point de vue de la souris ne bouge pas.
 - **Chrome sans tête plafonne la fenêtre à 500 px CSS.** Une capture demandée
   à 390 px compose en fait sur 485 px de large et se fait recadrer à 390 : le
   texte paraît coupé net au bord droit alors que rien ne déborde, et on part
@@ -197,6 +213,9 @@ Un thème est une surcouche de tokens plus quelques règles de forme. Ce qu'il
 doit honorer, vérifié sur les six :
 
 - **Les quatre rayons**, ensemble (voir Tokens).
+- **Le plancher de contraste** de `--text-faint`, sur les trois surfaces
+  (voir Tokens). `--text` et `--text-soft` passent partout sans effort, ce
+  troisième niveau est le seul qui se vérifie.
 - **Les groupes, pas les anciennes boîtes.** La liste à viser est la même
   partout : `.card, .io-grid, .deep-link, .video-box, .formula, figure.diagram,
   #constat-list, .toc-m, .viewer3d .v3d-parts, .landing .choices`. Un thème
