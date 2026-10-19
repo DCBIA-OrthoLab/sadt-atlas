@@ -142,9 +142,14 @@ Trois d'entre eux ne sont pas ce que leur nom suggère :
   couleur. Le bloc du visualiseur 3D en gardait quatre, plus la pastille de
   module du schéma de pipeline et le marqueur « EN » de la barre latérale.
   `ardoise` en annulait un à la main, avec une règle de plus : c'est le signe
-  qu'il fallait tokeniser, pas rattraper. Seules exceptions restantes, la
-  squircle de `.tool-icon`, le `50%` d'une pastille d'état et le bout arrondi
-  des trois barres du menu tactile : des formes, pas des rayons.
+  qu'il fallait tokeniser, pas rattraper. Seules exceptions restantes, le
+  `50%` d'une pastille d'état et le bout arrondi des trois barres du menu
+  tactile : des formes, pas des rayons.
+- **Une icône de module porte déjà sa forme.** Les dix-huit PNG de
+  `assets/screens/*/icon.png` ont leurs quatre coins à alpha zéro, et la
+  moitié de leur carré laisse voir le fond, 87 % pour AutoMatrix. Leur donner
+  un `background` et un `border-radius` peignait une plaque qui dépassait
+  toujours, et en sombre un pâté plus noir que la page. On les pose nues.
 - **L'anneau de focus ne fixe pas de rayon.** `border-radius` sur
   `:focus-visible` ne modèle pas l'anneau, il déforme l'élément le temps du
   focus. La règle valait `4px` en dur : à spécificité égale elle est déclarée
