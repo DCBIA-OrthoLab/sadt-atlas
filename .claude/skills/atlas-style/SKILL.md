@@ -138,6 +138,13 @@ Trois d'entre eux ne sont pas ce que leur nom suggère :
 - **Un schéma rétréci n'est pas un schéma.** `figure.diagram` déborde de la
   colonne de texte jusqu'à la largeur de `.main` et impose un `min-width` :
   au-dessous, il défile au lieu de devenir microscopique.
+- **L'anneau de focus ne fixe pas de rayon.** `border-radius` sur
+  `:focus-visible` ne modèle pas l'anneau, il déforme l'élément le temps du
+  focus. La règle valait `4px` en dur : à spécificité égale elle est déclarée
+  après `.card` et `.theme-toggle`, donc elle gagnait, et une pilule de 999 px
+  s'écrasait à 4 px au clavier pendant qu'`ardoise`, tout carré, s'arrondissait.
+  Le navigateur fait déjà suivre l'anneau au rayon de l'élément : on ne lui
+  donne qu'une couleur et un décalage.
 - **`transition` se déclare sur l'état de repos, pas sur `:hover`.** Sinon
   l'animation ne joue qu'à l'entrée et claque à la sortie.
 - **`@media (hover: none)`** : tout ce qui n'apparaît qu'au survol (bouton
