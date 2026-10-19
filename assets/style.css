@@ -1002,7 +1002,11 @@ figure.shot figcaption .src { opacity: .75; }
   border: 0; border-radius: var(--radius-group);
   box-shadow: var(--shadow-sm); overflow: hidden;
 }
-.viewer3d.v3d-on .v3d-stage { display: block; }
+/* Une grille d'une seule cellule : le canevas la remplit, le bandeau de
+   lancement s'y pose par-dessus sans être positionné, pour que la pastille
+   d'état qu'il abrite sur AMASSS se cale encore sur la scène. */
+.viewer3d.v3d-on .v3d-stage { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+.viewer3d .v3d-stage > canvas { grid-area: 1 / 1; }
 .viewer3d .v3d-stage canvas {
   display: block; width: 100%; height: 100%;
   touch-action: none;                          /* l'orbite mange le geste */
@@ -1074,16 +1078,39 @@ figure.shot figcaption .src { opacity: .75; }
 .viewer3d .v3d-run {
   display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin-top: .7rem;
 }
+/* Dans la scène, le bandeau se pose au coin bas droit, le coin gauche
+   portant déjà l'aide au geste. C'est le socle qui l'y déplace une fois
+   WebGL obtenu (scene3d.js, dockRun). */
+.viewer3d .v3d-stage > .v3d-run {
+  grid-area: 1 / 1; align-self: end; justify-self: end; z-index: 2;
+  margin: .55rem .6rem; justify-content: flex-end; max-width: calc(100% - 1.2rem);
+}
+/* Le bandeau occupe le bas à droite : l'aide au geste n'y a plus droit qu'à
+   ce qui reste, et passe à la ligne au lieu de courir dessous. Mesure prise
+   sur la scène la plus étroite du Guide, 701 px pour un bandeau de 421. */
+.viewer3d .v3d-stage:has(> .v3d-run) > .v3d-hint { max-width: calc(100% - 28rem); }
+/* Une scène de 358 px ne tient ni l'un ni l'autre : ils s'empilent, le
+   bandeau au-dessus. */
+@media (max-width: 560px) {
+  .viewer3d .v3d-stage > .v3d-run { margin-bottom: 2.4rem; }
+  .viewer3d .v3d-stage:has(> .v3d-run) > .v3d-hint { max-width: calc(100% - 1.2rem); }
+}
 .viewer3d .v3d-go {
   font: inherit; font-size: .9375rem; font-weight: 500; letter-spacing: -.012em; cursor: pointer;
   background: var(--accent); color: var(--bg);
   border: 0; border-radius: var(--radius-pill);
   padding: .38rem .9rem;
 }
+.viewer3d .v3d-stage > .v3d-run .v3d-go { box-shadow: var(--shadow-sm); }
 .viewer3d .v3d-go:hover { filter: brightness(1.08); }
 .viewer3d.v3d-sim .v3d-go { opacity: .5; pointer-events: none; }
+/* Le compte rendu de passe porte la même pastille où qu'il soit : enfant de
+   la scène sur la plupart des fiches, logé dans le bandeau sur AMASSS. */
 .viewer3d .v3d-status {
-  font-size: .82rem; color: var(--text-soft); font-variant-numeric: tabular-nums;
+  font-size: .8125rem; font-weight: 500; letter-spacing: -.005em;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: var(--text-soft); background: color-mix(in srgb, var(--bg) 82%, transparent);
+  border: 0; border-radius: var(--radius-pill); padding: .2rem .75rem;
 }
 /* Pendant la passe, la liste ne se clique pas : on regarde le réseau travailler. */
 .viewer3d.v3d-sim .v3d-parts > li { pointer-events: none; }
@@ -1104,12 +1131,9 @@ figure.shot figcaption .src { opacity: .75; }
 
 /* --- Scene ALI : la liste est celle des reperes, pas des structures --- */
 .viewer3d .v3d-lms > li { cursor: pointer; }
-.viewer3d .v3d-status {
+.viewer3d .v3d-stage .v3d-status {
   position: absolute; left: 50%; top: .7rem; transform: translateX(-50%);
-  pointer-events: none; white-space: nowrap;
-  font-size: .8125rem; font-weight: 500; letter-spacing: -.005em;
-  color: var(--text-soft); background: color-mix(in srgb, var(--bg) 82%, transparent);
-  border: 0; border-radius: var(--radius-pill); padding: .2rem .75rem;
+  pointer-events: none;
 }
 .viewer3d .v3d-status:empty { display: none; }
 
@@ -1191,6 +1215,13 @@ math { color: var(--text); }
   border: 1px solid transparent; border-radius: var(--radius-sm);
 }
 .viewer3d .v3d-speed button:hover { color: var(--text); }
+/* Posée sur la scène, la rangée des vitesses n'a plus de page sous elle :
+   elle prend la pastille de l'aide au geste, sinon un chiffre gris se perd
+   sur un crâne clair. */
+.viewer3d .v3d-stage > .v3d-run .v3d-speed {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  border-radius: var(--radius-pill); padding: .12rem .35rem;
+}
 .viewer3d .v3d-speed button[aria-pressed="true"] {
   color: var(--accent); border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
