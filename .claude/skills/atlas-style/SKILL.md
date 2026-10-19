@@ -195,6 +195,11 @@ doit honorer, vérifié sur les six :
   `:root[data-theme="light"]`**, pas seulement `--accent`. `ardoise` n'avait que
   lui : sur une fiche de segmentation le lien tombait à 2,3 contre 1, et un
   callout ouvrait un rectangle brun foncé au milieu d'une page blanche.
+- **Un signe accentué se juge en grille, pas à l'unité.** `carnet` donnait aux
+  cartes un filet de 3 px en tête : juste pour une carte isolée, intenable sur
+  l'index du Guide, qui en aligne douze sous un titre qui porte déjà un trait
+  accentué. Avant d'ajouter une marque de couleur à un composant, compte
+  combien d'exemplaires la page la plus dense en montre.
 - **Se relire dans le mode inverse.** Les quatre thèmes clairs en sombre, les
   deux sombres via la bascule. C'est là que les blocs oubliés se voient.
 
