@@ -639,10 +639,23 @@ def video_block(lang, tool):
         dur = ui["min"].format(m=sec // 60, s=sec % 60) if sec >= 60 else ui["sec"].format(s=sec)
         # sous une minute et demie, c'est une annonce : le dire plutôt que de laisser croire
         qual = f" ({ui['short']})" if sec < 90 else ""
-        out.append(
-            f'          <li><a href="https://www.youtube.com/watch?v={vid}" '
-            f'target="_blank" rel="noopener">{html.escape(title, quote=False)}</a> '
-            f'<span class="vb-meta">{dur}{qual} · {ui["chan"]}</span></li>')
+        url = f"https://www.youtube.com/watch?v={vid}"
+        t = html.escape(title, quote=False)
+        # L'aperçu est une image LOCALE : rien n'est demandé à YouTube tant que
+        # personne ne clique. La vignette porte le même lien que le titre, mais
+        # elle est cachée aux lecteurs d'écran, qui liraient deux fois la même
+        # chose. site.js y substitue le lecteur au clic.
+        out += [
+            '          <li class="vb-item">',
+            f'            <a class="vb-shot" href="{url}" target="_blank" rel="noopener" '
+            f'data-yt="{vid}" tabindex="-1" aria-hidden="true">'
+            f'<img src="../../assets/video/{vid}.jpg" alt="" width="480" height="270" '
+            f'loading="lazy" decoding="async"></a>',
+            '            <span class="vb-text">'
+            f'<a class="vb-title" href="{url}" target="_blank" rel="noopener">{t}</a>'
+            f'<span class="vb-meta">{dur}{qual} · {ui["chan"]}</span></span>',
+            "          </li>",
+        ]
     out += ["        </ul>", "      </div>", "      <!-- video:end -->"]
     return "\n".join(out) + "\n"
 

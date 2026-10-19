@@ -487,6 +487,32 @@
     }
   }
 
+  /* ---------------- Vidéos : la vignette devient le lecteur ---------------- */
+  /* L'aperçu est une image locale, posée par build.py. Rien n'est demandé à
+     YouTube tant que personne ne clique : une fiche ouverte hors ligne garde
+     son aperçu, et une fiche en ligne n'appelle pas Google pour rien. Au clic,
+     la vignette cède la place au lecteur ; le titre, lui, reste un lien vers
+     YouTube, seul recours si le cadre ne charge pas. */
+  function videos() {
+    document.addEventListener("click", function (e) {
+      var shot = e.target.closest && e.target.closest(".vb-shot[data-yt]");
+      if (!shot || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      var item = shot.closest(".vb-item");
+      var titre = item && item.querySelector(".vb-title");
+      var box = document.createElement("div");
+      box.className = "vb-shot vb-playing";
+      var fr = document.createElement("iframe");
+      fr.src = "https://www.youtube-nocookie.com/embed/" + shot.getAttribute("data-yt") +
+               "?autoplay=1&rel=0";
+      fr.title = titre ? titre.textContent : "";
+      fr.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+      fr.setAttribute("allowfullscreen", "");
+      box.appendChild(fr);
+      shot.parentNode.replaceChild(box, shot);
+    });
+  }
+
   /* ---------------- Lien d'évitement ---------------- */
   function skipLink() {
     var art = document.querySelector(".content");
@@ -505,7 +531,8 @@
       ["mobileNav", mobileNav], ["skipLink", skipLink],
       ["anchors", anchors], ["tocMobile", tocMobile], ["toc", toc],
       ["theme", themeToggle], ["pager", pager], ["pageBar", pageBar],
-      ["copy", copyButtons], ["search", search], ["constats", constats]
+      ["copy", copyButtons], ["search", search], ["constats", constats],
+      ["videos", videos]
     ];
     for (var i = 0; i < steps.length; i++) {
       try {
