@@ -145,6 +145,19 @@ Trois d'entre eux ne sont pas ce que leur nom suggère :
   entiers (`word-break: normal`) et c'est `.table-wrap` qui défile. La règle
   `overflow-wrap: anywhere` ne s'applique qu'au code **en prose**, où la mesure
   est large.
+- **Une boîte de schéma se taille sur la langue la plus large, pas sur
+  l'anglais.** Le SVG est écrit à la main, en unités de `viewBox` : une boîte
+  de 140 qui tient « Elastix registration (computed) » à 153 déborde, et le
+  portugais est souvent le pire cas. La mesure se prend dans le navigateur,
+  `text.getBoundingClientRect().width / (svg.width / viewBox.width)` donne la
+  largeur en unités, à comparer au `rect`. Même chose pour un libellé de
+  flèche posé à côté d'une boîte haute : il faut l'ancrer (`text-anchor`
+  `start` ou `end`) au bord de la boîte pour qu'il fuie vers l'extérieur, sinon
+  il la mord dès qu'une traduction l'allonge. Une sonde qui croise chaque
+  `<text>` avec chaque `<rect>` et avec les autres `<text>` trouve ces défauts
+  en une passe : seuil utile, 3 px pour un texte contre une boîte, 5 px entre
+  deux textes (en dessous, c'est l'interligne de deux lignes d'une même boîte).
+  `.d-label-xs` existe pour une ligne qui doit tenir toute une colonne.
 - **Un schéma rétréci n'est pas un schéma.** `figure.diagram` déborde de la
   colonne de texte jusqu'à la largeur de `.main` et impose un `min-width` :
   au-dessous, il défile au lieu de devenir microscopique.
@@ -253,6 +266,20 @@ doit honorer, vérifié sur les six :
   combien d'exemplaires la page la plus dense en montre.
 - **Se relire dans le mode inverse.** Les quatre thèmes clairs en sombre, les
   deux sombres via la bascule. C'est là que les blocs oubliés se voient.
+
+## Les vidéos
+
+`papers.VIDEOS` donne les tutoriels DCBIA d'un outil ; `build.py` pose le bloc
+sous l'en-tête de sa page du Guide, et `i18n.py` l'écarte du digest (`STRIP`),
+donc ce bloc se remanie sans périmer une traduction.
+
+**L'aperçu est une image locale**, `assets/video/<id>.jpg`, 480 × 270, tirée une
+fois de `img.youtube.com` (`maxresdefault`, sinon `hqdefault` dont il faut
+recadrer les deux bandes noires). Pas d'`<iframe>` YouTube au chargement : elle
+violerait la règle hors ligne, et elle ferait appeler Google par chaque fiche
+ouverte. Au clic, `site.js` substitue le lecteur `youtube-nocookie` à la
+vignette ; le titre reste un lien vers YouTube, seul recours si le cadre ne
+charge pas. Sans JavaScript, la vignette est ce lien.
 
 ## Le visualiseur 3D (AMASSS)
 
