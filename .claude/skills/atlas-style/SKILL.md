@@ -85,7 +85,7 @@ un thème sombre par défaut (`ardoise`, `labo`) ajoute en plus un bloc
 | Sémantique | `--warn-*`, `--bug-*`, `--ok-*`, `--info-*` (chacun `-bg`, `-br`, `-tx`) |
 | Mesure | `--measure` (76ch, 68ch dans le Guide), `--sidebar-w`, `--toc-w`, `--mbar-h` |
 | Profondeur | `--shadow-sm`, `--shadow-md` |
-| Rayons | `--radius` (pré, figure, callout), `--radius-group` (un groupe de lignes, une carte), `--radius-sm` (pastille de code, champ, entrée de nav), `--radius-pill` (bouton, puce, filtre) |
+| Rayons | `--radius` (pré, figure, callout), `--radius-group` (un groupe de lignes, une carte), `--radius-sm` (pastille de code, champ, entrée de nav), `--radius-pill` (bouton, puce, filtre), `--radius-tag` (marqueur de 11 à 15 px, dérivé de `--radius-sm`, aucun thème ne le déclare) |
 | Mouvement | `--ease` (la courbe des feuilles d'iOS) |
 | Curseur segmenté | `--thumb`, `--thumb-ink`, `--thumb-shadow` (la case lue de `.sec-switch`) |
 
@@ -138,6 +138,13 @@ Trois d'entre eux ne sont pas ce que leur nom suggère :
 - **Un schéma rétréci n'est pas un schéma.** `figure.diagram` déborde de la
   colonne de texte jusqu'à la largeur de `.main` et impose un `min-width` :
   au-dessous, il défile au lieu de devenir microscopique.
+- **Un rayon en dur est hors d'atteinte d'un thème**, au même titre qu'une
+  couleur. Le bloc du visualiseur 3D en gardait quatre, plus la pastille de
+  module du schéma de pipeline et le marqueur « EN » de la barre latérale.
+  `ardoise` en annulait un à la main, avec une règle de plus : c'est le signe
+  qu'il fallait tokeniser, pas rattraper. Seules exceptions restantes, la
+  squircle de `.tool-icon`, le `50%` d'une pastille d'état et le bout arrondi
+  des trois barres du menu tactile : des formes, pas des rayons.
 - **L'anneau de focus ne fixe pas de rayon.** `border-radius` sur
   `:focus-visible` ne modèle pas l'anneau, il déforme l'élément le temps du
   focus. La règle valait `4px` en dur : à spécificité égale elle est déclarée
