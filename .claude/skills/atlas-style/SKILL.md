@@ -171,9 +171,22 @@ Trois d'entre eux ne sont pas ce que leur nom suggère :
   quelle que soit la place offerte : `minmax(0, min(100%, var(--measure)))`,
   pas `minmax(0, var(--measure))`.
 - **Chrome sans tête plafonne la fenêtre à 500 px CSS.** Une capture demandée
-  à 390 px rend en fait 500 px et se fait recadrer : le contenu paraît coupé
-  alors qu'il ne déborde pas. Pour un vrai 390, `--force-device-scale-factor=2`
-  avec une fenêtre de 780. Et pour forcer le thème de couleurs,
+  à 390 px compose en fait sur 485 px de large et se fait recadrer à 390 : le
+  texte paraît coupé net au bord droit alors que rien ne déborde, et on part
+  chercher une fuite horizontale qui n'existe pas.
+  `--force-device-scale-factor=2` avec une fenêtre de 780 ne rattrape rien,
+  mesuré : le viewport vaut 780 px CSS, seul le ratio de pixels change. Le
+  vrai 390 passe par une **iframe**, qui n'a pas de plancher : une page
+  d'appoint dans le même dossier, `<iframe src="AREG_CBCT.html">` large de
+  390, capturée dans une fenêtre de 500, puis rognée à 390. Sonde à l'appui,
+  `clientWidth` et `scrollWidth` valent 390 des deux côtés.
+- **Une page d'appoint se termine en `.htm`, jamais en `.html`.** `build.py`
+  écarte les dossiers commençant par un point, pas les fichiers : une sonde
+  nommée `.essai.html` entre dans l'index de recherche, se voit réécrire sa
+  sidebar et son `<link>` de thème, et salit l'arbre jusqu'au prochain
+  `build.py`. Les trois parcours du script ne retiennent que `.html` : en
+  `.htm` la page reste invisible pour eux et un `rm` suffit à la fin.
+- **Forcer le thème de couleurs** se fait par
   `--blink-settings=preferredColorScheme=0` (sombre) ou `=1` (clair) : **toute
   autre valeur est ignorée**, la page rend en clair, et on croit à un bug du
   thème.
@@ -300,9 +313,9 @@ google-chrome --headless --disable-gpu --hide-scrollbars \
 
 Trois gabarits à regarder à chaque fois : une fiche Atlas dense (tableaux +
 schéma + callouts), la page `findings.html` (grille large), et une fiche en
-390 px de large (tiroir, tableaux qui défilent). Attention aux deux pièges de
-Chrome sans tête, plus haut : le plancher de 500 px, et les valeurs de
-`preferredColorScheme`.
+390 px de large (tiroir, tableaux qui défilent). Attention aux trois pièges de
+Chrome sans tête, plus haut : le plancher de 500 px, qui demande l'iframe, le
+nom de la page d'appoint, et les valeurs de `preferredColorScheme`.
 
 Pour essayer un thème sans réécrire les trois cent trente pages, poser son
 `<link>` dans une copie jetable de la page plutôt que de lancer
@@ -310,8 +323,8 @@ Pour essayer un thème sans réécrire les trois cent trente pages, poser son
 
 ```bash
 sed 's|<script src=|<link rel="stylesheet" href="../../assets/themes/labo.css">\n<script src=|' \
-  en/AREG_CBCT/AREG_CBCT.html > en/AREG_CBCT/.essai.html
-# capture, puis rm en/AREG_CBCT/.essai.html
+  en/AREG_CBCT/AREG_CBCT.html > en/AREG_CBCT/essai.htm
+# capture, puis rm en/AREG_CBCT/essai.htm
 ```
 
 ## Les skills de design intégrées
