@@ -201,6 +201,13 @@
     this.ok = true;
     stage.insertBefore(canvas, stage.firstChild);
 
+    /* Une figure du Guide porte deux scenes et n'en montre qu'une : le
+       bandeau suit la premiere, et la bascule le redeplace. */
+    var figure = stage.closest && stage.closest(".viewer3d");
+    if (figure && figure.querySelector(".v3d-stage") === stage) {
+      Scene3D.dockRun(stage);
+    }
+
     var self = this;
     this.gl = gl; this.canvas = canvas; this.stage = stage; this.data = data;
     this.dirty = true;
@@ -680,6 +687,17 @@
     var c = 0.42, x = c * (1 - Math.abs((h / 60) % 2 - 1));
     var r = [[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][Math.floor(h / 60) % 6];
     return [(r[0] + 0.52) * 255, (r[1] + 0.52) * 255, (r[2] + 0.52) * 255];
+  };
+
+  /* Le bouton de lancement appartient a la vue. Pose sous la liste, il
+     tombait a 426 px du bas de la scene sur AMASSS et a 1254 px sur
+     BatchDentalSeg, chart compris : on lancait une passe sans voir ce
+     qu'elle produit. Des que WebGL repond, le bandeau se replie dans un coin
+     de la scene. Sans WebGL il ne bouge pas, mais la scene non plus. */
+  Scene3D.dockRun = function (stage) {
+    var fig = stage && stage.closest && stage.closest(".viewer3d");
+    var bar = fig && fig.querySelector(".v3d-run");
+    if (bar && bar.parentNode !== stage) { stage.appendChild(bar); }
   };
 
   /* Commandes communes a toutes les scenes : la vitesse, et le saut a une

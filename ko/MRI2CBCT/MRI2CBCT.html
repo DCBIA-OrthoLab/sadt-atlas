@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MRI2CBCT · SADT Atlas</title>
 <link rel="stylesheet" href="../../assets/style.css">
-<link rel="stylesheet" href="../../assets/themes/labo.css">
+<link rel="stylesheet" href="../../assets/themes/carnet.css">
 <script src="../../assets/site.js"></script>
 </head>
 <body data-cat="recalage">
@@ -14,12 +14,13 @@
   <nav class="sidebar">
     <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, 도구별 해설</small></a>
     <div class="lang-switch">
-      <a href="../../en/MRI2CBCT/MRI2CBCT.html" hreflang="en" title="English">EN</a><a href="../../fr/MRI2CBCT/MRI2CBCT.html" hreflang="fr" title="Français">FR</a><a href="../../pt/MRI2CBCT/MRI2CBCT.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/MRI2CBCT/MRI2CBCT.html" hreflang="th" title="ไทย">TH</a>
+      <a href="../../en/MRI2CBCT/MRI2CBCT.html" hreflang="en" title="English">EN</a><a href="../../fr/MRI2CBCT/MRI2CBCT.html" hreflang="fr" title="Français">FR</a><a href="../../pt/MRI2CBCT/MRI2CBCT.html" hreflang="pt" title="Português">PT</a><span class="cur">KO</span><a href="../../th/MRI2CBCT/MRI2CBCT.html" hreflang="th" title="ไทย">TH</a><a href="../../es/MRI2CBCT/MRI2CBCT.html" hreflang="es" title="Español">ES</a><a href="../../it/MRI2CBCT/MRI2CBCT.html" hreflang="it" title="Italiano">IT</a>
     </div>
-    <div class="sec-switch">
-      <a href="../guide/MRI2CBCT.html"><b>가이드</b><small>도구 사용법</small></a>
-      <a href="../MRI2CBCT/MRI2CBCT.html" aria-current="true"><b>아틀라스</b><small>코드 속 동작 원리</small></a>
+    <div class="sec-switch" role="group">
+      <a href="../guide/MRI2CBCT.html">가이드</a>
+      <a href="../MRI2CBCT/MRI2CBCT.html" aria-current="true">아틀라스</a>
     </div>
+    <p class="sec-hint">코드 속 동작 원리</p>
     <div class="nav-group"><h4>정합</h4><ul>
       <li><a href="../FlexReg/FlexReg.html">FlexReg</a></li>
       <li><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
@@ -53,14 +54,13 @@
       <li><a href="../Agent/Agent.html">Agent</a></li>
     </ul></div>
     <div class="nav-group"><h4>공통 코드</h4><ul>
-      <li><a class="untranslated" href="../../en/ADTLib/ADTLib.html" hreflang="en" title="ADTLib: not translated into 한국어 yet, this opens the English page">ADTLib</a></li>
+      <li><a href="../ADTLib/ADTLib.html">ADTLib</a></li>
     </ul></div>
     <div class="nav-group"><h4>공통 주제</h4><ul>
       <li><a href="../findings.html">발견 사항</a></li>
       <li><a href="../glossary.html">용어집</a></li>
     </ul></div>
   </nav>
-
   <div class="main">
     <article class="content">
 
@@ -68,988 +68,802 @@
         <img class="tool-icon" src="../../assets/screens/MRI2CBCT/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › 정합</div>
         <h1>MRI2CBCT</h1>
-        <p class="lede"><a class="gterm" href="../glossary.html#g-elastix" title="용어집 보기">elastix</a>(Mattes 상호정보량)를 이용한 TMJ의 강체 다중 모달 MRI → CBCT 정합으로, 서로 독립된 다섯 가지 준비 단계 끝에 수행된다. 유일한 신경망은 CBCT에서 과두를 분할하여 기준점을 제공할 뿐이며, 그 자체로는 아무것도 정합하지 않는다.</p>
+        <p class="lede">TMJ의 MRI → CBCT 정합을 버튼 하나로 수행한다. 모듈은 MRI 폴더와 CBCT 폴더를 짝짓고, 각 CBCT의 방향을 정렬하고, 두 신경망으로 두 스캔의 두개저를 <em>예측</em>한 다음, 예측된 두 표면을 FPFH + RANSAC + ICP(Open3D)로 정합하며, 결과가 뒤집혀 나오면 복구 단계를 차례로 오른다. 영상 자체는 비교하지 않는다.</p>
         <div class="meta-row">
-          <a class="badge paper" href="https://doi.org/10.1007/978-3-031-73083-2_7" target="_blank" rel="noopener" title="Novel CBCT-MRI Registration Approach for TMJ Degenerative Joint Disease.">Leroux 2024 · CLIP, LNCS 15196</a>
-          <span class="badge cli">MRI2CBCT_* CLI 6개</span>
+          <a class="badge paper" href="https://doi.org/10.1007/978-3-031-73083-2_7" target="_blank" rel="noopener" title="Novel CBCT-MRI Registration Approach for TMJ Degenerative Joint Disease. 여기서 문서화한 코드가 아니라, 이전의 elastix 기반 버전을 설명한다.">Leroux 2024 · 이전 버전, CLIP, LNCS 15196</a>
+          <span class="badge cli">MRI2CBCT_* CLI 3개 + 빌려 온 4개</span>
           <span class="badge neutral">Slicer의 Python, conda 없음</span>
           <a class="badge neutral" href="SOURCES.html">참고문헌</a>
         </div>
       </header>
 
-      <p>TMJ의 강체 다중 모달 MRI → CBCT 정합. 서로 독립된 여섯 단계로 이루어지며, 각 단계는
-      자체 버튼과 CLI를 가지고, 마지막은 상호정보량 기반의 강체 elastix 정합이다.
-      모듈의 유일한 신경망은 <a class="gterm" href="../glossary.html#g-nnunet" title="용어집 보기">nnU-Net</a>으로, <strong>CBCT에서</strong> 과두를 분할한다.
-      이 신경망은 정합 자체에는 관여하지 않고, 기준점 하나와 자르기 상자를 제공한다.</p>
+      <p>PR #277과 #278 이후 모듈은 단일 패널(<code>MRI2CBCT.py</code>, 753줄)이며, Slicer에 의존하지 않는
+      패키지 <code>MRI2CBCT_core/</code> 위에 놓여 있다. 일곱 단계가 <strong>Run</strong> 버튼 하나로 이어진다.
+      자체 CLI 셋(<code>MRI2CBCT_PREPARE</code>, <code>MRI2CBCT_SEGMENT_MRI</code>,
+      <code>MRI2CBCT_REGISTER</code>)과 <a href="../ASO/ASO.html">ASO</a>, <a href="../ALI/ALI.html">ALI</a>,
+      <a href="../AMASSS/AMASSS.html">AMASSS</a>에서 빌려 온 넷이다. <a class="gterm" href="../glossary.html#g-nnunet" title="용어집 보기">nnU-Net</a> 계열 신경망 두 개가
+      두개저를 분할하는데, 하나는 CBCT에, 하나는 MRI에 쓰인다. 그 뒤의 모든 것은 두 점군에 대한
+      기하 연산이다. 임상의가 확인할 수 있도록 실행은 어느 단계 뒤에서든 멈출 수 있다.</p>
 
       <h2 id="situation">1. 파이프라인에서의 위치</h2>
 
-      <p>저장소의 어떤 코드도 MRI2CBCT를 호출하지 않으며, MRI2CBCT도 확장의 다른 모듈을
-      호출하지 않는다. <strong>SlicerNNUNet</strong>에 의존한다고 선언하지만
-      (<code>MRI2CBCT.py:150</code>) 실제로 import하지는 않는다.
-      서브프로세스로 실행되는 것은 <code>nnUNetv2_predict</code> 실행 파일이다.</p>
+      <p>새 CLI 셋을 호출하는 것은 모듈 자신의 패널뿐이다. 확장 전체에서
+      <code>MRI2CBCT_PREPARE</code>, <code>MRI2CBCT_SEGMENT_MRI</code>, <code>MRI2CBCT_REGISTER</code>를
+      검색하면 <code>plan.py</code>와 각자의 폴더에서만 나온다.
+      <a href="../Agent/Agent.html">Agent</a>의 매니페스트는 여전히 MRI2CBCT CLI를 하나,
+      <code>mri2cbct_resample</code>(<code>Agent_CLI/manifest.yaml:491</code>)만 알고, 새 셋은 하나도 모른다.
+      모듈은 <code>dependencies = []</code>를 선언한다(<code>MRI2CBCT.py:49</code>). 더 이상
+      SlicerNNUNet에 의존하지 않으며, nnU-Net은 <code>pip</code>로 들어온다.</p>
 
       <div class="table-wrap">
         <table>
           <thead><tr><th>호출 대상</th><th>방식</th><th>시점</th></tr></thead>
           <tbody>
-            <tr><td>저장소의 <code>MRI2CBCT_*</code> CLI 6개</td><td><code>slicer.cli.run</code></td><td>버튼마다 하나</td></tr>
-            <tr><td><code>nnUNetv2_predict</code></td><td>CLI에서 <code>subprocess.run</code></td><td>Approximate와 <a class="gterm" href="../glossary.html#g-tmj" title="용어집 보기">TMJ</a> Crop</td></tr>
-            <tr><td><code>slicer.modules.fiducialregistration</code></td><td><code>slicer.cli.runSync</code></td><td>자동 근사의 끝</td></tr>
+            <tr><td><code>MRI2CBCT_PREPARE</code>, <code>MRI2CBCT_SEGMENT_MRI</code>, <code>MRI2CBCT_REGISTER</code></td><td><code>slicer.cli.run</code>, 한 번에 한 단계씩(<code>MRI2CBCT.py:386</code>, <code>:395</code>)</td><td>1, 5, 7단계</td></tr>
+            <tr><td><code>PRE_ASO_CBCT</code>, <code>ALI_CBCT</code>, <code>SEMI_ASO_CBCT</code></td><td>같음, 매개변수는 <code>plan.py:73-86</code></td><td>2~4단계: CBCT 방향 정렬</td></tr>
+            <tr><td><code>AMASSS_CLI</code></td><td>같음, <code>skullStructure = CB</code>(<code>plan.py:87-92</code>)</td><td>5단계: CBCT의 두개저</td></tr>
+            <tr><td>nnU-Net Python API</td><td>프로세스 안에서, <code>MRI2CBCT_SEGMENT_MRI</code> 내부(<code>seg516.py:14</code>)</td><td>MRI의 두개저</td></tr>
+            <tr><td>Open3D</td><td>프로세스 안에서, <code>MRI2CBCT_REGISTER</code> 내부(<code>ladder.py:25</code>)</td><td>정합</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p><code>MRI2CBCT_CLI_utils/__init__.py</code> 첫머리의 주석은
-      <code>resample_images</code>를 <a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a>와 <a href="../VFACE/VFACE.html">VFACE</a>가 사용한다고 주장한다. 그러나 저장소 전체를
-      grep해도 MRI2CBCT_CLI 밖에서 호출하는 곳은 <strong>없다</strong>. 지연 import 자체는
-      여전히 유용하지만(단순 리샘플링에 <code>torchreg</code>를 끌어오지 않게 해 준다),
-      명시된 근거는 더 이상 성립하지 않는다.</p>
-
-      <h2 id="fichiers">2. 관련 파일</h2>
+      <p>단계 목록은 <code>plan.build</code>(<code>plan.py:57</code>)에서 한 번 만들어지고, 패널은 그것이 돌려주는
+      대로 실행한다. 빌려 온 CLI가 출력 아래의 새 폴더를 받는 이유는 <code>plan.py:7-8</code>에 있다.
+      <code>~/Documents</code> 아래에 있는 ALI의 공유 임시 폴더는 "이름이 같은 낡은 파일을 재사용"한다.</p>
 
       <div class="callout note">
-        <div class="callout-title">참고</div>
-        <p><strong>이 모듈의 일부는 이제 공통 계층에 있다.</strong> <a href="../../en/ADTLib/ADTLib.html">ADTLib</a> 는 여러 모듈이 복사본으로 지니고 있던 것을 모았다: 여기서는 <code>method.py</code>, <code>io/fs.py</code>, <code>logging_setup.py</code> 그리고 <code>method.py</code>의 계약이다. 해당 페이지에 각 파일이 몇 벌의 복사본을 대신했는지 적혀 있다.</p>
+        <div class="callout-title">재작성이 대체한 것</div>
+        <p>이전 모듈에는 CLI 여섯 개(<code>ORIENT_CENTER_MRI</code>, <code>LR_CROP</code>,
+        <code>RESAMPLE_CBCT_MRI</code>, <code>APPROX</code>, <code>TMJ_CROP</code>, <code>REG</code>),
+        <code>.ui</code> 파일, 수동 근사 도구, CBCT에 적용하는 과두 분할 신경망, 상호정보량 기반의 강체
+        <a class="gterm" href="../glossary.html#g-elastix" title="용어집 보기">elastix</a> 정합이 있었다. 지금은 트리에 아무것도 남아 있지 않다. 남은 것은
+        <code>MRI2CBCT_RESAMPLE_CBCT_MRI</code>와 그 보조 패키지 <code>MRI2CBCT_CLI_utils</code>뿐이며,
+        이들은 <strong>이 연쇄 밖에</strong> 있다. 여전히 빌드되고(<code>MRI2CBCT_CLI/CMakeLists.txt:2</code>)
+        여전히 호출되지만, 호출하는 쪽은
+        <a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a>
+        (<code>AREG/AREG_Method/IOSCBCT.py:601</code>)와 <a href="../VFACE/VFACE.html">VFACE</a>
+        (<code>VFACE/VFACE_utils/createlistprocess.py:119</code>)이며,
+        <code>MRI2CBCT_CLI_utils/__init__.py:1-3</code>의 주석이 그렇게 말한다. 이전 페이지의 "아무도 이들을
+        쓰지 않는다"는 서술은 이 점에서 틀렸으므로 철회한다.</p>
       </div>
+
+      <h2 id="fichiers">2. 관련 파일</h2>
 
       <div class="table-wrap">
         <table>
           <thead><tr><th>파일</th><th>역할</th></tr></thead>
           <tbody>
-            <tr><td><code>MRI2CBCT/MRI2CBCT.py</code></td><td>위젯, 2400줄: UI, 방향 / 정규화 / 리샘플링 표, CLI 연결</td></tr>
-            <tr><td><code>MRI2CBCT_utils/</code></td><td>버튼마다 <code>Method</code> 클래스 하나: 경로 검증, 파라미터 dict 구성</td></tr>
-            <tr><td><code>ManualApprox_MRI2CBCT.py</code></td><td>수동 근사(<a href="../GreedyReg/GreedyReg.html">GreedyReg</a>에서 이식), <strong>전부 위젯 쪽에서 실행</strong></td></tr>
-            <tr><td><code>MRI2CBCT_CLI_utils/</code></td><td>실제 코드: 방향, 리샘플링, 반전, 정규화, 마스킹, 분할, elastix</td></tr>
+            <tr><td><code>MRI2CBCT/MRI2CBCT.py</code></td><td>패널(<code>MRI2CBCTWidget</code>), 첫 실행 설정과 멈춤 화면(<code>MRI2CBCTLogic</code>), 스모크 테스트 하나</td></tr>
+            <tr><td><code>MRI2CBCT_core/plan.py</code></td><td>일곱 단계: 어떤 CLI, 어떤 인자, 어떤 멈춤. 모델 위치</td></tr>
+            <tr><td><code>MRI2CBCT_core/pairing.py</code></td><td>환자 ID로 두 폴더를 짝짓는다. 폴더가 서로 바뀐 경우를 감지한다</td></tr>
+            <tr><td><code>MRI2CBCT_core/mri_prep.py</code></td><td>0.3 mm로 리샘플링. 좌우 분리. 헤더에서 좌우 판별</td></tr>
+            <tr><td><code>MRI2CBCT_core/seg516.py</code></td><td>nnU-Net의 Python API를 통한 Dataset516 추론</td></tr>
+            <tr><td><code>MRI2CBCT_core/ladder.py</code></td><td>관절 하나: 표면, 측면 절단, 작업자 풀, FLIP 복구 단계</td></tr>
+            <tr><td><code>MRI2CBCT_core/reg/</code></td><td><code>pipeline.py</code>(상수, QC 표지), <code>global_reg.py</code>(FPFH, RANSAC, ICP), <code>surface.py</code>(표면 점과 법선, 가장 큰 성분), <code>itk_io.py</code>(§11 참조)</td></tr>
+            <tr><td><code>MRI2CBCT_core/frames.py</code></td><td>RAS와 LPS 변환, <code>.tfm</code> 기록, 헤더 이동, 리샘플링</td></tr>
+            <tr><td><code>MRI2CBCT_core/layout.py</code></td><td><code>_steps/</code> 트리, 매니페스트, CLI 진행 프로토콜, <code>as_bool</code></td></tr>
+            <tr><td><code>MRI2CBCT_core/env.py</code>, <code>requirements.py</code></td><td>모델과 Open3D가 있는 위치. 설치하고 내려받을 것</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p><strong>모든 것이 Slicer의 Python에서 실행된다.</strong> 어디에도 <code>conda run</code>이 없다는 점에서
-      <a href="../FlexReg/FlexReg.html">FlexReg</a>/AREG_IOS와 다르다. <code>install_function()</code>
-      (<code>MRI2CBCT.py:78</code>)은 Slicer 내부에서 <code>pip_install</code>을
-      수행하며, 모든 동작의 첫머리에서 다시 호출된다. CUDA는 선택 사항이다.
-      <code>nnunet_predict</code>는 <code>torch.cuda.is_available()</code>를 검사하고 안 되면 <code>-device cpu</code>로 되돌아간다
-      (<code>condyle_segmentation.py:55</code>).</p>
+      <p><strong>모든 것이 Slicer의 Python에서 실행된다.</strong> 세 CLI는
+      <code>#!/usr/bin/env python-real</code>로 시작하고, <code>conda run</code>은 없으며, 핵심 패키지는
+      Slicer에서 아무것도 import하지 않으므로 각 단계를 <code>PythonSlicer</code>에서도 실행할 수 있다
+      (<code>MRI2CBCT_core/__init__.py</code>). 매개변수는 문자열로 전달된다. 불리언은
+      <code>"True"</code> 또는 <code>"False"</code>로 도착하여 <code>layout.as_bool</code>을 거친다
+      (<code>layout.py:84-85</code>).</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>CLI</th><th>호출하는 곳</th><th>역할</th></tr></thead>
+          <thead><tr><th>CLI</th><th>인자(위치 인자, 모두 필수)</th><th>읽는 것</th><th>쓰는 것</th></tr></thead>
           <tbody>
-            <tr><td><span class="badge cli">MRI2CBCT_ORIENT_CENTER_MRI</span></td><td><code>orientCenterMRI</code></td><td>헤더의 direction / Z 간격 / origin을 다시 씀</td></tr>
-            <tr><td><span class="badge cli">MRI2CBCT_LR_CROP</span></td><td><code>lrCropMRI2CBCT</code></td><td>볼륨을 좌/우 절반으로 나눔</td></tr>
-            <tr><td><span class="badge cli">MRI2CBCT_RESAMPLE_CBCT_MRI</span></td><td><code>resampleMRICBCT</code></td><td>MRI, CBCT, Seg T1/T2를 리샘플링</td></tr>
-            <tr><td><span class="badge cli">MRI2CBCT_APPROX</span></td><td><code>approximateMRI</code></td><td>과두를 분할하고 점 두 개 + 회전 하나를 JSON에 기록</td></tr>
-            <tr><td><span class="badge cli">MRI2CBCT_TMJ_CROP</span></td><td><code>tmjCropMRI2CBCT</code></td><td>과두 주위 400³ 상자로 CBCT/MRI/Seg를 자름</td></tr>
-            <tr><td><span class="badge cli">MRI2CBCT_REG</span></td><td><code>registration_MR2CBCT</code></td><td>반전, 정규화, 마스킹, elastix</td></tr>
+            <tr><td><span class="badge cli">MRI2CBCT_PREPARE</span></td><td><code>mri_folder</code>, <code>cbct_folder</code>, <code>output_folder</code>, <code>resample</code>, <code>separate</code>, <code>acquisition_spacing</code></td><td>두 입력 폴더</td><td><code>_steps/0_cbct_in</code>, <code>_steps/1_mri</code>, <code>manifest.json</code></td></tr>
+            <tr><td><span class="badge cli">MRI2CBCT_SEGMENT_MRI</span></td><td><code>output_folder</code>, <code>model_folder</code>, <code>folds</code></td><td>매니페스트, <code>1_mri</code></td><td><code>_steps/4_mri_seg</code></td></tr>
+            <tr><td><span class="badge cli">MRI2CBCT_REGISTER</span></td><td><code>output_folder</code>, <code>on_cbct_grid</code>, <code>workers</code></td><td>매니페스트, <code>2_cbct_oriented</code>(ASO 변환), <code>3_cbct_seg</code>, <code>1_mri</code>, <code>4_mri_seg</code></td><td><code>&lt;PID&gt;/…</code>, <code>summary.csv</code></td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>파라미터는 <code>slicer.cli.run</code>을 거치는데, 이 함수는 리스트나 튜플을 대괄호를 뺀
-      <code>str(value)</code>로 직렬화한다(<code>slicer/cli.py:setNodeParameters</code>). 그래서 CLI 쪽에
-      <code>split(',')</code>와 <code>re.findall(r'\d+')</code>가 있다.</p>
+      <p>각 CLI의 XML 설명은 "MRI2CBCT 모듈이 실행한다. 모든 인자는 필수다"라고 적는다. 뒤의 두 CLI는
+      독립적이지 않다. <code>_steps/manifest.json</code>, 곧
+      <code>MRI2CBCT_PREPARE</code>가 쓴 파일(<code>layout.py:36-38</code>)과 앞 단계들이 남긴 파일을 연다.</p>
+
+      <div class="callout note">
+        <div class="callout-title">참고</div>
+        <p><strong>공유 계층은 예전보다 덜 쓰인다.</strong> <a href="../ADTLib/ADTLib.html">ADTLib</a>는 이제
+        패널에 <code>testdata</code>(테스트 파일과 모델 다운로드), <code>env.deps</code>와
+        <code>env.cuda</code>(무엇을 설치할지)를 제공하고, 남은 리샘플링 CLI에는 <code>logging_setup</code>과
+        <code>progress_protocol</code>을 제공한다. 모듈은 더 이상 ADTLib의 <code>method.py</code> 계약을 쓰지 않는다.</p>
+      </div>
 
       <h2 id="pipeline">3. 파이프라인 순서, 그리고 실제로 필수인 것</h2>
 
-      <pre class="ascii"><code>[MRI orientation/centering] → [L/R crop] → resample → approximation → [TMJ crop] → registration</code></pre>
+      <pre class="ascii"><code>pair → [resample] [split L/R] → orient CBCT (ASO) → cranial base on CBCT → cranial base on MRI → register</code></pre>
 
       <figure class="diagram">
-        <svg viewBox="0 0 1200 300" role="img" aria-label="원본 MRI와 CBCT에서 정합된 볼륨까지 MRI2CBCT의 CLI 6개가 이어지는 흐름">
-          <rect class="d-box-a" x="10" y="40" width="120" height="50" rx="6"/>
-          <text class="d-label" x="70" y="62" text-anchor="middle">MRI + CBCT</text>
-          <text class="d-label-s" x="70" y="76" text-anchor="middle">원본</text>
+        <svg viewBox="0 0 1200 300" role="img" aria-label="MRI2CBCT 데이터 흐름: MRI 레인과 CBCT 레인이 각각 예측된 두개저로 끝나고, 정합에서 합류한다">
+          <rect class="d-box" x="10" y="30" width="150" height="54" rx="6"/>
+          <text class="d-label" x="85" y="53" text-anchor="middle">MRI 폴더</text>
+          <text class="d-label-s" x="85" y="68" text-anchor="middle">환자 ID로 짝지음</text>
 
-          <path class="d-arrow" d="M130 65 H150"/>
-          <path class="d-arrow-head" d="M150 65 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M160 57 H190"/>
+          <path class="d-arrow-head" d="M190 57 l-7 -4 v8 z"/>
 
-          <rect class="d-box" x="150" y="40" width="150" height="50" rx="6"/>
-          <text class="d-label" x="225" y="60" text-anchor="middle">orient_center_mri</text>
-          <text class="d-label-s" x="225" y="74" text-anchor="middle">MRI 헤더 재작성</text>
+          <rect class="d-box" x="190" y="30" width="230" height="54" rx="6"/>
+          <text class="d-label" x="305" y="53" text-anchor="middle">1 · MRI2CBCT_PREPARE</text>
+          <text class="d-label-s" x="305" y="68" text-anchor="middle">짝짓기, 리샘플링, 좌 / 우 분리</text>
 
-          <path class="d-arrow" d="M300 65 H320"/>
-          <path class="d-arrow-head" d="M320 65 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M420 57 H450"/>
+          <path class="d-arrow-head" d="M450 57 l-7 -4 v8 z"/>
 
-          <rect class="d-box" x="320" y="40" width="120" height="50" rx="6"/>
-          <text class="d-label" x="380" y="60" text-anchor="middle">lr_crop</text>
-          <text class="d-label-s" x="380" y="74" text-anchor="middle">선택</text>
+          <rect class="d-box-n" x="450" y="30" width="230" height="54" rx="6"/>
+          <text class="d-label" x="565" y="53" text-anchor="middle">6 · MRI2CBCT_SEGMENT_MRI</text>
+          <text class="d-label-s" x="565" y="68" text-anchor="middle">예측: 두개저 (Dataset516)</text>
 
-          <path class="d-arrow" d="M440 65 H460"/>
-          <path class="d-arrow-head" d="M460 65 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M305 84 V200"/>
+          <path class="d-arrow-head" d="M305 200 l-4 -7 h8 z"/>
+          <text class="d-label-s" x="315" y="146" text-anchor="start">CBCT를 연결한다</text>
 
-          <rect class="d-box" x="460" y="40" width="160" height="50" rx="6"/>
-          <text class="d-label" x="540" y="60" text-anchor="middle">resample_cbct_mri</text>
-          <text class="d-label-s" x="540" y="74" text-anchor="middle">공통 간격</text>
+          <rect class="d-box" x="10" y="200" width="150" height="54" rx="6"/>
+          <text class="d-label" x="85" y="223" text-anchor="middle">CBCT 폴더</text>
+          <text class="d-label-s" x="85" y="238" text-anchor="middle">환자당 하나</text>
 
-          <path class="d-arrow" d="M620 65 H640"/>
-          <path class="d-arrow-head" d="M640 65 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M160 227 H190"/>
+          <path class="d-arrow-head" d="M190 227 l-7 -4 v8 z"/>
 
-          <rect class="d-box" x="640" y="40" width="160" height="50" rx="6"/>
-          <text class="d-label" x="720" y="60" text-anchor="middle">mri2cbct_approx</text>
-          <text class="d-label-s" x="720" y="74" text-anchor="middle">대략 정렬</text>
+          <rect class="d-box" x="190" y="200" width="290" height="54" rx="6"/>
+          <text class="d-label" x="335" y="223" text-anchor="middle">2~4 · CBCT 방향 정렬 (ASO)</text>
+          <text class="d-label-s" x="335" y="238" text-anchor="middle">PRE_ASO · ALI · SEMI_ASO</text>
 
-          <path class="d-arrow" d="M800 65 H820"/>
-          <path class="d-arrow-head" d="M820 65 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M480 227 H510"/>
+          <path class="d-arrow-head" d="M510 227 l-7 -4 v8 z"/>
 
-          <rect class="d-box" x="820" y="40" width="130" height="50" rx="6"/>
-          <text class="d-label" x="885" y="60" text-anchor="middle">tmj_crop</text>
-          <text class="d-label-s" x="885" y="74" text-anchor="middle">선택, 400³</text>
+          <rect class="d-box-n" x="510" y="200" width="170" height="54" rx="6"/>
+          <text class="d-label" x="595" y="223" text-anchor="middle">5 · AMASSS_CLI</text>
+          <text class="d-label-s" x="595" y="238" text-anchor="middle">예측: CB</text>
 
-          <path class="d-arrow" d="M950 65 H970"/>
-          <path class="d-arrow-head" d="M970 65 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M680 57 H710 V115 H740"/>
+          <path class="d-arrow-head" d="M740 115 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M680 227 H710 V150 H740"/>
+          <path class="d-arrow-head" d="M740 150 l-7 -4 v8 z"/>
 
-          <rect class="d-box-a" x="970" y="40" width="100" height="50" rx="6"/>
-          <text class="d-label" x="1020" y="60" text-anchor="middle">reg</text>
-          <text class="d-label-s" x="1020" y="74" text-anchor="middle">elastix</text>
+          <rect class="d-box-a" x="740" y="85" width="230" height="95" rx="6"/>
+          <text class="d-label" x="855" y="110" text-anchor="middle">7 · MRI2CBCT_REGISTER</text>
+          <text class="d-label-s" x="855" y="127" text-anchor="middle">FPFH + RANSAC + ICP</text>
+          <text class="d-label-s" x="855" y="141" text-anchor="middle">두 두개저에 대해</text>
+          <text class="d-label-s" x="855" y="155" text-anchor="middle">계산됨, FLIP 복구 단계</text>
 
-          <path class="d-arrow" d="M1070 65 H1090"/>
-          <path class="d-arrow-head" d="M1090 65 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M970 132 H1000"/>
+          <path class="d-arrow-head" d="M1000 132 l-7 -4 v8 z"/>
 
-          <rect class="d-box-a" x="1090" y="40" width="100" height="50" rx="6"/>
-          <text class="d-label" x="1140" y="60" text-anchor="middle">출력</text>
-          <text class="d-label-s" x="1140" y="74" text-anchor="middle">.nii.gz + .tfm</text>
-
-          <path class="d-arrow" d="M720 170 V90"/>
-          <path class="d-arrow-head" d="M720 90 l-4 7 h8 z"/>
-          <path class="d-arrow" d="M885 170 V90"/>
-          <path class="d-arrow-head" d="M885 90 l-4 7 h8 z"/>
-
-          <rect class="d-box-n" x="640" y="170" width="310" height="60" rx="6"/>
-          <text class="d-label" x="795" y="196" text-anchor="middle">nnU-Net v2가 과두를 분할</text>
-          <text class="d-label-s" x="795" y="212" text-anchor="middle">CBCT 절반에서</text>
-          <text class="d-mono" x="795" y="226" text-anchor="middle">nnUNetv2_predict --disable_tta -f 0</text>
+          <rect class="d-box-a" x="1000" y="97" width="190" height="70" rx="6"/>
+          <text class="d-label" x="1095" y="120" text-anchor="middle">결과</text>
+          <text class="d-label-s" x="1095" y="136" text-anchor="middle">_REG · _MASK · .tfm</text>
+          <text class="d-label-s" x="1095" y="150" text-anchor="middle">summary.csv</text>
         </svg>
-        <figcaption>파이프라인이 연결하는 순서대로 본 MRI2CBCT의 CLI 6개. 유일한
-        신경망(nnU-Net)은 두 단계(approx, tmj_crop)에서 서브프로세스로 호출되어
-        CBCT에서 과두를 분할한다. 그 자체로는 아무것도 정합하지 않는다.</figcaption>
+        <figcaption>데이터 흐름을 두 레인으로 그렸다. 번호는 패널이 일곱 단계를 실행하는 순서이며,
+        ASO CLI 셋은 한 상자(2~4)에 묶었다. 두 신경망(음영)은 두개저 마스크만 만들고, 정합은 이 두 마스크만
+        읽고 다른 것은 읽지 않는다.</figcaption>
       </figure>
 
-      <p>서로 독립된 버튼 여섯 개. 코드의 어떤 부분도 순서나 파일의 출처를 통제하지
-      않는다. 유일한 강제 제약은 정합 단계에 있다.</p>
+      <p>패널은 일곱 단계를 센다(<code>plan.py:69-98</code>). PREPARE, PRE_ASO_CBCT, ALI_CBCT,
+      SEMI_ASO_CBCT, AMASSS_CLI, SEGMENT_MRI, REGISTER. 그림은 방향 정렬 CLI 셋을 한 상자로 묶었다.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>단계</th><th>상태</th><th>이유</th></tr></thead>
+          <thead><tr><th>#</th><th>단계</th><th>상태</th><th>이유</th></tr></thead>
           <tbody>
-            <tr><td>MRI 방향 정렬 / 중심 맞춤</td><td><strong>사실상 필수</strong></td><td>elastix가 초기 변환 없이, 단일 해상도로 시작한다</td></tr>
-            <tr><td>L/R 자르기</td><td>선택</td><td>양측 촬영용. 리샘플링 단계가 다시 읽는 <code>left</code>/<code>right</code> 접미사를 만든다</td></tr>
-            <tr><td>리샘플링</td><td><strong>실제로는 필수</strong></td><td>MRI와 CBCT가 비교 가능한 간격을 공유해야 한다. 중심 맞춤도 여기서 일어난다</td></tr>
-            <tr><td>근사(자동 또는 수동)</td><td><strong>사실상 필수</strong></td><td>elastix가 스스로 찾지 못하는 대략 정렬을 제공한다</td></tr>
-            <tr><td>TMJ 자르기</td><td>선택</td><td>시야(field of view)를 줄인다</td></tr>
-            <tr><td>정합</td><td>목표</td><td>CBCT + MRI + <strong>CBCT 분할 하나</strong>가 필요하다</td></tr>
+            <tr><td>1</td><td><code>MRI2CBCT_PREPARE</code></td><td><strong>필수</strong></td><td>환자를 짝짓고 이후 모든 CLI가 읽는 매니페스트를 쓴다. 그 안의 <em>리샘플링</em>과 <em>좌우 분리</em>는 옵션이다(<code>MRI2CBCT.py:118-135</code>, 둘 다 기본으로 켜짐)</td></tr>
+            <tr><td>2~4</td><td><code>PRE_ASO_CBCT</code>, <code>ALI_CBCT</code>, <code>SEMI_ASO_CBCT</code></td><td><strong>필수</strong></td><td>AMASSS 단계는 방향 정렬된 CBCT에서 실행되고 REGISTER는 ASO 변환을 읽는다(<code>MRI2CBCT_REGISTER.py:51</code>). 이것이 없으면 환자는 "정합 전에" 실패한다(<code>:52-56</code>)</td></tr>
+            <tr><td>5</td><td><code>AMASSS_CLI</code> (CB)</td><td><strong>필수</strong></td><td>고정 표면</td></tr>
+            <tr><td>6</td><td><code>MRI2CBCT_SEGMENT_MRI</code></td><td><strong>필수</strong></td><td>이동 표면. 출력이 하나라도 없으면 코드 1로 종료한다(<code>MRI2CBCT_SEGMENT_MRI.py:31-34</code>)</td></tr>
+            <tr><td>7</td><td><code>MRI2CBCT_REGISTER</code></td><td>목표</td><td>정합된 관절이 하나도 없으면 코드 1로 종료한다(<code>MRI2CBCT_REGISTER.py:119-120</code>)</td></tr>
+            <tr><td>멈춤</td><td>검토 지점 다섯 개</td><td>선택</td><td>기본은 꺼짐(§9)</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>"사실상 필수"라는 점은 코드에서 드러난다. <code>ElastixReg</code>는
-      <code>initial_transform=None</code>과 <code>NumberOfResolutions = 1</code>로 호출되며
-      (<code>AREG_MRI.py:61</code>), <code>process_images</code>의 오류
-      메시지는 <em>"PLEASE MAKE SURE THE IMAGES ARE OF SIMILAR SIZE,
-      ORIENTATION, AND APPROXIMATED"</em>라고 말한다. 정합 입력은 또한
-      <code>get_corresponding_file</code>
-      (<code>AREG_MRI.py:98</code>)이 검사하는 엄격한 이름 규칙을 따라야 한다.
-      <code>&lt;ID&gt;_CBCT*.nii.gz</code>, <code>&lt;ID&gt;_MR*.nii.gz</code> 또는 <code>&lt;ID&gt;_MRI*.nii.gz</code>, 마스크는
-      <code>&lt;ID&gt;_CBCT*.nii.gz</code>. <code>.nii.gz</code>만 허용되며 <code>.nii</code>는 절대 허용되지 않는다.</p>
+      <p>이전 버전의 독립된 버튼 여섯 개와 비교해 가장 큰 변화는 이것이다. 파일의 순서와 출처를 이제 계획이
+      강제하며, 실패한 단계는 오류 텍스트와 함께 실행을 멈춘다(<code>MRI2CBCT.py:421-424</code>).</p>
 
-      <div class="callout warn">
-        <div class="callout-title">함정</div>
-        <p>방향 정렬, 리샘플링, 근사를 먼저 거치지 않고 정합을 실행하는 것을 막는 장치가
-        없다. CLI는 파일을 받아들이고, elastix는 수렴하지 못해 조용히 발산하며,
-        이를 "정상적인" 실패와 구별해 주는 메시지는 없다.</p>
-      </div>
+      <h2 id="preparation">4. 짝짓기와 MRI 준비</h2>
 
-      <h2 id="orientation">4. MRI 방향 정렬과 중심 맞춤</h2>
+      <h3 id="preparation-pairing">4.1 환자 ID로 짝짓기</h3>
 
-      <p><code>MRI2CBCT_ORIENT_CENTER_MRI.py</code>,
-      <code>modify_image_properties</code>. <strong>리샘플링 없이 헤더만 다시 쓴다.</strong> 복셀
-      배열은 그대로이고, <code>Direction</code>, <code>Spacing[2]</code>, <code>Origin</code>만 바뀐다.</p>
+      <p><code>pair_folders</code>(<code>pairing.py:81</code>). <strong>모달리티는 임상의가 고른 폴더에서</strong> 오며,
+      파일 이름에서는 결코 오지 않는다(<code>pairing.py:3-4</code>). ID는 앞쪽 글자 뒤에 숫자가 오는 형태,
+      <code>^([A-Za-z]+)[_\-\s]*0*(\d+)</code>(<code>pairing.py:12</code>)이다. <code>P01</code>,
+      <code>B038</code>, <code>A3_scan</code>. 앞의 0은 세지 않으므로 <code>P1</code>과 <code>P01</code>은 같은
+      환자이고, 대소문자도 구분하지 않는다(<code>patient_key</code>, <code>:27-32</code>). 허용되는 확장자는
+      <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>(<code>:11</code>)이며 <strong>재귀적으로</strong>
+      검색한다(<code>list_images</code>, <code>:41-47</code>).</p>
 
-      <ol>
-        <li><code>SetDirection(new_direction)</code>: 체크박스 표로 만든 3×3 행렬로,
-        <code>getCheckboxValuesOrient</code>가 행 단위로 펼친다
-        (<code>MRI2CBCT.py:847</code>). 기본값은 <code>(0,0,-1, 1,0,0, 0,-1,0)</code>
-        (<code>MRI2CBCT.py:866</code>)이며, CLI 맨 아래에
-        "USE THIS DIRECTION FOR MRI"라는 주석이 달린 값이다. 표는 행과 열마다 ±1이
-        정확히 하나만 있도록 강제하므로, 도달할 수 있는 것은 부호 있는 순열 행렬 48개뿐이다.</li>
-        <li><code>Spacing[2]</code>는 <code>acquisition_z_spacing</code>으로 바뀐다. 단, <strong>Bilateral MRI</strong>가
-        체크된 경우에만 그렇다(기본 3.0 mm, 필요하면 선택한 노드의 DICOM 태그 <code>0018,0088</code>, 이어서 <code>0018,0050</code>에서
-        읽는다, <code>MRI2CBCT.py:733</code>). 그렇지 않으면 문자열
-        <code>"None"</code>이 전달되어 원래 간격이 유지된다. NIfTI 변환 때 슬라이스 간 간격을 잃는
-        양측 촬영을 위한 우회책이다.</li>
-        <li>새 origin: <code>[(size[i]*spacing[i])/2]</code>를 <code>[o[2], -o[0], o[1]]</code>로 순열 변환하며,
-        "FOR MRI"라는 주석이 달려 있다. 이 순열은 <strong>기본 행렬과 결합되어 있다</strong>.
-        이것을 함께 바꾸지 않고 direction만 바꾸면 볼륨의 중심이 어긋난다.</li>
-      </ol>
+      <p>다음 경우에는 파일이나 환자가 메시지와 함께 제외된다. ID를 읽을 수 없을 때, MRI는 있는데 CBCT가
+      없을 때, CBCT는 있는데 MRI가 없을 때, 같은 ID에 <strong>CBCT가 둘 이상</strong>일 때
+      (<code>pairing.py:92</code>, <code>:98</code>, <code>:106</code>, <code>:109</code>, <code>:111-113</code>).
+      패널은 이를 목록으로 보여 주고 계속하기 전에 확인을 요청한다(<code>MRI2CBCT.py:350</code>). 환자는 MRI를 하나
+      또는 둘 가질 수 있다.</p>
 
-      <p>출력: 입력 확장자에 따라 <code>&lt;id&gt;_OR.nii</code> 또는 <code>&lt;id&gt;_OR.nii.gz</code>.</p>
+      <p><strong>폴더가 서로 바뀐 경우.</strong> <code>folders_swapped</code>(<code>pairing.py:73-78</code>)는 폴더마다
+      최대 네 파일의 헤더만 읽는다. <code>looks_like</code>(<code>:50-70</code>)는 간격이 2배 넘게 비등방성이거나 어느
+      한 방향의 범위가 90 mm 미만이면 MRI로, 5% 이내로 등방성이고 모든 방향에서 최소 120 mm이면 CBCT로 본다.
+      그 밖의 것은 "둘 다 아님"이다. 그러면 패널이 두 폴더를 맞바꿀지 제안한다(<code>MRI2CBCT.py:328-336</code>).</p>
 
-      <div class="callout warn">
-        <div class="callout-title">함정</div>
-        <p>3단계의 origin 순열은 기본 direction 행렬과만 일관된다. 이 순열을
-        손보지 않고 다른 체크박스 조합을 고르면 볼륨의 중심이 어긋난다.</p>
-      </div>
+      <h3 id="preparation-mri">4.2 각 MRI 준비</h3>
 
-      <h2 id="cropping">5. 자르기</h2>
-
-      <h3 id="cropping-lr">5.1 L/R 자르기: <code>LR_crop.py</code></h3>
-
-      <p>순수하게 기하학적이며, <code>sitk.RegionOfInterest</code>로 반씩 나눈다.</p>
-
-      <ul>
-        <li><strong>MRI</strong>: <strong>Z</strong> 축을 따라 자른다(<code>size[2]//2</code>). 아래쪽 절반 → <code>_cropLeft</code>,
-        위쪽 절반 → <code>_cropRight</code>.</li>
-        <li><strong>CBCT와 Seg</strong>: <strong>X</strong> 축을 따라 자르며,
-        <code>direction[0,0] &lt; 0</code>이면 두 절반을 맞바꾼다. 그다음 이름을 <strong>의도적으로 엇갈리게</strong> 붙인다
-        (<code>left</code> 절반을 <code>_cropRight</code>에 쓰고 그 반대도 마찬가지). 이 부분에는
-        <code># TODO: Check why left is right and why right is left</code>라는 주석이 있다
-        (<code>LR_crop.py:64</code>).</li>
-      </ul>
-
-      <p>출력은 <code>&lt;output&gt;/CBCT</code>, <code>/MRI</code>, <code>/Seg</code>에 저장된다. <code>left</code>/<code>right</code> 접미사는
-      이후 리샘플링 단계에서 단순한 <code>in input_path.lower()</code>로 다시 읽힌다.</p>
-
-      <div class="callout warn">
-        <div class="callout-title">함정</div>
-        <p><code>crop_cbct</code>에서 좌우가 의도적으로 뒤바뀌어 있으며, 그 이유는 밝혀지지
-        않았다(코드 안의 <code>TODO</code>가 이를 그대로 확인해 준다). 이후 하류 전체
-        (리샘플링 시 미러링, 측면 판별)가 이 엇갈린 이름에 의존한다.</p>
-      </div>
-
-      <h3 id="cropping-tmj">5.2 TMJ 자르기: <code>MRI2CBCT_TMJ_CROP.py</code></h3>
-
-      <ol>
-        <li><code>GetPatients</code>는 식별자로 CBCT / MRI / Seg를 짝짓는다
-        (<code>TMJ_crop.py:24</code>: <code>split</code> 호출이 길게 이어진다. 대상은
-        <code>_Scan</code>, <code>_T1</code>, <code>_CBCT</code>, <code>_crop</code>…). 분할 파일만으로는 환자가 생성되지 않으며,
-        셋 중 하나라도 없는 환자는 건너뛴다.</li>
-        <li><code>segment_condyle</code>(§6) → CBCT 절반의 좌표계에서의 이진 마스크.</li>
-        <li>경계 상자: <code>MARGIN = 3</code> 복셀<strong>이지만</strong> <code>FIXED_BBOX_VOXELS = [400,400,400]</code>이
-        활성화되어 있어 여백은 쓰이지 않는다. 상자는 마스크의 <strong>무게중심</strong>을 중심으로 한
-        400복셀 정육면체이며, 볼륨 경계 안으로 제한된다.</li>
-        <li>8개 꼭짓점을 <code>cbct_half.affine</code>으로 월드 좌표에 대응시킨다. 전체 CBCT와
-        MRI를 이 월드 좌표 상자로 각자의 격자에서 자른다
-        (<code>crop_by_world_corners</code>는 각 영상의 역아핀을 거쳐 되돌아간다).</li>
-        <li>CBCT와 분할은 <strong>잘라 낸 MRI의 격자로
-        리샘플링된다</strong>(<code>nibabel.processing.resample_from_to</code>, CBCT는 <code>order=1</code>,
-        레이블은 <code>order=0</code>).</li>
-      </ol>
-
-      <p>출력: <code>MRI/&lt;id&gt;_MRI_TMJ_crop&lt;side&gt;.nii.gz</code>, <code>CBCT/&lt;id&gt;_CBCT_TMJ_crop&lt;side&gt;.nii.gz</code>,
-      <code>CBCT seg/&lt;id&gt;_Seg_TMJ_crop&lt;side&gt;.nii.gz</code>, <code>CBCT seg/&lt;id&gt;_Mask_TMJ_crop&lt;side&gt;.nii.gz</code>,
-      <code>Mask/&lt;id&gt;_Mask_TMJ_&lt;side&gt;.nii.gz</code>(확인용 원시 마스크). <code>&lt;id&gt;</code>는 CBCT 파일 이름의 <strong>첫
-      토큰</strong>이다(<code>stem.split(".")[0].split("_")[0]</code>). <code>MRI/&lt;id&gt;_MRI_TMJ_crop*.nii.gz</code>가
-      이미 있으면 그 환자는 건너뛴다.</p>
-
-      <h2 id="segmentation">6. 신경망: 과두 분할</h2>
-
-      <p><code>condyle_segmentation.py</code>로,
-      TMJ 자르기와 Approximate가 한 글자도 다르지 않게 공유한다. <strong>모듈의 유일한
-      신경망이다. MRI 분할은 전혀 없다.</strong></p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>항목</th><th>값</th></tr></thead>
-          <tbody>
-            <tr><td>구조</td><td><span class="badge predit">예측</span> nnU-Net v2, <code>nnUNetResEncUNetXLPlans</code> 플랜, <code>3d_fullres</code> 설정, fold 0</td></tr>
-            <tr><td>데이터셋</td><td><code>Dataset001_myseg</code></td></tr>
-            <tr><td>가중치</td><td><code>checkpoint_final.pth</code>, 그리고 <code>dataset.json</code>과 <code>plans.json</code></td></tr>
-            <tr><td>URL</td><td><code>github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/TMJ_CROP_MODEL/…</code> (<code>MRI2CBCT.py:1249</code>)</td></tr>
-            <tr><td>위치</td><td><code>&lt;Documents&gt;/SlicerDownloads/MRI2CBCT/MRI2CBCT_CBCT/ML/Dataset001_myseg/nnUNetTrainer__nnUNetResEncUNetXLPlans__3d_fullres/fold_0/</code></td></tr>
-            <tr><td>실행</td><td><code>subprocess.run(["nnUNetv2_predict", …, "--disable_tta", "--save_probabilities", "-f", "0"])</code></td></tr>
-            <tr><td>입력 / 출력</td><td>CBCT 절반 하나 <code>&lt;name&gt;_0000.nii.gz</code> → 레이블 맵 <code>&lt;name&gt;.nii.gz</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>정확한 구조와 nnU-Net 전처리(강도 정규화, 목표 간격, 패치 크기)는 다운로드되는
-      <code>plans.json</code> / <code>dataset.json</code>에 들어 있어,
-      <strong>저장소만으로는 알 수 없다</strong>. 코드는 자체 전처리를 전혀 하지 않고
-      모두 nnU-Net에 맡긴다. <code>os.environ['nnUNet_results']</code>는
-      trainer 폴더에서 두 단계 위로 올라가 구한다.</p>
-
-      <p><strong>모듈 고유의 전처리</strong>, <code>detect_side_and_half</code>
-      (<code>condyle_segmentation.py:84</code>):
-      MRI의 0이 아닌 복셀의 질량 중심을 <strong>월드 좌표에서</strong>
-      CBCT의 중심과 비교한다(<code>cog_w[0] &gt; cbct_mid_w[0]</code> → 측면 <code>Right</code>). CBCT는
-      축 인덱스 0을 따라 둘로 나뉘며, 남길 절반은
-      <code>affine[:3,0][0]</code>의 부호로 정한다: 따라서 복셀 저장 방향과 무관하다. 목적은
-      신경망에 학습 때와 같은 시야를 보여 주는 것이다.</p>
-
-      <p><strong>후처리</strong>: <span class="badge calcule">계산</span></p>
-
-      <pre><code>mask = pred if pred.max() &gt; 1 else (pred &gt; PROBA_THR)   # PROBA_THR = 0.02
-mask = biggest_cc(mask)                                  # scipy.ndimage.label</code></pre>
-
-      <p><code>nnUNetv2_predict</code>는 레이블 맵을 쓴다(확률은
-      <code>.npz</code>에 들어가지만 다시 읽히지 않는다). 따라서 <code>pred.max()</code>는 1이고, 실제로
-      타는 분기는 0.02 임계값, 즉 "레이블 ≠ 0"이다. <code>PROBA_THR</code>는 확률 맵에서만
-      효과가 있을 것이다. 가장 큰 연결 성분만 남기므로 결과는
-      <strong>하나의 이진 과두</strong>다.</p>
-
-      <h2 id="resampling">7. 리샘플링</h2>
-
-      <p><code>MRI2CBCT_RESAMPLE_CBCT_MRI.py</code>
-      + <code>resample.py</code>. 입력 폴더 여섯 개:
-      MRI/CBCT/Seg × T1/T2. <code>create_csv</code>는 <code>.nii</code>, <code>.nii.gz</code>,
-      <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>를 재귀적으로 목록화하고 각각의 크기와 간격을 기록한다.</p>
-
-      <p>표의 기본값(<code>MRI2CBCT.py:543</code>): <strong>443 × 443 × 119</strong>
-      슬라이스, 간격 <strong>0.3 × 0.3 × 0.3 mm</strong>. 각 행은 "Keep the
-      same size / spacing as the input scan"(입력 스캔과 같은 크기 / 간격 유지)으로 끌 수 있으며, 이때 문자열 <code>"None"</code>이
-      CLI에 전달된다.</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>입력</th><th><code>resample_size</code></th><th>보간</th><th>참고</th></tr></thead>
-          <tbody>
-            <tr><td>MRI</td><td>표의 값</td><td>선형</td><td><code>iso_spacing=True</code>는 실제로 <strong><code>isMRI</code></strong> 플래그 역할을 한다</td></tr>
-            <tr><td>CBCT</td><td><code>"None"</code>으로 강제</td><td>선형</td><td>간격만 바뀌고 원래 크기는 유지된다</td></tr>
-            <tr><td>Seg</td><td><code>"None"</code>으로 강제</td><td><strong>최근접 이웃</strong>(<code>linear=False</code>)</td><td></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>이 강제는 163행에 주석으로 설명되어 있다. MRI의 크기를 CBCT에 강제하면
-      두개골 전체가 작은 MRI 볼륨의 크기로 잘려 버린다.</p>
-
-      <p><code>resample_fn</code> 내부:</p>
-
-      <ul>
-        <li><code>fit_spacing=True</code>(목표 크기가 주어짐) → <code>output_spacing = sp·si/o_si</code>로
-        물리적 범위가 보존된다. 명시적 간격이 주어지면 그 뒤에 덮어쓴다.</li>
-        <li><code>center</code> → <code>output_origin -= (output_physical_size − input_physical_size)/2</code>.
-        MRI의 경우 이 오프셋에 먼저 direction 행렬을 곱한다.</li>
-        <li><strong>미러링</strong>: MRI<strong>이고</strong> 이름에 <code>right</code>가 들어 있<strong>으며</strong> <code>center</code>가
-        거짓이면, 리샘플링 전에 볼륨을 Z축으로 뒤집고(<code>sitk.Flip [False,False,True]</code>)
-        리샘플링 후 다시 뒤집는다. 측면은 L/R 자르기가 만든
-        파일 이름에서 온다.</li>
-        <li><code>DefaultPixelValue</code> = 0이 아니라 <strong>입력 볼륨의 최솟값</strong>. 패딩에 실제 배경값을
-        쓴다.</li>
-        <li><code>iso_spacing == "True"</code> 분기는 불리언을 문자열과 비교하므로 사용되지 않는 코드다.</li>
-      </ul>
-
-      <p>출력은 <code>&lt;output&gt;/MRI</code>, <code>/CBCT</code>, <code>/Seg</code>에 <strong>이름 그대로</strong> 저장된다. 출력 경로는
-      <code>file_path.replace(dirname(file_path), output)</code>이다. 입력 디렉터리 트리가 어떻든
-      평탄화되므로, 서로 다른 하위 폴더의 같은 이름 파일 두 개는 조용히 서로를
-      덮어쓴다.</p>
-
-      <div class="callout warn">
-        <div class="callout-title">함정</div>
-        <p>리샘플링 시 하위 폴더를 평탄화하면, 서로 다른 하위 폴더에서 온 같은 이름의 파일 두 개가
-        조용히 덮어써진다. 이 문제를 알려야 할 오류 처리기도
-        고장 나 있다(§12).</p>
-      </div>
-
-      <h2 id="approximation">8. 근사</h2>
-
-      <p>두 경로가 같은 UI 섹션에 공존하며, <strong>같은</strong>
-      <code>&lt;output&gt;/first_approximation/</code> 폴더에 <strong>같은</strong> 파일 이름으로 쓴다.</p>
-
-      <h3 id="approx-auto">8.1 자동 경로</h3>
-
-      <p><code>MRI2CBCT_APPROX</code> CLI는 <strong>아무것도
-      정합하지 않는다</strong>. 점 한 쌍과 회전 하나를 만들고, 나머지는 위젯이
-      마무리한다(CLI는 Slicer 모듈에 접근할 수 없다). <code>approximation()</code>
-      (<code>approximate.py:77</code>)은 CBCT/MRI
-      쌍마다 실행된다(폴더, 또는 두 입력이 모두 파일이면 파일 하나, "Scene Volume"
-      모드):</p>
+      <p><code>MRI2CBCT_PREPARE.py</code>. 먼저 <strong>지운다</strong>. 대상은 출력의 <code>_steps/</code> 폴더 전체다(<code>:23-24</code>).
+      그다음 각 CBCT를 <code>_steps/0_cbct_in/&lt;PID&gt;</code>에 연결한 다음(심볼릭 링크이며 링크가 실패하면 복사,
+      <code>:45-48</code>), MRI 파일마다 <code>mri_prep.plan_joints</code>에 볼륨이 무엇인지 묻는다. MRI의 헤더는
+      <strong>그대로 보존</strong>된다. 이전의 "Orient" 단계는 방향 행렬을 고정된 것으로 덮어써서 "슬라이스가 어느 쪽으로
+      달리는지에 대한 유일한 기록을 버렸는데"(<code>mri_prep.py:3-6</code>), 새 코드는 원래 헤더에서 세계 좌표를 읽는다.</p>
 
       <figure class="diagram">
-        <svg viewBox="0 0 1300 300" role="img" aria-label="자동 근사 경로: 원본 CBCT와 MRI에서 미리 위치를 잡은 MRI 볼륨까지">
-          <rect class="d-box" x="10" y="30" width="120" height="44" rx="6"/>
-          <text class="d-label" x="70" y="56" text-anchor="middle">CBCT(절반)</text>
+        <svg viewBox="0 0 1200 330" role="img" aria-label="MRI 볼륨 하나가 관절이 되는 과정: separate 옵션, 폭, 슬라이스 간극에 따른 다섯 가지 경우">
+          <rect class="d-box" x="10" y="140" width="140" height="50" rx="6"/>
+          <text class="d-label" x="80" y="162" text-anchor="middle">MRI 파일 하나</text>
+          <text class="d-label-s" x="80" y="177" text-anchor="middle">원래 헤더</text>
 
-          <path class="d-arrow" d="M130 52 H160"/>
-          <path class="d-arrow-head" d="M160 52 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M150 165 H175"/>
+          <path class="d-rule" d="M175 40 V290"/>
 
-          <rect class="d-box-n" x="160" y="30" width="220" height="44" rx="6"/>
-          <text class="d-label" x="270" y="48" text-anchor="middle">nnU-Net으로</text>
-          <text class="d-label-s" x="270" y="62" text-anchor="middle">과두 분할</text>
+          <path class="d-arrow" d="M175 40 H200"/><path class="d-arrow-head" d="M200 40 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M175 98 H200"/><path class="d-arrow-head" d="M200 98 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M175 156 H200"/><path class="d-arrow-head" d="M200 156 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M175 214 H200"/><path class="d-arrow-head" d="M200 214 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M175 272 H200"/><path class="d-arrow-head" d="M200 272 l-7 -4 v8 z"/>
 
-          <path class="d-arrow" d="M380 52 H410"/>
-          <path class="d-arrow-head" d="M410 52 l-7 -4 v8 z"/>
+          <rect class="d-box" x="200" y="15" width="370" height="50" rx="6"/>
+          <text class="d-label" x="385" y="37" text-anchor="middle">분리 · 110 mm보다 넓음 · 간극 있음</text>
+          <text class="d-label-s" x="385" y="52" text-anchor="middle">슬라이스가 획득 간격의 1.2배에 걸쳐 퍼짐</text>
+          <rect class="d-box" x="200" y="73" width="370" height="50" rx="6"/>
+          <text class="d-label" x="385" y="95" text-anchor="middle">분리 · 110 mm보다 넓음 · 연속</text>
+          <text class="d-label-s" x="385" y="110" text-anchor="middle">양쪽 관절, 간극 없음</text>
+          <rect class="d-box" x="200" y="131" width="370" height="50" rx="6"/>
+          <text class="d-label" x="385" y="153" text-anchor="middle">분리 · 110 mm보다 좁음</text>
+          <text class="d-label-s" x="385" y="168" text-anchor="middle">관절 하나짜리 슬래브</text>
+          <rect class="d-box" x="200" y="189" width="370" height="50" rx="6"/>
+          <text class="d-label" x="385" y="211" text-anchor="middle">분리 안 함 · 110 mm보다 넓음</text>
+          <text class="d-label-s" x="385" y="226" text-anchor="middle">한 볼륨에 양쪽 관절</text>
+          <rect class="d-box" x="200" y="247" width="370" height="50" rx="6"/>
+          <text class="d-label" x="385" y="269" text-anchor="middle">분리 안 함 · 110 mm보다 좁음</text>
+          <text class="d-label-s" x="385" y="284" text-anchor="middle">관절 하나짜리 슬래브</text>
 
-          <rect class="d-box" x="410" y="30" width="170" height="44" rx="6"/>
-          <text class="d-label" x="495" y="48" text-anchor="middle">CBCT 점</text>
-          <text class="d-label-s" x="495" y="62" text-anchor="middle">마스크 무게중심</text>
+          <path class="d-arrow" d="M570 40 H620"/><path class="d-arrow-head" d="M620 40 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M570 98 H620"/><path class="d-arrow-head" d="M620 98 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M570 156 H620"/><path class="d-arrow-head" d="M620 156 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M570 214 H620"/><path class="d-arrow-head" d="M620 214 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M570 272 H620"/><path class="d-arrow-head" d="M620 272 l-7 -4 v8 z"/>
 
-          <rect class="d-box" x="10" y="190" width="120" height="44" rx="6"/>
-          <text class="d-label" x="70" y="216" text-anchor="middle">MRI(전체)</text>
+          <rect class="d-box-a" x="620" y="15" width="350" height="50" rx="6"/>
+          <text class="d-label" x="795" y="37" text-anchor="middle">split_gapped</text>
+          <text class="d-label-s" x="795" y="52" text-anchor="middle">두 묶음을 획득 간격으로 재구성</text>
+          <rect class="d-box-a" x="620" y="73" width="350" height="50" rx="6"/>
+          <text class="d-label" x="795" y="95" text-anchor="middle">split_lr</text>
+          <text class="d-label-s" x="795" y="110" text-anchor="middle">좌우 축의 가운데에서 절단</text>
+          <rect class="d-box-a" x="620" y="131" width="350" height="50" rx="6"/>
+          <text class="d-label" x="795" y="153" text-anchor="middle">분리하지 않음</text>
+          <text class="d-label-s" x="795" y="168" text-anchor="middle">헤더 위치에서 좌우 판별</text>
+          <rect class="d-box-a" x="620" y="189" width="350" height="50" rx="6"/>
+          <text class="d-label" x="795" y="211" text-anchor="middle">통째로 유지</text>
+          <text class="d-label-s" x="795" y="226" text-anchor="middle">CBCT 전체에 대해 정합</text>
+          <rect class="d-box-a" x="620" y="247" width="350" height="50" rx="6"/>
+          <text class="d-label" x="795" y="269" text-anchor="middle">분리하지 않음</text>
+          <text class="d-label-s" x="795" y="284" text-anchor="middle">헤더 위치에서 좌우 판별</text>
 
-          <path class="d-arrow" d="M130 212 H160"/>
-          <path class="d-arrow-head" d="M160 212 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M970 40 H1010"/><path class="d-arrow-head" d="M1010 40 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M970 98 H1010"/><path class="d-arrow-head" d="M1010 98 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M970 156 H1010"/><path class="d-arrow-head" d="M1010 156 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M970 214 H1010"/><path class="d-arrow-head" d="M1010 214 l-7 -4 v8 z"/>
+          <path class="d-arrow" d="M970 272 H1010"/><path class="d-arrow-head" d="M1010 272 l-7 -4 v8 z"/>
 
-          <rect class="d-box" x="160" y="190" width="190" height="44" rx="6"/>
-          <text class="d-label" x="255" y="208" text-anchor="middle">MRI 점</text>
-          <text class="d-label-s" x="255" y="222" text-anchor="middle">질량 중심</text>
-
-          <path class="d-arrow" d="M350 212 H380"/>
-          <path class="d-arrow-head" d="M380 212 l-7 -4 v8 z"/>
-
-          <rect class="d-box" x="380" y="190" width="220" height="44" rx="6"/>
-          <text class="d-label" x="490" y="208" text-anchor="middle">회전 = SVD(아핀)</text>
-          <text class="d-label-s" x="490" y="222" text-anchor="middle">R_cbct · R_mriᵀ</text>
-
-          <path class="d-arrow" d="M600 212 H630"/>
-          <path class="d-arrow-head" d="M630 212 l-7 -4 v8 z"/>
-
-          <rect class="d-box" x="630" y="190" width="170" height="44" rx="6"/>
-          <text class="d-label" x="715" y="208" text-anchor="middle">회전된 MRI 점</text>
-          <text class="d-label-s" x="715" y="222" text-anchor="middle">R · MRI 점</text>
-
-          <path class="d-arrow" d="M580 60 L850 130"/>
-          <path class="d-arrow-head" d="M850 130 l-9 -2 l3 -8 z"/>
-          <path class="d-arrow" d="M800 205 L850 155"/>
-          <path class="d-arrow-head" d="M850 155 l-9 2 l1 -8 z"/>
-
-          <rect class="d-box-a" x="850" y="105" width="200" height="60" rx="6"/>
-          <text class="d-label" x="950" y="128" text-anchor="middle">fiducialregistration</text>
-          <text class="d-label-s" x="950" y="142" text-anchor="middle">Slicer, 평행이동, 점 1개</text>
-          <text class="d-mono" x="950" y="156" text-anchor="middle">fixed = CBCT, moving = MRI</text>
-
-          <path class="d-arrow" d="M1050 135 H1080"/>
-          <path class="d-arrow-head" d="M1080 135 l-7 -4 v8 z"/>
-
-          <rect class="d-box-a" x="1080" y="105" width="200" height="60" rx="6"/>
-          <text class="d-label" x="1180" y="128" text-anchor="middle">근사된 MRI</text>
-          <text class="d-label-s" x="1180" y="142" text-anchor="middle">이동된 볼륨 + .tfm</text>
-          <text class="d-mono" x="1180" y="156" text-anchor="middle">hardenTransform</text>
+          <rect class="d-box" x="1010" y="15" width="180" height="50" rx="6"/>
+          <text class="d-label" x="1100" y="45" text-anchor="middle">L과 R</text>
+          <rect class="d-box" x="1010" y="73" width="180" height="50" rx="6"/>
+          <text class="d-label" x="1100" y="103" text-anchor="middle">L과 R</text>
+          <rect class="d-box" x="1010" y="131" width="180" height="50" rx="6"/>
+          <text class="d-label" x="1100" y="161" text-anchor="middle">L 또는 R</text>
+          <rect class="d-box" x="1010" y="189" width="180" height="50" rx="6"/>
+          <text class="d-label" x="1100" y="219" text-anchor="middle">B (양쪽)</text>
+          <rect class="d-box" x="1010" y="247" width="180" height="50" rx="6"/>
+          <text class="d-label" x="1100" y="277" text-anchor="middle">L 또는 R</text>
         </svg>
-        <figcaption>회전은 헤더에서(아핀의 <a class="gterm" href="../glossary.html#g-svd" title="용어집 보기">SVD</a>), 평행이동은
-        과두 무게중심과 MRI 질량 중심을 짝지어 얻는다. 신경망은
-        CBCT 점을 제공하는 데만 쓰인다.</figcaption>
+        <figcaption><code>plan_joints</code>(<code>mri_prep.py:136-167</code>)가 파일마다 결정한다. "분리"는 패널의
+        "Separate left and right" 옵션이다. 110 mm는 <code>BILATERAL_MM</code>(<code>:17</code>)이며 연구실
+        데이터로 측정한 값이다(주석에 따르면 관절 하나짜리는 최대 98 mm, 합쳐진 슬래브는 120~130 mm).
+        간극 검사는 <code>has_gap</code>(<code>:131-133</code>)이다. 리샘플링이 켜져 있으면 결과로 나온 모든
+        관절이 이어서 <code>resample_iso</code>를 거친다.</figcaption>
+      </figure>
+
+      <ul>
+        <li><strong>헤더에서 좌우 판별.</strong> <code>side_from_header</code>(<code>mri_prep.py:64-66</code>)는 슬래브의
+        세계 좌표 중심이 LPS x &gt; 0이면 LEFT, 아니면 RIGHT라고 판정한다. docstring은 좌우를 아는 관절 하나짜리
+        슬래브(환자 97명)에서 이 규칙이 355개 중 355개에서 맞았다고 밝힌다.</li>
+        <li><strong>간극이 있는 양측 슬래브.</strong> NIfTI는 두 묶음 사이의 간극을 저장할 수 없어서, 파일은 모든
+        슬라이스를 고르게 펼쳐 놓는다. docstring의 예는 B038이다. 6.876 mm 간격의 18개 슬라이스가 사실은
+        3.0 mm 간격의 9 + 9개이고 그 사이가 69 mm다. 양 끝 슬라이스만 제자리에 있으므로, 각 절반은 자기 끝
+        슬라이스를 기준으로 획득 간격으로 재구성된다(<code>split_gapped</code>, <code>:90-128</code>). 두 묶음의
+        슬라이스 수가 같다고 가정하며, 홀수이면 비고에 "check the split"이 추가된다(<code>:150-151</code>).
+        획득 간격은 패널의 필드이며 기본값은 3.0 mm다.</li>
+        <li><strong>리샘플링.</strong> <code>resample_iso</code>(<code>:20-42</code>)는 볼륨을 0.3 mm 등방성으로 만든다.
+        Dataset516이 학습된 간격이며(<code>:12-13</code>), 선형 보간을 쓰고 <em>물리적</em> 범위를 유지한다. 크기는
+        범위 / 간격이다. docstring은 이전 리샘플러가 복셀 수를 유지해서 100 × 100 × 30 mm 슬래브를
+        76.8 × 76.8 × 3 mm로 줄였다고 적는다.</li>
+        <li><strong>좌우마다 관절 하나.</strong> 같은 환자의 L(또는 R) 관절이 될 두 번째 MRI는 메시지와 함께
+        건너뛴다(<code>MRI2CBCT_PREPARE.py:56-58</code>).</li>
+      </ul>
+
+      <p>출력: <code>_steps/1_mri/&lt;PID&gt;_&lt;S&gt;_MRI.nii.gz</code>(S = L, R 또는 B), 그리고 환자마다 CBCT 경로와
+      각 관절의 원본 파일, 좌우, 비고를 나열한 매니페스트(<code>:38-40</code>, <code>:64-66</code>).</p>
+
+      <h2 id="orientation">5. CBCT 방향 정렬(ASO)</h2>
+
+      <p><a href="../ASO/ASO.html">ASO</a>와 <a href="../ALI/ALI.html">ALI</a>에서 빌려 온 CLI 셋으로, "각자의 모듈이
+      호출하는 방식 그대로" 호출된다(<code>plan.py:3-5</code>).</p>
+
+      <ol>
+        <li><code>PRE_ASO_CBCT</code>는 스캔의 중심을 맞춘다. 영상 중심의 물리적 위치만큼 음의 방향으로 평행이동한 뒤
+        리샘플링한다. <code>model_folder</code> 인자를 받지만(<code>plan.py:73-76</code>) CLI는 이를 파싱만 하고
+        읽지 않는다(<code>PRE_ASO_CBCT.py:272</code>가 유일한 사용처). 그래서 MRI2CBCT의 다운로드에는 PreASO 모델이
+        들어 있지 않다.</li>
+        <li><code>ALI_CBCT</code>는 랜드마크 일곱 개를 배치한다. <code>Ba</code>, <code>LPo</code>, <code>N</code>,
+        <code>RPo</code>, <code>S</code>, <code>LOr</code>, <code>ROr</code>(<code>plan.py:14</code>). 인자는
+        <code>spacing [1,0.3]</code>, <code>speed_per_scale [1,1]</code>, <code>agent_FOV [64,64,64]</code>,
+        <code>spawn_radius 10</code>이다(<code>plan.py:81-82</code>). 랜드마크마다 모델 하나를 내려받는다
+        (<code>requirements.py:43</code>).</li>
+        <li><code>SEMI_ASO_CBCT</code>는 스캔을 프랑크푸르트 수평면과 정중시상 기준에 맞춘다(기준 폴더의
+        <code>MAMP_0002_T1.mrk.json</code>, <code>plan.py:45</code>). 접미사는 <code>Or</code>다.</li>
+      </ol>
+
+      <p>출력: <code>_steps/2_cbct_oriented/&lt;PID&gt;_Or.nii.gz</code>와
+      <code>&lt;PID&gt;_Or_transform.tfm</code>(<code>layout.py:57-62</code>). 이 변환은 방향 정렬된 좌표계의 점을 원래
+      CBCT로 되돌리며, 리샘플링 규약을 따른다(<code>frames.py:8-10</code>). <code>aso_original_to_oriented_ras</code>
+      (<code>frames.py:33-36</code>)가 이를 정합에 필요한 RAS 점 매핑으로 바꾼다. 여기서 방향 정렬이 중요한 구체적
+      이유가 있다. CBCT는 두개저의 중앙 x에서 왼쪽 절반과 오른쪽 절반으로 잘리는데(§7), 이는 머리가 표준
+      자세에 놓인 뒤에야 의미가 있다.</p>
+
+      <h2 id="segmentation">6. 두 신경망</h2>
+
+      <p><strong>어느 신경망도 아무것도 정합하지 않는다.</strong> 각각 이진 두개저 마스크 하나를 만들며, 정합은 그
+      두 마스크의 표면에 대해 이루어진다.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>요소</th><th>CBCT: AMASSS</th><th>MRI: Dataset516</th></tr></thead>
+          <tbody>
+            <tr><td>성격</td><td><span class="badge predit">예측</span> nnU-Net, <code>CB</code> 구조용 이진 모델 하나</td><td><span class="badge predit">예측</span> nnU-Net <code>3d_fullres</code>, 트레이너 <code>nnUNetTrainer_250epochs__nnUNetPlans__3d_fullres</code>(<code>env.py:20</code>)</td></tr>
+            <tr><td>호출 방식</td><td><code>AMASSS_CLI</code>를 <code>slicer.cli.run</code>으로 호출: <code>skullStructure = CB</code>, <code>merge = MERGE</code>, VTK 없음(<code>plan.py:87-92</code>)</td><td>프로세스 안의 nnU-Net Python API로, <em>아니라</em> <code>nnUNetv2_predict</code> 스크립트를 쓰지 않는다. 그 shebang이 "Slicer 런처 밖에서는 libpython을 찾지 못하기" 때문이다(<code>seg516.py:1-5</code>)</td></tr>
+            <tr><td>입력</td><td>방향 정렬된 CBCT, <code>2_cbct_oriented/&lt;PID&gt;_Or.nii.gz</code></td><td>준비된 각 관절, <code>1_mri/&lt;PID&gt;_&lt;S&gt;_MRI.nii.gz</code></td></tr>
+            <tr><td>출력</td><td><code>3_cbct_seg/&lt;PID&gt;_Or_Pred_CB.nii.gz</code>(<code>layout.py:65-66</code>)</td><td><code>4_mri_seg/&lt;PID&gt;_&lt;S&gt;_MRI_seg.nii.gz</code>, 레이블 1 = 두개저(<code>seg516.py:15</code>)</td></tr>
+            <tr><td>설정</td><td>AMASSS 모듈의 설정. 모델 폴더에 <code>CB</code>가 들어 있어야 한다(<code>plan.py:50</code>)</td><td><code>tile_step_size 0.5</code>, 가우시안 가중, <strong>미러링 없음</strong>(테스트 시 증강 꺼짐), <code>checkpoint_final.pth</code>, fold 0~4 또는 fold 0만(<code>seg516.py:21-26</code>, <code>MRI2CBCT.py:358</code>)</td></tr>
+            <tr><td>장치</td><td>AMASSS에 따름</td><td>가능하면 CUDA, 아니면 CPU(<code>seg516.py:19</code>)</td></tr>
+            <tr><td>가중치</td><td>AMASSS 릴리스의 <code>AMASSS_Models.zip</code>(<code>requirements.py:32-33</code>)</td><td><code>Dataset516_MRICBManual.zip</code>, <code>MRI2CBCT_Dataset516</code> 릴리스(<code>env.py:22-25</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>모든 환자의 모든 관절이 한 번의 호출로 예측기 하나를 거친다
+      (<code>predict_from_files_sequential</code>, <code>seg516.py:30</code>. 목록은
+      <code>MRI2CBCT_SEGMENT_MRI.py:23-26</code>에서 만들어진다). nnU-Net을 import하기 전에 환경 변수 두 종류가
+      강제 설정된다. <code>nnUNet_compile = f</code>(<code>torch.compile</code>이 Slicer의 Python에서 깨지므로),
+      그리고 "설정되어 있어야 하지만 추론에서는 읽히지 않는" 더미 <code>nnUNet_raw</code>,
+      <code>nnUNet_preprocessed</code>, <code>nnUNet_results</code>를 <code>/unused</code>로 설정한다
+      (<code>seg516.py:9-11</code>).</p>
+
+      <p>신경망의 패치 크기, 강도 정규화, 학습 데이터는 내려받은 <code>plans.json</code>과
+      <code>dataset.json</code>에 있다. <strong>저장소로부터 확인할 수 없다</strong>. Dataset516이 어떻게 학습되고
+      평가되었는지를 기록한 것은 저장소 어디에도 없으며, 아카이브 이름(<code>MRICBManual</code>)이 유일한 단서다.
+      추론 시 후처리는 없다. MRI 마스크는 정합이 불러올 때 정리된다(§7).</p>
+
+      <h2 id="recalage">7. 정합</h2>
+
+      <p><code>MRI2CBCT_REGISTER</code>는 환자마다 CBCT 두개저 마스크와 ASO 변환을 한 번 불러온 뒤
+      (<code>MRI2CBCT_REGISTER.py:50-51</code>), <code>ladder.register_joint</code>로 관절을 하나씩 정합한다
+      (<code>:70-73</code>). <strong>이 시점에는 영상을 읽지 않는다.</strong> 입력은 마스크 두 개뿐이다.</p>
+
+      <h3 id="recalage-surfaces">7.1 표면</h3>
+      <ul>
+        <li><strong>MRI 마스크</strong>(<code>mri_surface</code>, <code>ladder.py:131-147</code>): 0.5에서 임계값을 적용하고,
+        50 복셀 미만의 마스크는 거부하며, <strong>가장 큰 연결 성분</strong>(6-연결)만 남기고 표면을 표본추출한다.
+        성분 필터는 <code>surface.py:35-41</code>에서 필수라고 불린다. 법선의 방향이 연결 그래프를 따라 전파되므로
+        떨어져 나온 섬들은 법선이 뒤집히기 때문이다. 마스크의 부피(cm³)는 QC를 위해 보관한다(§7.3).</li>
+        <li><strong>CBCT 마스크</strong>(<code>cbct_surface</code>, <code>:150-157</code>): 같은 임계값과 표본추출을 쓰며
+        성분 필터는 없다.</li>
+        <li><strong>표면 점</strong>(<code>surface_points_normals</code>, <code>surface.py:10-30</code>): 마스크에서 그
+        침식을 뺀 복셀들을 고정된 난수 시드로 20 000개 점으로 부분 표집하고(<code>NPTS</code>,
+        <code>reg/pipeline.py:14</code>), 세계 좌표는 RAS이며, 법선은 σ = 1.5 복셀로 평활화한 마스크의 기울기에서
+        얻는다.</li>
+        <li><strong>측면 절단</strong>(<code>side_cut</code>, <code>ladder.py:94-102</code>): L 또는 R로 표시된 관절의
+        경우, CBCT 표면은 스캔된 쪽에서 전체 표면의 중앙 x를 <code>MARGIN = 5</code> mm 넘는 지점까지의 점만
+        남긴다(RAS +x는 환자의 오른쪽). 이것이 관절 하나짜리 MRI 슬래브를 머리 전체 CBCT에 대해 정합할 수 있게
+        해 준다. B(전체 볼륨)로 표시된 관절은 표면 전체를 쓴다.</li>
+      </ul>
+
+      <h3 id="recalage-draw">7.2 추출 한 번</h3>
+      <p><code>register</code>(<code>reg/global_reg.py:27-47</code>), 매개변수는 <code>reg/pipeline.py:14-17</code>:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>단계</th><th>값</th></tr></thead>
+          <tbody>
+            <tr><td>다운샘플링</td><td>복셀 1.5 mm, 그다음 <code>orient_normals_consistent_tangent_plane(20)</code>(<code>:18-24</code>)</td></tr>
+            <tr><td>기술자</td><td><abbr title="Fast Point Feature Histograms">FPFH</abbr>, 하이브리드 탐색 반경 5 × 복셀 = 7.5 mm, 이웃 최대 100개(<code>:31-35</code>)</td></tr>
+            <tr><td>전역 탐색</td><td>특징 매칭에 대한 RANSAC, 거리 1.5 × 복셀, 스케일링 없는 점-대-점, 표본당 3점, 변 길이 검사기 0.9와 거리 검사기, 신뢰도 0.999에서 최대 4 000 000회 반복(<code>:36-42</code>)</td></tr>
+            <tr><td>정밀화</td><td>RANSAC 자세에서 시작하는 <a class="gterm" href="../glossary.html#g-icp" title="용어집 보기">ICP</a> 점-대-면, 임계값 1.5 × 복셀(<code>:44-46</code>)</td></tr>
+            <tr><td>점수</td><td>ICP의 인라이어 적합도(와 인라이어 RMSE)</td></tr>
+            <tr><td>추출</td><td>독립 추출 50회, 적합도가 가장 높은 것을 유지(<code>NDRAW</code>). 병렬로 실행되는 것은 추출뿐이다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><code>global_reg.py:1-12</code>의 모듈 주석이 이 설계의 이유를 밝힌다. ICP는 국소적이어서 "B108에서
+      172도 뒤집힌 상태에 안착"했지만, 전역 특징 탐색은 부분 중첩과 알 수 없는 시작 자세를 다룬다. 추출은
+      <code>spawn</code> 프로세스 풀에서 실행된다(<code>ladder.py:64-86</code>). 점군은 추출마다가 아니라 작업자마다
+      한 번 전송되며(<code>:35-44</code>), Open3D가 "제한이 없으면 심하게 과다 할당하므로" 각 작업자는
+      <code>OMP_NUM_THREADS = 4</code>로 제한된다. 기본 작업자 수는 <code>cpu_count // 4</code>이고 1에서 50 사이다
+      (<code>:89-90</code>).</p>
+
+      <h3 id="recalage-qc">7.3 판정</h3>
+      <p><code>qc_tag</code>(<code>reg/pipeline.py:26-41</code>)는 기준 변환이 필요 없다. 다음 순서로 검사한다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>표지</th><th>조건</th><th>의미</th></tr></thead>
+          <tbody>
+            <tr><td><code>FLIP</code></td><td>자세의 회전 &gt; 90°</td><td>"한 사람의 머리에서는 불가능". 적합도가 잡아내지 못한 좌우 오류를 잡아내는 유일한 기준이라고 한다</td></tr>
+            <tr><td><code>FLAG</code></td><td>적합도 &lt; 0.75(<code>GATE</code>)</td><td>약한 중첩</td></tr>
+            <tr><td><code>SMALL</code></td><td>MRI 마스크 &lt; 11.21 cm³</td><td>정합 전 경고. 코드 주석은 모든 뒤집힘이 이 군에서 나왔다고 기록한다(46개 중 5개 대 172개 중 0개, Fisher p = 3.5e-04)</td></tr>
+            <tr><td><code>OK</code></td><td>위의 어느 것도 아님</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>주석은 이 설정과 수치를 "published"라고 부르며(<code>reg/pipeline.py:12</code>,
+      <code>:19</code>) 저장소에 없는 스크립트(<code>run_02_register_w48.py</code>, <code>snap_icp.py</code>)를
+      가리킨다. §13 참조.</p>
+
+      <h3 id="recalage-ladder">7.4 FLIP 복구 단계</h3>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1200 290" role="img" aria-label="복구 단계: 자세가 뒤집히면 0단계와 네 단계를 차례로 시도하며, 각 단계는 결과를 받아들일 수 있고, 어느 것도 받아들이지 못하면 플래그가 붙은 결과로 끝난다">
+          <rect class="d-box" x="10" y="30" width="160" height="70" rx="6"/>
+          <text class="d-label" x="90" y="55" text-anchor="middle">0 · 기본</text>
+          <text class="d-label-s" x="90" y="72" text-anchor="middle">추출 50회,</text>
+          <text class="d-label-s" x="90" y="86" text-anchor="middle">최고 적합도</text>
+
+          <path class="d-arrow" d="M170 65 H210"/>
+          <path class="d-arrow-head" d="M210 65 l-7 -4 v8 z"/>
+          <text class="d-label-xs" x="190" y="58" text-anchor="middle">FLIP</text>
+
+          <rect class="d-box" x="210" y="30" width="160" height="70" rx="6"/>
+          <text class="d-label" x="290" y="55" text-anchor="middle">1 · 추출 추가</text>
+          <text class="d-label-s" x="290" y="72" text-anchor="middle">+100회 추출,</text>
+          <text class="d-label-s" x="290" y="86" text-anchor="middle">뒤집히지 않은 최선</text>
+
+          <path class="d-arrow" d="M370 65 H410"/>
+          <path class="d-arrow-head" d="M410 65 l-7 -4 v8 z"/>
+          <text class="d-label-xs" x="390" y="58" text-anchor="middle">실패</text>
+
+          <rect class="d-box" x="410" y="30" width="160" height="70" rx="6"/>
+          <text class="d-label" x="490" y="55" text-anchor="middle">2 · 180° 회전</text>
+          <text class="d-label-s" x="490" y="72" text-anchor="middle">뒤집힌 자세를 x, y, z</text>
+          <text class="d-label-s" x="490" y="86" text-anchor="middle">축으로 돌림 + ICP</text>
+
+          <path class="d-arrow" d="M570 65 H610"/>
+          <path class="d-arrow-head" d="M610 65 l-7 -4 v8 z"/>
+          <text class="d-label-xs" x="590" y="58" text-anchor="middle">실패</text>
+
+          <rect class="d-box" x="610" y="30" width="160" height="70" rx="6"/>
+          <text class="d-label" x="690" y="55" text-anchor="middle">3 · 반대쪽</text>
+          <text class="d-label-s" x="690" y="72" text-anchor="middle">CBCT를 반대쪽으로</text>
+          <text class="d-label-s" x="690" y="86" text-anchor="middle">절단</text>
+
+          <path class="d-arrow" d="M770 65 H810"/>
+          <path class="d-arrow-head" d="M810 65 l-7 -4 v8 z"/>
+          <text class="d-label-xs" x="790" y="58" text-anchor="middle">실패</text>
+
+          <rect class="d-box" x="810" y="30" width="160" height="70" rx="6"/>
+          <text class="d-label" x="890" y="55" text-anchor="middle">4 · MRI 반전</text>
+          <text class="d-label-s" x="890" y="72" text-anchor="middle">마스크를 좌우 반전,</text>
+          <text class="d-label-s" x="890" y="86" text-anchor="middle">추출 50회</text>
+
+          <path class="d-arrow" d="M970 65 H1010"/>
+          <path class="d-arrow-head" d="M1010 65 l-7 -4 v8 z"/>
+          <text class="d-label-xs" x="990" y="58" text-anchor="middle">실패</text>
+
+          <rect class="d-box" x="1010" y="30" width="180" height="70" rx="6"/>
+          <text class="d-label" x="1100" y="55" text-anchor="middle">미해결</text>
+          <text class="d-label-s" x="1100" y="72" text-anchor="middle">0단계의 자세를</text>
+          <text class="d-label-s" x="1100" y="86" text-anchor="middle">_FLAGGED로 기록</text>
+
+          <path class="d-arrow" d="M90 100 V190"/>
+          <path class="d-arrow-head" d="M90 190 l-4 -7 h8 z"/>
+          <text class="d-label-xs" x="98" y="150" text-anchor="start">뒤집힘 아님</text>
+          <path class="d-arrow" d="M290 100 V190"/>
+          <path class="d-arrow-head" d="M290 190 l-4 -7 h8 z"/>
+          <text class="d-label-xs" x="298" y="150" text-anchor="start">통과</text>
+          <path class="d-arrow" d="M490 100 V190"/>
+          <path class="d-arrow-head" d="M490 190 l-4 -7 h8 z"/>
+          <text class="d-label-xs" x="498" y="150" text-anchor="start">통과</text>
+          <path class="d-arrow" d="M690 100 V190"/>
+          <path class="d-arrow-head" d="M690 190 l-4 -7 h8 z"/>
+          <text class="d-label-xs" x="698" y="150" text-anchor="start">통과</text>
+          <path class="d-arrow" d="M890 100 V190"/>
+          <path class="d-arrow-head" d="M890 190 l-4 -7 h8 z"/>
+          <text class="d-label-xs" x="898" y="150" text-anchor="start">통과</text>
+          <path class="d-arrow" d="M1100 100 V190"/>
+          <path class="d-arrow-head" d="M1100 190 l-4 -7 h8 z"/>
+
+          <rect class="d-box-a" x="10" y="190" width="1180" height="70" rx="6"/>
+          <text class="d-label" x="600" y="216" text-anchor="middle">결과 기록: 변환, 적합도, 회전, QC 표지, 해결한 단계</text>
+          <text class="d-label-s" x="600" y="234" text-anchor="middle">0단계는 적합도가 0.75 미만이어도 뒤집히지 않은 자세는 모두 받아들인다(표지 FLAG)</text>
+          <text class="d-label-s" x="600" y="248" text-anchor="middle">1~4단계는 뒤집히지 않았고 적합도가 0.75 이상인 자세를 받아들인다. 4단계는 _MIRRORED 접미사를 붙인다</text>
+        </svg>
+        <figcaption>복구 단계(<code>ladder.py:170-271</code>)는 0단계의 최선 자세가 FLIP일 때만 오른다.
+        "통과"는 FLIP이 아니고 적합도가 문턱 이상임을 뜻한다(<code>_passes</code>,
+        <code>:166-167</code>).</figcaption>
       </figure>
 
       <ol>
-        <li><code>segment_condyle</code> → 올바른 CBCT 절반에서 과두의 <span class="badge predit">예측</span> 마스크;</li>
-        <li><strong>CBCT 점</strong> = 마스크 복셀의 <span class="badge calcule">계산</span> 무게중심을 <a class="gterm" href="../glossary.html#g-ras" title="용어집 보기">RAS</a> 월드
-        좌표에 대응시킨 것(<code>cbct_half.affine</code> 사용);</li>
-        <li><strong>MRI 점</strong> = <code>world_center_of_mass</code>, MRI 전체에서 0이 아닌 복셀의
-        질량 중심, RAS 좌표;</li>
-        <li><strong>회전</strong> = <code>compute_rotation_correction</code>
-        (<code>approx_utils.py:38</code>): 두 영상 모두
-        <code>nib.as_closest_canonical</code>을 거치고, 각 아핀의 3×3 부분을 SVD로 직교화하여
-        (<code>U @ Vt</code>) <code>R_cbct @ R_mri.T</code>를 반환한다. 정준화를 다시 거친 뒤에는 좌표계가
-        이미 RAS에 가까우므로, 이 회전은 축에 정렬되지 않은 잔여분만
-        잡아낸다;</li>
-        <li><code>mri_point_rotated = R @ mri_point</code>;</li>
-        <li><code>first_approximation/points/&lt;id&gt;_approx_points.json</code> 기록: <code>patient_id</code>,
-        <code>side</code>, <code>cbct_point_ras</code>, <code>mri_point_rotated_ras</code>, <code>rotation_ras</code>, <code>mri_path</code>,
-        <code>cbct_path</code>.</li>
+        <li><strong>0단계, 기본 정합</strong>(<code>:205-216</code>): 추출 50회. 최선 자세가 FLIP이 아니면 결과를
+        그대로 받아들인다.</li>
+        <li><strong>추출 추가</strong>(<code>:221-227</code>): <code>EXTRA_DRAWS = 100</code>회를 더 추출하고, 150회
+        전체에서 통과하는 최선 자세를 유지한다.</li>
+        <li><strong>180° 회전</strong>(<code>:229-242</code>): 뒤집힌 자세에 세 축 각각에 대한 반 바퀴 회전을
+        (<code>rot180</code>, <code>:105-113</code>) MRI 표면의 무게중심 둘레로 합성하고, 각각을 점-대-면 ICP로 병렬
+        정밀화한다.</li>
+        <li><strong>반대쪽</strong>(<code>:244-254</code>), L 또는 R에만 해당: CBCT를 반대쪽 반구로 절단하고 추출
+        50회를 시도한다. "MRI의 좌우 표지가 틀렸을 수 있기" 때문이다. 통과하면 관절은 로그와 요약에서 다시
+        표시된다(<code>side L → R</code>).</li>
+        <li><strong>반전</strong>(<code>:256-267</code>): MRI 표면을 무게중심을 지나며 좌우 인덱스 축에 수직인
+        평면에 대해 반사하고(<code>mirror_matrix</code>, <code>:116-124</code>) 다시 정합한다. 반사는 보고되는
+        변환에 합성된다. 이는 "파일 자체의 좌우 손잡이성 오류를 바로잡으며, 잘못된 반전은 눈에 띄게 맞지 않는다".
+        <code>qc_tag</code>는 반사에서 회전을 읽어낼 수 없으므로 QC는 강체 부분에 대해 점수를 매긴다
+        (<code>:260-261</code>).</li>
+        <li><strong>미해결</strong>(<code>:269-271</code>): 결과는 접미사 <code>_FLAGGED</code>와 함께 기록된다.</li>
       </ol>
-
-      <p>그다음 <code>finalizeApproximation()</code>
-      (<code>Approx_MRI2CBCT.py:119</code>)이
-      <code>onProcessUpdate</code>에서 <code>module_name == "MRI2CBCT approximation"</code>일 때 호출된다
-      (<code>MRI2CBCT.py:2166</code>). 단일 점 기준점 두 개
-      (fixed = CBCT 점, moving = 회전된 MRI 점)를 Slicer의
-      <code>fiducialregistration</code> 모듈에 <code>transformType = "Translation"</code>으로 넘긴다. 4×4
-      RAS 행렬을 조립하고(3×3 블록 = JSON의 회전, 3열 =
-      평행이동), MRI 볼륨을 불러와 이 변환 아래에 두고,
-      <code>hardenTransform</code> 후 저장한다.</p>
-
-      <p>다시 말해 <strong>회전은 헤더에서, 평행이동은 과두 무게중심과 MRI 질량 중심을
-      짝지어 얻는다.</strong> 신경망은 CBCT 점을 제공하는 데만
-      쓰인다.</p>
-
-      <h3 id="approx-manuelle">8.2 수동 경로</h3>
-
-      <p><code>ManualApprox_MRI2CBCT.py</code>로, <code>injectUI</code>가 Approximate 섹션에
-      주입한다. <a href="../GreedyReg/GreedyReg.html">GreedyReg</a>에서 이식한 것으로, 전부 위젯 안에서 동작한다.</p>
-
-      <ul>
-        <li>슬라이더 6개: X/Y/Z 회전(−180…180°), X/Y/Z 평행이동(−200…200 mm).
-        <code>onManualTransformChanged</code>가 <code>vtkTransform</code>을 만든다: <code>Translate</code> 다음
-        <code>RotateX/Y/Z</code>. <code>vtkTransform</code>은 <strong>PreMultiply</strong>로 동작하므로 최종 행렬은
-        <code>T·Rx·Ry·Rz</code>다. 회전은 볼륨 중심이 아니라 <strong>RAS 좌표계의 원점을 중심으로</strong>
-        일어난다: 그래서 상류의 중심 맞춤 단계가
-        중요하다.</li>
-        <li>"Center MRI on CBCT"는 두
-        <code>GetRASBounds</code> 중심 사이의 차이를 평행이동에 더한다.</li>
-        <li>"Enable Interactive Tool"은 Slicer의 기본 핸들을 활성화한다. 평행이동과
-        회전은 허용되고 <strong>크기 조절은 꺼져 있다</strong>(<code>SetEditorScalingEnabled(False)</code>). 또한
-        Transforms 모듈의 <code>qMRMLTransformDisplayNodeWidget</code>을 표시한다.</li>
-        <li>"Confirm &amp; Save Alignment"는 MRI를 복제하고 변환을 굳힌 뒤(harden)
-        볼륨을 쓰고, 이어서 <code>.tfm</code>을 <strong>직접</strong> 쓴다.</li>
-      </ul>
-
-      <div class="callout bug">
-        <div class="callout-title">확인된 버그</div>
-        <p>볼륨이 씬에서 온 경우 "Confirm &amp; Save"가 크래시한다. <code>onConfirm</code>은
-        <code>os.path.basename(self._mri_path)</code>를 호출하는데, <code>_mri_path</code>는
-        <code>None</code>으로 초기화되기 때문이다. <code>qMRMLNodeComboBox</code>로 볼륨을 고르는 순간 그렇게 된다
-        (<code>ManualApprox_MRI2CBCT.py:247</code>). "Load from Folders Above"만 동작한다.</p>
-      </div>
-
-      <h3 id="approx-donne">8.3 근사가 정합에 넘겨주는 것</h3>
-
-      <p>형식적으로는 아무것도 없다. elastix에 전달되는 파라미터는 없다. 근사는 이미 이동된
-      <strong>MRI 볼륨</strong>을 만들어 내고, 정합 단계에서 운영자가 MRI 폴더로 지정해야 하는 것이
-      바로 이 볼륨이다. <code>.tfm</code>은 모듈이 다시 읽지 않는다.</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>경로</th><th>볼륨</th><th>변환</th><th><code>.tfm</code> 규약</th></tr></thead>
-          <tbody>
-            <tr><td>자동</td><td><code>&lt;mri_basename&gt;_approximate.nii.gz</code></td><td><code>&lt;patient_id&gt;_MRI_approximate.tfm</code></td><td><code>slicer.util.saveNode</code>(Slicer가 RAS→<a class="gterm" href="../glossary.html#g-lps" title="용어집 보기">LPS</a> 처리)</td></tr>
-            <tr><td>수동</td><td><code>&lt;mri_basename&gt;_approximate.nii.gz</code></td><td><code>&lt;mri_basename&gt;_approximate.tfm</code></td><td><code>flip @ M @ flip</code>, <code>flip = diag(-1,-1,1,1)</code>, <strong>역변환 없음</strong></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>규약도 같지 않고, 이름 규칙도 같지 않다(§12 참조).</p>
-
-      <div class="callout warn">
-        <div class="callout-title">함정</div>
-        <p>두 경로는 같은 폴더에 같은 볼륨 이름으로 쓰지만
-        <code>.tfm</code> 이름이 다르고, RAS/LPS 규약도 다르다: 자세한 내용은
-        §12.</p>
-      </div>
-
-      <h2 id="normalisation">9. 정규화</h2>
-
-      <p>4열 × 2행(MRI, CBCT) 표: <code>Normalization Min/Max</code>,
-      <code>Percentile Min/Max</code>. 기본값 세트는 두 가지다, <code>DefaultNorm</code>
-      (<code>MRI2CBCT.py:1157</code>):</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>프리셋</th><th>MRI <code>[min, max, p_low, p_high]</code></th><th>CBCT <code>[min, max, p_low, p_high]</code></th></tr></thead>
-          <tbody>
-            <tr><td><strong>Default 1</strong>(열 때 적용)</td><td><code>[0, 100, 0, 100]</code></td><td><code>[0, 75, 10, 95]</code></td></tr>
-            <tr><td><strong>Default 2</strong></td><td><code>[0, 100, 10, 95]</code></td><td><code>[0, 100, 10, 95]</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>두 역할은 구별된다
-      (<code>normalize_percentile.py</code>):</p>
-
-      <ul>
-        <li><strong>백분위수는 강도 창(window)을 정한다</strong>. <code>np.percentile</code>은
-        0이 아닌 복셀이 아니라 <strong>배경을 포함한 배열 전체</strong>에 대해 계산된다. 대부분
-        공기로 이루어진 CBCT에서는 <code>p10</code>이 배경에 떨어지고, <code>p95</code>는 가장
-        밀도 높은 구조를 잘라 낸다.</li>
-        <li><strong><code>min_norm</code> / <code>max_norm</code>은 출력 범위를 정한다</strong>:</li>
-      </ul>
-
-      <pre><code>normalized = np.clip((array - lo) / (hi - lo), 0, 1)
-scaled     = normalized * (max_norm - min_norm) + min_norm</code></pre>
-
-      <p><strong>Default 1</strong>에서 MRI는 백분위수 <code>[0, 100]</code>로 창이 정해진다: 즉 잘라 내기 없는
-      순수 min–max 정규화 후 <code>[0, 100]</code>으로 재조정된다. 반면 CBCT는
-      p10과 p95 사이로 창이 정해진 뒤 <code>[0, 75]</code>로 재조정되어, 의도적으로
-      MRI보다 낮다. <strong>Default 2</strong>에서는 두 모달리티가 같은 처리를
-      받는다.</p>
-
-      <p>코드에는 <strong>정규화 방법이 하나뿐이다</strong>. 알고리즘 선택은 없고,
-      모달리티마다 이 네 숫자만 있다. <code>CheckNormalization</code>
-      (<code>Reg_MRI2CBCT.py:54</code>)은 두 쌍 모두
-      <code>max &gt; min</code>인지만 검사한다. <code>normalize()</code>는 <code>.nii.gz</code> 파일만 처리하며(<code>.nii</code>는
-      조용히 건너뛴다) <code>&lt;name&gt;_percentile=[lo,hi]_norm=[min,max].nii.gz</code>를 쓴다.
-      파일 이름은 단계마다 길어지며, 대괄호와 쉼표도 들어간다.</p>
-
-      <h2 id="recalage">10. 정합</h2>
-
-      <p><code>MRI2CBCT_REG.py</code>는 6단계를 연결하며,
-      각 단계는 <code>folder_general</code> 아래 자체 하위 폴더를 가진다:</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>단계</th><th>출력</th></tr></thead>
-          <tbody>
-            <tr><td>1</td><td>MRI 강도 반전</td><td><code>a01_MRI_inv/</code></td></tr>
-            <tr><td>2</td><td>MRI 정규화</td><td><code>a2_MRI_inv_norm/percentile=[…]_norm=[…]/</code></td></tr>
-            <tr><td>3</td><td><strong>CBCT 분할</strong>로 MRI 마스킹</td><td><code>a3_MRI_inv_norm_mask/…</code></td></tr>
-            <tr><td>4</td><td>CBCT 정규화</td><td><code>b2_CBCT_norm/…</code></td></tr>
-            <tr><td>5</td><td>같은 분할로 CBCT 마스킹</td><td><code>b3_CBCT_norm_mask_l2/…</code></td></tr>
-            <tr><td>6</td><td>elastix</td><td><code>mri=inv+norm[…]+p[…]_cbct=norm[…]+p[…]+mask/</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <figure class="diagram">
-        <svg viewBox="0 0 1000 300" role="img" aria-label="정합의 여섯 단계: 같은 분할로 마스킹된 MRI와 CBCT 두 갈래가 elastix로 모인다">
-          <rect class="d-box" x="10" y="20" width="110" height="44" rx="6"/>
-          <text class="d-label" x="65" y="46" text-anchor="middle">원본 MRI</text>
-
-          <path class="d-arrow" d="M120 42 H150"/>
-          <path class="d-arrow-head" d="M150 42 l-7 -4 v8 z"/>
-
-          <rect class="d-box" x="150" y="20" width="120" height="44" rx="6"/>
-          <text class="d-label" x="210" y="38" text-anchor="middle">반전</text>
-          <text class="d-mono" x="210" y="52" text-anchor="middle">a01_MRI_inv</text>
-
-          <path class="d-arrow" d="M270 42 H300"/>
-          <path class="d-arrow-head" d="M300 42 l-7 -4 v8 z"/>
-
-          <rect class="d-box" x="300" y="20" width="140" height="44" rx="6"/>
-          <text class="d-label" x="370" y="38" text-anchor="middle">정규화</text>
-          <text class="d-mono" x="370" y="52" text-anchor="middle">a2_..._norm</text>
-
-          <path class="d-arrow" d="M440 42 H470"/>
-          <path class="d-arrow-head" d="M470 42 l-7 -4 v8 z"/>
-
-          <rect class="d-box" x="470" y="20" width="150" height="44" rx="6"/>
-          <text class="d-label" x="545" y="38" text-anchor="middle">마스킹(moving)</text>
-          <text class="d-mono" x="545" y="52" text-anchor="middle">a3_..._mask</text>
-
-          <rect class="d-box" x="10" y="185" width="110" height="44" rx="6"/>
-          <text class="d-label" x="65" y="211" text-anchor="middle">CBCT</text>
-
-          <path class="d-arrow" d="M120 207 H150"/>
-          <path class="d-arrow-head" d="M150 207 l-7 -4 v8 z"/>
-
-          <rect class="d-box" x="150" y="185" width="140" height="44" rx="6"/>
-          <text class="d-label" x="220" y="203" text-anchor="middle">정규화</text>
-          <text class="d-mono" x="220" y="217" text-anchor="middle">b2_CBCT_norm</text>
-
-          <path class="d-arrow" d="M290 207 H470"/>
-          <path class="d-arrow-head" d="M470 207 l-7 -4 v8 z"/>
-
-          <rect class="d-box" x="470" y="185" width="150" height="44" rx="6"/>
-          <text class="d-label" x="545" y="203" text-anchor="middle">마스킹(fixed)</text>
-          <text class="d-mono" x="545" y="217" text-anchor="middle">b3_..._mask_l2</text>
-
-          <rect class="d-box-n" x="470" y="105" width="150" height="40" rx="6"/>
-          <text class="d-label" x="545" y="127" text-anchor="middle">CBCT 분할</text>
-          <text class="d-label-s" x="545" y="140" text-anchor="middle">두 번 재사용</text>
-
-          <path class="d-arrow" d="M545 105 V64"/>
-          <path class="d-arrow-head" d="M545 64 l-4 7 h8 z"/>
-          <path class="d-arrow" d="M545 145 V185"/>
-          <path class="d-arrow-head" d="M545 185 l-4 -7 h8 z"/>
-
-          <path class="d-arrow" d="M620 42 L660 115"/>
-          <path class="d-arrow-head" d="M660 115 l-8 -3 l5 -7 z"/>
-          <path class="d-arrow" d="M620 207 L660 165"/>
-          <path class="d-arrow-head" d="M660 165 l-8 3 l1 -8 z"/>
-
-          <rect class="d-box-a" x="660" y="95" width="150" height="90" rx="6"/>
-          <text class="d-label" x="735" y="128" text-anchor="middle">elastix</text>
-          <text class="d-label-s" x="735" y="142" text-anchor="middle">강체, Mattes MI</text>
-          <text class="d-label-s" x="735" y="156" text-anchor="middle">fixed = CBCT</text>
-          <text class="d-label-s" x="735" y="170" text-anchor="middle">moving = MRI</text>
-
-          <path class="d-arrow" d="M810 140 H840"/>
-          <path class="d-arrow-head" d="M840 140 l-7 -4 v8 z"/>
-
-          <rect class="d-box-a" x="840" y="115" width="150" height="50" rx="6"/>
-          <text class="d-label" x="915" y="135" text-anchor="middle">출력</text>
-          <text class="d-label-s" x="915" y="150" text-anchor="middle">_reg.nii.gz + .tfm</text>
-        </svg>
-        <figcaption>§6의 CBCT 분할은 반전·정규화된 MRI(moving)와 정규화된 CBCT(fixed) 모두에
-        마스크로 두 번 쓰인다. 원본 CBCT는 elastix가 한 번도 읽지 않는다. <code>cbct_folder</code> 변수는
-        환자를 열거하는 데만 쓰인다.</figcaption>
-      </figure>
-
-      <p><strong>반전</strong>(<code>mri_inverse.py:19</code>):
-      <code>inverted = max_intensity − array</code>, 그다음 원래 0이던 복셀을 다시 0으로 되돌린다.
-      MRI에서 어둡던 뼈가 CBCT처럼 밝아져, 두 모달리티 사이의 강도 관계가
-      대략 단조가 된다. 접미사 <code>_inv</code>, <code>os.listdir</code>를 쓰므로
-      재귀적이지 않다.</p>
-
-      <p><strong>마스킹</strong>(<code>apply_mask.py</code>):
-      <strong>두</strong> 모달리티 모두 <strong>같은</strong> 파일, 즉 CBCT 분할
-      (<code>cbct_label2</code>)로 마스킹되며 <code>seg_label = 1</code>이다. 값 1이 있으면 분할은
-      <code>array == 1</code>로 이진화되고, 없으면 마스크를 그대로 쓴다. 크기가 다른
-      마스크는 최근접 이웃으로 영상 격자에 리샘플링된다. 이름에
-      <code>_CBCT</code>도 <code>_MR</code>도 없는 파일은 건너뛴다. <strong>결과는
-      <code>sitk.sitkInt16</code>으로 캐스팅된다</strong>. 부동소수점 정규화 값이 정수로
-      잘리므로, <code>[0, 75]</code>로 정규화된 CBCT에는 서로 다른 값이 76단계만 남는다.</p>
-
-      <div class="callout bug">
-        <div class="callout-title">확인된 버그(이후 수정됨, §14 참조)</div>
-        <p>자동 리샘플링이 추가되기 전에는 <code>apply_mask.py</code>에서 마스크와 영상의 크기 불일치가
-        크래시를 일으켰다: NA-MIC PW45 보고서 참조. 이 보고서는 위 설명 이후의
-        수정 사항 중 하나로 "fixed a mask size mismatch crash in apply_mask.py"를 든다.</p>
-      </div>
-
-      <p><strong>Elastix</strong>, <code>ElastixReg</code>
-      (<code>AREG_MRI.py:49</code>):</p>
-
-      <pre><code>elastix_object = itk.ElastixRegistrationMethod.New(fixed_image, moving_image)
-parameter_object.AddParameterMap(parameter_object.GetDefaultParameterMap("rigid"))
-parameter_object.SetParameter("ErodeMask", "true")
-parameter_object.SetParameter("WriteResultImage", "false")
-parameter_object.SetParameter("MaximumNumberOfIterations", "10000")
-parameter_object.SetParameter("NumberOfResolutions", "1")
-parameter_object.SetParameter("NumberOfSpatialSamples", "10000")</code></pre>
-
-      <p><strong>Fixed = 정규화·마스킹된 CBCT. Moving = 반전·정규화·마스킹된
-      MRI.</strong> 원본 CBCT는 한 번도 읽히지 않는다. <code>cbct_folder</code>는 환자를 열거하는 데만 쓰인다.</p>
-
-      <p>나머지는 모두 ITKElastix의 기본 <code>rigid</code> parameter map에서 오므로, 실제 알고리즘을
-      알려면 다른 곳을 읽어야 한다. 실효값:</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>파라미터</th><th>값</th><th>출처</th></tr></thead>
-          <tbody>
-            <tr><td><code>Transform</code></td><td><code>EulerTransform</code>(강체, 6 자유도)</td><td>기본값</td></tr>
-            <tr><td><code>Metric</code></td><td><strong><code>AdvancedMattesMutualInformation</code></strong></td><td>기본값</td></tr>
-            <tr><td><code>NumberOfHistogramBins</code></td><td>32(elastix 기본값, map에는 없음)</td><td>기본값</td></tr>
-            <tr><td><code>Optimizer</code></td><td><code>AdaptiveStochasticGradientDescent</code></td><td>기본값</td></tr>
-            <tr><td><code>ImageSampler</code></td><td><code>RandomCoordinate</code>, <code>NewSamplesEveryIteration = true</code></td><td>기본값</td></tr>
-            <tr><td><code>Registration</code></td><td><code>MultiResolutionRegistration</code>, <code>*SmoothingImagePyramid</code> 피라미드</td><td>기본값</td></tr>
-            <tr><td><code>NumberOfResolutions</code></td><td><strong>1</strong>(기본값 4)</td><td>재정의</td></tr>
-            <tr><td><code>MaximumNumberOfIterations</code></td><td><strong>10000</strong>(기본값 256)</td><td>재정의</td></tr>
-            <tr><td><code>NumberOfSpatialSamples</code></td><td><strong>10000</strong>(기본값 2048)</td><td>재정의</td></tr>
-            <tr><td><code>Interpolator</code> / <code>ResampleInterpolator</code></td><td><code>LinearInterpolator</code> / <code>FinalBSplineInterpolator</code> 3차</td><td>기본값</td></tr>
-            <tr><td><code>AutomaticParameterEstimation</code>, <code>AutomaticScalesEstimation</code></td><td><code>true</code></td><td>기본값</td></tr>
-            <tr><td><code>MaximumNumberOfSamplingAttempts</code></td><td>8</td><td>기본값</td></tr>
-          </tbody>
-        </table>
-      </div>
 
       <div class="callout ok">
         <div class="callout-title">확인됨</div>
-        <p>최종 정합은 실제로 Mattes 상호정보량, 단일 해상도, 반복 10,000회,
-        반복마다 새로 뽑는 무작위 표본 10,000개를 쓰는 강체 elastix이며, 초기 변환이 없다:
-        방법 논문의 기술과 일치한다.</p>
+        <p>정합은 MRI나 CBCT의 강도를 결코 보지 않는다. <code>MRI2CBCT_REGISTER</code>는 <code>register_joint</code>에
+        분할 파일 두 개만 넘긴다(<code>MRI2CBCT_REGISTER.py:70</code>). 영상은 나중에, 옮기거나 리샘플링하기 위해
+        읽는다(§8). 분할이 놓치거나 지어낸 것이 무엇이든 정합이 그대로 물려받는다. 이는 CBCT 분할이 마스크일
+        뿐이고 일치를 강도로 맞추던 이전 버전과 정반대다.</p>
       </div>
 
-      <p>정리하면 다중 모달 설정에서 예상할 수 있듯 <strong>Mattes 상호정보량</strong>,
-      단일 해상도, 반복 10,000회, 반복마다 새로 뽑는 무작위 표본 10,000개,
-      초기 변환 없음이다. <code>ErodeMask = "true"</code>는 효과가 없다.
-      <code>SetFixedMask</code> / <code>SetMovingMask</code>가 한 번도 호출되지 않기 때문이다. 마스킹은 이미
-      상류에서 복셀을 0으로 만들어 처리했다.</p>
+      <h2 id="sortie">8. 출력, 그리고 그것이 놓인 좌표계</h2>
 
-      <p><code>MatrixRetrieval</code>은 <code>sitk.Euler3DTransform</code>을 6개의
-      <code>TransformParameters</code>(각도 3개, 평행이동 3개)로 재구성한다. <code>ComputeFinalMatrix</code>는
-      여기서는 원소가 하나뿐인 리스트를 다시 합성하므로 아무 효과가 없다.</p>
+      <p>모든 것은 ASO로 방향 정렬된 좌표계가 아니라 <strong>원래 CBCT의 좌표계</strong>로 기록된다.
+      <code>T = inv(T_aso) @ T_register</code>(<code>MRI2CBCT_REGISTER.py:93</code>). 환자마다
+      <code>&lt;output&gt;/&lt;PID&gt;/</code>에(<code>:4-8</code>, <code>:34-36</code>):</p>
 
-      <div class="callout bug">
-        <div class="callout-title">확인된 버그</div>
-        <p><code>MatrixRetrieval</code>은 <code>TransformParameters</code>를 읽지만, elastix 출력 parameter map에
-        분명히 들어 있는 <code>CenterOfRotationPoint</code>는 무시한다.
-        따라서 재구성된 <code>sitk.Euler3DTransform</code>은 원점을 중심으로 회전한다.
-        기록되고 적용되는 변환이 elastix가 실제로 추정한 변환과 일치하는 것은
-        이 회전 중심이 원점에 있을 때뿐이며, 이는
-        보장되지 않는다. 코드는
-        <code>AREG_CBCT/AREG_CBCT_utils/utils.py:830</code>에서 그대로 복사한 것이어서, 이 문제는
-        AREG_CBCT에도 있다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>내용</th></tr></thead>
+          <tbody>
+            <tr><td><code>&lt;PID&gt;_&lt;S&gt;_MRI_REG&lt;TAG&gt;.nii.gz</code></td><td>CBCT에 정합된 MRI</td></tr>
+            <tr><td><code>&lt;PID&gt;_&lt;S&gt;_MRI_MASK&lt;TAG&gt;.nii.gz</code></td><td>정합된 Dataset516 두개저</td></tr>
+            <tr><td><code>&lt;PID&gt;_&lt;S&gt;_MRI_transform&lt;TAG&gt;.tfm</code></td><td>변환, MRI → CBCT</td></tr>
+            <tr><td><code>&lt;PID&gt;_CBCT_MASK.nii.gz</code></td><td>환자마다 한 번: 원래 CBCT로 되돌린 AMASSS 두개저</td></tr>
+            <tr><td><code>summary.csv</code></td><td>관절마다 한 행: <code>patient, side, status, qc, tag, fitness, rotation_deg, mask_cm3, resolved_by, ladder, note</code>(<code>:30-31</code>)</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <p><strong>적용</strong>(<code>AREG_MRI.py:231</code>):</p>
+      <p><code>TAG</code>는 비어 있거나 <code>_MIRRORED</code> 또는 <code>_FLAGGED</code>다(<code>:92</code>).</p>
 
-      <pre><code>transformed_mri = sitk.Resample(original_mri_sitk, original_mri_sitk,
-                                transform, sitk.sitkLinear, 0.0, ...)</code></pre>
+      <ul>
+        <li><strong>헤더 이동 또는 리샘플링.</strong> 기본값(<code>on_cbct_grid</code> 꺼짐)에서는 볼륨이 MRI 자신의
+        복셀을 유지하고 원점과 방향만 다시 쓰인다(<code>move_header</code>,
+        <code>frames.py:53-68</code>). 아무것도 보간되지 않으며, MRI는 "헤더를 읽는 어떤 뷰어에서든 CBCT 위에
+        열린다". 반전된 결과도 마찬가지다(반사는 왼손 좌표계의 방향 행렬을 주며, NIfTI가 이를 저장한다). 옵션을
+        켜면 볼륨이 CBCT 격자로 리샘플링된다(MRI는 선형, 마스크는 최근접 이웃, <code>frames.py:71-79</code>).</li>
+        <li><strong><code>.tfm</code>.</strong> ITK는 리샘플링 방향, 즉 고정 → 이동을 LPS로 저장한다.
+        <code>to_itk_resampling</code>(<code>frames.py:39-46</code>)은 <code>L @ inv(T) @ L</code>을 적용한다.
+        여기서 <code>L = diag(-1, -1, 1)</code>이다. <em>원본</em> MRI를 Slicer에 불러와 이 변환을 주면 전체 해상도로
+        같은 결과가 재현된다.</li>
+        <li><strong>좌우 재표시.</strong> 복구 단계가 관절을 반대쪽으로 옮겼다면 파일은 새 쪽의 이름을 받는다. 다만
+        그 쪽에 이미 환자의 관절이 있으면 원래 이름을 유지하고 비고가 그렇다고 적는다(<code>:82-91</code>).</li>
+        <li><strong>실패도 행이다.</strong> CBCT 표면이나 ASO 변환을 읽을 수 없는 환자는 관절마다 <code>failed</code>
+        행을 얻고(<code>:52-56</code>), 예외를 일으킨 관절도 마찬가지다(<code>:73-78</code>). 나머지는 계속
+        진행한다.</li>
+      </ul>
 
-      <p>변환은 마스킹된 MRI가 아니라 <strong>원본 MRI</strong>에 적용되며, 기준
-      기하는 CBCT가 아니라 <strong>MRI의 것</strong>이다. 출력 볼륨은 MRI 격자에
-      남고, 이동 후 원래 시야 밖으로 나간 부분은 잃는다.</p>
+      <h2 id="interface">9. 패널</h2>
 
-      <p>출력은 <code>mri=…_cbct=…</code> 폴더에 저장된다: <code>&lt;original_MRI_name&gt;_reg.nii.gz</code>와
-      <code>&lt;original_MRI_name&gt;_reg_transform.tfm</code>(ITK 변환, LPS, SimpleITK로 바로
-      읽을 수 있음). "Keep the temporary folder"(임시 폴더 유지)가 체크되어 있지 않으면 중간 폴더 5개와
-      그 상위 폴더가 CLI 끝에서 삭제된다.</p>
+      <p><code>MRI2CBCTWidget</code>. 위에서 아래로:</p>
 
-      <h2 id="predit-calcule">11. 예측되는 것과 계산되는 것</h2>
+      <ul>
+        <li><strong>처음 한 번의 설정</strong>(<code>MRI2CBCT.py:529</code>, <code>:544</code>): 모든 것이 갖춰질 때까지
+        "One-time setup needed (packages and models, about 5 GB)"라고 적힌 줄과 버튼이 있으며, Run도 이를 수행한다.
+        <code>quick_status</code>는 설치된 패키지와 다운로드 표지만 보고, torch를 import하거나 GPU를 조회하지 않는다
+        (<code>:529-542</code>). PyTorch를 설치하거나 교체해야 했다면 패널은 Slicer 재시작을 요청하고 멈춘다
+        (<code>:576-581</code>).</li>
+        <li><strong>입력</strong>: MRI, CBCT, 출력 폴더, 그리고 <strong>Use test files</strong>
+        (<code>onTestFiles</code>, <code>:274</code>). 샘플 환자(CBCT 하나, MRI 둘)를
+        <code>SlicerDownloads/MRI2CBCT/TestFiles</code>에 내려받고, 세 폴더를 채우며(출력은 그 옆의
+        <code>TestFiles_output</code>, <code>:286</code>), 기대 결과인 <code>reference/</code>를 가리킨다
+        (<code>env.py:26-30</code>).</li>
+        <li><strong>옵션</strong>: 0.3 mm로 리샘플링(켜짐), 좌우 분리(켜짐)와 획득 슬라이스 간격(3.0 mm, 범위 0.5~10,
+        분리할 때만 활성화). <strong>고급</strong>은 접혀 있으며, fold 5개 전체 또는 1개("GPU가 없는 컴퓨터용"),
+        정합된 MRI를 CBCT 격자에 올리기(꺼짐), <code>_steps</code> 폴더 보관(꺼짐), 정합 작업자 수(0 = 자동).</li>
+        <li><strong>검토</strong>: "Pause during the run to check the results"와 단계마다 체크박스 하나
+        (<code>plan.REVIEW_STEPS</code>, <code>plan.py:17-28</code>): MRI 관절과 좌우, 방향 정렬된 CBCT, CBCT 두개저,
+        MRI 두개저, 정합. 선택은 <code>QSettings</code>에 기억된다. 멈추면 패널이 영상을 불러오고 그 위에 마스크를
+        윤곽선으로 그려 4분할 레이아웃에 보여 주며, 환자 또는 관절마다 항목 하나, 이전 / 다음이 있다
+        (<code>MRI2CBCT.py:628-715</code>). 첫 번째 멈춤에는 <strong>Swap left / right for this patient</strong>
+        (<code>swap_sides</code>, <code>:717-736</code>)도 있어, 관절 파일의 이름을 바꾸고 매니페스트를 수정한다.
+        볼륨 전체 MRI(B)는 바꿀 것이 없다. 끝에서는 메시지가 관절마다 판정을 나열한다
+        (<code>_finish</code>, <code>:442-458</code>).</li>
+      </ul>
+
+      <h2 id="predit-calcule">10. 예측되는 것과 계산되는 것</h2>
 
       <div class="table-wrap">
         <table>
           <thead><tr><th>블록</th><th>성격</th><th>위치</th></tr></thead>
           <tbody>
-            <tr><td>MRI 방향 정렬 / 중심 맞춤</td><td><span class="badge calcule">계산</span> 헤더 재작성, 행렬은 수동 선택</td><td>CLI</td></tr>
-            <tr><td>L/R 자르기, 리샘플링</td><td><span class="badge calcule">계산</span> 중앙 인덱스, <code>sitk.ResampleImageFilter</code></td><td>CLI</td></tr>
-            <tr><td>측면 판별, 절반 분할</td><td><span class="badge calcule">계산</span> 월드 좌표에서 질량 중심 비교</td><td>CLI</td></tr>
-            <tr><td>과두 분할</td><td><span class="badge predit">예측</span> nnU-Net v2 <code>3d_fullres</code> ResEnc XL 신경망</td><td><code>nnUNetv2_predict</code> 서브프로세스</td></tr>
-            <tr><td>CBCT 점, 400³ TMJ 상자</td><td><span class="badge calcule">계산</span> 예측 마스크의 무게중심</td><td>CLI</td></tr>
-            <tr><td>MRI 점, 회전</td><td><span class="badge calcule">계산</span> 질량 중심 + 아핀의 SVD</td><td>CLI</td></tr>
-            <tr><td>근사 평행이동</td><td><span class="badge calcule">계산</span> Slicer의 <code>fiducialregistration</code>, 점 1개</td><td>위젯</td></tr>
-            <tr><td>수동 근사</td><td><span class="badge neutral">운영자</span> 슬라이더 / 핸들</td><td>위젯</td></tr>
-            <tr><td>반전, 정규화, 마스킹</td><td><span class="badge calcule">계산</span> numpy / SimpleITK</td><td>CLI</td></tr>
-            <tr><td>정합</td><td><span class="badge calcule">계산</span> 강체 elastix, Mattes MI</td><td>CLI</td></tr>
+            <tr><td>짝짓기, 헤더에서 좌우 판별, 좌우 분리, 0.3 mm 리샘플링</td><td><span class="badge calcule">계산됨</span> 파일 이름, 헤더 기하, SimpleITK</td><td>PREPARE</td></tr>
+            <tr><td>CBCT 중심 맞추기</td><td><span class="badge calcule">계산됨</span> 영상 중심으로의 평행이동</td><td>PRE_ASO_CBCT</td></tr>
+            <tr><td>랜드마크 일곱 개</td><td><span class="badge predit">예측</span> ALI 랜드마크 모델, 랜드마크마다 하나</td><td>ALI_CBCT</td></tr>
+            <tr><td>프랑크푸르트 / 정중시상 방향 정렬</td><td><span class="badge calcule">계산됨</span> 랜드마크에서 기준으로 가는 변환</td><td>SEMI_ASO_CBCT</td></tr>
+            <tr><td>CBCT의 두개저</td><td><span class="badge predit">예측</span> AMASSS, 구조 <code>CB</code></td><td>AMASSS_CLI</td></tr>
+            <tr><td>MRI의 두개저</td><td><span class="badge predit">예측</span> nnU-Net Dataset516, fold 5개 또는 1개</td><td>SEGMENT_MRI</td></tr>
+            <tr><td>표면, 측면 절단, FPFH, RANSAC, ICP</td><td><span class="badge calcule">계산됨</span> numpy, SciPy, Open3D</td><td>REGISTER</td></tr>
+            <tr><td>QC 표지, FLIP 복구 단계</td><td><span class="badge calcule">계산됨</span> 회전각, 적합도, 마스크 부피</td><td>REGISTER</td></tr>
+            <tr><td>볼륨 이동, <code>.tfm</code></td><td><span class="badge calcule">계산됨</span> 헤더 재작성 또는 리샘플링</td><td>REGISTER</td></tr>
+            <tr><td>좌우 교환, 멈춤</td><td><span class="badge neutral">조작자</span> 임상의의 선택</td><td>패널</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>실행 시점에 학습은 일어나지 않는다. 유일한 신경망은 사전 학습된 것이며
-      해부학적 기준점 검출기로 쓰인다.</p>
+      <p>실행 중에 학습되는 것은 없다. 세 신경망(ALI의 랜드마크 모델, AMASSS, Dataset516)은 사전 학습되어 있으며,
+      그것들이 만들어 내는 것이 정합의 기반이다.</p>
 
-      <h2 id="pieges">12. 함정과 취약 지점</h2>
+      <h2 id="pieges">11. 함정과 취약 지점</h2>
 
-      <div class="callout bug">
-        <div class="callout-title">확인된 버그</div>
-        <p><strong><code>install_function()</code>은 항상 실패한다.</strong> 의존성 목록
-        (<code>MRI2CBCT.py:96</code>)에 <code>('nnunet_version', "==2.8.0")</code>이 들어 있는데,
-        이런 패키지는 PyPI에 없다(<a href="../AMASSS/AMASSS.html">AMASSS</a>는 올바르게 <code>('nnunetv2','2.8.0')</code>으로 선언한다).
-        따라서 <code>check_lib_installed</code>는 항상 <code>False</code>를 반환한다. 동작할 때마다 설치 대화상자가 뜨고,
-        <code>pip_install</code>이 예외를 던지고, <code>errorDisplay</code>가 뜨고, <code>False</code>가 반환된다:
-        <strong>호출하는 쪽 모두가 이 값을 무시하므로</strong> 동작은 그대로 진행된다.</p>
-      </div>
-
-      <div class="callout bug">
-        <div class="callout-title">확인된 버그</div>
-        <p><strong>elastix의 회전 중심이 사라진다.</strong> <code>MatrixRetrieval</code>은
-        <code>TransformParameters</code>는 읽지만, 출력 parameter map에 함께 들어 있는
-        <code>CenterOfRotationPoint</code>는 읽지 않는다. 따라서 재구성된 <code>sitk.Euler3DTransform</code>은
-        원점을 중심으로 회전한다. 기록되고 적용되는 변환이 elastix가 추정한 변환과 일치하는 것은
-        그 중심이 원점에 있을 때뿐이다. 코드는
-        <code>AREG_CBCT/AREG_CBCT_utils/utils.py:830</code>에서
-        그대로 복사한 것이어서 문제도 공유된다.</p>
+      <div class="callout warn">
+        <div class="callout-title">함정</div>
+        <p><strong>약한 정합도 깔끔한 파일 이름을 유지한다.</strong> 복구 단계는 FLIP일 때만 시작된다
+        (<code>ladder.py:215</code>). 뒤집히지는 않았지만 적합도가 0.75 미만인 자세는 그대로 받아들여져
+        <code>FLAG</code>라는 표지가 <code>qc</code>에 붙고 접미사 <strong>없이</strong> 기록된다. <code>_FLAGGED</code>
+        이름은 미해결 뒤집힘에만 쓰이기 때문이다(<code>MRI2CBCT_REGISTER.py:92</code>,
+        <code>ladder.py:270</code>). <code>summary.csv</code>와 실행 끝의
+        메시지만 <code>FLAG</code>라고 말해 준다.</p>
       </div>
 
       <div class="callout warn">
         <div class="callout-title">함정</div>
-        <p><strong>같은 단계에 <code>.tfm</code> 규약이 두 가지다.</strong> 수동 근사는
-        역변환 없이 <code>flip @ M @ flip</code>을 쓴다
-        (<code>ManualApprox_MRI2CBCT.py:472</code>).
-        반면 <a href="../FlexReg/FlexReg.html">FlexReg</a>는 같은 변환에 <code>inv(flip @ M @ flip)</code>을 쓴다: ITK
-        규약은 fixed → moving이기 때문이다. 자동 경로는
-        올바른 규약을 적용하는 <code>slicer.util.saveNode</code>를 거친다.</p>
-      </div>
-
-      <div class="callout bug">
-        <div class="callout-title">확인된 버그</div>
-        <p><strong>볼륨이 씬에서 온 경우 "Confirm &amp; Save"가 크래시한다</strong>: <code>onConfirm</code>은
-        <code>os.path.basename(self._mri_path)</code>를 호출하는데, <code>_mri_path</code>는 <code>None</code>으로 초기화되어 있다.
-        <code>qMRMLNodeComboBox</code>로 볼륨을 고르는 순간 그렇게 된다
-        (<code>ManualApprox_MRI2CBCT.py:247</code>).
-        "Load from Folders Above"만 동작한다.</p>
-      </div>
-
-      <div class="callout bug">
-        <div class="callout-title">확인된 버그</div>
-        <p><strong>리샘플링의 오류 처리기도 크래시한다</strong>:
-        <code>logger.warning(e, file=sys.stderr)</code>
-        (<code>resample.py:240</code>),
-        <code>Logger.warning</code>은 <code>file=</code>을 받지 않으므로, 잡힌 예외가 잡히지 않는
-        <code>TypeError</code>로 바뀐다.</p>
-      </div>
-
-      <div class="callout bug">
-        <div class="callout-title">확인된 버그</div>
-        <p><strong>T1 없이 T2만 있으면 리샘플링이 깨진다</strong>: <code>mri_output_folder</code> / <code>cbct_output_folder</code>가
-        T1 분기에서만 정의된다
-        (<code>MRI2CBCT_RESAMPLE_CBCT_MRI.py:157</code>) → <code>NameError</code>.</p>
+        <p><strong>미해결 뒤집힘은 최선이 아니라 첫 번째 자세를 기록한다.</strong> docstring은 "최선의 결과가 _FLAGGED
+        접미사와 함께 기록된다"(<code>ladder.py:14</code>)고 하지만, 코드는 <code>flipped</code>, 곧 0단계의 추출 50회
+        중 최선(<code>:218</code>, <code>:271</code>)을 기록하며, 1단계가 모은 150회 중 적합도가 가장 높은 뒤집힘이
+        아니다.</p>
       </div>
 
       <div class="callout warn">
         <div class="callout-title">함정</div>
-        <p><strong><code>_T1</code>/<code>_T2</code> 접미사가 하드코딩되어 있다.</strong> <code>extract_patient_id</code>
-        (<code>TMJ_crop.py:24</code>)와 <code>GetPatients</code>
-        (<code>utils_CBCT.py:41</code>)에서다. <code>_T3</code>이 있으면
-        짝짓기가 깨진다. AREG_CBCT와 공통된 사항이다.</p>
+        <p><strong>좌우는 헤더가 슬래브를 놓은 위치에서 정해진다.</strong> 관절 하나짜리 MRI는 세계 x가 LPS에서
+        양수이면 LEFT라고 판정된다(<code>mri_prep.py:64-66</code>). 이 규칙은 연구실 자신의 슬래브로 검증되었다
+        (<code>:5-7</code>). 헤더가 환자를 x = 0 근처에 두지 않는 파일은 아무 메시지 없이 잘못된 쪽을 얻는다.
+        두 가지 안전망이 이를 잡는다. 첫 번째 멈춤의 교환 버튼, 그리고 복구 단계의 3단계(단, 자세가 뒤집힌 뒤에만)다.</p>
       </div>
 
       <div class="callout warn">
         <div class="callout-title">함정</div>
-        <p><strong>좌우가 의도적으로 뒤바뀌어 있다</strong>(<code>crop_cbct</code>). 이유는 밝혀지지
-        않았다(<code>TODO</code>). 하류 전체(리샘플링 시 미러링, 측면
-        판별)가 이 이름에 의존한다.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">함정</div>
-        <p><strong>방향 정렬의 origin 순열은 기본 행렬에 맞춰
-        작성되어 있다</strong>. 표에서 다른 direction을 고르면 볼륨의 중심이 어긋난다.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">함정</div>
-        <p><strong>리샘플링 시 하위 폴더 평탄화</strong>: 같은 이름의 파일이 아무 메시지 없이
-        덮어써진다.</p>
+        <p><strong>입력 폴더 안의 출력 폴더는 다시 읽힌다.</strong> <code>list_images</code>는 폴더를 재귀적으로
+        훑으며(<code>pairing.py:41-47</code>) 이름이 ID로 시작하는 <code>.nii.gz</code>는 모두 가져간다. MRI나 CBCT
+        폴더 아래에 있는 이전 실행의 결과(<code>P01/P01_L_MRI_REG.nii.gz</code>,
+        <code>P01_CBCT_MASK.nii.gz</code>)가 다음 실행에 끼어들 것이다. 같은 ID에 두 번째 CBCT가 생기면 환자
+        전체가 "제외"된다(<code>pairing.py:111-113</code>). 코드를 읽어 안 것이며 실행해 본 것은 아니다.</p>
       </div>
 
       <div class="callout">
         <div class="callout-title">참고</div>
-        <p>TMJ 자르기에서는 <strong>진행 표시줄</strong>이 동작하지 않는 것으로 표시되어 있다
-        (<code>labelBarNotWorking</code>).</p>
+        <p><strong>성공한 실행 뒤에는 로그 파일이 남지 않는다.</strong> 패널은 <code>_steps/run.log</code>에 이어
+        쓰는데(<code>MRI2CBCT.py:313</code>), <code>MRI2CBCT_PREPARE</code>가 시작할 때 <code>_steps</code>를
+        지우므로(<code>:23-24</code>) 그 전에 쓴 첫 줄들은 사라지고, "Keep the intermediate files"를 체크하지 않으면
+        패널이 성공한 실행 뒤에 다시 지운다(<code>:455-457</code>).</p>
       </div>
 
-      <h3 id="pieges-mort">사용되지 않는 코드</h3>
+      <div class="callout">
+        <div class="callout-title">참고</div>
+        <p><strong>연결 성분 정리는 MRI 쪽에만 적용된다.</strong> <code>mri_surface</code>는 가장 큰 성분을 남기지만
+        (<code>ladder.py:138</code>), <code>cbct_surface</code>는 그러지 않는다(<code>:150-157</code>).
+        <code>surface.py:35-41</code>은 정합 전에 이 필터를 필수라고 부르는데도 그렇다. AMASSS 마스크에 떨어져
+        나온 섬이 실제로 문제가 되는지는 측정되지 않았다.</p>
+      </div>
+
+      <h3 id="pieges-mort">죽은 코드와 잔재</h3>
 
       <ul>
-        <li><code>run_script_get_transformation</code>과 <code>run_script_crop_volumes</code>
-        (<code>MRI2CBCT_APPROX.py:63</code>)는
-        한 번도 호출되지 않는다. <code>main()</code>은 첫 단계만 실행하며, XML 파라미터
-        <code>mean_folder</code> / <code>ROI_file</code>은 주석 처리되어 있다. 그런데 import 문
-        <code>from MRI2CBCT_CLI_utils import approximation, get_transformation, crop_volume</code>은
-        남아 있어 <code>crop_approximation</code>을, 따라서 <code>torch</code>, <code>sklearn</code>,
-        <code>torchreg</code>를 강제로 불러온다: <code>__init__</code>의 지연 import가 피하려던 바로
-        그것이다.</li>
-        <li><code>crop_approximation.py</code>
-        (359줄)와 <code>nmi.py</code>(155줄)는
-        <strong>예전</strong> 근사 방식이다. 미분 가능한 가우시안 NMI
-        로 구동되는 강체 <code>torchreg.AffineRegistration</code>(스케일
-        <code>(4,2)</code>, 반복 <code>(100,30)</code>, Adam)이며, NMI는
-        <code>nbins=64</code>를 쓰고, <code>ParameterSampler</code>로 40회 추출하는 하이퍼파라미터 탐색을 한다
-        (<code>learning_rate ∈ logspace(-5,-3,10)</code>, <code>sigma ∈ logspace(-2,-1,4)</code>). 커밋 <code>2e79862</code>에서
-        과두 + 기준점 경로로 대체되었다. 호출하는 곳은 남아 있지 않다.</li>
-        <li><code>utils_CBCT.py</code> 전체: 한 번도 호출되지 않는
-        <code>NumberScan()</code>을 통해서만 도달할 수 있다. <code>getGPUUsage()</code>, <code>getModelUrl()</code>
-        (<code>{"MeanCBCT": "xxx", "ROI": "xxx"}</code>을 반환), <code>TestScanDCM</code>, <code>getTestFileListDCM</code>도 마찬가지다.</li>
-        <li><code>MRI2CBCTLogic.process()</code>와 <code>MRI2CBCTTest</code>: Slicer 템플릿의 임계값 처리
-        상용구 코드로, 모듈과 무관하다.</li>
-        <li><code>predict_entry_point</code>는
-        <code>MRI2CBCT_TMJ_CROP.py:5</code> 첫머리에서 import되지만
-        쓰이지 않는다: 그런데도 예측이 서브프로세스로 실행됨에도 Slicer 안에서
-        <code>nnunetv2</code>를 import할 수 있어야 한다.</li>
-        <li><code>run_resample</code>은 두 군데에 있다:
-        <code>resample.py:243</code>과,
-        <code>MRI2CBCT_RESAMPLE_CBCT_MRI.py:32</code>의 복사본.
-        실제로 쓰이는 것은 로컬 복사본이다.</li>
-        <li><code>downloadModel()</code>은 docstring에서 <code>getModelUrl</code>을 쓴다고 주장하지만, 실제로는
-        네 개의 "Test File" 버튼을 위해 하드코딩된 <code>TestFile.zip</code>을 내려받는다.</li>
+        <li><code>plan.missing_models</code>(<code>plan.py:42-54</code>)는 한 번도 호출되지 않는다. 패널은 무엇이
+        빠졌는지를 대신 <code>requirements.downloads_plan</code>과 다운로드 표지로 판단한다.</li>
+        <li><code>reg.pipeline.register_joint</code>와 <code>cbct_surface</code>(<code>reg/pipeline.py:44-118</code>),
+        그리고 <code>reg/itk_io.py</code> 전체는 <code>reg/__init__.py</code>가 내보내지만 아무도 호출하지 않는다.
+        복구 단계에는 자체 <code>register_joint</code>가 있고 <code>frames.py</code>는 RAS에서 ITK로의 변환을
+        반복한다. <code>reg/__init__.py:2</code>는 트리에 없는 <code>../REGISTRATION.md</code>도 가리킨다.</li>
+        <li><code>global_reg.register</code>는 쓰지 않는 <code>seed</code> 인자를 받는다(<code>:27</code>).</li>
+        <li><code>env.DATASET516</code>(<code>env.py:98</code>)은 "이전 이전에 작성된 코드를 위해" 남겨져 있지만 읽는 곳이
+        없다.</li>
+        <li><a href="../ADTLib/ADTLib.html">ADTLib</a>에서: <code>MRI2CBCT_TEST_FILES</code>와
+        <code>TMJ_CROP_MODEL</code>(<code>model_registry.py</code>)은 아무것도 참조하지 않으며,
+        <code>TMJ_CROP_MARKERS</code>(<code>naming.py:74</code>)는 <code>Testing/Python/test_naming.py</code>만
+        참조한다.</li>
       </ul>
 
-      <h2 id="environnement">13. 실행 환경</h2>
+      <div class="callout note">
+        <div class="callout-title">이전 페이지의 발견, 철회됨</div>
+        <p>이전 버전의 확인된 버그와 함정은 이제 존재하지 않는 코드에 관한 것이었다. <code>CenterOfRotationPoint</code>가
+        <code>MatrixRetrieval</code>에서 사라진 것(<a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a>와 공유하며
+        그쪽에는 남아 있다), 장면 볼륨에서 수동 근사가 죽던 것, 리샘플링의 깨진 오류 처리기와 T1 없는 T2의
+        충돌, 좌우 자르기에서 좌우 이름이 뒤바뀌던 것, 방향 정렬 단계의 원점 순열, 두 가지 <code>.tfm</code> 규약,
+        존재하지 않는 pip 이름 <code>nnunet_version==2.8.0</code>, TMJ 자르기의 하드코딩된 <code>_T1</code>과
+        <code>_T2</code> 접미사. 리샘플링 CLI는 이번 재작성에서 건드려지지 않았으며, 결함이 남아 있다면 그것을
+        호출하는 AREG_IOSCBCT와 VFACE의 몫이다. 여기서는 다시 확인하지 않았다.</p>
+      </div>
+
+      <h2 id="environnement">12. 실행 환경</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>항목</th><th>값</th></tr></thead>
+          <thead><tr><th>요소</th><th>값</th></tr></thead>
           <tbody>
-            <tr><td>인터프리터</td><td>모든 곳에서 Slicer의 Python(<code>slicer.cli.run</code>, <code>#!/usr/bin/env python-real</code>)</td></tr>
+            <tr><td>인터프리터</td><td>어디서나 Slicer의 Python. 세 CLI는 <code>#!/usr/bin/env python-real</code>을 쓴다</td></tr>
             <tr><td>Conda</td><td>없음</td></tr>
-            <tr><td>GPU</td><td>선택 사항, nnU-Net에서 CPU로 자동 대체(<code>condyle_segmentation.py:55</code>)</td></tr>
-            <tr><td>torch</td><td><code>2.2.0</code>, 인덱스 <code>download.pytorch.org/whl/cu118</code> (<code>MRI2CBCT.py:117</code>)</td></tr>
-            <tr><td>numpy</td><td><strong>1.26.4</strong>로 고정. <code>numexpr==2.9.0</code></td></tr>
-            <tr><td>pydicom</td><td><strong>3.0.2</strong>로 고정: 다운그레이드하면 <code>dicomweb-client</code>, <code>highdicom</code>과 Slicer의 모든 DICOM 모듈이 깨진다(<code>MRI2CBCT.py:83</code>)</td></tr>
-            <tr><td>dicom2nifti</td><td><code>2.6.2</code></td></tr>
-            <tr><td>정합</td><td><code>itk-elastix</code>(Slicer 5.12에서 0.19.2)</td></tr>
-            <tr><td>기타</td><td><code>einops</code>, <code>nibabel</code>, <code>pandas</code>, <code>scikit-learn</code>, <code>torchreg</code>, <code>SimpleITK</code>, <code>psutil</code></td></tr>
-            <tr><td>nnU-Net</td><td><strong>SlicerNNUNet</strong> 확장을 통해 제공된다고 가정. pip 항목은 잘못되어 있다(§12)</td></tr>
+            <tr><td>GPU</td><td>MRI 신경망에는 선택 사항(CPU로 대체, <code>seg516.py:19</code>). torch 빌드는 GPU에 따라 <code>ADTLib.env.cuda.torch_install_arguments</code>가 고르며 가장 먼저 설치된다(<code>requirements.py:11-12</code>, <code>MRI2CBCT.py:605</code>)</td></tr>
+            <tr><td>패키지</td><td><code>itk</code>, <code>pytorch_lightning</code>, <code>dicom2nifti&gt;=2.6.2</code>, <code>pydicom==3.0.2</code>, <code>monai==1.3.2</code>, <code>blosc2</code>, <code>einops</code>, <code>nibabel</code>, <code>scipy</code>, <code>nnunetv2&gt;=2.8.0</code>(<code>requirements.py:15-20</code>): ASO, ALI, AMASSS, nnU-Net이 import하는 것의 합집합이며, 해당 모듈들이 이미 쓰는 고정 버전을 따른다</td></tr>
+            <tr><td>numpy</td><td><strong>마지막에</strong> <code>1.26.4</code>로 복원한다. 그보다 높은 것은 numpy 2를 끌어와 torch를 깨뜨릴 수 있기 때문이다(<code>MRI2CBCT.py:624-626</code>)</td></tr>
+            <tr><td>Open3D</td><td><code>open3d==0.19.0</code>과 순수 Python 런타임(<code>plotly</code>, <code>addict</code>, <code>configargparse</code>, <code>pyquaternion</code>, <code>dash==2.18.2</code>, <code>flask</code>, <code>werkzeug</code>, <code>nest_asyncio</code>, <code>retrying</code>. <code>requirements.py:25-26</code>)</td></tr>
+            <tr><td>내려받는 모델</td><td>ASO 프랑크푸르트 기준, ALI 랜드마크 모델 일곱 개, AMASSS 모델, Dataset516(<code>requirements.py:36-48</code>). ASO, ALI, AMASSS가 이미 쓰는 배치를 따르므로 아무것도 두 번 받지 않는다</td></tr>
+            <tr><td>위치</td><td><code>~/Documents/SlicerDownloads</code>. Dataset516은 <code>MRI2CBCT/Models/Dataset516/</code> 아래, Linux의 Open3D는 <code>MRI2CBCT/py_deps/</code> 아래(<code>env.py:1-9</code>). <code>MRI2CBCT_DOWNLOADS</code>, <code>MRI2CBCT_DATASET516</code>, <code>MRI2CBCT_DATASET516_URL</code>, <code>MRI2CBCT_TESTFILES_URL</code>, <code>MRI2CBCT_PY_DEPS</code>로 바꿀 수 있다</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>하위 폴더의 CLI들은 심볼릭 링크로 된 평면 폴더를 통해 등록된다.
-      그래서 각 CLI 첫머리에서 <code>os.path.realpath(__file__)</code>가 <code>sys.path.append("..")</code>보다
-      먼저 온다. 이것이 없으면 개발 환경에서 <code>MRI2CBCT_CLI_utils</code>를 찾을 수
-      없다.</p>
+      <h3 id="environnement-open3d">12.1 Linux의 Open3D</h3>
+      <p>Linux에서 Open3D는 자기만의 폴더가 필요하다. Slicer의 <code>pip</code>는 manylinux 태그를 2_28로 제한하는데
+      Open3D의 휠은 2_31이기 때문이다(<code>env.py:12-15</code>). 이 휠은 glibc 2.31 이상이면 어디서나 동작하므로,
+      패널이 시스템의 glibc를 확인하고(더 낮으면 "Open3D needs glibc 2.31 or newer"를 일으킨다,
+      <code>MRI2CBCT.py:612-615</code>) <code>--no-deps --only-binary :all: --platform
+      manylinux_2_31_x86_64 --target &lt;py_deps&gt;</code>로 설치한다(<code>:618-621</code>). 그 밖의 시스템은 평범한
+      <code>pip_install</code>을 쓴다(<code>:623</code>). Open3D는 import가 아니라 <em>디스크에서</em> 감지한다.
+      실행 중인 Slicer는 폴더가 삭제된 뒤에도 이미 import한 <code>open3d</code>를 계속 들고 있는 반면 각 CLI는
+      새 인터프리터를 시작하기 때문이다(<code>env.py:67-78</code>). 실행 시 <code>ensure_open3d</code>는 인터프리터
+      자신의 사본을 쓰고, 없으면 <code>py_deps</code>를 <strong>뒤에 덧붙여</strong> <code>sys.path</code>에 넣어
+      Slicer의 numpy와 SciPy가 우선하게 한다(<code>env.py:81-94</code>). <code>ladder.py</code>가 import할 때 이를
+      호출하므로, 둘 다 없으면 <code>MRI2CBCT_REGISTER</code>는 "Open3D is not installed"와 함께 즉시 실패한다.
+      패널 자체는 <code>ladder</code>를 import하지 않으므로 Open3D 없이도 열린다.</p>
 
-      <h2 id="litterature">14. 문헌</h2>
+      <h2 id="litterature">13. 문헌</h2>
 
-      <p>대응하는 논문은 <strong>Novel CBCT-MRI Registration Approach for Enhanced
-      Analysis of Temporomandibular Degenerative Joint Disease</strong>, Leroux G. <em>et al.</em>,
-      <em>Clinical Image-Based Procedures</em>(CLIP 2024), LNCS vol. 15196, Springer다. 초록은
-      여기 구현된 순서를 기술한다. 자동 방향 정렬,
-      리샘플링, MRI 반전, 정규화, 그리고 상호정보량에 의한
-      강체 정합.</p>
+      <p>이 도구에 연결된 논문은 <strong>Novel CBCT-MRI Registration Approach for Enhanced Analysis of
+      Temporomandibular Degenerative Joint Disease</strong>, Leroux G. <em>et al.</em>, <em>Clinical Image-Based
+      Procedures</em>(CLIP 2024), LNCS vol. 15196, Springer다. 이 폴더의 참고문헌이 초록을 읽은 바로는 이전
+      순서를 설명한다. 자동 방향 정렬, 리샘플링, MRI 반전, 정규화, 그다음 상호정보량 기반의 강체 정합이다.
+      <strong>코드는 더 이상 그렇게 하지 않는다.</strong> 현재의 정합은 예측된 두 표면에 대한 전역 탐색이며 강도를
+      전혀 쓰지 않는다. 이 페이지 옆에 보관된 NA-MIC 보고서 두 편도 마찬가지다. PW43(2025)은 TorchReg와 elastix
+      세대이고, PW45(2026)는 그 세대에 대한 수정 사항과, 다음 단계로 더 견고한 자동 근사, 더 넓은 elastix 포착
+      범위, 표적 정합 오차에 대한 검증을 나열한다.</p>
 
-      <p>논문과 현재 코드 사이에는 두 가지 불일치가 있다. 당시 저장소의 근사는
-      <code>torchreg</code> + NMI 경로(<code>crop_approximation.py</code>)였으며, 이후
-      nnU-Net 과두 + <code>fiducialregistration</code>으로 대체되었다. 또 과두
-      분할도 TMJ 자르기도 출판된 초록에는 나오지 않는다. 덧붙여 저장소의
-      README는 여전히 <em>"Currently, cropping is done using the
-      AutoCrop method. In the future, this step will be replaced by a trained model"</em>이라고 적고 있다:
-      이 작업은 이미 이루어졌다.</p>
+      <p>이 폴더의 어떤 문서도 FPFH, RANSAC, 복구 단계를 설명하지 않는다. 코드 주석은 "published" 설정, 코호트
+      통계(46개 중 5개 대 172개 중 0개, <code>reg/pipeline.py:22-23</code>), 저장소 밖의 스크립트
+      (<code>run_02_register_w48.py</code>, <code>run_03_export.py</code>, <code>snap_icp.py</code>,
+      <code>itk_io.py:10</code>, <code>surface.py:3-5</code>)를 말하지만, 참고문헌 조사에서 이들을 담은 출판물은
+      찾지 못했다. 이는 유지보수자에게 물을 문제이며 이 페이지가 해결할 수 있는 것이 아니다. FPFH(Rusu
+      <em>et al.</em>, ICRA 2009)와 Open3D(Zhou <em>et al.</em>, 2018)는 구성 요소에 대한 통상적인 참고문헌이며,
+      여기서는 둘 다 확보하지 않았다.</p>
 
       <ul>
-        <li><a href="https://link.springer.com/chapter/10.1007/978-3-031-73083-2_7">Novel CBCT-MRI Registration Approach… (CLIP 2024, LNCS 15196)</a></li>
+        <li><a href="https://link.springer.com/chapter/10.1007/978-3-031-73083-2_7">Novel CBCT-MRI Registration Approach… (CLIP 2024, LNCS 15196)</a>, 이전 버전</li>
         <li><a href="https://journalotohns.biomedcentral.com/articles/10.1186/s40463-016-0144-4">MRI and CBCT image registration of TMJ: a systematic review</a></li>
         <li><a href="https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0169555">Three-Dimensional Assessment of TMJ Using MRI-CBCT Image Registration (PLOS ONE)</a></li>
-        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12360114/">Aligning MRI and CBCT for Advanced TMJ Diagnostics (PMC)</a></li>
+        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12360114/">Aligning MRI and CBCT for Advanced TMJ Diagnostics (PMC)</a>, 이전 버전에 대한 증례 시리즈</li>
         <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
       </ul>
 
-      <p><strong>전체 참고문헌: <a href="SOURCES.html">SOURCES.html</a></strong>, 확인된 참고문헌,
-      이 폴더에 받아 둔 파일(Caleme <em>et al.</em> 2025 전문과
-      NA-MIC Project Week 보고서 두 편 포함), 그리고 온라인으로 확인할 것들. 이 파이프라인에 대해
-      출판된 유일한 수치 평가(밀리미터 미만 정확도, 성공률 98.75%, Gaydamour <em>et al.</em>, CLIP 2025)도
-      이곳에 정리되어 있다.</p>
+      <p><strong>전체 참고문헌: <a href="SOURCES.html">SOURCES.html</a></strong>. 검증된 참고문헌, 이 폴더에 받아 둔
+      파일(Caleme <em>et al.</em> 2025의 전문과 NA-MIC Project Week 보고서 두 편 포함), 온라인에서 확인해야 할 것이
+      있다. 이 모듈에 대해 출판된 유일한 수치 평가(밀리미터 미만 정확도, 성공률 98.75%, Gaydamour
+      <em>et al.</em>, CLIP 2025)도 담고 있는데, 이는 재작성 이전의 것이다. 현재 버전을 측정한 출판물은 없다.</p>
 
       <footer class="footer">
         <a href="../index.html">← 전체 도구 페이지</a> ·

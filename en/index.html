@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SADT Atlas · SlicerAutomatedDentalTools</title>
 <link rel="stylesheet" href="../assets/style.css">
-<link rel="stylesheet" href="../assets/themes/labo.css">
+<link rel="stylesheet" href="../assets/themes/carnet.css">
 <script src="../assets/site.js"></script>
 </head>
 <body data-cat="recalage">
@@ -14,12 +14,13 @@
   <nav class="sidebar">
     <a class="brand" href="index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
     <div class="lang-switch">
-      <span class="cur">EN</span><a href="../fr/index.html" hreflang="fr" title="Français">FR</a><a href="../pt/index.html" hreflang="pt" title="Português">PT</a><a href="../ko/index.html" hreflang="ko" title="한국어">KO</a><a href="../th/index.html" hreflang="th" title="ไทย">TH</a>
+      <span class="cur">EN</span><a href="../fr/index.html" hreflang="fr" title="Français">FR</a><a href="../pt/index.html" hreflang="pt" title="Português">PT</a><a href="../ko/index.html" hreflang="ko" title="한국어">KO</a><a href="../th/index.html" hreflang="th" title="ไทย">TH</a><a href="../es/index.html" hreflang="es" title="Español">ES</a><a href="../it/index.html" hreflang="it" title="Italiano">IT</a>
     </div>
-    <div class="sec-switch">
-      <a href="guide/index.html"><b>Guide</b><small>how to use the tools</small></a>
-      <a href="index.html" aria-current="true"><b>Atlas</b><small>how it works in the code</small></a>
+    <div class="sec-switch" role="group">
+      <a href="guide/index.html">Guide</a>
+      <a href="index.html" aria-current="true">Atlas</a>
     </div>
+    <p class="sec-hint">how it works in the code</p>
     <div class="nav-group"><h4>Registration</h4><ul>
       <li><a href="FlexReg/FlexReg.html">FlexReg</a></li>
       <li><a href="AREG_IOS/AREG_IOS.html">AREG_IOS</a></li>
@@ -70,7 +71,7 @@
         is predicted by a network, when the model gets called, what it actually does, what the preprocessing is,
         and what comes out.</p>
         <p>This is not a user manual. Code links point to the
-        <code>~/Projects/UNC/SlicerAutomatedDentalTools</code> repository.</p>
+        <code>~/Projects/UNC/slicer/SlicerAutomatedDentalTools</code> repository.</p>
       </header>
 
       <h2 id="lecture">Where to start</h2>
@@ -233,8 +234,9 @@ AutoCrop3D ─────────► AutoCrop3D_CLI
 DOCShapeAXI ────────► DOCShapeAXI_CLI
 SurgMovPred ────────► SurgMovPred_CLI
 CNE ────────────────► CNE_CLI, CNE_Dashboard
-MRI2CBCT ───────────► mri2cbct_{approx, lr_crop, tmj_crop, orient_center_mri,
-                               resample_cbct_mri, reg}
+MRI2CBCT ───────────► MRI2CBCT_{PREPARE, SEGMENT_MRI, REGISTER}
+       ├────────────► PRE_ASO_CBCT / ALI_CBCT / SEMI_ASO_CBCT
+       └────────────► AMASSS_CLI
 
 CLIC, BatchDentalSeg, Medical_Data_Anonymizer : standalone</code></pre>
 
@@ -247,6 +249,7 @@ CLIC, BatchDentalSeg, Medical_Data_Anonymizer : standalone</code></pre>
           <tr><td><a href="VFACE/VFACE.html">VFACE</a></td><td>unsupervised UMAP + spectral clustering</td><td>3 supervised binary <a class="gterm" href="glossary.html#g-lightgbm" title="See glossary">LightGBM</a> models</td></tr>
           <tr><td><a href="DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td>ResNet-18, condyles as <strong>binary</strong></td><td>dual-branch 4096 points + 42 views, <strong>4-class</strong> checkpoint</td></tr>
           <tr><td><a href="AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></td><td>two passes, SimpleElastix</td><td>one pass, itk-elastix</td></tr>
+          <tr><td><a href="MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></td><td>CLIP 2024: orientation, resampling, MRI inversion, normalization, rigid registration by mutual information</td><td>FPFH + RANSAC + ICP on two network-predicted cranial-base surfaces, no intensity</td></tr>
         </tbody>
       </table></div>
 
@@ -259,14 +262,14 @@ CLIC, BatchDentalSeg, Medical_Data_Anonymizer : standalone</code></pre>
           <tr><td><a href="MedicalDataAnonymizer/MedicalDataAnonymizer.html">MedicalDataAnonymizer</a></td><td><code>anonymize_text_presidio</code> does <code>return text</code> on any exception: the <code>_anonymized</code> file holds the <strong>untouched</strong> text, and the UI shows "Complete!"</td><td>yes, read line by line</td></tr>
           <tr><td><a href="CLIC/CLIC.html">CLIC</a></td><td>the <code>[SEG]</code>/<code>[PROGRESS]</code> markers are emitted through <code>logger.info</code> with a prefix, the reader tests <code>startswith</code>: the segmentation is <strong>never loaded</strong> into Slicer</td><td>yes</td></tr>
           <tr><td><a href="BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg</a></td><td>NasoMaxillaDentSeg: the rename list is out of order, the last 4 segments get the wrong name and the wrong colour</td><td>yes</td></tr>
-          <tr><td><a href="AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a> · <a href="MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></td><td><code>MatrixRetrieval</code> ignores <code>CenterOfRotationPoint</code> (absent from the whole repository); the output volume is resampled again with this matrix, so the <code>.tfm</code> <strong>and</strong> the image drift apart from <a class="gterm" href="glossary.html#g-elastix" title="See glossary">elastix</a></td><td>yes, to be measured on a case</td></tr>
-          <tr><td><a href="MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></td><td><code>install_function()</code> requests <code>nnunet_version==2.8.0</code>, a package that doesn't exist (PyPI 404); the 7 callers ignore the return value</td><td>yes</td></tr>
+          <tr><td><a href="AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a></td><td><code>MatrixRetrieval</code> ignores <code>CenterOfRotationPoint</code> (absent from the whole repository); the output volume is resampled again with this matrix, so the <code>.tfm</code> <strong>and</strong> the image drift apart from <a class="gterm" href="glossary.html#g-elastix" title="See glossary">elastix</a></td><td>yes, to be measured on a case</td></tr>
+          <tr><td><a href="MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></td><td>a flipped-then-unresolved joint is written from rung 0's pose, not the best of the 150 draws; a <code>FLAG</code> result keeps a clean file name (only <code>summary.csv</code> says <code>FLAG</code>)</td><td>yes, read line by line</td></tr>
           <tr><td><a href="ASO/ASO.html">ASO</a></td><td>the semi-CBCT mode requires a <code>.tfm</code> that only PRE_ASO writes: fails patient by patient unless a <code>.tfm</code> is already lying in the folder</td><td>yes</td></tr>
           <tr><td><a href="AMASSS/AMASSS.html">AMASSS</a></td><td>"small <a class="gterm" href="glossary.html#g-fov" title="See glossary">FOV</a>" is broken (<code>highDefinition</code> missing from the <code>.xml</code>); DICOM input is ignored; <code>temp_fold</code> shared with AREG and <a href="VFACE/VFACE.html">VFACE</a>, unconditional <code>rmtree</code></td><td>reported</td></tr>
           <tr><td><a href="AutoMatrix/AutoMatrix.html">AutoMatrix</a></td><td><code>.npy</code> and mesh support advertised but unreadable since <code>7bc362b</code></td><td>tested by the agent</td></tr>
           <tr><td><a href="CNE/CNE.html">CNE</a></td><td>the Ortho model requests <code>model-q4_0.gguf</code>, the HF repo only has <code>model-q4_k_m.gguf</code> (404)</td><td>tested by the agent</td></tr>
           <tr><td><a href="DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td>the CLI is written against the shapeaxi 1.0.x API while <code>install_pytorch</code> installs <code>&gt;=2.0.2</code></td><td>reported</td></tr>
-          <tr><td><a href="Agent/Agent.html">Agent</a></td><td><code>resolve_tool_path</code> looks for a <code>CLI files</code> folder absent from the repository; 17 of 23 signatures are out of step with the real <code>argparse</code></td><td>reported</td></tr>
+          <tr><td><a href="Agent/Agent.html">Agent</a></td><td><code>resolve_tool_path</code> looks for a <code>CLI files</code> folder absent from the repository; 14 of 16 signatures are out of step with the real <code>argparse</code></td><td>reported</td></tr>
           <tr><td><a href="SurgMovPred/SurgMovPred.html">SurgMovPred</a></td><td><code>pip_install("numpy==2.4.0")</code> <strong>unconditional on every Apply</strong></td><td>reported</td></tr>
           <tr><td><a href="VFACE/VFACE.html">VFACE</a></td><td><code>INPUT_KEYS</code> doesn't cover <code>inputVolume</code> / <code>t1_folder</code> / <code>input_path</code>: the selective rollback replays the slow steps on the whole batch</td><td>reported</td></tr>
         </tbody>

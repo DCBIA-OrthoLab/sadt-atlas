@@ -40,8 +40,13 @@ For purely local use, `python3 -m http.server 8080` still does the job, and
 
 ## What is in it
 
-The site has **two halves** and **five languages**: English, French, Portuguese
-(Brazilian), Korean and Thai.
+The site has **two halves** and **seven languages**: English, French, Portuguese
+(Brazilian), Korean, Thai, Spanish and Italian.
+
+**Code reference.** The pages describe `DCBIA-OrthoLab/SlicerAutomatedDentalTools`
+at `upstream/main` = `3c67957` (2026-10-26). Every `file.py:line` reference was
+checked against that revision. When the code moves, replay the audit from this SHA and
+update this line.
 
 - The **Guide** addresses whoever uses the tools: what it is for, what to supply, what
   to check. No implementation detail.
@@ -52,7 +57,7 @@ The site has **two halves** and **five languages**: English, French, Portuguese
 index.html              language picker
 assets/                 style, script, search index (shared)
 <Tool>/                 sources: the original .md, the papers collected
-en/  fr/  pt/  ko/  th/
+en/  fr/  pt/  ko/  th/  es/  it/
 ├── index.html          Atlas home
 ├── findings.html       every finding, collected
 ├── glossary.html       the glossary
@@ -118,8 +123,8 @@ every page. That is what keeps a hundred-odd copies from drifting apart.
 
 ## Languages
 
-**English is the source language.** Changes are made in `en/` only; `fr/`, `pt/`, `ko/`
-and `th/` are translations, brought up to date in batches rather than on every change.
+**English is the source language.** Changes are made in `en/` only; `fr/`, `pt/`, `ko/`,
+`th/`, `es/` and `it/` are translations, brought up to date in batches rather than on every change.
 Between two batches they lag behind, and that is deliberate.
 
 ```bash

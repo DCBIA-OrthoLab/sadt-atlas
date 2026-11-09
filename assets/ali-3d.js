@@ -424,6 +424,8 @@
         bs[i].setAttribute("aria-pressed", bs[i].getAttribute("data-mode") === name ? "true" : "false");
       }
       fig.setAttribute("data-active", name);
+      var shown = fig.querySelector('[data-scene="' + name + '"]');
+      if (shown && window.Scene3D.dockRun) { window.Scene3D.dockRun(shown); }
       var cs = chips();
       for (i = 0; i < cs.length; i++) { cs[i].setAttribute("aria-current", "false"); }
       run = { list: targets(name), i: 0, t: 0 };

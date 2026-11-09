@@ -6,7 +6,7 @@
   var KEY = "sadt_atlas_theme";
   var root = document.documentElement;
   var LANG = (root.getAttribute("lang") || "en").slice(0, 2).toLowerCase();
-  if (["en", "fr", "pt", "ko", "th"].indexOf(LANG) < 0) LANG = "en";
+  if (["en", "fr", "pt", "ko", "th", "es", "it"].indexOf(LANG) < 0) LANG = "en";
 
   var T = {
     fr: { dark: "☾ sombre", light: "☀ clair", onpage: "Sur cette page",
@@ -41,6 +41,22 @@
           toTop: "맨 위로", skip: "본문으로 건너뛰기",
           anchor: "이 섹션 링크", reading: "권장 읽기 순서",
           menu: "메뉴 열기" },
+    es: { dark: "☾ oscuro", light: "☀ claro", onpage: "En esta página",
+          copy: "copiar", copied: "copiado", failed: "falló",
+          search: "Buscar…  /", searchAria: "Buscar en el sitio",
+          noResult: "Sin resultados.", noIndex: "Índice no encontrado, ejecute <code>python3 build.py</code>.",
+          prev: "← anterior", next: "siguiente →", top: "↑ arriba",
+          toTop: "Volver arriba", skip: "Ir al contenido",
+          anchor: "Enlace a esta sección", reading: "Orden de lectura sugerido",
+          menu: "Abrir el menú" },
+    it: { dark: "☾ scuro", light: "☀ chiaro", onpage: "In questa pagina",
+          copy: "copia", copied: "copiato", failed: "non riuscito",
+          search: "Cerca…  /", searchAria: "Cerca nel sito",
+          noResult: "Nessun risultato.", noIndex: "Indice non trovato, esegui <code>python3 build.py</code>.",
+          prev: "← precedente", next: "successivo →", top: "↑ in alto",
+          toTop: "Torna in alto", skip: "Vai al contenuto",
+          anchor: "Link a questa sezione", reading: "Ordine di lettura consigliato",
+          menu: "Apri il menu" },
     th: { dark: "☾ มืด", light: "☀ สว่าง", onpage: "ในหน้านี้",
           copy: "คัดลอก", copied: "คัดลอกแล้ว", failed: "ล้มเหลว",
           search: "ค้นหา…  /", searchAria: "ค้นหาในเว็บไซต์",
@@ -487,6 +503,32 @@
     }
   }
 
+  /* ---------------- Vidéos : la vignette devient le lecteur ---------------- */
+  /* L'aperçu est une image locale, posée par build.py. Rien n'est demandé à
+     YouTube tant que personne ne clique : une fiche ouverte hors ligne garde
+     son aperçu, et une fiche en ligne n'appelle pas Google pour rien. Au clic,
+     la vignette cède la place au lecteur ; le titre, lui, reste un lien vers
+     YouTube, seul recours si le cadre ne charge pas. */
+  function videos() {
+    document.addEventListener("click", function (e) {
+      var shot = e.target.closest && e.target.closest(".vb-shot[data-yt]");
+      if (!shot || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      var item = shot.closest(".vb-item");
+      var titre = item && item.querySelector(".vb-title");
+      var box = document.createElement("div");
+      box.className = "vb-shot vb-playing";
+      var fr = document.createElement("iframe");
+      fr.src = "https://www.youtube-nocookie.com/embed/" + shot.getAttribute("data-yt") +
+               "?autoplay=1&rel=0";
+      fr.title = titre ? titre.textContent : "";
+      fr.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+      fr.setAttribute("allowfullscreen", "");
+      box.appendChild(fr);
+      shot.parentNode.replaceChild(box, shot);
+    });
+  }
+
   /* ---------------- Lien d'évitement ---------------- */
   function skipLink() {
     var art = document.querySelector(".content");
@@ -505,7 +547,8 @@
       ["mobileNav", mobileNav], ["skipLink", skipLink],
       ["anchors", anchors], ["tocMobile", tocMobile], ["toc", toc],
       ["theme", themeToggle], ["pager", pager], ["pageBar", pageBar],
-      ["copy", copyButtons], ["search", search], ["constats", constats]
+      ["copy", copyButtons], ["search", search], ["constats", constats],
+      ["videos", videos]
     ];
     for (var i = 0; i < steps.length; i++) {
       try {

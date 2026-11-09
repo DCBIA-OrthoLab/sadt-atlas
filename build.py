@@ -2,9 +2,11 @@
 """sadt-atlas : génère l'index de recherche et la page des constats.
 
 À relancer après toute modification des pages :  python3 build.py
-Ne modifie aucune page existante ; écrit assets/search-index.js et constats.html.
+Ne modifie aucune page existante ; écrit, par langue,
+assets/search-index-<lang>.js, assets/constats-<lang>.json et la page des
+constats : constats.html en français, findings.html dans les autres langues.
 """
-import os, re, json, html
+import os, re, json, html, unicodedata
 from html.parser import HTMLParser
 
 import nav
@@ -137,9 +139,22 @@ class Page(HTMLParser):
         self._add(d)
 
 
+def clip(s, limit):
+    """Une coupe en plein mot n'est pas une fin : on recule jusqu'a la derniere
+    espace. Le thai n'en met pas entre les mots, d'ou le repli sur la coupe
+    nette quand reculer couterait trop."""
+    if len(s) <= limit:
+        return s
+    cut = s[:limit].rstrip()
+    sp = cut.rfind(" ")
+    if sp > limit * 0.7:
+        cut = cut[:sp]
+    return cut.rstrip(" ,;:(") + "…"
+
+
 def clean(s, limit=None):
     s = re.sub(r"\s+", " ", s).strip()
-    return s[:limit].rstrip() + "…" if limit and len(s) > limit else s
+    return clip(s, limit) if limit else s
 
 
 def walk(lang):
@@ -171,7 +186,7 @@ def build_lang(lang):
                 "u": rel + ("#" + s["id"] if s["id"] else ""),
                 "p": title, "t": tool, "c": cat,
                 "s": clean(s["title"]) or "Introduction",
-                "x": body[:600],
+                "x": clip(body, 600),
             })
         for c in p.callouts:
             txt = clean(" ".join(c["text"]))
@@ -180,8 +195,8 @@ def build_lang(lang):
             constats.append({
                 "kind": c["kind"], "tool": tool, "cat": cat, "page": title,
                 "url": rel + ("#" + c["section"] if c["section"] else ""),
-                "title": constat_label(clean(c["title"]), txt) or "?",
-                "text": txt[:520],
+                "title": constat_title(clean(c["title"])),
+                "text": clean(txt, 520),
             })
 
     os.makedirs(os.path.join(ROOT, "assets"), exist_ok=True)
@@ -211,20 +226,50 @@ GENERIC_TITLES = {
 }
 
 
-def deaccent(s):
-    import unicodedata
-    return "".join(c for c in unicodedata.normalize("NFD", s.lower())
-                   if unicodedata.category(c) != "Mn").strip(" :.")
+def title_key(s):
+    """Clé de comparaison d'un titre, toutes écritures confondues.
+
+    NFD seul ne suffit pas : il éclate une syllabe coréenne en jamos qui ne se
+    recomposent jamais, et il détache les voyelles thaïes, que le filtre des
+    marques emporte ensuite, « บั๊กที่ยืนยันแล้ว » devenant « บกทยนยนแลว ».
+    On ne retire donc que les diacritiques latins, U+0300 à U+036F, le temps
+    d'assimiler « confirmé » à « confirme », puis on recompose en NFC."""
+    d = unicodedata.normalize("NFD", s.lower())
+    d = "".join(c for c in d if not ("\u0300" <= c <= "\u036f"
+                                     and unicodedata.category(c) == "Mn"))
+    return unicodedata.normalize("NFC", d).strip(" :.")
 
 
-def constat_label(title, text):
-    """Un titre générique n'apprend rien sur une page qui en agrège 250 :
-    on lui substitue la première phrase du corps."""
-    if deaccent(title) not in GENERIC_TITLES:
-        return title
-    m = re.split(r"(?<=[.!?])\s+", text.strip())
-    first = m[0] if m else text
-    return clean(first, 110) or title
+GENERIC_KEYS = {title_key(t) for t in GENERIC_TITLES}
+
+
+def recapitalise(s):
+    """Un titre amputé de son préfixe commence en minuscule. On lui rend sa
+    capitale, sauf quand le premier mot est un identifiant : vtkICP.__call__
+    s'écrit comme le code l'écrit, pas comme une phrase."""
+    first = s.split(" ", 1)[0]
+    if not first[:1].isalpha() or any(c in first for c in "._(0123456789"):
+        return s
+    return s[:1].upper() + s[1:]
+
+
+def constat_title(title):
+    """Un titre générique n'apprend rien : « Défaut confirmé » est déjà dit par
+    la pastille à gauche de la ligne. On a longtemps promu la première phrase
+    du corps à sa place, mais le corps l'imprimait ensuite en entier : la
+    moitié des constats se lisaient deux fois. Et sa médiane fait 117 signes,
+    c'est une phrase, pas un intitulé. On la laisse donc au corps, et la ligne
+    n'a pas de titre."""
+    if title_key(title) in GENERIC_KEYS:
+        return ""
+    # « Défaut confirmé : entrée DICOM ignorée » dit deux fois le genre, une
+    # fois dans la pastille et une fois dans son propre titre. On ne garde
+    # que ce que le titre apporte.
+    for sep in (":", "\uff1a"):
+        head, found, tail = title.partition(sep)
+        if found and tail.strip() and title_key(head) in GENERIC_KEYS:
+            return recapitalise(tail.strip())
+    return title
 
 
 KIND_LABEL = {
@@ -232,6 +277,8 @@ KIND_LABEL = {
  "en": {"bug": "Confirmed bug", "warn": "Pitfall", "ok": "Verified", "note": "Note"},
  "pt": {"bug": "Bug confirmado", "warn": "Armadilha", "ok": "Verificado", "note": "Nota"},
  "ko": {"bug": "확인된 버그", "warn": "함정", "ok": "확인됨", "note": "참고"},
+ "es": {"bug": "Error confirmado", "warn": "Trampa", "ok": "Verificado", "note": "Nota"},
+ "it": {"bug": "Bug confermato", "warn": "Insidia", "ok": "Verificato", "note": "Nota"},
  "th": {"bug": "บั๊กที่ยืนยันแล้ว", "warn": "ข้อควรระวัง", "ok": "ตรวจสอบแล้ว", "note": "หมายเหตุ"},
 }
 KIND_ORDER = ["bug", "warn", "ok", "note"]
@@ -246,6 +293,10 @@ CONSTAT_INTRO = {
                         "destaques das páginas. Anotado ao documentar, não ao caçar bugs."),
  "ko": ("발견 사항", "코드를 읽으며 드러난 모든 것을 각 페이지의 강조 상자 {n}개에서 모았다. "
                   "버그를 찾으려 한 것이 아니라 문서화하면서 기록한 것이다."),
+ "es": ("Hallazgos", "Todo lo que reveló la lectura del código, reunido a partir de los {n} "
+                    "recuadros de las páginas. Anotado al documentar, no al buscar errores."),
+ "it": ("Riscontri", "Tutto ciò che la lettura del codice ha messo in luce, raccolto dai {n} "
+                    "riquadri delle pagine. Annotato mentre si documentava, non mentre si cercavano bug."),
  "th": ("ข้อค้นพบ", "ทุกสิ่งที่การอ่านโค้ดเปิดเผยออกมา รวบรวมจากกล่องเน้น {n} กล่องในทุกหน้า "
                 "บันทึกไว้ระหว่างการจัดทำเอกสาร ไม่ใช่ระหว่างการไล่หาบั๊ก"),
 }
@@ -256,6 +307,8 @@ CONSTAT_FILTERS = {
  "en": ("Tool", "all", "filter text…", "Filter the findings"),
  "pt": ("Ferramenta", "todas", "filtrar o texto…", "Filtrar as constatações"),
  "ko": ("도구", "전체", "텍스트 필터…", "발견 사항 필터"),
+ "es": ("Herramienta", "todas", "filtrar el texto…", "Filtrar los hallazgos"),
+ "it": ("Strumento", "tutti", "filtra il testo…", "Filtra i riscontri"),
  "th": ("เครื่องมือ", "ทั้งหมด", "กรองข้อความ…", "กรองข้อค้นพบ"),
 }
 
@@ -270,16 +323,19 @@ def write_constats(lang, constats):
     tools = sorted({c["tool"] for c in constats})
     counts = {k: sum(1 for c in constats if c["kind"] == k) for k in KIND_ORDER}
     order = {k: i for i, k in enumerate(KIND_ORDER)}
-    constats = sorted(constats, key=lambda c: (order[c["kind"]], c["tool"], c["title"]))
+    constats = sorted(constats, key=lambda c: (order[c["kind"]], c["tool"], c["title"] or c["text"]))
 
     rows = []
     for c in constats:
+        titre = (f'<span class="constat-title">{html.escape(c["title"])}</span>'
+                 if c["title"] else "")
         rows.append(
             f'<article class="constat" data-kind="{c["kind"]}" data-tool="{html.escape(c["tool"])}">'
             f'<div class="constat-head">'
-            f'<span class="badge k-{c["kind"]}">{kl[c["kind"]]}</span> '
+            f'<span class="constat-kind"><span class="dot k-{c["kind"]}"></span>'
+            f'{kl[c["kind"]]}</span> '
             f'<a class="constat-tool" href="{html.escape(c["url"])}">{html.escape(c["tool"])}</a>'
-            f'<span class="constat-title">{html.escape(c["title"])}</span>'
+            f'{titre}'
             f'</div>'
             f'<p class="constat-text">{html.escape(c["text"])}</p>'
             f'</article>'
@@ -434,6 +490,24 @@ PAPERS_UI = {
         "free": "무료 전문",
         "biblio": "이 도구의 전체 참고문헌(찾아낸 것과 찾아봤지만 없었던 것)은 "
                   "<a href=\"{href}\">출처 페이지</a>에 있습니다."},
+ "es": {"h2": "Cómo citar",
+        "cite": "Si usó {tool} en una investigación, cite:",
+        "software": "Nada describe el módulo en sí, así que cite la extensión "
+                    "como software:",
+        "accessed": "Añada la fecha de acceso si el estilo de su revista la exige.",
+        "context": "Contexto, no es una cita de la herramienta",
+        "free": "texto completo gratuito",
+        "biblio": "La bibliografía completa de la herramienta, lo que se encontró y lo que se "
+                  "buscó sin éxito, está en <a href=\"{href}\">sus fuentes</a>."},
+ "it": {"h2": "Come citare",
+        "cite": "Se hai usato {tool} nella tua ricerca, cita:",
+        "software": "Nulla descrive il modulo in sé, quindi cita l'estensione "
+                    "come software:",
+        "accessed": "Aggiungi la data di accesso se lo stile della tua rivista la richiede.",
+        "context": "Contesto, non una citazione dello strumento",
+        "free": "testo completo gratuito",
+        "biblio": "La bibliografia completa dello strumento, ciò che è stato trovato e ciò che è stato "
+                  "cercato senza successo, si trova nelle <a href=\"{href}\">sue fonti</a>."},
  "th": {"h2": "วิธีอ้างอิง",
         "cite": "หากคุณใช้ {tool} ในงานวิจัย ให้อ้างอิง:",
         "software": "ไม่มีเอกสารที่อธิบายโมดูลนี้โดยตรง "
@@ -572,6 +646,10 @@ VIDEO_UI = {
         "min": "{m} min {s:02d}", "sec": "{s} s"},
  "ko": {"label": "영상", "chan": "DCBIA Videos 채널", "short": "개요",
         "min": "{m}분 {s:02d}초", "sec": "{s}초"},
+ "es": {"label": "En vídeo", "chan": "canal DCBIA Videos", "short": "presentación",
+        "min": "{m} min {s:02d}", "sec": "{s} s"},
+ "it": {"label": "In video", "chan": "canale DCBIA Videos", "short": "panoramica",
+        "min": "{m} min {s:02d}", "sec": "{s} s"},
  "th": {"label": "วิดีโอ", "chan": "ช่อง DCBIA Videos", "short": "ภาพรวม",
         "min": "{m} นาที {s:02d} วินาที", "sec": "{s} วินาที"},
 }
@@ -591,10 +669,23 @@ def video_block(lang, tool):
         dur = ui["min"].format(m=sec // 60, s=sec % 60) if sec >= 60 else ui["sec"].format(s=sec)
         # sous une minute et demie, c'est une annonce : le dire plutôt que de laisser croire
         qual = f" ({ui['short']})" if sec < 90 else ""
-        out.append(
-            f'          <li><a href="https://www.youtube.com/watch?v={vid}" '
-            f'target="_blank" rel="noopener">{html.escape(title, quote=False)}</a> '
-            f'<span class="vb-meta">{dur}{qual} · {ui["chan"]}</span></li>')
+        url = f"https://www.youtube.com/watch?v={vid}"
+        t = html.escape(title, quote=False)
+        # L'aperçu est une image LOCALE : rien n'est demandé à YouTube tant que
+        # personne ne clique. La vignette porte le même lien que le titre, mais
+        # elle est cachée aux lecteurs d'écran, qui liraient deux fois la même
+        # chose. site.js y substitue le lecteur au clic.
+        out += [
+            '          <li class="vb-item">',
+            f'            <a class="vb-shot" href="{url}" target="_blank" rel="noopener" '
+            f'data-yt="{vid}" tabindex="-1" aria-hidden="true">'
+            f'<img src="../../assets/video/{vid}.jpg" alt="" width="480" height="270" '
+            f'loading="lazy" decoding="async"></a>',
+            '            <span class="vb-text">'
+            f'<a class="vb-title" href="{url}" target="_blank" rel="noopener">{t}</a>'
+            f'<span class="vb-meta">{dur}{qual} · {ui["chan"]}</span></span>',
+            "          </li>",
+        ]
     out += ["        </ul>", "      </div>", "      <!-- video:end -->"]
     return "\n".join(out) + "\n"
 
@@ -638,18 +729,19 @@ LANDING = """<!doctype html>
 <div class="landing">
   <h1>SADT Atlas</h1>
   <p>How each SlicerAutomatedDentalTools module works.</p>
-  <div class="choices">
+  <nav class="choices" aria-label="Language">
     <a href="en/guide/index.html" hreflang="en"><b>English</b><small>Guide and Atlas</small></a>
     <a href="fr/guide/index.html" hreflang="fr"><b>Français</b><small>Guide et Atlas</small></a>
     <a href="pt/guide/index.html" hreflang="pt"><b>Português</b><small>Guia e Atlas</small></a>
     <a href="ko/guide/index.html" hreflang="ko"><b>한국어</b><small>가이드와 아틀라스</small></a>
+    <a href="es/guide/index.html" hreflang="es"><b>Español</b><small>Guía y Atlas</small></a>
+    <a href="it/guide/index.html" hreflang="it"><b>Italiano</b><small>Guida e Atlante</small></a>
     <a href="th/guide/index.html" hreflang="th"><b>ไทย</b><small>คู่มือและแอตลาส</small></a>
-  </div>
+  </nav>
 </div>
 </body>
 </html>
 """
-
 
 def write_landing():
     open(os.path.join(ROOT, "index.html"), "w", encoding="utf-8").write(LANDING)
@@ -669,6 +761,12 @@ GUIDE_INTRO = {
  "ko": ("사용 가이드",
         "각 도구가 무엇을 하는지, 무엇을 넣어야 하는지, 무엇을 돌려주는지, 코드는 다루지 "
         "않습니다. 내부 동작이 궁금하다면 아틀라스로 넘어가십시오."),
+ "es": ("Guía de uso",
+        "Qué hace cada herramienta, qué hay que darle, qué devuelve, sin entrar en el "
+        "código. Para los mecanismos internos, pase al Atlas."),
+ "it": ("Guida all'uso",
+        "Che cosa fa ciascuno strumento, che cosa fornirgli, che cosa restituisce, senza entrare "
+        "nel codice. Per i meccanismi interni, passa all'Atlante."),
  "th": ("คู่มือการใช้งาน",
         "เครื่องมือแต่ละตัวทำอะไร ต้องป้อนอะไรให้ และได้อะไรกลับมา, โดยไม่ลงรายละเอียดโค้ด "
         "หากต้องการเข้าใจกลไกภายใน ให้ไปที่แอตลาส"),
@@ -888,6 +986,107 @@ GUIDE_ABOUT = {
         <a href="#utilities">유틸리티</a></li>
         <li>임상 텍스트 추출 또는 익명화 →
         <a href="#text">텍스트 &amp; 언어</a></li>
+      </ul>
+""",
+ "es": """      <h2 id="pour-qui">A quién se dirige esta guía</h2>
+      <p>A cualquiera que abra SlicerAutomatedDentalTools en 3D Slicer y quiera usarlo:
+      clínicos, investigadores, estudiantes. No supone saber leer código ni saber qué es
+      una red neuronal. Si lo que interesa es el funcionamiento interno, qué modelo se
+      llama, cuándo, sobre qué datos, lo que se busca es el <a href="../index.html">Atlas</a>:
+      las dos secciones cubren los mismos {n} módulos, cada una desde el extremo opuesto.</p>
+
+      <h2 id="pourquoi">Por qué existe</h2>
+      <p>La extensión reúne {n} módulos escritos por equipos distintos en épocas
+      distintas. Su documentación se reduce, según el caso, a unas pocas líneas de
+      README, a una página de proyecto o a nada. Varios se comportan de forma distinta a
+      lo que describe su publicación: el artículo documenta una versión que el código ya no
+      ejecuta.</p>
+      <p>Esta guía se escribió leyendo el código de cada módulo, no su documentación. Dice
+      por tanto lo que la herramienta hace realmente cuando se hace clic, incluso cuando eso
+      incomoda: <strong>{warn} advertencias y {bug} errores</strong> se señalan en el punto
+      exacto en que es probable toparse con ellos. Aquí no se corrige nada: el objetivo es
+      que no pierda un día por ello.</p>
+
+      <h2 id="plan">Qué contiene cada página</h2>
+      <p>Todas siguen el mismo plan, para saber dónde mirar sin releerlo todo:</p>
+      <ul>
+        <li><strong>Cuándo usarla</strong>: qué problema resuelve la herramienta y los casos
+        en que no sirve de nada.</li>
+        <li><strong>Qué necesita, qué obtiene</strong>: las entradas esperadas, su
+        formato y lo que sale al final.</li>
+        <li><strong>Paso a paso</strong>: los pasos en orden, campo por campo.</li>
+        <li><strong>Cuando algo sale mal</strong>: los fallos frecuentes y sus
+        causas.</li>
+        <li><strong>Cómo citar</strong>: la referencia que se debe citar en un artículo
+        cuando la herramienta tiene una, y el enlace a la página del Atlas.</li>
+      </ul>
+
+      <h2 id="commencer">Por dónde empezar</h2>
+      <p>Si ya sabe qué herramienta busca, elíjala en la lista de abajo. Si no, parta de lo
+      que necesita hacer:</p>
+      <ul>
+        <li>Comparar dos exploraciones del mismo paciente a lo largo del tiempo →
+        <a href="#registration">Registro</a></li>
+        <li>Aislar estructuras en un CBCT →
+        <a href="#segmentation">Segmentación</a></li>
+        <li>Colocar landmarks anatómicos, o devolver un escaneo a su posición vertical →
+        <a href="#landmarks">Landmarks y orientación</a></li>
+        <li>Medir, clasificar o predecir a partir de una forma →
+        <a href="#analysis">Análisis</a></li>
+        <li>Recortar o aplicar una matriz, por lotes →
+        <a href="#utilities">Utilidades</a></li>
+        <li>Extraer o anonimizar texto clínico →
+        <a href="#text">Texto y lenguaje</a></li>
+      </ul>
+""",
+ "it": """      <h2 id="pour-qui">A chi è rivolta questa guida</h2>
+      <p>A chiunque apra SlicerAutomatedDentalTools in 3D Slicer e voglia usarlo:
+      clinici, ricercatori, studenti. Non presuppone di saper leggere il codice né di sapere
+      che cos'è una rete neurale. Se ti interessa il funzionamento interno, quale modello
+      viene chiamato, quando, su quali dati, ti serve invece l'<a href="../index.html">Atlante</a>:
+      le due sezioni coprono gli stessi {n} moduli, ciascuna dall'estremo opposto.</p>
+
+      <h2 id="pourquoi">Perché esiste</h2>
+      <p>L'estensione riunisce {n} moduli scritti da gruppi diversi in momenti diversi.
+      La loro documentazione si riduce, a seconda dei casi, a qualche riga di README, a una
+      pagina di progetto o a nulla. Parecchi si comportano diversamente da quanto descrive la
+      loro pubblicazione: l'articolo documenta una versione che il codice non esegue più.</p>
+      <p>Questa guida è stata scritta leggendo il codice di ciascun modulo, non la sua
+      documentazione. Dice quindi che cosa lo strumento fa davvero quando si clicca, anche
+      quando è scomodo: <strong>{warn} avvertenze e {bug} bug</strong> sono segnalati nel
+      punto esatto in cui è probabile inciamparvi. Qui non si corregge nulla: lo scopo è che
+      tu non perda una giornata per questo.</p>
+
+      <h2 id="plan">Che cosa contiene ogni pagina</h2>
+      <p>Seguono tutte lo stesso schema, così sai dove guardare senza rileggere tutto:</p>
+      <ul>
+        <li><strong>Quando usarlo</strong>: a quale problema risponde lo strumento e i casi
+        in cui non serve a nulla.</li>
+        <li><strong>Di che cosa hai bisogno, che cosa ottieni</strong>: gli input attesi, il
+        loro formato e ciò che esce alla fine.</li>
+        <li><strong>Passo dopo passo</strong>: le fasi in ordine, campo per campo.</li>
+        <li><strong>Quando qualcosa va storto</strong>: i guasti frequenti e le loro
+        cause.</li>
+        <li><strong>Come citare</strong>: il riferimento da citare in un articolo, quando lo
+        strumento ne ha uno, e il rimando alla pagina dell'Atlante.</li>
+      </ul>
+
+      <h2 id="commencer">Da dove cominciare</h2>
+      <p>Se sai quale strumento cerchi, prendilo dall'elenco qui sotto. Altrimenti parti da
+      ciò che devi fare:</p>
+      <ul>
+        <li>Confrontare due esami dello stesso paziente nel tempo →
+        <a href="#registration">Registrazione</a></li>
+        <li>Isolare strutture in un CBCT →
+        <a href="#segmentation">Segmentazione</a></li>
+        <li>Posizionare punti di repere anatomici, o rimettere dritta una scansione →
+        <a href="#landmarks">Landmark e orientamento</a></li>
+        <li>Misurare, classificare o predire a partire da una forma →
+        <a href="#analysis">Analisi</a></li>
+        <li>Ritagliare o applicare una matrice, in batch →
+        <a href="#utilities">Utilità</a></li>
+        <li>Estrarre o anonimizzare testo clinico →
+        <a href="#text">Testo e linguaggio</a></li>
       </ul>
 """,
  "th": """      <h2 id="pour-qui">คู่มือนี้เขียนให้ใคร</h2>
