@@ -54,7 +54,7 @@
       <li><a href="../Agent/Agent.html">Agent</a></li>
     </ul></div>
     <div class="nav-group"><h4>Code partagé</h4><ul>
-      <li><a class="untranslated" href="../../en/ADTLib/ADTLib.html" hreflang="en" title="ADTLib: not translated into Français yet, this opens the English page">ADTLib</a></li>
+      <li><a href="../ADTLib/ADTLib.html">ADTLib</a></li>
     </ul></div>
     <div class="nav-group"><h4>Transverse</h4><ul>
       <li><a href="../constats.html">Constats</a></li>
@@ -95,9 +95,9 @@
         </table>
       </div>
 
-      <p>Côté aval, <code>AREG_IOS.py:191</code> fait
+      <p>Côté aval, <code>AREG_IOS.py:180</code> fait
       <code>vtkMeshTeeth(list_teeth=[1], property="Butterfly")</code> et
-      <code>AREG_IOS.py:205</code> la même chose sur <code>MGL_ARRAY_NAME</code> :
+      <code>AREG_IOS.py:346</code> la même chose sur <code>MGL_ARRAY_NAME</code> :
       un patch fabriqué dans FlexReg est directement consommable par AREG_IOS, et
       réciproquement. La différence est l'origine du patch : AREG_IOS le fait prédire
       par un réseau (<code>PredPatch.py</code>, un <code>MonaiUNetHRes</code>
@@ -188,7 +188,7 @@
         <div class="callout-title">Point non évident</div>
         <p>Le CLI n'est <strong>pas</strong> lancé dans l'environnement conda. Il passe
         par <code>slicer.cli.run(slicer.modules.flexreg_cli, ...)</code>
-        (<code>FlexReg.py:939</code>), donc dans le Python de Slicer : d'où
+        (<code>FlexReg.py:949</code>), donc dans le Python de Slicer : d'où
         l'installation de <code>torch</code> dans Slicer lui-même par
         <code>ensureBooted</code>. Seuls <code>dentalmodelseg</code> et
         <code>ALI_IOS</code> passent par <code>conda run -n shapeaxi</code>.</p>
@@ -201,7 +201,7 @@
 
       <div class="callout warn">
         <div class="callout-title">Piège : conversion de fichier</div>
-        <p><code>ensureVtkInput()</code> (<code>FlexReg.py:3454</code>) convertit un
+        <p><code>ensureVtkInput()</code> (<code>FlexReg.py:3425</code>) convertit un
         <code>.stl</code> en <code>.vtk</code> avant toute opération. Ce n'est pas
         cosmétique : <code>dental_model_seg.py</code> fait
         <code>os.remove(args.stl)</code> et détruirait le fichier source si on lui
@@ -236,7 +236,7 @@
 
       <h3>4.1 Segmentation des couronnes : <a href="../ALI/ALI.html">DentalModelSeg</a> <span class="badge predit">prédit</span></h3>
 
-      <p><code>checkSegmentation()</code> (<code>FlexReg.py:3657</code>) ne teste pas
+      <p><code>checkSegmentation()</code> (<code>FlexReg.py:3628</code>) ne teste pas
       la présence de l'array : il <strong>tente l'orientation ci-dessus</strong> et
       lit l'exception.</p>
 
@@ -302,7 +302,7 @@
       <p>Les poids sont cherchés dans
       <code>&lt;Documents&gt;/SlicerDownloads/ALI/ALI_IOS/Models/Prediction</code>,
       sous la forme <code>Lower_MG_*.pth</code> (<code>hasMGLModel</code>,
-      <code>FlexReg.py:2587</code>) ; sinon un sélecteur de dossier s'ouvre.</p>
+      <code>FlexReg.py:2600</code>) ; sinon un sélecteur de dossier s'ouvre.</p>
 
       <h2 id="coeur">5. Le cœur algorithmique</h2>
 
@@ -355,7 +355,7 @@
       chaque patch a son index, ce qui permet de les <strong>cumuler</strong>. En fin
       de CLI, tous les <code>Butterfly1..N</code> sont fusionnés par
       <code>torch.logical_or</code> en un seul array <code>Butterfly</code>
-      (<code>FlexReg_CLI.py:229</code>) : c'est celui que l'ICP et <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> lisent.
+      (<code>FlexReg_CLI.py:277</code>) : c'est celui que l'ICP et <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> lisent.
       Le résultat est réécrit <strong>dans le fichier d'entrée</strong>.</p>
 
       <p>Le mode <code>delete</code> renumérote les arrays au-dessus de l'index
@@ -410,7 +410,7 @@
 
       <h3>5.2 Voie B : le patch dessiné <span class="badge calcule">calculé</span></h3>
 
-      <p><code>draw()</code> (<code>FlexReg.py:4239</code>), <code>type="curve"</code>.
+      <p><code>draw()</code> (<code>FlexReg.py:3972</code>), <code>type="curve"</code>.
       Une courbe Slicer contrainte à la surface
       (<code>SetAndObserveSurfaceConstraintNode</code>) plus un point milieu,
       sérialisés en chaînes et passés au CLI. <code>draw.py</code> interpole
@@ -529,7 +529,7 @@
 
       <h3>5.4 La registration <span class="badge calcule">calculé</span></h3>
 
-      <p><code>Reg.run()</code> (<code>FlexReg.py:1276</code>) relance le même CLI
+      <p><code>Reg.run()</code> (<code>FlexReg.py:1286</code>) relance le même CLI
       avec <code>type = "icp"</code> (haut) ou <code>"icp_mgl"</code> (bas).
       <strong>T2 est le mobile</strong> (<code>lineedit</code>), <strong>T1 le
       fixe</strong> (<code>path_reg</code>).</p>
@@ -611,7 +611,7 @@ sitk_tfm.SetTranslation(composed_inv[:3, 3])</code></pre>
 
       <h2 id="environnement">8. Environnement</h2>
 
-      <p><code>ensureBooted()</code> (<code>FlexReg.py:181</code>) centralise la
+      <p><code>ensureBooted()</code> (<code>FlexReg.py:192</code>) centralise la
       vérification, <strong>une seule fois</strong>, au moment où une action en a
       besoin, pas à l'affichage d'un scan. Les sondes coûtent 7.6 s mesurées :
       2.2 s pour <code>conda --version</code>, 0.6 s pour le test d'environnement,
