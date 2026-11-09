@@ -277,6 +277,8 @@ KIND_LABEL = {
  "en": {"bug": "Confirmed bug", "warn": "Pitfall", "ok": "Verified", "note": "Note"},
  "pt": {"bug": "Bug confirmado", "warn": "Armadilha", "ok": "Verificado", "note": "Nota"},
  "ko": {"bug": "확인된 버그", "warn": "함정", "ok": "확인됨", "note": "참고"},
+ "es": {"bug": "Error confirmado", "warn": "Trampa", "ok": "Verificado", "note": "Nota"},
+ "it": {"bug": "Bug confermato", "warn": "Insidia", "ok": "Verificato", "note": "Nota"},
  "th": {"bug": "บั๊กที่ยืนยันแล้ว", "warn": "ข้อควรระวัง", "ok": "ตรวจสอบแล้ว", "note": "หมายเหตุ"},
 }
 KIND_ORDER = ["bug", "warn", "ok", "note"]
@@ -291,6 +293,10 @@ CONSTAT_INTRO = {
                         "destaques das páginas. Anotado ao documentar, não ao caçar bugs."),
  "ko": ("발견 사항", "코드를 읽으며 드러난 모든 것을 각 페이지의 강조 상자 {n}개에서 모았다. "
                   "버그를 찾으려 한 것이 아니라 문서화하면서 기록한 것이다."),
+ "es": ("Hallazgos", "Todo lo que reveló la lectura del código, reunido a partir de los {n} "
+                    "recuadros de las páginas. Anotado al documentar, no al buscar errores."),
+ "it": ("Riscontri", "Tutto ciò che la lettura del codice ha messo in luce, raccolto dai {n} "
+                    "riquadri delle pagine. Annotato mentre si documentava, non mentre si cercavano bug."),
  "th": ("ข้อค้นพบ", "ทุกสิ่งที่การอ่านโค้ดเปิดเผยออกมา รวบรวมจากกล่องเน้น {n} กล่องในทุกหน้า "
                 "บันทึกไว้ระหว่างการจัดทำเอกสาร ไม่ใช่ระหว่างการไล่หาบั๊ก"),
 }
@@ -301,6 +307,8 @@ CONSTAT_FILTERS = {
  "en": ("Tool", "all", "filter text…", "Filter the findings"),
  "pt": ("Ferramenta", "todas", "filtrar o texto…", "Filtrar as constatações"),
  "ko": ("도구", "전체", "텍스트 필터…", "발견 사항 필터"),
+ "es": ("Herramienta", "todas", "filtrar el texto…", "Filtrar los hallazgos"),
+ "it": ("Strumento", "tutti", "filtra il testo…", "Filtra i riscontri"),
  "th": ("เครื่องมือ", "ทั้งหมด", "กรองข้อความ…", "กรองข้อค้นพบ"),
 }
 
@@ -482,6 +490,24 @@ PAPERS_UI = {
         "free": "무료 전문",
         "biblio": "이 도구의 전체 참고문헌(찾아낸 것과 찾아봤지만 없었던 것)은 "
                   "<a href=\"{href}\">출처 페이지</a>에 있습니다."},
+ "es": {"h2": "Cómo citar",
+        "cite": "Si usó {tool} en una investigación, cite:",
+        "software": "Nada describe el módulo en sí, así que cite la extensión "
+                    "como software:",
+        "accessed": "Añada la fecha de acceso si el estilo de su revista la exige.",
+        "context": "Contexto, no es una cita de la herramienta",
+        "free": "texto completo gratuito",
+        "biblio": "La bibliografía completa de la herramienta, lo que se encontró y lo que se "
+                  "buscó sin éxito, está en <a href=\"{href}\">sus fuentes</a>."},
+ "it": {"h2": "Come citare",
+        "cite": "Se hai usato {tool} nella tua ricerca, cita:",
+        "software": "Nulla descrive il modulo in sé, quindi cita l'estensione "
+                    "come software:",
+        "accessed": "Aggiungi la data di accesso se lo stile della tua rivista la richiede.",
+        "context": "Contesto, non una citazione dello strumento",
+        "free": "testo completo gratuito",
+        "biblio": "La bibliografia completa dello strumento, ciò che è stato trovato e ciò che è stato "
+                  "cercato senza successo, si trova nelle <a href=\"{href}\">sue fonti</a>."},
  "th": {"h2": "วิธีอ้างอิง",
         "cite": "หากคุณใช้ {tool} ในงานวิจัย ให้อ้างอิง:",
         "software": "ไม่มีเอกสารที่อธิบายโมดูลนี้โดยตรง "
@@ -620,6 +646,10 @@ VIDEO_UI = {
         "min": "{m} min {s:02d}", "sec": "{s} s"},
  "ko": {"label": "영상", "chan": "DCBIA Videos 채널", "short": "개요",
         "min": "{m}분 {s:02d}초", "sec": "{s}초"},
+ "es": {"label": "En vídeo", "chan": "canal DCBIA Videos", "short": "presentación",
+        "min": "{m} min {s:02d}", "sec": "{s} s"},
+ "it": {"label": "In video", "chan": "canale DCBIA Videos", "short": "panoramica",
+        "min": "{m} min {s:02d}", "sec": "{s} s"},
  "th": {"label": "วิดีโอ", "chan": "ช่อง DCBIA Videos", "short": "ภาพรวม",
         "min": "{m} นาที {s:02d} วินาที", "sec": "{s} วินาที"},
 }
@@ -704,6 +734,8 @@ LANDING = """<!doctype html>
     <a href="fr/guide/index.html" hreflang="fr"><b>Français</b><small>Guide et Atlas</small></a>
     <a href="pt/guide/index.html" hreflang="pt"><b>Português</b><small>Guia e Atlas</small></a>
     <a href="ko/guide/index.html" hreflang="ko"><b>한국어</b><small>가이드와 아틀라스</small></a>
+    <a href="es/guide/index.html" hreflang="es"><b>Español</b><small>Guía y Atlas</small></a>
+    <a href="it/guide/index.html" hreflang="it"><b>Italiano</b><small>Guida e Atlante</small></a>
     <a href="th/guide/index.html" hreflang="th"><b>ไทย</b><small>คู่มือและแอตลาส</small></a>
   </nav>
 </div>
@@ -729,6 +761,12 @@ GUIDE_INTRO = {
  "ko": ("사용 가이드",
         "각 도구가 무엇을 하는지, 무엇을 넣어야 하는지, 무엇을 돌려주는지, 코드는 다루지 "
         "않습니다. 내부 동작이 궁금하다면 아틀라스로 넘어가십시오."),
+ "es": ("Guía de uso",
+        "Qué hace cada herramienta, qué hay que darle, qué devuelve, sin entrar en el "
+        "código. Para los mecanismos internos, pase al Atlas."),
+ "it": ("Guida all'uso",
+        "Che cosa fa ciascuno strumento, che cosa fornirgli, che cosa restituisce, senza entrare "
+        "nel codice. Per i meccanismi interni, passa all'Atlante."),
  "th": ("คู่มือการใช้งาน",
         "เครื่องมือแต่ละตัวทำอะไร ต้องป้อนอะไรให้ และได้อะไรกลับมา, โดยไม่ลงรายละเอียดโค้ด "
         "หากต้องการเข้าใจกลไกภายใน ให้ไปที่แอตลาส"),
@@ -948,6 +986,107 @@ GUIDE_ABOUT = {
         <a href="#utilities">유틸리티</a></li>
         <li>임상 텍스트 추출 또는 익명화 →
         <a href="#text">텍스트 &amp; 언어</a></li>
+      </ul>
+""",
+ "es": """      <h2 id="pour-qui">A quién se dirige esta guía</h2>
+      <p>A cualquiera que abra SlicerAutomatedDentalTools en 3D Slicer y quiera usarlo:
+      clínicos, investigadores, estudiantes. No supone saber leer código ni saber qué es
+      una red neuronal. Si lo que interesa es el funcionamiento interno, qué modelo se
+      llama, cuándo, sobre qué datos, lo que se busca es el <a href="../index.html">Atlas</a>:
+      las dos secciones cubren los mismos {n} módulos, cada una desde el extremo opuesto.</p>
+
+      <h2 id="pourquoi">Por qué existe</h2>
+      <p>La extensión reúne {n} módulos escritos por equipos distintos en épocas
+      distintas. Su documentación se reduce, según el caso, a unas pocas líneas de
+      README, a una página de proyecto o a nada. Varios se comportan de forma distinta a
+      lo que describe su publicación: el artículo documenta una versión que el código ya no
+      ejecuta.</p>
+      <p>Esta guía se escribió leyendo el código de cada módulo, no su documentación. Dice
+      por tanto lo que la herramienta hace realmente cuando se hace clic, incluso cuando eso
+      incomoda: <strong>{warn} advertencias y {bug} errores</strong> se señalan en el punto
+      exacto en que es probable toparse con ellos. Aquí no se corrige nada: el objetivo es
+      que no pierda un día por ello.</p>
+
+      <h2 id="plan">Qué contiene cada página</h2>
+      <p>Todas siguen el mismo plan, para saber dónde mirar sin releerlo todo:</p>
+      <ul>
+        <li><strong>Cuándo usarla</strong>: qué problema resuelve la herramienta y los casos
+        en que no sirve de nada.</li>
+        <li><strong>Qué necesita, qué obtiene</strong>: las entradas esperadas, su
+        formato y lo que sale al final.</li>
+        <li><strong>Paso a paso</strong>: los pasos en orden, campo por campo.</li>
+        <li><strong>Cuando algo sale mal</strong>: los fallos frecuentes y sus
+        causas.</li>
+        <li><strong>Cómo citar</strong>: la referencia que se debe citar en un artículo
+        cuando la herramienta tiene una, y el enlace a la página del Atlas.</li>
+      </ul>
+
+      <h2 id="commencer">Por dónde empezar</h2>
+      <p>Si ya sabe qué herramienta busca, elíjala en la lista de abajo. Si no, parta de lo
+      que necesita hacer:</p>
+      <ul>
+        <li>Comparar dos exploraciones del mismo paciente a lo largo del tiempo →
+        <a href="#registration">Registro</a></li>
+        <li>Aislar estructuras en un CBCT →
+        <a href="#segmentation">Segmentación</a></li>
+        <li>Colocar landmarks anatómicos, o devolver un escaneo a su posición vertical →
+        <a href="#landmarks">Landmarks y orientación</a></li>
+        <li>Medir, clasificar o predecir a partir de una forma →
+        <a href="#analysis">Análisis</a></li>
+        <li>Recortar o aplicar una matriz, por lotes →
+        <a href="#utilities">Utilidades</a></li>
+        <li>Extraer o anonimizar texto clínico →
+        <a href="#text">Texto y lenguaje</a></li>
+      </ul>
+""",
+ "it": """      <h2 id="pour-qui">A chi è rivolta questa guida</h2>
+      <p>A chiunque apra SlicerAutomatedDentalTools in 3D Slicer e voglia usarlo:
+      clinici, ricercatori, studenti. Non presuppone di saper leggere il codice né di sapere
+      che cos'è una rete neurale. Se ti interessa il funzionamento interno, quale modello
+      viene chiamato, quando, su quali dati, ti serve invece l'<a href="../index.html">Atlante</a>:
+      le due sezioni coprono gli stessi {n} moduli, ciascuna dall'estremo opposto.</p>
+
+      <h2 id="pourquoi">Perché esiste</h2>
+      <p>L'estensione riunisce {n} moduli scritti da gruppi diversi in momenti diversi.
+      La loro documentazione si riduce, a seconda dei casi, a qualche riga di README, a una
+      pagina di progetto o a nulla. Parecchi si comportano diversamente da quanto descrive la
+      loro pubblicazione: l'articolo documenta una versione che il codice non esegue più.</p>
+      <p>Questa guida è stata scritta leggendo il codice di ciascun modulo, non la sua
+      documentazione. Dice quindi che cosa lo strumento fa davvero quando si clicca, anche
+      quando è scomodo: <strong>{warn} avvertenze e {bug} bug</strong> sono segnalati nel
+      punto esatto in cui è probabile inciamparvi. Qui non si corregge nulla: lo scopo è che
+      tu non perda una giornata per questo.</p>
+
+      <h2 id="plan">Che cosa contiene ogni pagina</h2>
+      <p>Seguono tutte lo stesso schema, così sai dove guardare senza rileggere tutto:</p>
+      <ul>
+        <li><strong>Quando usarlo</strong>: a quale problema risponde lo strumento e i casi
+        in cui non serve a nulla.</li>
+        <li><strong>Di che cosa hai bisogno, che cosa ottieni</strong>: gli input attesi, il
+        loro formato e ciò che esce alla fine.</li>
+        <li><strong>Passo dopo passo</strong>: le fasi in ordine, campo per campo.</li>
+        <li><strong>Quando qualcosa va storto</strong>: i guasti frequenti e le loro
+        cause.</li>
+        <li><strong>Come citare</strong>: il riferimento da citare in un articolo, quando lo
+        strumento ne ha uno, e il rimando alla pagina dell'Atlante.</li>
+      </ul>
+
+      <h2 id="commencer">Da dove cominciare</h2>
+      <p>Se sai quale strumento cerchi, prendilo dall'elenco qui sotto. Altrimenti parti da
+      ciò che devi fare:</p>
+      <ul>
+        <li>Confrontare due esami dello stesso paziente nel tempo →
+        <a href="#registration">Registrazione</a></li>
+        <li>Isolare strutture in un CBCT →
+        <a href="#segmentation">Segmentazione</a></li>
+        <li>Posizionare punti di repere anatomici, o rimettere dritta una scansione →
+        <a href="#landmarks">Landmark e orientamento</a></li>
+        <li>Misurare, classificare o predire a partire da una forma →
+        <a href="#analysis">Analisi</a></li>
+        <li>Ritagliare o applicare una matrice, in batch →
+        <a href="#utilities">Utilità</a></li>
+        <li>Estrarre o anonimizzare testo clinico →
+        <a href="#text">Testo e linguaggio</a></li>
       </ul>
 """,
  "th": """      <h2 id="pour-qui">คู่มือนี้เขียนให้ใคร</h2>
