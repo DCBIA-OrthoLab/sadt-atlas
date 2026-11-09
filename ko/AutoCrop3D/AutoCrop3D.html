@@ -54,7 +54,7 @@
       <li><a href="../Agent/Agent.html">Agent</a></li>
     </ul></div>
     <div class="nav-group"><h4>공통 코드</h4><ul>
-      <li><a class="untranslated" href="../../en/ADTLib/ADTLib.html" hreflang="en" title="ADTLib: not translated into 한국어 yet, this opens the English page">ADTLib</a></li>
+      <li><a href="../ADTLib/ADTLib.html">ADTLib</a></li>
     </ul></div>
     <div class="nav-group"><h4>공통 주제</h4><ul>
       <li><a href="../findings.html">발견 사항</a></li>
@@ -193,13 +193,13 @@ Upper = ROI_Center + ROI_Size / 2</code></pre>
       </div>
 
       <p>볼륨 쪽에서는 <code>Search</code>가 <code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd.gz</code>, <code>.nrrd</code>,
-      <code>.gipl.gz</code>, <code>.gipl</code>을 받아들인다(<code>AutoCrop3D_CLI.py:48</code>).
+      <code>.gipl.gz</code>, <code>.gipl</code>을 받아들인다(<code>AutoCrop3D_CLI.py:49</code>).
       <code>glob.iglob(**, recursive=True)</code> 뒤에 <code>endswith</code>를 적용하는 방식이다.</p>
 
       <h2 id="application">4. 상자를 적용하는 방식: 인덱스 추출, 리샘플링 없음</h2>
 
       <p>핵심은 이것이다: <strong>보간이 없다</strong>. 물리 좌표 → 인덱스 변환 뒤
-      자르기(<code>AutoCrop3D_CLI.py:77</code>):</p>
+      자르기(<code>AutoCrop3D_CLI.py:78</code>):</p>
 
       <pre><code>Lower = np.array(img.TransformPhysicalPointToContinuousIndex(Lower)).astype(int)
 Upper = np.array(img.TransformPhysicalPointToContinuousIndex(Upper)).astype(int)
@@ -280,7 +280,7 @@ img_roi = img[Lower[0]:Upper[0], Lower[1]:Upper[1], Lower[2]:Upper[2]]</code></p
 
       <h2 id="crop-volume">5. 대체 경로: Slicer의 Crop Volume 모듈</h2>
 
-      <p><code>processCropVolume()</code> (<code>AutoCrop3D.py:915</code>).
+      <p><code>processCropVolume()</code> (<code>AutoCrop3D.py:996</code>).
       "Use module 'Crop Volume' for tilted images" 체크박스로 활성화된다(커밋
       <code>9d2bbe8</code>). CLI가 아니라 <strong>위젯 안에서</strong> 실행된다:</p>
 
@@ -308,7 +308,7 @@ cropVolumeLogic.Apply(parameters)</code></pre>
       <h2 id="batch">6. 일괄 모드와 환자 ↔ ROI 짝짓기</h2>
 
       <p><code>len(ROIList['.mrk.json']) &gt; 1</code>로 구분되는 두 가지 방식이 있다
-      (<code>AutoCrop3D_CLI.py:53</code>):</p>
+      (<code>AutoCrop3D_CLI.py:54</code>):</p>
 
       <ul>
         <li><strong>ROI 하나</strong> → 찾은 모든 볼륨에 적용;</li>
@@ -334,12 +334,12 @@ cropVolumeLogic.Apply(parameters)</code></pre>
 
       <p>진행 상황은 파일마다 단순히 <code>open(logPath,'r+').write(str(index))</code>로
       기록한다. 위젯은 내용은 읽지 않고 <code>st_mtime</code>만 본다
-      (<code>AutoCrop3D.py:574</code>).</p>
+      (<code>AutoCrop3D.py:906</code>).</p>
 
       <h2 id="vtk">7. 분할로부터 VTK 메시 생성</h2>
 
       <p><code>if "seg" in ScanOutPath.lower()</code>로 작동한다
-      (<code>AutoCrop3D_CLI.py:151</code>). 이
+      (<code>AutoCrop3D_CLI.py:143</code>). 이
       검사는 <strong>출력 경로 전체</strong>에 대해 이루어지므로, 상위 폴더 이름이
       <code>Segmentations/</code>이기만 해도 모든 파일에서 작동한다. 실패는
       맨 <code>except: pass</code>가 삼켜 버린다.</p>
@@ -414,9 +414,8 @@ cropVolumeLogic.Apply(parameters)</code></pre>
       <h2 id="environnement">10. 실행 환경</h2>
 
       <p>설치할 것이 없다. 모듈은 Slicer에 이미 포함된 것만 쓴다:
-      <code>SimpleITK</code>, <code>numpy</code>, <code>vtk</code>, <code>qt</code>. <code>pip_install</code>은
-      <code>AutoCrop3D.py:11</code>에서 import되지만 한 번도
-      호출되지 않는다. CUDA도, WSL도, conda도 없다.</p>
+      <code>SimpleITK</code>, <code>numpy</code>, <code>vtk</code>, <code>qt</code>. <code>pip_install</code>은 이 페이지를 쓸 당시 import되었으나 한 번도 호출되지
+      않았으며, 2026-10-12에 다시 확인했을 때 그 import는 제거되어 있었다. CUDA도, WSL도, conda도 없다.</p>
 
       <h2 id="pieges">11. 함정과 취약 지점</h2>
 
@@ -446,7 +445,7 @@ cropVolumeLogic.Apply(parameters)</code></pre>
 
       <div class="callout warn">
         <div class="callout-title">함정: 인덱스 절삭</div>
-        <p><strong><code>.astype(int)</code>는 0 쪽으로 절삭하므로</strong>, <code>Upper</code>가 축마다 최대
+        <p><strong><code>.astype(int)</code>는 0 쪽으로 절삭하므로</strong>, <code>upper</code>가 축마다 최대
         복셀 하나를 잃는다. 임상적 영향은 없지만, 자르기가 요청한 중심에 대해
         대칭이 아니다.</p>
       </div>
@@ -456,14 +455,14 @@ cropVolumeLogic.Apply(parameters)</code></pre>
         <p><strong>ROI가 볼륨과 교차하는지 검사하지 않는다.</strong> 클램핑은
         <code>Lower ≥ 0</code>과 <code>Upper ≤ size</code>로 제한하지만, 클램핑 뒤
         <code>Lower &gt; Upper</code>가 되는 것은 막지 못한다. 그러면 크기 0인 영상이 나오고, 기록은
-        <code>try/except</code> 안에서 실패하며, 이 블록은 <code>Lower</code>/<code>Upper</code>를
+        <code>try/except</code> 안에서 실패하며, 이 블록은 <code>lower</code>/<code>upper</code>를
         로그에 남긴다.</p>
       </div>
 
       <div class="callout warn">
         <div class="callout-title">함정: 지나치게 넓은 경로 치환</div>
         <p><strong><code>.replace(basename, filename)</code>은 결합된 경로의 모든 등장 위치를 치환한다</strong>
-        (<code>AutoCrop3D_CLI.py:129</code>).
+        (<code>AutoCrop3D_CLI.py:130</code>).
         파일과 이름이 같은 폴더도 함께 이름이 바뀐다.</p>
       </div>
 
@@ -492,7 +491,7 @@ cropVolumeLogic.Apply(parameters)</code></pre>
         <div class="callout-title">함정: 동작하지 않는 단위 테스트</div>
         <p><strong>단위 테스트는 아무것도 테스트하지 않는다.</strong> <code>test_AutoCrop3D1</code>이 두 번 정의되어 있다.
         docstring만 들어 있는 클래스 메서드(<code>runTest</code>가 호출)와,
-        실제 테스트를 담고 있지만 한 번도 실행되지 않는 <strong>모듈 수준</strong> 함수(<code>AutoCrop3D.py:1097</code>)다.</p>
+        실제 테스트를 담고 있지만 한 번도 실행되지 않는 <strong>모듈 수준</strong> 함수(<code>AutoCrop3D.py:988</code>)다.</p>
       </div>
 
       <div class="callout warn">
