@@ -14,10 +14,10 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # L'anglais est la langue source : les autres arbres en sont des traductions,
 # mises à jour par lots. `python3 i18n.py stale` dit lesquelles sont en retard.
-LANGS = ("en", "fr", "pt", "ko", "th")
+LANGS = ("en", "fr", "pt", "ko", "th", "es", "it")
 
 # nom affiché dans le sélecteur de langue, dans sa propre langue
-LANG_NAMES = {"en": "English", "fr": "Français", "pt": "Português", "ko": "한국어", "th": "ไทย"}
+LANG_NAMES = {"en": "English", "fr": "Français", "pt": "Português", "ko": "한국어", "th": "ไทย", "es": "Español", "it": "Italiano"}
 
 # ─────────────────────────────────────────────────────────────
 #  THÈME : la seule variable à changer pour tester un style.
@@ -183,6 +183,8 @@ FILES = {
     "pt": {"findings": "findings.html", "glossary": "glossary.html"},
     "ko": {"findings": "findings.html", "glossary": "glossary.html"},
     "th": {"findings": "findings.html", "glossary": "glossary.html"},
+    "it": {"findings": "findings.html", "glossary": "glossary.html"},
+    "es": {"findings": "findings.html", "glossary": "glossary.html"},
 }
 
 

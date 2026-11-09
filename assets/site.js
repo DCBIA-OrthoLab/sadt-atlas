@@ -6,7 +6,7 @@
   var KEY = "sadt_atlas_theme";
   var root = document.documentElement;
   var LANG = (root.getAttribute("lang") || "en").slice(0, 2).toLowerCase();
-  if (["en", "fr", "pt", "ko", "th"].indexOf(LANG) < 0) LANG = "en";
+  if (["en", "fr", "pt", "ko", "th", "es", "it"].indexOf(LANG) < 0) LANG = "en";
 
   var T = {
     fr: { dark: "☾ sombre", light: "☀ clair", onpage: "Sur cette page",
