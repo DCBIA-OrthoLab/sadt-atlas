@@ -366,7 +366,7 @@
 "page": "AREG_CBCT",
 "url": "AREG_CBCT/AREG_CBCT.html#environnement",
 "title": "",
-"text": "check_lib_installed ( AREG.py:68 ) does not compare versions : the constraint is ignored as soon as the package is present, whatever its version."
+"text": "check_lib_installed ( AREG.py:104 ) does not compare versions : the constraint is ignored as soon as the package is present, whatever its version."
 },
 {
 "kind": "warn",
@@ -582,7 +582,7 @@
 "page": "AREG_IOS",
 "url": "AREG_IOS/AREG_IOS.html#pieges",
 "title": "",
-"text": "patch_radius is clamped to [0, 20] mm on the widget side ( AREG/AREG.py:817 ), whereas FlexReg stops at 5 mm. Beyond the height of attached gingiva, the band spills over onto mobile tissue."
+"text": "patch_radius is clamped to [0, 20] mm on the widget side ( AREG/AREG.py:878 ), whereas FlexReg stops at 5 mm. Beyond the height of attached gingiva, the band spills over onto mobile tissue."
 },
 {
 "kind": "ok",
@@ -851,8 +851,17 @@
 "cat": "Texte",
 "page": "Agent: full pipeline",
 "url": "Agent/Agent.html#modules",
-"title": "6 signatures out of 23 are correct",
+"title": "2 signatures out of 16 are correct",
 "text": "Since no parameter is named on the CLI side (everything is positional), a signature that is too short does not raise a clean error but produces a silent shift : on areg_ios , the log file path ends up as a filename suffix."
+},
+{
+"kind": "note",
+"tool": "Agent",
+"cat": "Texte",
+"page": "Agent: full pipeline",
+"url": "Agent/Agent.html#modules",
+"title": "Entries removed since this table was first written",
+"text": "The manifest used to list 23 tools. It has no medx_dashboard or medx_summarize entry any more (MedX left the tree), and the MRI2CBCT rework removed five more: mri2cbct_approx , mri2cbct_reg , mri2cbct_lr_crop , mri2cbct_orient_center and mri2cbct_tmj_crop . Only mri2cbct_resample remains. The three CLIs of the new pipeline, MRI2CBCT_PREPARE , MRI2CBCT_SEGMENT_MRI and MRI2CBCT_REGISTER , exist in MRI2CBCT_CLI/ but have no manifest entry, so the Agent cannot reach them either (checked with grep -i mri on the…"
 },
 {
 "kind": "bug",
@@ -1365,16 +1374,16 @@
 "page": "CNE",
 "url": "CNE/CNE.html#dependances",
 "title": "",
-"text": "The extra index explicitly points to the CPU wheels . Yet the CLI requests n_gpu_layers=-1 with the comment \"Use GPU if available\" ( CNE_CLI.py:166 ): with a CPU-only build this parameter has no effect. In practice inference runs on CPU, and a 7–8 B Q4-quantized model costs several tens of seconds per note there."
+"text": "The extra index explicitly points to the CPU wheels . Yet the CLI requests n_gpu_layers=-1 with the comment \"Use GPU if available\" ( CNE_CLI.py:164 ): with a CPU-only build this parameter has no effect. In practice inference runs on CPU, and a 7–8 B Q4-quantized model costs several tens of seconds per note there."
 },
 {
-"kind": "bug",
+"kind": "ok",
 "tool": "CNE",
 "cat": "Texte",
 "page": "CNE",
 "url": "CNE/CNE.html#modeles",
-"title": "",
-"text": "The Ortho download is broken. Verified via the Hugging Face API: the repository dcbia/Meta-Llama-3.1-8B-Instruct-Ortho contains only .gitattributes and model-q4_k_m.gguf . The file model-q4_0.gguf requested by the code does not exist: the URL returns HTTP 404 , while the q4_k_m URL returns 200. urlretrieve raises, the partial file is deleted, and the user sees \"Download failed or was cancelled\". TMJ mode, on the other hand, is correct ( qwen-ft-q4_k_m.gguf → 200). Fix: model-q4_0.gguf → model-q4_k_m.gguf ."
+"title": "Corrected",
+"text": "This page used to record a confirmed bug here: the Ortho mode asked for model-q4_0.gguf , which did not exist in the repository, so the download returned HTTP 404 and failed with \"Download failed or was cancelled\". The code now asks for model-q4_k_m.gguf in DCBIA-OrthoLab/Llama-3.1-8B-Instruct-Ortho ( CNE.py:518-519 ), and the TMJ file in DCBIA-OrthoLab/Qwen-2.5-7B-Instruct-TMJ ( CNE.py:525-526 ). Checked on 2026-11-09 with an HTTP HEAD request on both URLs: each answers 302 to the file, and the Ortho file is…"
 },
 {
 "kind": "warn",
@@ -1402,6 +1411,15 @@
 "url": "CNE/CNE.html#post-traitement",
 "title": "",
 "text": "Consequences: the naive find('{') … rfind('}') slicing breaks as soon as the response contains more than one JSON object, and a nested value (list, dict) is rendered by its Python repr in the text file."
+},
+{
+"kind": "warn",
+"tool": "CNE",
+"cat": "Texte",
+"page": "CNE",
+"url": "CNE/CNE.html#sorties",
+"title": "",
+"text": "The dashboard is a TMJ dashboard. The expected keys are headache intensity, jaw clicking, disc displacement, maximum opening, sleep disorder and similar ( dashboard_utils.py:339-396 ). They are the keys the TMJ model is supposed to return; nothing in the repository says the Ortho model writes them, and the Ortho mode has no instruction to impose them. On Ortho extractions the coverage check would most likely stop the run with the \"keys do not match\" error. This is an inference from the key list, not something run…"
 },
 {
 "kind": "bug",
@@ -1806,16 +1824,25 @@
 "page": "Automated CBCT-MRI Registration Advances Temporomandibular Degenerative Joint Disease Diagnosis",
 "url": "MRI2CBCT/2025_NAMIC_PW43_automated_cbct_mri_registration.html#approach",
 "title": "",
-"text": "This step 3 plan describes deformable registration by Elastix on the cropped images; the MRI2CBCT page describes, in the current code, a rigid registration (ITKElastix's \"rigid\" parameter). This 2025 report documents an earlier state of the pipeline, before the condyle + fiducial path and before the TMJ crop became automatic."
+"text": "This step 3 plan describes deformable registration by Elastix on the cropped images; the MRI2CBCT page describes, in the current code, no elastix at all: a global registration of two predicted cranial-base surfaces. This 2025 report documents the first generation of the pipeline (TorchReg then elastix), two rewrites before the current code."
 },
 {
-"kind": "ok",
+"kind": "note",
 "tool": "MRI2CBCT",
 "cat": "Recalage",
 "page": "MR2CBCT: Restoring and Extending Automated CBCT-MRI Registration for TMJ Analysis",
 "url": "MRI2CBCT/2026_NAMIC_PW45_MR2CBCT_restoring_extending.html#progress",
-"title": "",
-"text": "This report confirms, from the side of the team that maintains the module, two points that the MRI2CBCT page also documents from the code side: a fix for the mask/image size mismatch in apply_mask.py , and a fix for the left/right swap in side detection for the TMJ crop, the same swap flagged by the TODO found in LR_crop.py ."
+"title": "Superseded",
+"text": "The fixes listed here ( AREG_MRI.py , apply_mask.py , the TMJ crop side detection, the manual approximation tools) concern the previous generation of the module, which the MRI2CBCT page no longer describes: those files are gone from the tree."
+},
+{
+"kind": "note",
+"tool": "MRI2CBCT",
+"cat": "Recalage",
+"page": "MRI2CBCT",
+"url": "MRI2CBCT/MRI2CBCT.html#situation",
+"title": "What the rewrite replaced",
+"text": "The earlier module had six CLIs ( ORIENT_CENTER_MRI , LR_CROP , RESAMPLE_CBCT_MRI , APPROX , TMJ_CROP , REG ), a .ui file, a manual approximation tool, a condyle-segmentation network applied to the CBCT and a rigid elastix registration on mutual information. None of it is in the tree any more. Only MRI2CBCT_RESAMPLE_CBCT_MRI and its helper package MRI2CBCT_CLI_utils remain, and they are outside this chain : they are still built ( MRI2CBCT_CLI/CMakeLists.txt:2 ) and still called, but by AREG_IOSCBCT…"
 },
 {
 "kind": "note",
@@ -1824,70 +1851,7 @@
 "page": "MRI2CBCT",
 "url": "MRI2CBCT/MRI2CBCT.html#fichiers",
 "title": "",
-"text": "Part of this module now lives in the shared layer. ADTLib centralises what several modules carried in copies: from here, method.py , io/fs.py , logging_setup.py and the contract of method.py . Its page records how many copies each file replaced."
-},
-{
-"kind": "warn",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#pipeline",
-"title": "",
-"text": "Nothing prevents launching the registration without having gone through orientation, resample and approximation first: the CLI will accept the files, and elastix will silently diverge for lack of convergence, with no message distinguishing that from a \"normal\" failure."
-},
-{
-"kind": "warn",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#orientation",
-"title": "",
-"text": "The origin permutation from step 3 is only consistent with the default direction matrix. Choosing a different combination of checkboxes without revisiting this permutation decenters the volume."
-},
-{
-"kind": "warn",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#cropping",
-"title": "",
-"text": "Left and right are deliberately swapped in crop_cbct , for no elucidated reason (the TODO confirms it right in the code itself); the whole downstream chain (mirroring at resample, side detection) then depends on these crossed names."
-},
-{
-"kind": "warn",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#resampling",
-"title": "",
-"text": "Flattening subfolders at resample silently overwrites two same-named files coming from different subfolders. The error handler meant to flag the issue is itself broken (§12)."
-},
-{
-"kind": "bug",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#approximation",
-"title": "",
-"text": "\"Confirm & Save\" crashes if the volume comes from the scene: onConfirm does os.path.basename(self._mri_path) while _mri_path is reset to None as soon as the volume is picked via the qMRMLNodeComboBox ( ManualApprox_MRI2CBCT.py:247 ). Only \"Load from Folders Above\" works."
-},
-{
-"kind": "warn",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#approximation",
-"title": "",
-"text": "Both paths write into the same folder under identical volume names but different .tfm names, with different RAS/LPS conventions: see the detail in §12."
-},
-{
-"kind": "bug",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#recalage",
-"title": "Confirmed bug (fixed since, see §14)",
-"text": "A size mismatch between mask and image in apply_mask.py used to cause a crash before automatic resampling was added: see the NA-MIC PW45 report, which lists \"fixed a mask size mismatch crash in apply_mask.py\" among the fixes made since the description above."
+"text": "The shared layer is used less than before. ADTLib now serves the panel for testdata (test files and model downloads), env.deps and env.cuda (what to install), and the leftover resample CLI for logging_setup and progress_protocol . The module no longer uses ADTLib's method.py contract."
 },
 {
 "kind": "ok",
@@ -1896,25 +1860,7 @@
 "page": "MRI2CBCT",
 "url": "MRI2CBCT/MRI2CBCT.html#recalage",
 "title": "",
-"text": "The final registration is indeed a rigid elastix using Mattes mutual information, a single resolution, 10,000 iterations, 10,000 randomly drawn samples renewed at every iteration, with no initial transform: consistent with what the method paper states."
-},
-{
-"kind": "bug",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#recalage",
-"title": "",
-"text": "MatrixRetrieval reads TransformParameters but ignores the CenterOfRotationPoint that elastix's output parameter map nonetheless carries; the reconstructed sitk.Euler3DTransform therefore rotates around the origin. The written and applied transform only coincides with the one actually estimated by elastix if this center of rotation is at the origin, which is not guaranteed. Code copied verbatim from AREG_CBCT/AREG_CBCT_utils/utils.py:711 : the problem is shared with AREG_CBCT."
-},
-{
-"kind": "bug",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#pieges",
-"title": "",
-"text": "Elastix's center of rotation is lost. MatrixRetrieval reads TransformParameters but not the CenterOfRotationPoint that the output parameter map also carries; the reconstructed sitk.Euler3DTransform therefore rotates around the origin. The written and applied transform only coincides with the one estimated by elastix if that center is at the origin. Code copied verbatim from AREG_CBCT/AREG_CBCT_utils/utils.py:711 : the problem is shared."
+"text": "The registration never looks at the MRI or CBCT intensities. MRI2CBCT_REGISTER feeds register_joint the two segmentation files only ( MRI2CBCT_REGISTER.py:70 ); the images are read later, to be moved or resampled (§8). Whatever the segmentation misses or invents, the registration inherits. This is the opposite of the earlier version, where the CBCT segmentation was only a mask and the match was made on intensities."
 },
 {
 "kind": "warn",
@@ -1923,34 +1869,7 @@
 "page": "MRI2CBCT",
 "url": "MRI2CBCT/MRI2CBCT.html#pieges",
 "title": "",
-"text": "Two .tfm conventions for the same step. Manual approximation writes flip @ M @ flip with no inversion ( ManualApprox_MRI2CBCT.py:472 ), where FlexReg writes inv(flip @ M @ flip) for the same conversion: the ITK convention being fixed → moving. The automatic path goes through slicer.util.saveNode , which applies the correct convention."
-},
-{
-"kind": "bug",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#pieges",
-"title": "",
-"text": "\"Confirm & Save\" crashes if the volume comes from the scene : onConfirm does os.path.basename(self._mri_path) while _mri_path is reset to None as soon as the volume is picked via the qMRMLNodeComboBox ( ManualApprox_MRI2CBCT.py:247 ). Only \"Load from Folders Above\" works."
-},
-{
-"kind": "bug",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#pieges",
-"title": "",
-"text": "The resample's error handler crashes too : logger.warning(e, file=sys.stderr) ( resample.py:240 ), Logger.warning does not accept file= , so the caught exception turns into an uncaught TypeError ."
-},
-{
-"kind": "bug",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#pieges",
-"title": "",
-"text": "T2 without T1 breaks the resample : mri_output_folder / cbct_output_folder are only defined in the T1 branch ( MRI2CBCT_RESAMPLE_CBCT_MRI.py:162 ) → NameError ."
+"text": "A weak registration keeps a clean file name. The ladder only starts on a FLIP ( ladder.py:215 ). A pose that is not a flip but has fitness under 0.75 is accepted as it is, tagged FLAG in qc , and written without a suffix, because the _FLAGGED name is reserved for unresolved flips ( MRI2CBCT_REGISTER.py:92 , ladder.py:270 ). Only summary.csv and the end-of-run message say FLAG ."
 },
 {
 "kind": "warn",
@@ -1959,7 +1878,7 @@
 "page": "MRI2CBCT",
 "url": "MRI2CBCT/MRI2CBCT.html#pieges",
 "title": "",
-"text": "Hardcoded _T1 / _T2 suffixes in extract_patient_id ( TMJ_crop.py:24 ) and GetPatients ( utils_CBCT.py:25 ): a _T3 breaks the pairing. Note shared with AREG_CBCT."
+"text": "An unresolved flip writes the first pose, not the best. The docstring says \"the best result is written with a _FLAGGED suffix\" ( ladder.py:14 ); the code writes flipped , the best of rung 0's 50 draws ( :218 , :271 ), not the highest-fitness flip among the 150 collected by rung 1."
 },
 {
 "kind": "warn",
@@ -1968,7 +1887,7 @@
 "page": "MRI2CBCT",
 "url": "MRI2CBCT/MRI2CBCT.html#pieges",
 "title": "",
-"text": "Left and right deliberately swapped in crop_cbct , for no elucidated reason ( TODO ); the whole downstream chain (mirroring at resample, side detection) depends on these names."
+"text": "The side comes from where the header puts the slab. A single-joint MRI is called LEFT if its world x is positive in LPS ( mri_prep.py:64-66 ). The rule was validated on the lab's own slabs ( :5-7 ); a file whose header does not centre the patient near x = 0 gets the wrong side without any message. Two nets catch it: the swap button at the first pause, and rung 3 of the ladder (but only once the pose has flipped)."
 },
 {
 "kind": "warn",
@@ -1977,16 +1896,7 @@
 "page": "MRI2CBCT",
 "url": "MRI2CBCT/MRI2CBCT.html#pieges",
 "title": "",
-"text": "The orientation's origin permutation is written for the default matrix : a different direction in the table decenters the volume."
-},
-{
-"kind": "warn",
-"tool": "MRI2CBCT",
-"cat": "Recalage",
-"page": "MRI2CBCT",
-"url": "MRI2CBCT/MRI2CBCT.html#pieges",
-"title": "",
-"text": "Subfolder flattening at resample : same-named files overwritten with no message."
+"text": "An output folder inside an input folder is read back. list_images walks the folders recursively ( pairing.py:41-47 ) and takes any .nii.gz whose name starts with an ID. Results from an earlier run ( P01/P01_L_MRI_REG.nii.gz , P01_CBCT_MASK.nii.gz ) sitting under the MRI or CBCT folder would join the next run: a second CBCT for the same ID makes the whole patient \"skipped\" ( pairing.py:111-113 ). Read from the code, not run."
 },
 {
 "kind": "note",
@@ -1995,16 +1905,34 @@
 "page": "MRI2CBCT",
 "url": "MRI2CBCT/MRI2CBCT.html#pieges",
 "title": "",
-"text": "The progress bar is reported as non-functional for the TMJ crop ( labelBarNotWorking )."
+"text": "The log file does not survive a successful run. The panel appends to _steps/run.log ( MRI2CBCT.py:313 ); MRI2CBCT_PREPARE deletes _steps at the start ( :23-24 ), so the first lines written before it are lost, and the panel deletes it again after a successful run unless \"Keep the intermediate files\" is checked ( :455-457 )."
 },
 {
-"kind": "ok",
+"kind": "note",
+"tool": "MRI2CBCT",
+"cat": "Recalage",
+"page": "MRI2CBCT",
+"url": "MRI2CBCT/MRI2CBCT.html#pieges",
+"title": "",
+"text": "Only the MRI side gets the connected-component clean-up. mri_surface keeps the largest component ( ladder.py:138 ); cbct_surface does not ( :150-157 ), although surface.py:35-41 calls the filter mandatory before registration. Whether a stray island in the AMASSS mask ever matters has not been measured."
+},
+{
+"kind": "note",
+"tool": "MRI2CBCT",
+"cat": "Recalage",
+"page": "MRI2CBCT",
+"url": "MRI2CBCT/MRI2CBCT.html#pieges",
+"title": "Findings of the earlier page, withdrawn",
+"text": "The confirmed bugs and traps of the previous version described code that no longer exists: the lost CenterOfRotationPoint in MatrixRetrieval (shared with AREG_CBCT , where it stays), the manual approximation's crash on scene volumes, the resample's broken error handler and T2-without-T1 crash, the crossed left/right names in the L/R crop, the origin permutation of the orient step, the two .tfm conventions, the nnunet_version==2.8.0 pip name that does not exist, the hard-coded _T1 and _T2 suffixes of the TMJ crop.…"
+},
+{
+"kind": "note",
 "tool": "MRI2CBCT",
 "cat": "Recalage",
 "page": "MRI2CBCT: sources",
 "url": "MRI2CBCT/SOURCES.html",
-"title": "",
-"text": "What is published and confirmed in the code: the final registration is indeed a rigid elastix using Mattes mutual information ."
+"title": "Superseded",
+"text": "This page used to record, as confirmed in the code, a rigid elastix on Mattes mutual information. That was true of the earlier version; the current code has no elastix call."
 },
 {
 "kind": "note",
@@ -2169,13 +2097,22 @@
 "text": "This project page's illustrations are hosted on GitHub ( github.com/user-attachments/... ) and are therefore not reproducible offline; they are left here as links rather than as broken images. Two of the three screenshots actually show other modules (IOS-CBCT Registration, VFACE ), not SurgMovPred itself: the same copy-paste drift noted in SurgMovPred.py (see the tool page, \"Position in the pipeline\" section)."
 },
 {
-"kind": "warn",
+"kind": "ok",
 "tool": "SurgMovPred",
 "cat": "Analyse",
 "page": "SurgMovPred",
 "url": "SurgMovPred/SurgMovPred.html#situation",
-"title": "",
-"text": "Copy-paste leftovers from the CNE module (clinical-note summarization), not to be mistaken for the actual pipeline: the helpText says \"This tool helps to create summaries of clinical notes\" , the parameterNodeWrapper is documented with notesFolder_input / modelType / notesType , and process() still names its arguments notesFolder_input / notesFolder_output ( SurgMovPred.py:236 , SurgMovPred.py:815 )."
+"title": "Build state",
+"text": "The module is built with the extension: the root CMakeLists.txt has add_subdirectory(SurgMovPred) and add_subdirectory(SurgMovPred_CLI) ( CMakeLists.txt:60-61 ), and SurgMovPred/CMakeLists.txt calls slicerMacroBuildScriptedModule with the icon and SurgMovPred.ui . The interface text now describes this tool: the helpText says \"Predicts surgical movement targets from a table of patient measurements\" ( SurgMovPred.py:233 ) and the parameter node documents inputFolder , modelPath and outputFolder ( SurgMovPred.py:250…"
+},
+{
+"kind": "note",
+"tool": "SurgMovPred",
+"cat": "Analyse",
+"page": "SurgMovPred",
+"url": "SurgMovPred/SurgMovPred.html#situation",
+"title": "Remaining leftover",
+"text": "SurgMovPredLogic.process() still names its arguments notesFolder_input / notesFolder_output ( SurgMovPred.py:815 ); its docstring now says so and defers the renaming, because every caller passes them positionally."
 },
 {
 "kind": "note",
@@ -2893,9 +2830,9 @@
 "tool": "guide",
 "cat": "",
 "page": "CNE: extract information from clinical notes",
-"url": "guide/CNE.html#coince",
-"title": "The Ortho model won't download",
-"text": "The file the module asks for the Ortho model doesn't exist at the address listed on Hugging Face: the download fails with \"Download failed or was cancelled\", with no further explanation. TMJ mode downloads fine. If you pick Ortho today, expect this failure: it isn't something on your end."
+"url": "guide/CNE.html#tableau-de-bord",
+"title": "The Dashboard is built for TMJ notes",
+"text": "It looks for the fields the TMJ model writes (headache, jaw clicking, disc displacement, maximum opening...). Extractions made in Ortho mode list orthodontic findings instead (wire size, elastics, overjet...), so they would most likely stop the Dashboard with an error saying the keys do not match. That is deduced from the lists of fields in the code and on the model cards, not tested on Ortho output."
 },
 {
 "kind": "warn",
@@ -3119,8 +3056,8 @@
 "cat": "",
 "page": "MRI2CBCT: align an MRI and a CBCT of the TMJ",
 "url": "guide/MRI2CBCT.html#quand",
-"title": "Six tabs, not one button",
-"text": "Each tab has its own button and writes its files to its own folder; nothing in the module stops you from running them out of order or skipping one. Two tabs are genuinely optional (the left/right crop and the joint crop); the others only look optional: without them, the final registration starts with no starting point and won't converge."
+"title": "What it registers",
+"text": "The module does not match the two images' brightness. It asks a network to find the cranial base on the CBCT and another to find it on the MRI, then fits the two surfaces together. So the result is only as good as those two outlines, which is why it can pause to let you check them."
 },
 {
 "kind": "warn",
@@ -3128,8 +3065,8 @@
 "cat": "",
 "page": "MRI2CBCT: align an MRI and a CBCT of the TMJ",
 "url": "guide/MRI2CBCT.html#coince",
-"title": "An install prompt keeps coming back",
-"text": "Automatic dependency installation fails every time (a misspelled package name that doesn't exist). You'll see an installation error before almost every button, but the action carries on anyway regardless. If the rest of your setup is already in place, that changes nothing; but if condyle segmentation later fails without a clear message, this is the likely cause: the real dependency was never installed on its own, and you'll need to install it yourself."
+"title": "Restart after the first setup",
+"text": "If PyTorch had to be installed or replaced for your graphics card, the panel asks you to restart Slicer and press Run again. On Linux, the registration library needs a system with glibc 2.31 or newer."
 },
 {
 "kind": "warn",
@@ -3137,8 +3074,8 @@
 "cat": "",
 "page": "MRI2CBCT: align an MRI and a CBCT of the TMJ",
 "url": "guide/MRI2CBCT.html#coince",
-"title": "Two paths that crash the module",
-"text": "In manual approximation, \"Confirm & Save Alignment\" crashes if the MRI volume was picked from the scene's drop-down list: only loading it through \"Load from Folders Above\" works reliably. And in resampling, processing T2 MRIs without also filling in the T1 fields crashes the step: always fill in both, even if one of the two folders stays empty."
+"title": "A patient is skipped",
+"text": "A file with no ID at the start of its name, an MRI without a CBCT (or the reverse), or a patient with more than one CBCT is left out, and the panel lists them before it starts. Keep your output folder outside the MRI and CBCT folders: the folders are read recursively, so an earlier run's results could be picked up as new scans."
 },
 {
 "kind": "warn",
@@ -3146,8 +3083,8 @@
 "cat": "",
 "page": "MRI2CBCT: align an MRI and a CBCT of the TMJ",
 "url": "guide/MRI2CBCT.html#coince",
-"title": "The written matrix doesn't quite match the produced image",
-"text": "The transform file ( .tfm ) saved at the end of registration doesn't fully capture the internal computation: a reference point for the final rotation is lost on writing. The already-registered MRI the module gives you is reliable; but if you reload the matrix in another program to apply it yourself, expect a slight mismatch with the result produced here."
+"title": "Read the verdict, not only the file name",
+"text": "A joint can come out FLAG (weak overlap) and still be saved under a normal file name; only summary.csv and the message at the end say so. SMALL means the MRI outline was very small, the case that most often fails. Anything tagged _FLAGGED , FLIP or _MIRRORED deserves a look before you rely on it."
 },
 {
 "kind": "note",
@@ -3155,8 +3092,17 @@
 "cat": "",
 "page": "MRI2CBCT: align an MRI and a CBCT of the TMJ",
 "url": "guide/MRI2CBCT.html#coince",
-"title": "Files skipped without a word",
-"text": "Normalization and registration only accept .nii.gz : a .nii file is silently ignored, with no error. And during resampling, two files with the same name coming from different subfolders overwrite each other without warning. Use unique names per patient and check that every file you expect actually comes out."
+"title": "Wrong side",
+"text": "The side of a single-joint MRI comes from its position in the file. If it is wrong, swap it at the first pause. If you did not pause, the module can still recover by trying the other side, but only when the first answer was a flip."
+},
+{
+"kind": "note",
+"tool": "guide",
+"cat": "",
+"page": "MRI2CBCT: align an MRI and a CBCT of the TMJ",
+"url": "guide/MRI2CBCT.html#coince",
+"title": "The log disappears",
+"text": "The run log lives with the intermediate files, which are deleted after a successful run unless you tick \"Keep the intermediate files\"."
 },
 {
 "kind": "note",

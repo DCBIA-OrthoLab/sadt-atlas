@@ -469,8 +469,8 @@ PAPERS = {
              "Temporomandibular Degenerative Joint Disease",
     "fr": "Le papier du module : la démarche de recalage IRM ↔ CBCT sur "
           "l'articulation temporo-mandibulaire.",
-    "en": "The module's paper: the MRI ↔ CBCT registration approach on the "
-          "temporomandibular joint.",
+    "en": "The paper of the earlier, elastix-based version of the module; the "
+          "current registration works differently.",
     "pt": "O artigo do módulo: a abordagem de registro MRI ↔ CBCT na articulação "
           "temporomandibular (ATM).",
     "ko": "이 모듈의 논문입니다. 측두하악관절(TMJ)에서의 MRI ↔ CBCT 정합 방법을 "
@@ -482,8 +482,8 @@ PAPERS = {
              "to Precision Treatment",
     "fr": "La suite : ce recalage replacé dans la chaîne complète d'analyse du "
           "patient.",
-    "en": "The follow-up: this registration put back into the full patient "
-          "analysis pipeline.",
+    "en": "The follow-up: the registration of the earlier version put back into "
+          "the full patient analysis pipeline.",
     "pt": "A continuação: esse registro inserido no fluxo completo de análise do "
           "paciente.",
     "ko": "후속 연구입니다. 이 정합을 환자 분석 파이프라인 전체 안에 다시 배치합니다.",
@@ -519,7 +519,7 @@ PAPERS = {
     "ref": "Klein et al., IEEE TMI 2010",
     "title": "elastix: A Toolbox for Intensity-Based Medical Image Registration",
     "fr": "Le moteur de recalage employé sous le capot.",
-    "en": "The registration engine used under the hood.",
+    "en": "The registration engine of the earlier version of the module; the current one does not use it.",
     "pt": "O motor de registro usado internamente.",
     "ko": "내부에서 사용하는 정합 엔진입니다.",
     "th": "เครื่องมือลงทะเบียนภาพที่ใช้อยู่เบื้องหลัง"},

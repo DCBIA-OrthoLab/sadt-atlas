@@ -365,9 +365,9 @@ BLURBS = {
    "guide_th": "ลงทะเบียนภาพ CBCT สองชุดด้วยเอนจินของ ITK-SNAP"},
  "MRI2CBCT": {
    "atlas_fr": "recalage multimodal IRM ↔ CBCT",
-   "atlas_en": "multimodal MRI ↔ CBCT registration",
+   "atlas_en": "one-button MRI ↔ CBCT registration of cranial-base surfaces",
    "guide_fr": "Aligner une IRM et un CBCT de l'articulation temporo-mandibulaire",
-   "guide_en": "Align an MRI and a CBCT of the temporomandibular joint",
+   "guide_en": "Align an MRI and a CBCT of the temporomandibular joint in one run",
    "atlas_pt": "registro multimodal RM ↔ CBCT",
    "guide_pt": "Alinhar uma RM e um CBCT da articulação temporomandibular",
    "atlas_ko": "MRI ↔ CBCT 다중 모달 정합",

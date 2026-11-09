@@ -136,7 +136,7 @@
         <table>
           <thead><tr><th>Called</th><th>How</th></tr></thead>
           <tbody>
-            <tr><td><span class="badge cli">SurgMovPred_CLI</span></td><td><code>slicer.cli.run(slicer.modules.surgmovpred_cli, …)</code> (<code>SurgMovPred.py:842</code>)</td></tr>
+            <tr><td><span class="badge cli">SurgMovPred_CLI</span></td><td><code>slicer.cli.run(slicer.modules.surgmovpred_cli, …)</code> (<code>SurgMovPred.py:847</code>)</td></tr>
           </tbody>
         </table>
       </div>
@@ -144,14 +144,25 @@
       <p>The module isn't wired into the MRML scene: no <code>vtkMRMLNode</code> is created, read
       or transformed. It's a launch interface sitting on top of a pandas script.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall</div>
-        <p>Copy-paste leftovers from the <a href="../CNE/CNE.html">CNE</a> module (clinical-note summarization), not
-        to be mistaken for the actual pipeline: the <code>helpText</code> says <em>"This tool helps to
-        create summaries of clinical notes"</em>, the <code>parameterNodeWrapper</code> is documented with
-        <code>notesFolder_input</code> / <code>modelType</code> / <code>notesType</code>, and <code>process()</code> still names its
-        arguments <code>notesFolder_input</code> / <code>notesFolder_output</code>
-        (<code>SurgMovPred.py:236</code>, <code>SurgMovPred.py:815</code>).</p>
+      <div class="callout ok">
+        <div class="callout-title">Build state</div>
+        <p>The module is built with the extension: the root <code>CMakeLists.txt</code> has
+        <code>add_subdirectory(SurgMovPred)</code> and <code>add_subdirectory(SurgMovPred_CLI)</code>
+        (<code>CMakeLists.txt:60-61</code>), and <code>SurgMovPred/CMakeLists.txt</code> calls
+        <code>slicerMacroBuildScriptedModule</code> with the icon and <code>SurgMovPred.ui</code>.
+        The interface text now describes this tool: the <code>helpText</code> says <em>"Predicts
+        surgical movement targets from a table of patient measurements"</em>
+        (<code>SurgMovPred.py:233</code>) and the parameter node documents <code>inputFolder</code>,
+        <code>modelPath</code> and <code>outputFolder</code> (<code>SurgMovPred.py:250</code>). The notes-summarization
+        wording copied from <a href="../CNE/CNE.html">CNE</a>/<a href="../MedX/MedX.html">MedX</a> is gone.</p>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Remaining leftover</div>
+        <p><code>SurgMovPredLogic.process()</code> still names its arguments
+        <code>notesFolder_input</code> / <code>notesFolder_output</code> (<code>SurgMovPred.py:815</code>);
+        its docstring now says so and defers the renaming, because every caller passes them
+        positionally.</p>
       </div>
 
       <h2 id="fichiers">2. Files involved</h2>
@@ -162,7 +173,7 @@
           <tbody>
             <tr>
               <td><code>SurgMovPred/SurgMovPred.py</code></td>
-              <td>widget: 3 folder selectors, downloading of models and test files, dependency installation, ~400 lines of QSS</td>
+              <td>widget: 3 folder selectors, downloading of models and test files, dependency installation, ~230 lines of QSS</td>
               <td>Slicer's Python</td>
             </tr>
             <tr>
@@ -186,7 +197,7 @@
       <h2 id="entree">3. Input and preprocessing</h2>
 
       <p><strong>Accepted format.</strong> <code>load_data_from_directory()</code>
-      (<code>SurgMovPred_CLI.py:141</code>) collects every
+      (<code>SurgMovPred_CLI.py:143</code>) collects every
       <code>*.csv</code>, <code>*.xlsx</code>, <code>*.ods</code> file in the folder (extension in
       lowercase <strong>and</strong> uppercase), reads them (<code>read_csv</code>, <code>read_excel</code>,
       <code>read_excel(engine='odf')</code>) and <strong>concatenates</strong> them
@@ -197,7 +208,7 @@
       <code>dolp_ceph_total</code>), and it's <code>all_data</code> that sits in first position.</p>
 
       <p><strong>Column-name normalization</strong>, <code>clean_name()</code>
-      (<code>SurgMovPred_CLI.py:39</code>), applied on input
+      (<code>SurgMovPred_CLI.py:41</code>), applied on input
       to fall back onto the spelling used at training time:</p>
 
       <ol>
@@ -214,7 +225,7 @@
       becomes <code>Jarabak's_ratio</code>, <code>FMA(MP-FH) Ang_2D</code> becomes <code>FMA_MP_FH_Ang_2D</code>.</p>
 
       <p><strong>Patient identifier.</strong> <code>find_id_column()</code>
-      (<code>SurgMovPred_CLI.py:81</code>) tests 8 case-insensitive
+      (<code>SurgMovPred_CLI.py:83</code>) tests 8 case-insensitive
       patterns (<code>#</code>, <code>id</code>, <code>patient id</code>, <code>patient number</code>,
       <code>subject</code>, …) then, as a last resort, any column containing both "patient" and
       "id". In the test file, the column is <code>#</code>. On failure, the output column
@@ -223,10 +234,10 @@
       <p><strong>Value normalization.</strong> Each model package carries <strong>its own</strong>
       <code>StandardScaler</code> <span class="badge calcule">computed</span> (centering + scaling,
       <code>with_mean=True</code>, <code>with_std=True</code>), applied right before prediction
-      (<code>SurgMovPred_CLI.py:237</code>). No imputation: a missing value propagates as
+      (<code>SurgMovPred_CLI.py:239</code>). No imputation: a missing value propagates as
       <code>NaN</code> all the way to the output.</p>
 
-      <p><strong>Tolerance on the <code>_T0</code> suffix</strong> (<code>SurgMovPred_CLI.py:223</code>):
+      <p><strong>Tolerance on the <code>_T0</code> suffix</strong> (<code>SurgMovPred_CLI.py:225</code>):
       if the model expects <code>X_T0</code> and the column is named <code>X</code>, it is accepted.</p>
 
       <div class="callout">
@@ -247,15 +258,15 @@
       <p><strong>706 MB</strong>, 112 folders, one <code>stacking_package.pkl</code> of ~13 MB each.
       <code>load_all_model_packages()</code> does a recursive <code>Path.glob("**/stacking_package.pkl")</code>
       and indexes by <code>package['target_name']</code>: pointing the selector at <code>all_models/</code>
-      loads all 112 models, pointing at a subfolder loads only one. The CLI's help text
-      mentions <code>saved_models/class_1</code>, <code>saved_models/class_None</code> folders:
+      loads all 112 models, pointing at a subfolder loads only one. The CLI's help text and a comment
+      (<code>SurgMovPred_CLI.py:284</code>, <code>SurgMovPred_CLI.py:320</code>) mention <code>saved_models/class_1</code>, <code>saved_models/class_None</code> folders:
       <strong>this hierarchy by skeletal class does not exist in the published archive</strong>,
       which is flat.</p>
 
       <h3 id="modeles-paquet">4.1 Contents of a package</h3>
 
       <p>Each <code>.pkl</code> is a four-key <code>joblib</code> dict, used as-is by
-      <code>SurgMovPred_CLI.py:212</code>:</p>
+      <code>SurgMovPred_CLI.py:214-216</code>:</p>
 
       <div class="table-wrap">
         <table>
@@ -434,7 +445,7 @@
 
       <h2 id="traitement">5. The core processing</h2>
 
-      <p><code>predict_all_targets()</code> (<code>SurgMovPred_CLI.py:194</code>), in full:</p>
+      <p><code>predict_all_targets()</code> (<code>SurgMovPred_CLI.py:196</code>), in full:</p>
 
       <pre><code>for target_name, pack in packages.items():
     X_target = df_cleaned[[feature_source[f] for f in pack['features_names']]]
@@ -528,7 +539,7 @@
       <h2 id="environnement">8. Environment</h2>
 
       <p>Everything runs inside Slicer's Python. <code>check_dependencies()</code>
-      (<code>SurgMovPred.py:156</code>) is called on <strong>every</strong> click of Apply:</p>
+      (<code>SurgMovPred.py:153</code>) is called on <strong>every</strong> click of Apply:</p>
 
       <div class="table-wrap">
         <table>
@@ -589,8 +600,10 @@
         <li><strong>No uncertainty on output</strong> even though one of the three base models is
         a Gaussian process.</li>
         <li><strong>No rigid consistency between the points of a given segment</strong> (§7).</li>
-        <li>The <code>helpText</code>, the parameter node's docstring, and <code>process()</code>'s
-        argument names describe an entirely different tool (clinical-note summarization).</li>
+        <li><code>process()</code> still names its arguments <code>notesFolder_input</code> /
+        <code>notesFolder_output</code> (<code>SurgMovPred.py:815</code>), a leftover from the
+        clinical-notes tool; the <code>helpText</code> and the parameter node's docstring were
+        rewritten and no longer carry it.</li>
       </ul>
 
       <h2 id="litterature">10. Literature</h2>
