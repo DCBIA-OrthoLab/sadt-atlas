@@ -174,6 +174,11 @@ def build_lang(lang):
         folder = rel.split("/")[0] if "/" in rel else ""
         tool = folder if folder in CATS else ("Accueil" if rel == "index.html" else folder)
         cat = CATS.get(folder, "")
+        parts = rel.split("/")
+        if folder == "visor" and len(parts) == 3:
+            # pages VISOR d'un outil : visor/<Outil>/<Outil>.html et visor/guide/<Outil>.html
+            vtool = os.path.splitext(parts[2])[0] if parts[1] == "guide" else parts[1]
+            tool, cat = f"{vtool} (VISOR)", CATS.get(vtool, "")
         p = Page()
         p.feed(open(path, encoding="utf-8").read())
         title = clean(p.title) or rel
@@ -417,8 +422,14 @@ def page_params(rel):
                fl["glossary"]: "glossary"}.get(f, "home")
         return lang, "atlas", cur, 1, rel
     folder, f = rest[0], rest[1]
+    if folder == "visor" and len(rest) == 3:      # visor/<Outil>/<Outil>.html, visor/guide/<Outil>.html
+        if rest[1] == "guide":
+            return lang, "guide", "visor/" + os.path.splitext(rest[2])[0], 3, rel
+        return lang, "atlas", "visor/" + rest[1], 3, rel
     if folder == "guide":
         return lang, "guide", ("home" if f == "index.html" else os.path.splitext(f)[0]), 2, rel
+    if folder == "visor":
+        return lang, "atlas", "visor/" + os.path.splitext(f)[0], 2, rel
     return lang, "atlas", folder, 2, rel
 
 
@@ -1146,6 +1157,15 @@ def write_guide_index(lang):
     _w, _b = guide_callouts(lang)
     about = GUIDE_ABOUT[lang].format(n=len(nav.TOOLS), warn=_w, bug=_b)
     cards = []
+    if lang == "en":
+        # VISOR : anglais seulement pour l'instant (les autres langues n'ont pas la page).
+        cards.append('      <h2 id="visor">VISOR: run the tools on a server</h2>')
+        cards.append('      <p>The tool pages below describe the legacy Slicer modules, and each ends with a '
+                     '<em>With VISOR</em> section. This page covers the new way of running them.</p>')
+        cards.append('      <div class="card-grid">')
+        cards.append('        <a class="card" href="visor.html"><span class="card-name">Using VISOR</span>'
+                     '<span class="card-desc">Connect Slicer to a VISOR server, run a tool, review and download the results</span></a>')
+        cards.append("      </div>")
     for cat, labels in nav.CATS.items():
         tools = [t for t, c in nav.TOOLS if c == cat]
         if not tools:
