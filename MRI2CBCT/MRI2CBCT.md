@@ -1,3 +1,5 @@
+> **Version précédente.** Ce texte décrit le module avant le pipeline à un bouton (ADT PR #277, octobre 2026). La fiche à jour est `en/MRI2CBCT/MRI2CBCT.html`.
+
 # MRI2CBCT : pipeline complet
 
 Recalage rigide multimodal IRM → CBCT de l'ATM. Six étapes indépendantes, chacune
