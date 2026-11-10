@@ -11,6 +11,7 @@ from html.parser import HTMLParser
 
 import nav
 import papers
+import terms
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SKIP_DIRS = {"assets"}
@@ -1271,6 +1272,8 @@ if __name__ == "__main__":
     check_papers()
     sync_papers()
     sync_videos()
+    if terms.run():   # registre des termes (en/visor) : liens auto, cibles verifiees
+        print("registre des termes : cibles cassees, voir ci-dessus")
     for _l in nav.LANGS:
         if os.path.isdir(os.path.join(ROOT, _l)):
             _idx, _c = build_lang(_l)
