@@ -27,6 +27,7 @@ VOID = {"br", "hr", "img", "input", "meta", "link", "source", "wbr", "col", "are
 TAG = re.compile(r"(<!--.*?-->|<[^>]+>)", re.S)
 AUTO = re.compile(r'<a class="gterm" data-term="[^"]*" href="[^"]*" title="[^"]*">(.*?)</a>', re.S)
 IDS = {}
+GLOSS = set()
 
 
 def ids_of(path):
@@ -55,7 +56,7 @@ def check_targets(reg, langs):
     for lang in langs:
         gl = ids_of(os.path.join(ROOT, lang, "glossary.html"))
         for key, t in reg["terms"].items():
-            if gl is None or "g-" + key not in gl:
+            if not t.get("code") and not t.get("atlas") and (gl is None or "g-" + key not in gl):
                 bad.append("%s: g-%s absent de %s/glossary.html" % (key, key, lang))
             for fld in ("code", "atlas"):
                 tgt = t.get(fld)
@@ -84,6 +85,8 @@ def href_for(path, lang, key, t):
         tgt = t.get("atlas")
     else:
         tgt = t.get("code") or "glossary.html#g-" + key
+        if not t.get("code") and key not in GLOSS:
+            return None
     if not tgt or tgt.partition("#")[0] == here:
         return None
     rel = os.path.relpath(os.path.join(base, tgt.partition("#")[0]), os.path.dirname(path)).replace(os.sep, "/")
@@ -134,6 +137,9 @@ def process(src, path, lang, terms):
             mm = rx.search(p)
             if not mm:
                 continue
+            only = t.get("only")
+            if only and os.path.relpath(path, os.path.join(ROOT, lang)).replace(os.sep, "/") not in only:
+                continue
             h = href_for(path, lang, key, t)
             if h:
                 hits.append((mm.start(), mm.end(), key, h))
@@ -145,7 +151,8 @@ def process(src, path, lang, terms):
             seen.add(key)
             buf.append(p[last:s])
             buf.append('<a class="gterm" data-term="%s" href="%s" title="%s">%s</a>' % (
-                key, h, "See glossary" if h.split("#")[-1] == "g-" + key else "See the code", p[s:e]))
+                key, h, "See glossary" if h.split("#")[-1] == "g-" + key else
+                ("See the explanation" if path.endswith(".code.html") else "See the code"), p[s:e]))
             last = e
         buf.append(p[last:])
         out.append("".join(buf))
@@ -154,6 +161,7 @@ def process(src, path, lang, terms):
 
 def run(check=False):
     reg, terms = load()
+    GLOSS.update(k[2:] for k in ids_of(os.path.join(ROOT, "en", "glossary.html")) or [] if k.startswith("g-"))
     bad = check_targets(reg, ["en"])
     for b in bad:
         print("registre :", b)

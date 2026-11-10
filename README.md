@@ -165,6 +165,10 @@ the pages were checked against it. Update the SHA lines of this README with it.
 
 `assets/term-registry.json` lists the terms that link to the glossary (and, later, between an atlas page and its code page). `python3 build.py` runs `terms.py`, which wraps the first occurrence of each term in each `<h2>` section of `en/visor/` in `<a class="gterm" data-term="...">`. Code, headings, existing links, SVG and breadcrumbs are never touched; hand-written `gterm` links win. The auto links are removed and rewritten on each pass, so editing the registry is enough. A term can carry a `code` target (atlas page links to the code page) and an `atlas` target (a `*.code.html` page links back); both are checked against the page ids at build time. `python3 terms.py --check` changes nothing and exits 1 if a page would change or a target is broken. Scope is English VISOR only, so the translated pages and their `i18n.py` digests are unaffected.
 
+### Atlas and code pages (pilot: ALI)
+
+`en/visor/ALI/ALI.html` explains the tool (pipeline, maths, input to output) without `file:line` references; `en/visor/ALI/ALI.code.html` holds the code detail, the arguments, the environment, the legacy comparison and the findings (callouts live only on the code page, so `findings.html` has no duplicates). The pages link by section (`In the code` / `Plain-language explanation` links) and by term (registry entries with `code` and `atlas` targets and an `only` list of pages). The atlas page uses `figure.algo` cards (`assets/algo.js`): a looping SVG scene, the formula with coloured symbols and a legend; the text lives in the HTML, the script only draws (`data-scene` names the scene). Append `#algo=0.5` to a URL to freeze every scene at that time. The pipeline diagram boxes link to their sections. Other modules still carry both in one page.
+
 ## Languages
 
 **English is the source language.** Changes are made in `en/` only; `fr/`, `pt/`, `ko/`,
