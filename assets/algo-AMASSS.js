@@ -37,7 +37,8 @@
     };
   };
 
-  /* 2. Fenetre glissante : des fenetres qui se recouvrent de moitie, ponderees par une gaussienne */
+  /* 2. Fenetre glissante : trois fenetres decalees de la moitie, ponderees par une gaussienne.
+     La courbe noire du bas est la SOMME des poids (le denominateur de la formule), pas le score final. */
   A.scenes.amasss_window = function (svg) {
     var X0 = 20, L = 280, T = 140, STEP = 70, BASE = 150, TOP = 56, sigma = T / 8, i;
     var starts = [0, 70, 140];
@@ -105,9 +106,9 @@
     };
   };
 
-  /* 4. Interpolation : cubique contre lineaire entre les memes echantillons */
+  /* 4. Interpolation : cubique contre lineaire entre les memes six echantillons (valeurs inventees) */
   A.scenes.amasss_interp = function (svg) {
-    var X0 = 24, DX = 38, BASE = 150, ys = [60, 36, 74, 30, 66, 44, 52], n = ys.length, i;
+    var X0 = 24, DX = 38, BASE = 150, ys = [60, 36, 74, 30, 66, 44], n = ys.length, i;
     function Y(k) { return BASE - ys[k] * 1.1; }
     function cat(k, u) {                       /* Catmull-Rom entre k et k+1 */
       var p0 = Y(Math.max(0, k - 1)), p1 = Y(k), p2 = Y(k + 1), p3 = Y(Math.min(n - 1, k + 2));
@@ -132,7 +133,8 @@
     };
   };
 
-  /* 5. Surface : isocontour a 0.5 d'un masque binaire, puis decimation */
+  /* 5. Surface : isocontour d'un masque binaire (ici un contour 2D invente), lissage, puis decimation.
+     Sans decimation (data-decim="0", legacy) : contour puis lissage seulement. */
   A.scenes.amasss_surface = function (svg, fig) {
     var dec = !(fig && fig.getAttribute && fig.getAttribute("data-decim") === "0");
     var GX = 12, GY = 9, C = 15, OX = 16, OY = 12, i, j;
@@ -141,27 +143,29 @@
       var r = E("rect", { "class": ins(i, j) ? "a-soft" : "a-cell", x: OX + i * C, y: OY + j * C, width: C - 1, height: C - 1 }, svg);
       if (ins(i, j)) { r.setAttribute("fill-opacity", 0.22); }
     } }
-    var M = 40, pts = [], k;
+    var M = 40, smooth = [], rough = [], k;
     for (k = 0; k < M; k++) {
-      var a = k / M * 2 * Math.PI, wob = 1 + 0.08 * Math.sin(3 * a);
-      pts.push([OX + 5.5 * C + 4.1 * C * wob * Math.cos(a) + C / 2, OY + 4 * C + 2.9 * C * wob * Math.sin(a) + C / 2]);
+      var a = k / M * 2 * Math.PI, wob = 1 + 0.08 * Math.sin(3 * a), sgn = k % 2 ? 1 : -1;
+      var px = OX + 5.5 * C + 4.1 * C * wob * Math.cos(a) + C / 2, py = OY + 4 * C + 2.9 * C * wob * Math.sin(a) + C / 2;
+      smooth.push([px, py]);
+      rough.push([px + sgn * 5 * Math.cos(a), py + sgn * 5 * Math.sin(a)]);   /* contour en escalier, avant lissage */
     }
     var poly = E("polyline", { "class": "a-acc-s", fill: "none", "stroke-linejoin": "round" }, svg);
-    var dots = pts.map(function (p) { return E("circle", { "class": "a-acc", cx: p[0], cy: p[1], r: 2 }, svg); });
+    var dots = smooth.map(function (p) { return E("circle", { "class": "a-acc", cx: p[0], cy: p[1], r: 2 }, svg); });
     txt(svg, 236, 60, dec ? "0.5" : "1", "a-label-b"); if (dec) { txt(svg, 236, 130, "90 %", "a-label-b"); }
-    var cnt = txt(svg, 236, 150, "", "a-num");
     return function (t) {
-      var a = ease(seg(t, 0.05, 0.4)), d = dec ? ease(seg(t, 0.55, 0.95)) : 0;
+      var a = ease(seg(t, 0.05, 0.3)), sm = ease(seg(t, 0.35, 0.6)), d = dec ? ease(seg(t, 0.65, 0.95)) : 0;
       var list = [];
-      pts.forEach(function (p, n) {
-        var thr = (n % 8) / 8;                    /* les sommets s'eteignent un a un */
-        var on = n % 8 === 0 || thr > d;
+      smooth.forEach(function (p, n) {
+        var thr = (n % 10) / 10;                  /* decimation : les sommets s'eteignent un a un, un sur dix reste */
+        var on = n % 10 === 0 || thr > d;
+        var q = [lerp(rough[n][0], p[0], sm), lerp(rough[n][1], p[1], sm)];
+        dots[n].setAttribute("cx", q[0]); dots[n].setAttribute("cy", q[1]);
         dots[n].setAttribute("opacity", a * (on ? 1 : 0));
-        if (on) { list.push(p); }
+        if (on) { list.push(q); }
       });
       poly.setAttribute("points", list.concat([list[0]]).map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" "));
       poly.setAttribute("opacity", a);
-      cnt.textContent = "";
     };
   };
 
@@ -177,20 +181,24 @@
       var lane = 0; for (i = 1; i < W; i++) { if (free[i] < free[lane]) { lane = i; } }
       placed.push({ lane: lane, s: free[lane], d: d }); free[lane] += d; total = Math.max(total, free[lane]);
     });
-    var sc = L / total, top = 24, bars = [], labs = [];
+    var sc = L / total, top = 24, bars = [], loads = [], labs = [], LOAD = 0.06;   /* LOAD : duree inventee du chargement du modele */
     for (i = 0; i < W; i++) { E("line", { "class": "a-cell", x1: X0, x2: X0 + L, y1: top + i * LH + LH, y2: top + i * LH + LH }, svg); txt(svg, X0 - 8, top + i * LH + 17, String(i + 1), "a-num", "end"); }
     var fl = ["a-acc", "a-ana", "a-lmk", "a-nlp", "a-soft"];
     placed.forEach(function (p, n) {
-      var r = E("rect", { "class": fl[n % 5], x: X0 + p.s * sc, y: top + p.lane * LH + 3, width: 0, height: LH - 8, rx: 2 }, svg);
+      var ld = E("rect", { "class": fl[n % 5], x: X0 + p.s * sc, y: top + p.lane * LH + 3, width: 0, height: LH - 8, rx: 2, "fill-opacity": 0.3 }, svg);
+      loads.push(ld);
+      var r = E("rect", { "class": fl[n % 5], x: X0 + (p.s + LOAD) * sc, y: top + p.lane * LH + 3, width: 0, height: LH - 8, rx: 2 }, svg);
       bars.push(r);
-      var l = txt(svg, X0 + p.s * sc + 4, top + p.lane * LH + 17, names[n], "a-label-b"); l.setAttribute("opacity", 0); labs.push(l);
+      var l = txt(svg, X0 + (p.s + LOAD) * sc + 4, top + p.lane * LH + 17, names[n], "a-label-b"); l.setAttribute("opacity", 0); labs.push(l);
     });
     var cur = E("line", { "class": "a-dash", y1: top - 6, y2: top + W * LH + 4 }, svg);
     return function (t) {
       var T = t * total * 1.02;
       cur.setAttribute("x1", X0 + Math.min(T, total) * sc); cur.setAttribute("x2", X0 + Math.min(T, total) * sc);
       placed.forEach(function (p, n) {
-        var w = Math.max(0, Math.min(p.d, T - p.s)) * sc;
+        var wl = Math.max(0, Math.min(LOAD, T - p.s)) * sc;                 /* chargement du modele (pale) */
+        var w = Math.max(0, Math.min(p.d - LOAD, T - p.s - LOAD)) * sc;     /* puis application a chaque scan (plein) */
+        loads[n].setAttribute("width", wl);
         bars[n].setAttribute("width", w); labs[n].setAttribute("opacity", w > 28 ? 1 : 0);
       });
     };

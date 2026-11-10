@@ -174,22 +174,33 @@
     };
   };
 
-  /* 6. La bande muqueuse (legacy) : elle croit le long de la surface depuis la ligne, plus haute la ou la hauteur l'est */
+  /* 6. La bande muqueuse (legacy) : 13 reperes, deux hauteurs par repere (cote couronnes, cote vestibule),
+        interpolees entre reperes ; la bande croit le long de la surface depuis la courbe. Hauteurs inventees pour l'image. */
   A.scenes.flexreg_band = function (svg) {
-    var i, N = 15, L = [], hs = [], X0 = 26, X1 = 294, H = [5, 8, 11, 8, 14, 17, 11];
-    function y(x) { return 108 - 38 * Math.sin((x - X0) / (X1 - X0) * Math.PI); }
-    for (i = 0; i < N; i++) { var x = X0 + (X1 - X0) * i / (N - 1); L.push([x, y(x)]); }
-    for (i = 0; i < N; i++) { var s = i / (N - 1) * (H.length - 1), k = Math.min(H.length - 2, Math.floor(s)); hs.push(lerp(H[k], H[k + 1], s - k)); }
+    var i, N = 13, X0 = 26, X1 = 294;
+    var HU = [1.5, 2.5, 3.5, 2.5, 1.5, 2.5, 3.5, 3.0, 2.0, 1.0, 2.0, 3.0, 2.5];   /* cote couronnes (mm, inventes) */
+    var HD = [4.0, 3.0, 2.0, 1.0, 3.5, 5.0, 4.5, 2.5, 1.0, 3.0, 4.5, 3.5, 2.0];   /* cote vestibule (mm, inventes) */
+    var K = 8, M = 25;                                                               /* K : pixels par mm sur le dessin */
+    function y(x) { return 104 - 30 * Math.sin((x - X0) / (X1 - X0) * Math.PI); }
+    /* echantillons du spline : 25 par segment, hauteur interpolee lineairement entre reperes */
+    var P = [], hu = [], hd = [], n = (N - 1) * M + 1;
+    for (i = 0; i < n; i++) {
+      var u = i / (n - 1), x = X0 + (X1 - X0) * u, f = u * (N - 1), k = Math.min(N - 2, Math.floor(f));
+      P.push([x, y(x)]); hu.push(lerp(HU[k], HU[k + 1], f - k)); hd.push(lerp(HD[k], HD[k + 1], f - k));
+    }
+    /* couronnes (retirees de la plaque) au-dessus de la courbe */
+    for (i = 0; i < 9; i++) {
+      var cx = X0 + 14 + i * 31, cy = y(cx) - 38;
+      E("rect", { "class": "a-soft", x: cx - 11, y: cy - 20, width: 22, height: 26, rx: 5 }, svg);
+    }
     var band = E("polygon", { "class": "a-acc", "fill-opacity": 0.25 }, svg);
-    E("polyline", { "class": "a-ink", fill: "none", points: pts(L) }, svg);
-    var seeds = L.map(function (p) { return E("circle", { "class": "a-acc", cx: p[0], cy: p[1], r: 2.6 }, svg); });
-    var rings = L.map(function (p) { return E("line", { "class": "a-dash", x1: p[0], x2: p[0] }, svg); });
+    E("polyline", { "class": "a-ink", fill: "none", points: pts(P) }, svg);
+    var seeds = [];
+    for (i = 0; i < N; i++) { var xx = X0 + (X1 - X0) * i / (N - 1); seeds.push(E("circle", { "class": "a-acc", cx: xx, cy: y(xx), r: 2.8 }, svg)); }
     return function (t) {
       var g = ease(seg(t, 0.15, 0.85)), top = [], bot = [];
-      L.forEach(function (p, n) { top.push([p[0], p[1] - hs[n] * 2.2 * g]); bot.unshift([p[0], p[1] + hs[n] * 2.2 * g]); });
+      P.forEach(function (p, m) { top.push([p[0], p[1] - hu[m] * K * g]); bot.unshift([p[0], p[1] + hd[m] * K * g]); });
       band.setAttribute("points", pts(top.concat(bot)));
-      rings.forEach(function (r, n) { r.setAttribute("y1", L[n][1] - hs[n] * 2.2 * g); r.setAttribute("y2", L[n][1] + hs[n] * 2.2 * g); r.setAttribute("opacity", g > 0 ? 0.6 : 0); });
-      seeds.forEach(function (s) { s.setAttribute("opacity", 1); });
     };
   };
 })();

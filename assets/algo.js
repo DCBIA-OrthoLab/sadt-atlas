@@ -203,19 +203,25 @@
     };
   };
 
-  /* 5. Moyenne finale : six reprises, la moyenne tombe entre deux voxels */
+  /* 5. Moyenne finale : six reprises, la moyenne tombe entre deux voxels.
+     Vue 2D : projection des six departs (+-x, +-y, +-z) sur un plan, les deux departs
+     en z tombent au centre (points creux). Les arrivees sont des voxels entiers,
+     seule la moyenne tombe entre deux voxels. */
   SCENES.focus = function (svg) {
     var CX = 160, CY = 92, V = 22, i;
     for (i = -6; i <= 6; i++) {
       E("line", { "class": "a-fine", x1: CX + i * V - V / 2, x2: CX + i * V - V / 2, y1: 12, y2: 172 }, svg);
       if (Math.abs(i) <= 3) { E("line", { "class": "a-fine", x1: 20, x2: 300, y1: CY + i * V - V / 2, y2: CY + i * V - V / 2 }, svg); }
     }
-    var starts = [[-4, 0], [4, 0], [0, -4], [0, 4], [-2.8, -2.8], [2.8, 2.8]];
-    var lands = [[0.35, 0.1], [-0.3, 0.25], [0.2, -0.3], [-0.1, 0.4], [0.4, -0.2], [-0.25, -0.1]];
+    var starts = [[4, 0], [-4, 0], [0, 4], [0, -4], [-0.3, -0.3], [0.3, 0.3]];
+    var hollow = [false, false, false, false, true, true];
+    var lands = [[1, 0], [0, 0], [1, 1], [0, 1], [1, -1], [0, -1]];
     var mean = [0, 0];
     lands.forEach(function (l) { mean[0] += l[0] / 6; mean[1] += l[1] / 6; });
-    var dots = starts.map(function () { return E("circle", { "class": "a-acc", r: 4 }, svg); });
-    var land = lands.map(function (l) { return E("circle", { "class": "a-acc-s", r: 6, opacity: 0 }, svg); });
+    var dots = starts.map(function (s, k) {
+      return E("circle", hollow[k] ? { "class": "a-acc-s", r: 4, fill: "none" } : { "class": "a-acc", r: 4 }, svg);
+    });
+    var land = lands.map(function () { return E("rect", { "class": "a-acc-s", width: 16, height: 16, rx: 2, opacity: 0, fill: "none" }, svg); });
     var m = E("g", { opacity: 0 }, svg);
     E("circle", { "class": "a-seg", r: 6 }, m);
     E("path", { "class": "a-ink", d: "M-11 0 H11 M0 -11 V11" }, m);
@@ -224,7 +230,7 @@
       dots.forEach(function (d, k) {
         var x = lerp(starts[k][0], lands[k][0], w), y = lerp(starts[k][1], lands[k][1], w);
         d.setAttribute("cx", CX + x * V); d.setAttribute("cy", CY + y * V);
-        land[k].setAttribute("cx", CX + lands[k][0] * V); land[k].setAttribute("cy", CY + lands[k][1] * V);
+        land[k].setAttribute("x", CX + lands[k][0] * V - 8); land[k].setAttribute("y", CY + lands[k][1] * V - 8);
         land[k].setAttribute("opacity", w > 0.98 ? 0.8 * (1 - u) : 0);
         d.setAttribute("opacity", 1 - 0.7 * u);
       });
@@ -302,27 +308,45 @@
     };
   };
 
-  /* 8. Les cameras : le nombre de vues et la distance changent avec le reseau */
+  /* 8. Les cameras : les VRAIS vecteurs de direction des tables du code, en projection oblique.
+     Mandibule (tables 'Lower'). O et C : position = centre + r d, avec d comme dans le code
+     (les vecteurs de O ne sont pas tous de longueur 1, on garde leur longueur reelle).
+     MG : visee + r d, abaissee de 0.15 r, d tournee de +-0.35 rad autour de la verticale.
+     Seule la dent est un croquis. */
   SCENES.cameras = function (svg, fig) {
-    var CX = 160, CY = 96, i;
-    E("polygon", { "class": "a-acc", "fill-opacity": 0.45, points: "148,108 152,86 160,78 168,86 172,108 164,112 156,112" }, svg);
-    var g = E("g", {}, svg), net = "O", nets = {
-      O: { r: 62, angs: [-60, -30, 0, 30, 60] },
-      C: { r: 86, angs: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330] },
-      MG: { r: 62, angs: [250, 270, 290] }
+    var CX = 160, CY = 100, K = 290, i;
+    var AZ = 38 * Math.PI / 180, EL = 24 * Math.PI / 180;
+    function nrm(v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); }
+    function div(v, n) { return [v[0] / n, v[1] / n, v[2] / n]; }
+    function proj(p) {
+      var xr = p[0] * Math.cos(AZ) + p[1] * Math.sin(AZ), yr = -p[0] * Math.sin(AZ) + p[1] * Math.cos(AZ);
+      return [CX + xr * K, CY - (p[2] * Math.cos(EL) + yr * Math.sin(EL)) * K, yr];
+    }
+    var cvec = [[1, 0, 0], [-1, 0, 0], [1, -1, 0], [-1, -1, 0], [1, 1, 0], [-1, 1, 0],
+      [1, 0, 0.5], [-1, 0, 0.5], [1, -1, 0.5], [-1, -1, 0.5], [1, 1, 0.5], [-1, 1, 0.5]];
+    var sp = 0.35, front = [0, -1, 0];
+    var nets = {
+      O: { r: 0.2, dirs: [[0, 0, 1], div([0.5, 0, 1], nrm([0.5, 0.5, 1])), div([-0.5, 0, 1], nrm([-0.5, -0.5, 1])),
+        div([0, 0.5, 1], nrm([1, 0, 1])), div([0, -0.5, 1], nrm([0, 1, 1]))], drop: 0 },
+      C: { r: 0.3, dirs: cvec.map(function (v) { return div(v, nrm(v)); }), drop: 0 },
+      MG: { r: 0.2, dirs: [front,
+        [front[0] * Math.cos(sp) - front[1] * Math.sin(sp), front[0] * Math.sin(sp) + front[1] * Math.cos(sp), 0],
+        [front[0] * Math.cos(sp) + front[1] * Math.sin(sp), -front[0] * Math.sin(sp) + front[1] * Math.cos(sp), 0]], drop: 0.15 }
     };
-    var cams = [];
+    var tooth = E("polygon", { "class": "a-acc", "fill-opacity": 0.45, points: "148,112 152,90 160,82 168,90 172,112 164,116 156,116" }, svg);
+    var g = E("g", {}, svg), net = "O", cams = [];
     function build() {
       while (g.firstChild) { g.removeChild(g.firstChild); }
       cams = [];
-      var d = nets[net];
-      E("circle", { "class": "a-dash", cx: CX, cy: CY, r: d.r }, g);
-      d.angs.forEach(function (a) {
-        var rad = a * Math.PI / 180, x = CX + Math.sin(rad) * d.r, y = CY - Math.cos(rad) * d.r;
-        var c = E("g", { transform: "translate(" + x.toFixed(1) + " " + y.toFixed(1) + ") rotate(" + (a + 180) + ")" }, g);
-        E("path", { "class": "a-ana", d: "M0 -7 L6 6 L-6 6 Z" }, c);
-        var ray = E("line", { "class": "a-acc-s", x1: 0, y1: -7, x2: 0, y2: -d.r + 14, opacity: 0 }, c);
-        cams.push({ ray: ray, node: c });
+      var d = nets[net], c = [CX, CY];
+      E("circle", { "class": "a-dash", cx: CX, cy: CY, r: d.r * K }, g);
+      d.dirs.forEach(function (v) {
+        var p = [v[0] * d.r, v[1] * d.r, v[2] * d.r - d.drop * d.r], q = proj(p);
+        var ang = Math.atan2(CY - q[1], CX - q[0]) * 180 / Math.PI;
+        var node = E("g", { transform: "translate(" + q[0].toFixed(1) + " " + q[1].toFixed(1) + ") rotate(" + ang.toFixed(1) + ")" }, g);
+        E("path", { "class": "a-ana", d: "M7 0 L-6 5 L-6 -5 Z" }, node);
+        var ray = E("line", { "class": "a-acc-s", x1: q[0], y1: q[1], x2: CX, y2: CY - 4, opacity: 0 }, g);
+        cams.push({ ray: ray, node: node, back: q[2] > 0.05 });
       });
     }
     var tabs = fig.querySelectorAll("[data-net]"), tags = fig.querySelectorAll("[data-for]");
@@ -339,7 +363,7 @@
       var n = cams.length, k = Math.min(n - 1, Math.floor(t * n)), j;
       for (j = 0; j < n; j++) {
         cams[j].ray.setAttribute("opacity", j === k ? 0.9 : 0);
-        cams[j].node.setAttribute("opacity", j <= k ? 1 : 0.5);
+        cams[j].node.setAttribute("opacity", (j <= k ? 1 : 0.5) * (cams[j].back ? 0.6 : 1));
       }
     };
   };
@@ -370,14 +394,16 @@
     var lines = pix.map(function (p, n) {
       return E("line", { "class": "a-acc-s", x1: p[0], y1: p[1], x2: hitCtr[n % hitCtr.length][0], y2: hitCtr[n % hitCtr.length][1], opacity: 0, "stroke-width": 0.8 }, svg);
     });
-    var cx = 0, cy = 0, verts = {};
-    sel.forEach(function (n) { tris[n].forEach(function (v) { verts[v.join(",")] = v; }); });
+    /* le code additionne les 3 sommets du triangle de CHAQUE pixel : un triangle vu par
+       deux pixels compte deux fois (ici le premier et le dernier pixel partagent un triangle) */
+    var cx = 0, cy = 0, verts = {}, all = [];
+    pix.forEach(function (p, n) { tris[sel[n % sel.length]].forEach(function (v) { all.push(v); verts[v.join(",")] = v; }); });
     var vs = Object.keys(verts).map(function (q) { return verts[q]; });
-    vs.forEach(function (v) { cx += v[0] / vs.length; cy += v[1] / vs.length; });
+    all.forEach(function (v) { cx += v[0] / all.length; cy += v[1] / all.length; });
     var vdots = vs.map(function (v) { return E("circle", { "class": "a-seg", cx: v[0], cy: v[1], r: 2.8, opacity: 0 }, svg); });
     var surfLine = E("polyline", { "class": "a-ink", points: surf.map(function (p) { return p.join(","); }).join(" ") }, svg);
     var near = surf[0], best = 1e9;
-    surf.forEach(function (p) { var d = Math.hypot(p[0] - cx, p[1] - cy); if (d < best) { best = d; near = p; } });
+    surf.concat(low).forEach(function (p) { var d = Math.hypot(p[0] - cx, p[1] - cy); if (d < best) { best = d; near = p; } });
     var cen = E("g", { opacity: 0 }, svg);
     E("circle", { "class": "a-nlp", r: 5 }, cen); E("path", { "class": "a-ink", d: "M-9 0 H9 M0 -9 V9" }, cen);
     var snapLine = E("line", { "class": "a-dash", x1: cx, y1: cy, x2: cx, y2: cy, opacity: 0 }, svg);

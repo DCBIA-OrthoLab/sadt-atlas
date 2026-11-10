@@ -329,7 +329,8 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     cur_s = str(current)
     on_visor = lang == "en" and (cur_s == VISOR_GUIDE[0] or cur_s.startswith("visor/"))
     vt = cur_s[6:] if on_visor and cur_s.startswith("visor/") and cur_s[6:] in VISOR_TOOLS else None
-    T = current if on_tool else vt                     # l'outil de la page, s'il y en a un
+    on_shared = lang == "en" and current in SHARED   # autres langues : inchange
+    T = current if (on_tool or on_shared) else vt      # l'outil de la page, s'il y en a un
     if vt:
         sw = (("guide", f"visor/guide/{vt}.html" if vt in {t for t, _ in TOOLS} else f"guide/{VISOR_GUIDE[0]}.html"),
               ("atlas", f"visor/{vt}/{vt}.html"))
@@ -337,7 +338,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         sw = (("guide", f"guide/{VISOR_GUIDE[0]}.html"), ("atlas", "visor/index.html"))
     else:
         sw = (("guide", f"guide/{current}.html" if on_tool else "guide/index.html"),
-              ("atlas", f"{current}/{current}.html" if on_tool else "index.html"))
+              ("atlas", f"{current}/{current}.html" if (on_tool or on_shared) else "index.html"))
     # 3e case, « Code », anglais seulement et seulement si la page code de cet outil existe
     if lang == "en" and T:
         code_rel = f"visor/{T}/{T}.code.html" if on_visor else f"{T}/{T}.code.html"
@@ -351,6 +352,9 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         if T and T in tools_all:
             lg = f"guide/{T}.html" if section == "guide" else f"{T}/{T}.html"
             vi = f"visor/guide/{T}.html" if section == "guide" else f"visor/{T}/{T}.html"
+        elif T and on_shared:                            # ADTLib : une page legacy, pas de VISOR
+            lg = f"{T}/{T}.html"
+            vi = "visor/index.html"
         elif T:                                          # Crown_Seg : pas de page legacy
             lg = "index.html"
             vi = f"visor/{T}/{T}.html"
@@ -358,6 +362,11 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
             lg, vi = "guide/index.html", f"guide/{VISOR_GUIDE[0]}.html"
         else:
             lg, vi = "index.html", "visor/index.html"
+        if on_code:                                      # sur une page code, la bascule garde la case Code
+            def _code(r):
+                c = r[:-5] + ".code.html" if r.endswith(".html") else r
+                return c if os.path.exists(os.path.join(ROOT, lang, c)) else r
+            lg, vi = _code(lg), _code(vi)
         cur_attr = ' aria-current="true"'
         on_lg = cur_attr if mode0 == "legacy" else ""
         on_vi = cur_attr if mode0 == "visor" else ""

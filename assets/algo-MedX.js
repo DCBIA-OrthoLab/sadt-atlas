@@ -1,4 +1,4 @@
-/* Scenes of the MedX atlas page (archived code). Numbers and code symbols only. */
+/* Scenes of the MedX atlas page (archived code, fbfa0fb). Numbers and code symbols only. */
 (function () {
   "use strict";
   var A = window.Algo, E = A.E, txt = A.txt, ease = A.ease, seg = A.seg, lerp = A.lerp;
@@ -100,29 +100,32 @@
     };
   };
 
-  /* 4. A percentage is divided by the number of patients, so a missing value counts as a no */
+  /* 4. What a percentage is divided by: all patients (an empty field counts as a no) or only the patients with a value (the age pie).
+        Ten made-up patients: four yes, three no, three empty. */
   A.scenes.medx_percent = function (svg) {
     var states = [1, 1, 1, 1, 0, 0, 0, 2, 2, 2], dots = [], i;
     for (i = 0; i < 10; i++) {
-      var cx = 28 + (i % 5) * 26, cy = 52 + Math.floor(i / 5) * 30;
-      var d = E("circle", { cx: cx, cy: cy, r: 9, "class": states[i] === 1 ? "a-acc" : (states[i] === 0 ? "a-ink" : "a-dash") }, svg);
-      dots.push(d);
+      var cx = 28 + (i % 5) * 26, cy = 54 + Math.floor(i / 5) * 30;
+      dots.push(E("circle", { cx: cx, cy: cy, r: 9, "class": states[i] === 1 ? "a-acc" : (states[i] === 0 ? "a-ink" : "a-dash") }, svg));
     }
-    var BX = 176, BW = 120, BY = 112;
-    E("rect", { "class": "a-ink", x: BX, y: BY, width: BW, height: 14, rx: 2 }, svg);
-    var bar = E("rect", { "class": "a-acc", x: BX, y: BY, width: 0, height: 14, rx: 2, opacity: 0.8 }, svg);
-    txt(svg, BX, BY + 28, "0", "a-num"); txt(svg, BX + BW, BY + 28, "100", "a-num", "end");
-    var num = big(txt(svg, 236, 76, "", "a-label-b", "middle"), 22);
-    var frac = txt(svg, 28, 128, "4 / 10", "a-label-b");
+    var BX = 176, BW = 100, B1 = 66, B2 = 126;
+    E("rect", { "class": "a-ink", x: BX, y: B1, width: BW, height: 14, rx: 2 }, svg);
+    E("rect", { "class": "a-ink", x: BX, y: B2, width: BW, height: 14, rx: 2 }, svg);
+    var bar1 = E("rect", { "class": "a-acc", x: BX, y: B1, width: 0, height: 14, rx: 2, opacity: 0.8 }, svg);
+    var bar2 = E("rect", { "class": "a-nlp", x: BX, y: B2, width: 0, height: 14, rx: 2, opacity: 0.8 }, svg);
+    txt(svg, BX, B2 + 28, "0", "a-num"); txt(svg, BX + BW, B2 + 28, "100", "a-num", "end");
+    var f1 = txt(svg, BX, B1 - 8, "4 / 10", "a-label-b"), f2 = txt(svg, BX, B2 - 8, "4 / 7", "a-label-b");
+    var n1 = big(txt(svg, BX + BW + 8, B1 + 13, "40", "a-label-b"), 18), n2 = big(txt(svg, BX + BW + 8, B2 + 13, "57", "a-label-b"), 18);
     return function (t) {
-      var k = ease(seg(t, 0.45, 0.62));
+      var p1 = ease(seg(t, 0.28, 0.4)), g1 = ease(seg(t, 0.4, 0.55)), p2 = ease(seg(t, 0.6, 0.7)), g2 = ease(seg(t, 0.72, 0.9));
       for (var j = 0; j < 10; j++) {
-        if (states[j] === 2) { dots[j].setAttribute("class", k > 0.5 ? "a-ink" : "a-dash"); }
+        if (states[j] !== 2) { continue; }
+        if (t < 0.28) { dots[j].setAttribute("class", "a-dash"); dots[j].setAttribute("opacity", 1); }
+        else if (t < 0.6) { dots[j].setAttribute("class", "a-ink"); dots[j].setAttribute("opacity", 1); }
+        else { dots[j].setAttribute("class", "a-dash"); dots[j].setAttribute("opacity", 1 - 0.8 * p2); }
       }
-      var g = ease(seg(t, 0.62, 0.92));
-      bar.setAttribute("width", BW * 0.4 * g);
-      num.textContent = g > 0.98 ? "40" : "";
-      frac.setAttribute("opacity", ease(seg(t, 0.3, 0.45)));
+      f1.setAttribute("opacity", p1); bar1.setAttribute("width", BW * 0.4 * g1); n1.setAttribute("opacity", g1 > 0.98 ? 1 : 0);
+      f2.setAttribute("opacity", p2); bar2.setAttribute("width", BW * (4 / 7) * g2); n2.setAttribute("opacity", g2 > 0.98 ? 1 : 0);
     };
   };
 })();

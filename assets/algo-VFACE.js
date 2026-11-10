@@ -31,7 +31,7 @@
   /* 2. Orientation : les reperes du patient sont amenes sur ceux de la reference, le plan sagittal tombe sur x = 0 */
   A.scenes.vface_orient = function (svg) {
     var cx = 160, cy = 98, i;
-    var ref = [[0, -58], [-30, -36], [30, -36], [-44, 4], [44, 4], [-22, 46], [22, 46], [0, 62]];
+    var ref = [[0, -58], [-30, -36], [30, -36], [-44, 4], [44, 4], [-22, 46], [22, 46]];   /* 7 reperes, comme le cadre de la base du crane */
     E("line", { "class": "a-dash", x1: cx, x2: cx, y1: 18, y2: 180 }, svg);
     var gold = [], pat = [], lns = [];
     for (i = 0; i < ref.length; i++) { gold.push(E("circle", { "class": "a-ink", cx: cx + ref[i][0], cy: cy + ref[i][1], r: 4.5 }, svg)); }
@@ -104,9 +104,11 @@
       var a = ease(seg(t, 0.08, 0.3)), b = ease(seg(t, 0.55, 0.8));
       // decalage de depart (-12, 9) ; alignement sur le haut (0) ; puis sur la mandibule (shiftLo)
       var dx = lerp(lerp(-12, 0, a), shiftLo, b), dy = lerp(lerp(9, 0, a), 0, b);
-      gm.setAttribute("transform", "translate(" + dx + " " + dy + ")");
+      var ang = lerp(0.12, 0, a);   /* petite rotation de depart : le mouvement est rigide, rotation + translation */
+      gm.setAttribute("transform", "translate(" + dx + " " + dy + ") rotate(" + (ang * 180 / Math.PI) + " " + cx + " 98)");
       for (i = 0; i < all.length; i++) {
-        lines[i].setAttribute("x1", cx + all[i][0] + dx); lines[i].setAttribute("y1", all[i][1] + dy);
+        var rp = rot(cx + all[i][0], all[i][1], ang, cx, 98);
+        lines[i].setAttribute("x1", rp[0] + dx); lines[i].setAttribute("y1", rp[1] + dy);
         lines[i].setAttribute("x2", cx + all[i][0] + (i >= 3 ? shiftLo : 0)); lines[i].setAttribute("y2", all[i][1]);
       }
       tag[0].setAttribute("opacity", a * (1 - b)); tag[1].setAttribute("opacity", b);
@@ -167,7 +169,7 @@
   /* 7. Un angle : deux droites, on garde l'angle entre elles ; avec un sommet commun, on prend le supplement */
   A.scenes.vface_angle = function (svg) {
     var ox = 120, oy = 120, L = 100, i;
-    var u = E("line", { "class": "a-seg-s", x1: ox, y1: oy, x2: ox + L, y2: oy, "stroke-width": 2.6 }, svg);
+    var u = E("line", { "class": "a-seg-s", x1: ox - L, y1: oy, x2: ox, y2: oy, "stroke-width": 2.6 }, svg);
     var v = E("line", { "class": "a-ana-s", x1: ox, y1: oy, x2: ox, y2: oy, "stroke-width": 2.6 }, svg);
     var tail = E("line", { "class": "a-dash", x1: ox, y1: oy, x2: ox, y2: oy }, svg);
     E("circle", { "class": "a-ink", cx: ox, cy: oy, r: 3.5 }, svg);
@@ -179,9 +181,8 @@
     }
     return function (t) {
       var a = ease(seg(t, 0.1, 0.5)), b = ease(seg(t, 0.62, 0.9)), th = TH * a;
-      u.setAttribute("x2", ox + L);
       v.setAttribute("x2", ox + L * Math.cos(th)); v.setAttribute("y2", oy - L * Math.sin(th));
-      tail.setAttribute("x2", ox - L * 0.55); tail.setAttribute("y2", oy); tail.setAttribute("opacity", b);
+      tail.setAttribute("x2", ox + L * 0.55); tail.setAttribute("y2", oy); tail.setAttribute("opacity", 0.8);
       arc.setAttribute("d", th > 0.02 ? arcPath(0, th, 38) : "");
       arc2.setAttribute("d", b > 0.02 ? arcPath(th, Math.PI, 56) : ""); arc2.setAttribute("opacity", b);
       arc.setAttribute("opacity", 1 - 0.55 * b);
@@ -190,7 +191,7 @@
 
   /* 8. Les arbres de decision : le patient descend dans chaque arbre, les valeurs des feuilles s'additionnent */
   A.scenes.vface_trees = function (svg) {
-    var tx = [58, 160, 262], leaf = [[-0.9, 0.7], [0.4, -0.6], [0.5, -0.3]], pick = [1, 0, 0], i;
+    var tx = [58, 160, 262], leaf = [[-0.3, 0.25], [0.15, -0.2], [0.2, -0.1]], pick = [1, 0, 0], i;   /* valeurs inventees, petites comme celles du code */
     var X0 = 40, X1 = 280, XM = 160, YA = 168;
     var balls = [], tot = 0, steps = [];
     for (i = 0; i < 3; i++) {
@@ -206,7 +207,7 @@
     var ball = E("circle", { "class": "a-acc", r: 5.5 }, svg);
     var mark = E("circle", { "class": "a-nlp", cy: YA, r: 6.5 }, svg);
     var stepbar = E("line", { "class": "a-nlp-s", y1: YA - 12, y2: YA - 12, "stroke-width": 3 }, svg);
-    function sx(v) { return XM + v * 95; }
+    function sx(v) { return XM + v * 150; }
     return function (t) {
       var s = Math.min(2.999, t * 3.2), k = Math.floor(s), u = ease(Math.min(1, (s - k) * 1.5));
       var x0 = tx[k], x1 = tx[k] + (pick[k] ? 24 : -24);
@@ -228,9 +229,16 @@
     for (i = 1; i <= 52; i++) { var x = 30 + i * 5; d1 += " L" + x + " " + by(x); d2 += " L" + x + " " + cy(x); }
     E("path", { "class": "a-ink", d: d1, "stroke-width": 2 }, svg);
     var other = E("path", { "class": "a-dash", d: d2 }, svg);
+    var cpts = [];
+    for (i = 0; i <= 260; i++) { var xx = 30 + i; cpts.push([xx, cy(xx)]); }
+    function nearest(px, py) {
+      var best = 1e9, bq = null;
+      cpts.forEach(function (q) { var dd = Math.hypot(px - q[0], py - q[1]); if (dd < best) { best = dd; bq = q; } });
+      return [best, bq];
+    }
     for (i = 0; i < n; i++) {
-      var x = 42 + i * 17.4, d = by(x) - cy(x);
-      lns.push(E("line", { "class": "a-dash", x1: x, y1: by(x), x2: x, y2: cy(x) }, svg));
+      var x = 42 + i * 17.4, nn = nearest(x, by(x)), d = (by(x) - cy(x) > 0 ? 1 : -1) * nn[0];
+      lns.push(E("line", { "class": "a-dash", x1: x, y1: by(x), x2: nn[1][0], y2: nn[1][1] }, svg));
       dots.push([E("circle", { "class": d > 0 ? "a-nlp" : "a-seg", cx: x, cy: by(x), r: 5 }, svg), Math.min(1, Math.abs(d) / 16)]);
     }
     return function (t) {

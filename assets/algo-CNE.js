@@ -45,27 +45,32 @@
     };
   };
 
-  /* 2. The context window: the note and the room kept for the answer */
-  A.scenes.cne_budget = function (svg, fig) {
+  /* 2. The context window: the prompt fills it from the left, the answer gets what is left (up to max_tokens).
+     Three notes in turn: short (answer gets all it may use), long (answer cut short), too long (error). Illustrative lengths. */
+  A.scenes.cne_window = function (svg, fig) {
     var R = parseFloat((fig && fig.getAttribute && fig.getAttribute("data-reserve")) || "0.3");
-    var X = 20, W = 280, Y = 78, H = 34, cut = X + W * (1 - R);
+    var X = 20, W = 280, Y = 78, H = 34;
+    var cases = [0.35, 0.86, 1.0];
     E("rect", { "class": "a-ink", x: X, y: Y, width: W, height: H, rx: 3 }, svg);
-    E("rect", { "class": "a-dash", x: cut, y: Y + 3, width: W * R, height: H - 6 }, svg);
-    var note = E("rect", { "class": "a-acc", x: X, y: Y + 4, height: H - 8, opacity: 0.55 }, svg);
-    var ans = E("rect", { "class": "a-nlp", y: Y + 4, height: H - 8, opacity: 0.85 }, svg);
+    var note = E("rect", { "class": "a-seg", x: X, y: Y + 4, height: H - 8, opacity: 0.7 }, svg);
+    var ans = E("rect", { "class": "a-acc", y: Y + 4, height: H - 8, opacity: 0.85 }, svg);
     txt(svg, X, Y - 10, "n_ctx", "a-num");
-    txt(svg, X + W, Y + H + 16, "max_tokens", "a-num", "end");
-    E("path", { "class": "a-ink", d: "M" + cut + " " + (Y + H + 6) + " V" + (Y + H + 10) + " H" + (X + W) + " V" + (Y + H + 6) }, svg);
-    var mark = big(txt(svg, 160, 52, "", "a-label-b", "middle"), 24);
-    var notes = [(1 - R) * 0.62, (1 - R) + 0.18 * R + 0.05];
+    var marks = [], i;
+    for (i = 0; i < 3; i++) {
+      marks.push(big(txt(svg, 60 + i * 100, 150, "", "a-label-b", "middle"), 22));
+    }
+    var sym = ["\u2713", "\u2702", "\u2715"];
     return function (t) {
-      var r = t < 0.5 ? 0 : 1, s = (t - r * 0.5) / 0.5, n = notes[r] * W * ease(seg(s, 0.05, 0.4));
+      var k = Math.min(2, Math.floor(t * 3)), s = t * 3 - k;
+      var n = cases[k] * W * ease(seg(s, 0.05, 0.35));
+      var room = X + W - (X + n);
+      var wantW = R * W, a = Math.min(wantW, room);
       note.setAttribute("x", X); note.setAttribute("width", n);
-      var room = X + W - (X + n), want = r === 0 ? R * W * 0.5 : room;
-      var a = Math.min(want, room) * ease(seg(s, 0.45, 0.8));
-      ans.setAttribute("x", X + n); ans.setAttribute("width", Math.max(0, a));
-      var show = s > 0.85;
-      mark.textContent = show ? (r === 0 ? "✓" : "✕") : "";
+      var grow = ease(seg(s, 0.4, 0.75));
+      ans.setAttribute("x", X + n); ans.setAttribute("width", k < 2 ? Math.max(0, a * grow) : 0);
+      for (var j = 0; j < 3; j++) {
+        marks[j].textContent = (j < k || (j === k && s > 0.85)) ? sym[j] : "";
+      }
     };
   };
 

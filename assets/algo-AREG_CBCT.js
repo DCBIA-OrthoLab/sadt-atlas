@@ -78,9 +78,9 @@
     var moving = E("polygon", { "class": "a-acc-s", points: pts(shape), "stroke-linejoin": "round" }, svg);
     var X = shape[1];
     var cm = E("g", {}, svg);
-    E("circle", { "class": "a-nlp", r: 4, cx: C[0], cy: C[1] }, cm);
-    var v0 = E("line", { "class": "a-seg-s", x1: C[0], y1: C[1], x2: X[0], y2: X[1] }, svg);
-    var v1 = E("line", { "class": "a-ana-s", x1: C[0], y1: C[1], x2: X[0], y2: X[1] }, svg);
+    E("circle", { "class": "a-ana", r: 4, cx: C[0], cy: C[1] }, cm);
+    var v0 = E("line", { "class": "a-ink", x1: C[0], y1: C[1], x2: X[0], y2: X[1], "stroke-dasharray": "3 3" }, svg);
+    var v1 = E("line", { "class": "a-seg-s", x1: C[0], y1: C[1], x2: X[0], y2: X[1] }, svg);
     var vt = E("line", { "class": "a-nlp-s", x1: X[0], y1: X[1], x2: X[0], y2: X[1] }, svg);
     var dot = E("circle", { "class": "a-acc", r: 4, cx: X[0], cy: X[1] }, svg);
     txt(svg, C[0] - 8, C[1] + 16, "c", "a-label-b", "end");
@@ -96,6 +96,42 @@
       vt.setAttribute("x2", q[0] + off[0]); vt.setAttribute("y2", q[1] + off[1]);
       vt.setAttribute("opacity", b > 0 ? 1 : 0);
       dot.setAttribute("cx", q[0] + off[0]); dot.setAttribute("cy", q[1] + off[1]);
+    };
+  };
+
+  /* 3b. Legacy : l'angle et la translation d'elastix sont gardes, mais pas le centre c. La transformation
+     reconstruite tourne autour de l'origine O du repere : y = R x + t au lieu de y = R(x - c) + c + t */
+  A.scenes.areg_cbct_rigid_legacy = function (svg) {
+    var O = [28, 120], C = [150, 98], th = 0.3, tr = [40, -10];
+    var shape = [[100, 60], [190, 52], [205, 95], [188, 140], [125, 148], [104, 106]];
+    function rot(p, a, K) { var x = p[0] - K[0], y = p[1] - K[1]; return [K[0] + x * Math.cos(a) - y * Math.sin(a), K[1] + x * Math.sin(a) + y * Math.cos(a)]; }
+    function pts(poly) { return poly.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" "); }
+    E("polygon", { "class": "a-ink", points: pts(shape), "stroke-dasharray": "4 3", "stroke-linejoin": "round" }, svg);
+    var elx = E("polygon", { "class": "a-acc-s", points: pts(shape), "stroke-dasharray": "6 3", "stroke-linejoin": "round" }, svg);
+    var leg = E("polygon", { "class": "a-acc-s", points: pts(shape), "stroke-linejoin": "round" }, svg);
+    var X = shape[1];
+    E("path", { "class": "a-ink", d: "M" + (O[0] - 6) + " " + O[1] + " H" + (O[0] + 6) + " M" + O[0] + " " + (O[1] - 6) + " V" + (O[1] + 6) }, svg);
+    txt(svg, O[0] + 10, O[1] + 14, "O", "a-label-b", "start");
+    E("circle", { "class": "a-ana", r: 4, cx: C[0], cy: C[1] }, svg);
+    txt(svg, C[0] - 8, C[1] + 16, "c", "a-label-b", "end");
+    var rO = E("line", { "class": "a-seg-s", x1: O[0], y1: O[1], x2: X[0], y2: X[1], opacity: 0.6 }, svg);
+    var rC = E("line", { "class": "a-seg-s", x1: C[0], y1: C[1], x2: X[0], y2: X[1] }, svg);
+    var gap = E("line", { "class": "a-ink", x1: X[0], y1: X[1], x2: X[0], y2: X[1], "stroke-dasharray": "2 3" }, svg);
+    var dE = E("circle", { "class": "a-acc", r: 4, cx: X[0], cy: X[1] }, svg);
+    var dL = E("circle", { "class": "a-acc", r: 4, cx: X[0], cy: X[1] }, svg);
+    return function (t) {
+      var a = ease(seg(t, 0.1, 0.5)), b = ease(seg(t, 0.55, 0.85)), g = ease(seg(t, 0.88, 0.98));
+      var off = [tr[0] * b, tr[1] * b], ang = th * a;
+      var pe = shape.map(function (p) { var q = rot(p, ang, C); return [q[0] + off[0], q[1] + off[1]]; });
+      var pl = shape.map(function (p) { var q = rot(p, ang, O); return [q[0] + off[0], q[1] + off[1]]; });
+      elx.setAttribute("points", pts(pe)); leg.setAttribute("points", pts(pl));
+      var xe = rot(X, ang, C), xl = rot(X, ang, O);
+      rC.setAttribute("x2", xe[0]); rC.setAttribute("y2", xe[1]);
+      rO.setAttribute("x2", xl[0]); rO.setAttribute("y2", xl[1]);
+      dE.setAttribute("cx", xe[0] + off[0]); dE.setAttribute("cy", xe[1] + off[1]);
+      dL.setAttribute("cx", xl[0] + off[0]); dL.setAttribute("cy", xl[1] + off[1]);
+      gap.setAttribute("x1", xe[0] + off[0]); gap.setAttribute("y1", xe[1] + off[1]);
+      gap.setAttribute("x2", lerp(xe[0] + off[0], xl[0] + off[0], g)); gap.setAttribute("y2", lerp(xe[1] + off[1], xl[1] + off[1], g));
     };
   };
 

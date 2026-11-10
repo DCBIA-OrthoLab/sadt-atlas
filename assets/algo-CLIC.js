@@ -75,7 +75,7 @@
       bars.push(E("rect", { "class": "a-acc", x: X0 + i * (BW + GAP), width: BW, rx: 2, y: BASE - H * sc[i], height: H * sc[i] }, svg));
     }
     var line = E("line", { "class": "a-acc-s", x1: X0 - 10, x2: X0 + N * (BW + GAP) }, svg);
-    var tag = txt(svg, X0 + N * (BW + GAP) + 4, 0, "0.7", "a-label-b");
+    var tag = txt(svg, X0 + N * (BW + GAP) - 4, 0, "0.7", "a-label-b", "end");
     txt(svg, 8, BASE + 3, "0", "a-num"); txt(svg, 8, BASE - H + 3, "1", "a-num");
     return function (t) {
       var th = lerp(1, 0.7, ease(seg(t, 0.1, 0.5))), done = ease(seg(t, 0.55, 0.85));
@@ -84,6 +84,29 @@
       for (i = 0; i < N; i++) {
         var keep = sc[i] >= th;
         bars[i].setAttribute("opacity", keep ? 1 : 1 - 0.75 * done);
+        bars[i].setAttribute("class", (keep || done <= 0) ? "a-acc" : "a-soft");
+      }
+    };
+  };
+
+  /* 3b. Legacy : le seuil 0.7 est ecrit dans le script, la ligne est fixe des le debut */
+  A.scenes.clic_leg_score = function (svg) {
+    var sc = [0.97, 0.91, 0.82, 0.74, 0.55, 0.32, 0.12], N = sc.length, X0 = 36, BW = 28, GAP = 12, BASE = 160, H = 130, TH = 0.7, i;
+    E("line", { "class": "a-ink", x1: X0 - 10, x2: X0 + N * (BW + GAP), y1: BASE, y2: BASE }, svg);
+    var bars = [];
+    for (i = 0; i < N; i++) {
+      bars.push(E("rect", { "class": "a-acc", x: X0 + i * (BW + GAP), width: BW, rx: 2, y: BASE - H * sc[i], height: H * sc[i], opacity: 0 }, svg));
+    }
+    var y = BASE - H * TH;
+    var line = E("line", { "class": "a-acc-s", x1: X0 - 10, x2: X0 + N * (BW + GAP), y1: y, y2: y }, svg);
+    txt(svg, X0 + N * (BW + GAP) - 4, y - 4, "0.7", "a-label-b", "end");
+    txt(svg, 8, BASE + 3, "0", "a-num"); txt(svg, 8, BASE - H + 3, "1", "a-num");
+    return function (t) {
+      var show = ease(seg(t, 0.05, 0.4)), done = ease(seg(t, 0.55, 0.85));
+      line.setAttribute("opacity", 1);
+      for (i = 0; i < N; i++) {
+        var keep = sc[i] >= TH;
+        bars[i].setAttribute("opacity", show * (keep ? 1 : 1 - 0.75 * done));
         bars[i].setAttribute("class", (keep || done <= 0) ? "a-acc" : "a-soft");
       }
     };

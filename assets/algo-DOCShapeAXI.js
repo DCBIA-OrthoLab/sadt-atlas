@@ -146,12 +146,16 @@
     };
   };
 
-  /* 6. Retour sur le maillage : maximum par face entre les vues, premier sommet, filtre median */
+  /* 6. Retour sur le maillage (saxi_gradcam.gradcam_process puis post_process.MedianFilter) :
+     par vue, un pixel par face ; max entre les vues, plancher a 0 ; la valeur de la face est ecrite
+     sur son PREMIER sommet ; le filtre median remplace CHAQUE sommet par la mediane de ses voisins
+     (soi exclu), les sommets non vides comme les vides. Valeurs et voisinage inventes pour l'image. */
   A.scenes.dsx_project = function (svg) {
     var F = 6, X0 = 40, DX = 42, i;
-    var va = [0.9, 0.3, 0, 0.6, 0, 0], vb = [0.2, 0.7, 0, 0.45, 0, 0.25];
-    var face = [], pa = [], pb = [], lnA = [], lnB = [], vert = [], vv = [];
+    var va = [0.9, 0.3, -0.5, 0.6, -0.2, 0], vb = [0.2, 0.7, -0.4, 0.45, 0, 0.25];
+    var face = [], pa = [], pb = [], lnA = [], lnB = [], vert = [];
     var YA = 30, YF = 84, YV = 138;
+    function pos(v) { return v > 0 ? v : 0; }
     for (i = 0; i < F; i++) {
       var x = X0 + i * DX;
       pa.push(E("rect", { "class": "a-seg", x: x - 18, y: YA - 8, width: 16, height: 12, rx: 2 }, svg));
@@ -162,7 +166,6 @@
     }
     for (i = 0; i <= F; i++) {
       vert.push(E("circle", { "class": "a-acc", cx: X0 - 18 + i * DX, cy: YV, r: 6 }, svg));
-      vv.push(0);
     }
     E("line", { "class": "a-ink", x1: X0 - 18, x2: X0 - 18 + F * DX, y1: YV, y2: YV }, svg);
     function med(a) { var s = a.slice().sort(function (p, q) { return p - q; }), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
@@ -170,17 +173,18 @@
       var a = ease(seg(t, 0.05, 0.3)), b = ease(seg(t, 0.35, 0.6)), c = ease(seg(t, 0.68, 0.95));
       var fv = [], raw = [], sm = [];
       for (i = 0; i < F; i++) {
-        pa[i].setAttribute("fill-opacity", 0.12 + 0.85 * va[i] * a); pb[i].setAttribute("fill-opacity", 0.12 + 0.85 * vb[i] * a);
-        lnA[i].setAttribute("opacity", a * (va[i] > 0 ? 1 : 0.25)); lnB[i].setAttribute("opacity", a * (vb[i] > 0 ? 1 : 0.25));
-        fv.push(Math.max(va[i], vb[i]));
+        pa[i].setAttribute("fill-opacity", 0.12 + 0.85 * pos(va[i]) * a); pb[i].setAttribute("fill-opacity", 0.12 + 0.85 * pos(vb[i]) * a);
+        lnA[i].setAttribute("opacity", a); lnB[i].setAttribute("opacity", a);
+        fv.push(Math.max(0, va[i], vb[i]));
         face[i].setAttribute("fill-opacity", 0.08 + 0.9 * fv[i] * a);
       }
+      /* sommet i = premier sommet de la face i ; le dernier n'est le premier d'aucune face : 0 */
       for (i = 0; i <= F; i++) { raw.push(i < F ? fv[i] : 0); }
       for (i = 0; i <= F; i++) {
         var nb = [];
         if (i > 0) { nb.push(raw[i - 1]); } if (i > 1) { nb.push(raw[i - 2]); }
         if (i < F) { nb.push(raw[i + 1]); } if (i < F - 1) { nb.push(raw[i + 2]); }
-        sm.push(raw[i] > 0 ? raw[i] : med(nb));
+        sm.push(med(nb));
       }
       for (i = 0; i <= F; i++) {
         var val = lerp(0, lerp(raw[i], sm[i], c), b);

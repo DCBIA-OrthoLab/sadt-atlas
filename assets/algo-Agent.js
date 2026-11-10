@@ -112,6 +112,37 @@
     };
   };
 
+  /* Verification du legacy : rien n'est retire. Une valeur fautive est signalee et continue son chemin ;
+     un nom hors specification ne fait qu'un avertissement ; la confiance est multipliee par 0,6 des qu'une erreur existe */
+  A.scenes.agent_flag = function (svg) {
+    var CY = [28, 62, 96], i;
+    var chips = [], marks = [];
+    for (i = 0; i < 3; i++) {
+      chips.push(E("rect", { "class": i === 2 ? "a-dash" : "a-nlp", x: 24, y: CY[i], width: 60, height: 22, rx: 4 }, svg));
+      marks.push(txt(svg, 0, CY[i] + 16, "", "a-label-b", "middle"));
+    }
+    E("rect", { "class": "a-cell", x: 120, y: 16, width: 44, height: 110, rx: 6 }, svg);
+    E("line", { "class": "a-ink", x1: 24, x2: 296, y1: 168, y2: 168 }, svg);
+    var bar = E("rect", { "class": "a-seg", x: 24, y: 150, height: 12, rx: 3 }, svg);
+    txt(svg, 24, 186, "1", "a-num", "start");
+    var c06 = txt(svg, 24 + 272 * 0.6, 186, "0.6", "a-num", "middle");
+    var tick = E("line", { "class": "a-dash", x1: 24 + 272 * 0.6, x2: 24 + 272 * 0.6, y1: 146, y2: 168 }, svg);
+    var sym = ["\u2713", "\u00d7", "!"];
+    return function (t) {
+      for (i = 0; i < 3; i++) {
+        var u = ease(seg(t, 0.08 + i * 0.1, 0.5 + i * 0.05));
+        chips[i].setAttribute("x", lerp(24, 230, u));
+        marks[i].textContent = sym[i];
+        marks[i].setAttribute("x", 142);
+        marks[i].setAttribute("y", CY[i] + 16);
+        marks[i].setAttribute("opacity", u > 0.4 && u < 0.8 ? 1 : 0);
+      }
+      bar.setAttribute("width", 272 * (1 - 0.4 * ease(seg(t, 0.6, 0.85))));
+      tick.setAttribute("opacity", ease(seg(t, 0.85, 0.95)));
+      c06.setAttribute("opacity", ease(seg(t, 0.85, 0.95)));
+    };
+  };
+
   /* La porte d'execution : trois verifications et un seuil de confiance a 0,5 */
   A.scenes.agent_gate = function (svg) {
     var X = [44, 100, 156, 212], cls = ["a-acc", "a-seg", "a-ana", "a-soft"], i;

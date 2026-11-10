@@ -98,7 +98,7 @@ class Page(HTMLParser):
             kinds = [k for k in ("bug", "warn", "ok") if k in cls.split()]
             self.call_stack.append({"kind": kinds[0] if kinds else "note",
                                     "title": "", "text": [], "depth": 1,
-                                    "section": self.cur["id"] if self.cur else ""})
+                                    "section": a.get("id") or (self.cur["id"] if self.cur else "")})
         elif self.call_stack and tag == "div":
             if "callout-title" in cls:
                 self.in_call_title = True

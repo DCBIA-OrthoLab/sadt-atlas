@@ -86,6 +86,47 @@
     };
   };
 
+
+  /* 2 bis. Legacy : les triplets sont TIRES AU HASARD (generateur global, sans graine), un triplet deja vu ne compte pas, on garde le meilleur.
+     Les tirages, les scores et le nombre de cases sont inventes pour l'image. */
+  A.scenes.aso_draw = function (svg) {
+    var COLS = 8, ROWS = 5, N = COLS * ROWS, CELL = 21, GAP = 3, X0 = 12, Y0 = 34, D = 26, i, seed = 11;
+    function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    var draws = [], score = [];
+    for (i = 0; i < N; i++) { score.push(0.2 + 0.8 * ((i * 0.6180339 + 0.13) % 1)); }
+    for (i = 0; i < D; i++) { draws.push(Math.floor(rnd() * N)); }
+    draws[9] = draws[3]; draws[18] = draws[12];
+    function pos(c) { return [X0 + (c % COLS) * (CELL + GAP), Y0 + Math.floor(c / COLS) * (CELL + GAP)]; }
+    var fills = [], marks = [];
+    for (i = 0; i < N; i++) {
+      var p = pos(i);
+      fills.push(E("rect", { "class": "a-seg", x: p[0], y: p[1], width: CELL, height: CELL, rx: 2, opacity: 0 }, svg));
+      E("rect", { "class": "a-ink", x: p[0], y: p[1], width: CELL, height: CELL, rx: 2, fill: "none", opacity: 0.45 }, svg);
+    }
+    var best = E("rect", { "class": "a-acc-s", width: CELL + 4, height: CELL + 4, rx: 3, fill: "none", "stroke-width": 2.4, opacity: 0 }, svg);
+    var cur = E("rect", { "class": "a-nlp-s", width: CELL + 4, height: CELL + 4, rx: 3, fill: "none", "stroke-width": 2.4 }, svg);
+    var cross = E("path", { "class": "a-ink", fill: "none", "stroke-width": 2 }, svg);
+    var CX0 = 232, CX1 = 306, CBASE = 172, CTOP = 36;
+    E("path", { "class": "a-ink", d: "M" + CX0 + " " + CTOP + " V" + CBASE + " H" + CX1, fill: "none" }, svg);
+    var curve = E("polyline", { "class": "a-nlp-s", fill: "none", "stroke-width": 2 }, svg);
+    var dot = E("circle", { "class": "a-acc", r: 4 }, svg);
+    return function (t) {
+      var k = Math.min(D - 1, Math.floor(t * D * 1.02)), seen = {}, bestC = -1, bestS = 9, pts = [], j, c, isRepeat = false;
+      for (j = 0; j <= k; j++) {
+        c = draws[j]; isRepeat = !!seen[c]; seen[c] = true;
+        if (score[c] < bestS) { bestS = score[c]; bestC = c; }
+        pts.push([CX0 + (CX1 - CX0) * j / (D - 1), CBASE - (CBASE - CTOP) * 0.9 * bestS]);
+      }
+      for (i = 0; i < N; i++) { fills[i].setAttribute("opacity", seen[i] ? 0.4 : 0); }
+      var pc = pos(draws[k]), done = t > 0.94, pb = pos(bestC);
+      cur.setAttribute("x", pc[0] - 2); cur.setAttribute("y", pc[1] - 2); cur.setAttribute("opacity", done ? 0 : 1);
+      cross.setAttribute("d", isRepeat && !done ? "M" + (pc[0] + 3) + " " + (pc[1] + 3) + " l" + (CELL - 6) + " " + (CELL - 6) + " M" + (pc[0] + CELL - 3) + " " + (pc[1] + 3) + " l" + (6 - CELL) + " " + (CELL - 6) : "");
+      best.setAttribute("x", pb[0] - 2); best.setAttribute("y", pb[1] - 2); best.setAttribute("opacity", bestC >= 0 ? 1 : 0);
+      curve.setAttribute("points", pts.map(function (q) { return q[0].toFixed(1) + "," + q[1].toFixed(1); }).join(" "));
+      var lp = pts[pts.length - 1]; dot.setAttribute("cx", lp[0]); dot.setAttribute("cy", lp[1]);
+    };
+  };
+
   /* 3. Premiere rotation : les deux vecteurs sont replies dans le quadrant positif avant de prendre l'angle */
   A.scenes.aso_fold = function (svg) {
     var OX = 150, OY = 150, S = 60;
@@ -252,11 +293,10 @@
   A.scenes.aso_plane = function (svg) {
     var V = viewer(160, 110, 62, 0.55, 0.5);
     var T = [[-1.2, 0.0, 0.3], [0.0, 0.0, -0.5], [1.2, 0.0, 0.3]];            /* reference : gauche, milieu, droite */
-    var S0 = [[-0.9, 0.8, 0.7], [0.1, 0.1, 0.0], [1.0, -0.5, -0.8]];          /* scan, hors du plan de la reference */
+    var S0 = [[-0.9, 0.8, -0.7], [0.1, 0.1, 0.0], [1.0, -0.5, 0.8]];         /* scan, hors du plan de la reference, normale du meme cote que celle de la reference (le code ne retourne jamais une normale) */
     function normal(S) { return unit(cross(sub(S[2], S[1]), sub(S[0], S[1]))); }
     function cen(S) { return mul(add(add(S[0], S[1]), S[2]), 1 / 3); }
     var nt = normal(T), ns = normal(S0);
-    if (dot(ns, nt) < 0) { ns = mul(ns, -1); }
     var ax1 = cross(ns, nt), th1 = Math.acos(Math.max(-1, Math.min(1, dot(ns, nt)))), R1 = rodrigues(ax1, th1);
     function turned(S, R, c) { return S.map(function (p) { return add(apply(R, sub(p, c)), c); }); }
     var c0 = cen(S0), S1 = turned(S0, R1, c0);

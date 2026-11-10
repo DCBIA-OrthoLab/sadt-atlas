@@ -53,7 +53,7 @@
       bars.push({ rs: rs, v: v, row: row });
     });
     var bl = E("line", { "class": "a-dash", x1: X0 + budget * S, x2: X0 + budget * S, y1: 18, y2: 150 }, svg);
-    txt(svg, X0 + budget * S, 166, "0.85 ×", "a-label", "middle");
+    txt(svg, X0 + budget * S, 166, "0.85", "a-label", "middle");
     return function (t) {
       bars.forEach(function (b, n) {
         var u = ease(seg(t, 0.05 + n * 0.25, 0.5 + n * 0.25)), tot = b.row.total;
@@ -97,7 +97,7 @@
 
   /* 4. Argmax par classe : on garde la meilleure valeur et son indice au fil des classes */
   A.scenes.bds_argmax = function (svg) {
-    var X0 = 40, BW = 36, GAP = 16, BASE = 150, vals = [0.35, 0.8, 0.5, 0.9, 0.2, 0.62], n = vals.length, i;
+    var X0 = 40, BW = 30, GAP = 12, BASE = 150, vals = [0.35, 0.8, 0.5, 0.9, 0.2, 0.62], n = vals.length, i;
     var bars = [], best = E("rect", { "class": "a-acc-s", rx: 3, fill: "none", opacity: 0 }, svg);
     for (i = 0; i < n; i++) {
       var r = E("rect", { "class": "a-soft", x: X0 + i * (BW + GAP), width: BW, rx: 2 }, svg); r.setAttribute("fill-opacity", 0.25);
@@ -115,6 +115,107 @@
       best.setAttribute("x", x - 3); best.setAttribute("y", BASE - vals[b] * 100 - 3); best.setAttribute("width", BW + 6); best.setAttribute("height", vals[b] * 100 + 6); best.setAttribute("opacity", 1);
       var yy = BASE - vals[b] * 100; run.setAttribute("y1", yy); run.setAttribute("y2", yy);
       out.textContent = String(b);
+    };
+  };
+  /* 5. Normalisation nnU-Net (copie des scenes d'AMASSS, pour ne pas en dependre) :
+        ecreter a deux percentiles, retrancher une moyenne, diviser par un ecart type.
+        Histogramme, moyenne et ecart type sont dessines, pas calcules. */
+  A.scenes.bds_norm = function (svg) {
+    var N = 40, W = 280, X0 = 20, BASE = 150, bw = W / N, i, lo = 4, hi = 35;
+    var h = [];
+    for (i = 0; i < N; i++) { h[i] = 100 * Math.exp(-Math.pow((i - 17) / 8, 2)) + 24 * Math.exp(-Math.pow((i - 32) / 3, 2)) + 6; }
+    var mu = 17.5, sg = 8;                      /* position de la moyenne et de l'ecart type, en barres */
+    var bars = [], g = E("g", {}, svg);
+    for (i = 0; i < N; i++) { bars[i] = E("rect", { "class": "a-acc", width: bw - 1.2 }, g); }
+    var lL = E("line", { "class": "a-dash", y1: 24, y2: BASE }, svg), lR = E("line", { "class": "a-dash", y1: 24, y2: BASE }, svg);
+    var axis = E("line", { "class": "a-ink", x1: X0, x2: X0 + W, y1: BASE, y2: BASE }, svg);
+    var zero = E("line", { "class": "a-ink", y1: BASE - 6, y2: BASE + 6 }, svg);
+    var tz = txt(svg, 0, 168, "0", "a-label-b", "middle");
+    var tl = txt(svg, 0, 168, "p0.5", "a-label", "middle"), tr = txt(svg, 0, 168, "p99.5", "a-label", "middle");
+    function px(k) { return X0 + k * bw; }
+    return function (t) {
+      var a = ease(seg(t, 0.05, 0.4)), b = ease(seg(t, 0.55, 0.95));
+      for (var k = 0; k < N; k++) {
+        var kk = Math.min(hi, Math.max(lo, k));                          /* ecretage : on ramene sur la borne */
+        var cx = lerp(k, kk, a);
+        var z = (cx - mu) / sg;                                          /* puis (x - moyenne) / ecart type */
+        var X = lerp(px(cx), 160 + z * 36, b);
+        var hh = h[k], edge = k < lo || k > hi;
+        var op = edge ? 1 - 0.7 * a : 1;
+        bars[k].setAttribute("x", X); bars[k].setAttribute("width", Math.max(1, bw - 1.2));
+        bars[k].setAttribute("height", hh); bars[k].setAttribute("y", BASE - hh); bars[k].setAttribute("opacity", op);
+      }
+      var xl = lerp(px(lo), 160 + (lo - mu) / sg * 36, b), xr = lerp(px(hi), 160 + (hi - mu) / sg * 36, b);
+      lL.setAttribute("x1", xl); lL.setAttribute("x2", xl); lR.setAttribute("x1", xr); lR.setAttribute("x2", xr);
+      tl.setAttribute("x", xl); tr.setAttribute("x", xr);
+      var zx = lerp(px(mu), 160, b);
+      zero.setAttribute("x1", zx); zero.setAttribute("x2", zx); tz.setAttribute("x", zx); tz.setAttribute("opacity", b);
+    };
+  };
+
+  /* 6. Fenetre glissante : fenetres qui se recouvrent d'au moins la moitie, poids gaussiens ;
+        la courbe noire est la SOMME des poids (le denominateur), pas p(x). */
+  A.scenes.bds_window = function (svg) {
+    var X0 = 20, L = 280, T = 140, STEP = 70, BASE = 150, TOP = 56, sigma = T / 8, i;
+    var starts = [0, 70, 140];
+    E("rect", { "class": "a-cell", x: X0, y: 22, width: L, height: 18, fill: "none" }, svg);
+    var tiles = [], bells = [], cls = ["a-acc-s", "a-ana-s", "a-nlp-s"], fl = ["a-acc", "a-ana", "a-nlp"];
+    starts.forEach(function (s, n) {
+      tiles.push(E("rect", { "class": cls[n], x: X0 + s, y: 20, width: T, height: 22, rx: 2, opacity: 0 }, svg));
+      var d = "M" + (X0 + s) + " " + BASE;
+      for (i = 0; i <= 28; i++) {
+        var x = i / 28 * T, g = Math.exp(-Math.pow(x - T / 2, 2) / (2 * sigma * sigma));
+        d += " L" + (X0 + s + x).toFixed(1) + " " + (BASE - 70 * g).toFixed(1);
+      }
+      d += " L" + (X0 + s + T) + " " + BASE + " Z";
+      var b = E("path", { "class": fl[n], d: d, opacity: 0 }, svg); b.setAttribute("fill-opacity", 0.45);
+      bells.push(b);
+    });
+    E("line", { "class": "a-ink", x1: X0, x2: X0 + L, y1: BASE, y2: BASE }, svg);
+    var sumPath = E("path", { "class": "a-ink", fill: "none" }, svg);
+    var d2 = "";
+    for (i = 0; i <= 70; i++) {
+      var x2 = i / 70 * L, s2 = 0;
+      starts.forEach(function (s) { if (x2 >= s && x2 <= s + T) { s2 += Math.exp(-Math.pow(x2 - s - T / 2, 2) / (2 * sigma * sigma)); } });
+      d2 += (i ? " L" : "M") + (X0 + x2).toFixed(1) + " " + (BASE + 10 - 30 * Math.min(1.3, s2)).toFixed(1);
+    }
+    sumPath.setAttribute("d", d2); sumPath.setAttribute("opacity", 0);
+    txt(svg, X0, 172, "scan", "a-label");
+    return function (t) {
+      starts.forEach(function (s, n) {
+        var u = ease(seg(t, 0.08 + n * 0.22, 0.26 + n * 0.22));
+        tiles[n].setAttribute("opacity", u);
+        bells[n].setAttribute("opacity", u);
+      });
+      sumPath.setAttribute("opacity", ease(seg(t, 0.78, 0.95)));
+    };
+  };
+
+  /* 7. Interpolation : une courbe lisse (Catmull-Rom, pour figurer le spline cubique) contre
+        des segments droits entre les 7 memes echantillons. */
+  A.scenes.bds_interp = function (svg) {
+    var X0 = 24, DX = 38, BASE = 150, ys = [60, 36, 74, 30, 66, 44, 52], n = ys.length, i;
+    function Y(k) { return BASE - ys[k] * 1.1; }
+    function cat(k, u) {                       /* Catmull-Rom entre k et k+1 */
+      var p0 = Y(Math.max(0, k - 1)), p1 = Y(k), p2 = Y(k + 1), p3 = Y(Math.min(n - 1, k + 2));
+      return 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (-p0 + 3 * p1 - 3 * p2 + p3) * u * u * u);
+    }
+    var dc = "", dl = "";
+    for (i = 0; i < n - 1; i++) { for (var s = 0; s <= 12; s++) { dc += (dc ? " L" : "M") + (X0 + (i + s / 12) * DX).toFixed(1) + " " + cat(i, s / 12).toFixed(1); } }
+    for (i = 0; i < n; i++) { dl += (i ? " L" : "M") + (X0 + i * DX) + " " + Y(i); }
+    E("line", { "class": "a-ink", x1: X0 - 8, x2: X0 + (n - 1) * DX + 8, y1: BASE, y2: BASE }, svg);
+    var pc = E("path", { "class": "a-ink", d: dc, fill: "none" }, svg);
+    var pl = E("path", { "class": "a-acc-s", d: dl, fill: "none" }, svg);
+    for (i = 0; i < n; i++) { E("circle", { "class": "a-soft", cx: X0 + i * DX, cy: Y(i), r: 3 }, svg); }
+    var mk = E("line", { "class": "a-dash", y1: 20, y2: BASE }, svg);
+    var q = E("circle", { "class": "a-seg", r: 4 }, svg), r = E("circle", { "class": "a-nlp", r: 4 }, svg);
+    return function (t) {
+      var a = ease(seg(t, 0.05, 0.4)), b = ease(seg(t, 0.45, 0.8));
+      pc.setAttribute("opacity", 1 - 0.55 * b); pl.setAttribute("opacity", b);
+      var pos = 2.4 + 0.3 * Math.sin(t * 3), k = Math.floor(pos), u = pos - k, x = X0 + pos * DX;
+      mk.setAttribute("x1", x); mk.setAttribute("x2", x); mk.setAttribute("opacity", a);
+      q.setAttribute("cx", x); q.setAttribute("cy", cat(k, u)); q.setAttribute("opacity", a);
+      r.setAttribute("cx", x); r.setAttribute("cy", lerp(Y(k), Y(k + 1), u)); r.setAttribute("opacity", b);
     };
   };
 })();
