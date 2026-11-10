@@ -23,8 +23,9 @@
     <div class="sec-switch" role="group">
       <a href="../guide/MRI2CBCT.html">Guide</a>
       <a href="../MRI2CBCT/MRI2CBCT.html" aria-current="true">Atlas</a>
+      <a href="../MRI2CBCT/MRI2CBCT.code.html">Code</a>
     </div>
-    <p class="sec-hint">how it works in the code</p>
+    <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="legacy">
     <div class="gen-legacy">
     <div class="nav-group"><h4>Registration</h4><ul>
@@ -122,8 +123,9 @@
         <img class="tool-icon" src="../../assets/screens/MRI2CBCT/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Registration</div>
         <h1>MRI2CBCT</h1>
-        <p class="lede">One-button MRI → CBCT registration of the TMJ. The module pairs an MRI folder with a CBCT folder, orients each CBCT, <em>predicts</em> the cranial base on both scans with two networks, then registers the two predicted surfaces by FPFH + RANSAC + ICP (Open3D) and climbs a recovery ladder when the result comes out flipped. The images themselves are never compared.</p>
+        <p class="lede">MRI2CBCT places an MRI of the jaw joint onto the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> of the same patient. It predicts the cranial base on both scans with two networks, then aligns the two predicted surfaces and checks the result. This page explains how, step by step, with the maths: what goes in, what each step does to it, and what comes out. The files, lines and traps are on <a href="MRI2CBCT.code.html">the code page</a>. There is no VISOR port: <a href="../visor/MRI2CBCT/MRI2CBCT.html">see what exists</a>.</p>
         <div class="meta-row">
+          <a class="badge neutral" href="MRI2CBCT.code.html">Code (developers)</a>
           <a class="badge paper" href="https://doi.org/10.1007/978-3-031-73083-2_7" target="_blank" rel="noopener" title="Novel CBCT-MRI Registration Approach for TMJ Degenerative Joint Disease. Describes the earlier, elastix-based version, not the code documented here.">Leroux 2024 · earlier version, CLIP, LNCS 15196</a>
           <span class="badge cli">3 MRI2CBCT_* CLIs + 4 borrowed</span>
           <span class="badge neutral">Slicer's Python, no conda</span>
@@ -132,247 +134,153 @@
         </div>
       </header>
 
-      <p>Since PRs #277 and #278 the module is a single panel (<code>MRI2CBCT.py</code>, 753
-      lines) over a Slicer-free package, <code>MRI2CBCT_core/</code>. Seven steps are chained by one
-      <strong>Run</strong> button: three CLIs of its own (<code>MRI2CBCT_PREPARE</code>,
-      <code>MRI2CBCT_SEGMENT_MRI</code>, <code>MRI2CBCT_REGISTER</code>) and four borrowed from
-      <a href="../ASO/ASO.html">ASO</a>, <a href="../ALI/ALI.html">ALI</a> and
-      <a href="../AMASSS/AMASSS.html">AMASSS</a>. Two <a class="gterm" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>-family networks
-      segment the cranial base, one on the CBCT and one on the MRI; everything after that is
-      geometry on two point clouds. The run can pause after any step so the clinician can check it.</p>
 
-      <div class="callout note">
-        <div class="callout-title">Two code bases</div>
-        <p>Everything numbered below describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957,
-        2026-10-26, the rewritten version). <strong>There is no VISOR port</strong>: SADT-VISOR has no
-        MRI2CBCT tool, VISOR-serve has no deployment section for it, and the client module is kept in the
-        tree but not built. See <a href="../visor/MRI2CBCT/MRI2CBCT.html">what exists of MRI2CBCT in VISOR</a>.</p>
+      <h2 id="apercu">Overview: what goes in, what comes out</h2>
+
+      <p>MRI2CBCT places an MRI of the jaw joint (the temporomandibular joint) onto the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> of the same patient. The module pairs an MRI folder with a CBCT folder, orients each CBCT, <em>predicts</em> the cranial base on both scans with two networks, and then aligns the two predicted surfaces. <strong>The images themselves are never compared:</strong> only the two cranial-base masks are used. When the result comes out turned the wrong way, a recovery <a class="gterm" data-term="mri-ladder" href="MRI2CBCT.code.html#recalage-ladder" title="See the code">ladder</a> tries other possibilities. The whole run is started by one Run button and can pause after any step so that the clinician can check it.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>MRI2CBCT, legacy module</th></tr></thead>
+          <tbody>
+            <tr><td>Input</td><td>a folder of MRIs and a folder of CBCTs, matched by patient identifier</td></tr>
+            <tr><td>Method</td><td>prepare the MRIs, orient the CBCT, predict the cranial base on both, align the two surfaces, check the verdict</td></tr>
+            <tr><td>Output</td><td>per patient and joint: the MRI moved onto the CBCT, its mask, the transform, and one summary table with a quality tag for each joint</td></tr>
+            <tr><td>Where</td><td>inside Slicer&rsquo;s own Python, with a one-time download of packages and models (about 5 GB, the panel&rsquo;s own estimate)</td></tr>
+          </tbody>
+        </table>
       </div>
+
+      <p>This page describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, the rewritten version). <strong>There is no VISOR port</strong>: see <a href="../visor/MRI2CBCT/MRI2CBCT.html">what exists of MRI2CBCT in VISOR</a>. File names, line numbers and traps are on <a href="MRI2CBCT.code.html">the code page</a>.</p>
+
+            <a class="deep-link" href="MRI2CBCT.code.html#f-two-code-bases"><b>In the code</b><span>Which code base this describes</span></a>
+
 
       <h2 id="situation">1. Where it sits in the pipeline</h2>
 
-      <p>Nothing calls the three new CLIs but the module's own panel: a search for
-      <code>MRI2CBCT_PREPARE</code>, <code>MRI2CBCT_SEGMENT_MRI</code> and <code>MRI2CBCT_REGISTER</code>
-      across the whole extension finds them in <code>plan.py</code> and in their own folders only.
-      <a href="../Agent/Agent.html">Agent</a>'s manifest still knows a single MRI2CBCT CLI,
-      <code>mri2cbct_resample</code> (<code>Agent_CLI/manifest.yaml:491</code>), and none of the three.
-      The module declares <code>dependencies = []</code> (<code>MRI2CBCT.py:49</code>): it no longer
-      depends on SlicerNNUNet, nnU-Net comes from <code>pip</code>.</p>
+      <p>Seven steps are chained by the panel: three small programs of its own (prepare, segment the MRI, register) and four borrowed from ASO, ALI and AMASSS (the lab&rsquo;s other tools: ASO orients a <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>, ALI finds <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> on it, AMASSS segments it). Nothing else calls the three new programs. The step list is built once and the panel runs whatever it returns; the borrowed programs get fresh folders under the output so that they cannot pick up stale files. The module no longer depends on SlicerNNUNet: <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> is installed with pip.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Called</th><th>How</th><th>When</th></tr></thead>
-          <tbody>
-            <tr><td><code>MRI2CBCT_PREPARE</code>, <code>MRI2CBCT_SEGMENT_MRI</code>, <code>MRI2CBCT_REGISTER</code></td><td><code>slicer.cli.run</code>, one step at a time (<code>MRI2CBCT.py:386</code>, <code>:395</code>)</td><td>steps 1, 5, 7</td></tr>
-            <tr><td><code>PRE_ASO_CBCT</code>, <code>ALI_CBCT</code>, <code>SEMI_ASO_CBCT</code></td><td>same, parameters from <code>plan.py:73-86</code></td><td>steps 2 to 4: orient the CBCT</td></tr>
-            <tr><td><code>AMASSS_CLI</code></td><td>same, <code>skullStructure = CB</code> (<code>plan.py:87-92</code>)</td><td>step 5: cranial base on the CBCT</td></tr>
-            <tr><td>nnU-Net Python API</td><td>in process, inside <code>MRI2CBCT_SEGMENT_MRI</code> (<code>seg516.py:14</code>)</td><td>cranial base on the MRI</td></tr>
-            <tr><td>Open3D</td><td>in process, inside <code>MRI2CBCT_REGISTER</code> (<code>ladder.py:25</code>)</td><td>registration</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <a class="deep-link" href="MRI2CBCT.code.html#situation"><b>In the code</b><span>The table of what is called, how, and when, with lines</span></a>
 
-      <p>The step list is built once, in <code>plan.build</code> (<code>plan.py:57</code>), and the panel runs
-      whatever it returns. <code>plan.py:7-8</code> says why the borrowed CLIs get fresh folders under
-      the output: ALI's shared temporary folder under <code>~/Documents</code> "reuses stale files by name".</p>
-
-      <div class="callout note">
-        <div class="callout-title">What the rewrite replaced · not in VISOR</div>
-        <p><strong>Legacy only (3c67957); not present in <a href="../visor/MRI2CBCT/MRI2CBCT.html">VISOR</a>.</strong> In VISOR, VFACE no longer calls the resample CLI: it carries its own copy (<code>SADT-VISOR tools/VFACE/src/sadt_vface/resample.py:1-34</code>), and no file under <code>SADT-VISOR tools/AREG</code> mentions MRI2CBCT. The six-CLI layout survives only in the unbuilt client copy (see <a href="../visor/MRI2CBCT/MRI2CBCT.html#visor-where">the VISOR page</a>).</p>
-        <p>The earlier module had six CLIs (<code>ORIENT_CENTER_MRI</code>, <code>LR_CROP</code>,
-        <code>RESAMPLE_CBCT_MRI</code>, <code>APPROX</code>, <code>TMJ_CROP</code>, <code>REG</code>), a
-        <code>.ui</code> file, a manual approximation tool, a condyle-segmentation network applied to the
-        CBCT and a rigid <a class="gterm" href="../glossary.html#g-elastix" title="See glossary">elastix</a> registration on mutual information. None of it is in the
-        tree any more. Only <code>MRI2CBCT_RESAMPLE_CBCT_MRI</code> and its helper package
-        <code>MRI2CBCT_CLI_utils</code> remain, and they are <strong>outside this chain</strong>: they are still
-        built (<code>MRI2CBCT_CLI/CMakeLists.txt:2</code>) and still called, but by
-        <a href="../AREG_IOSCBCT/AREG_IOSCBCT.html">AREG_IOSCBCT</a>
-        (<code>AREG/AREG_Method/IOSCBCT.py:601</code>) and <a href="../VFACE/VFACE.html">VFACE</a>
-        (<code>VFACE/VFACE_utils/createlistprocess.py:119</code>), as the comment at
-        <code>MRI2CBCT_CLI_utils/__init__.py:1-3</code> says. The previous page's statement that no one consumes
-        them was wrong on this point and is withdrawn.</p>
-      </div>
 
       <h2 id="fichiers">2. Files involved</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>MRI2CBCT/MRI2CBCT.py</code></td><td>the panel (<code>MRI2CBCTWidget</code>), first-run setup and the pause views (<code>MRI2CBCTLogic</code>), one smoke test</td></tr>
-            <tr><td><code>MRI2CBCT_core/plan.py</code></td><td>the seven steps: which CLI, which arguments, which pause; model locations</td></tr>
-            <tr><td><code>MRI2CBCT_core/pairing.py</code></td><td>pairs the two folders by patient ID; detects swapped folders</td></tr>
-            <tr><td><code>MRI2CBCT_core/mri_prep.py</code></td><td>resample to 0.3 mm; left/right split; side from the header</td></tr>
-            <tr><td><code>MRI2CBCT_core/seg516.py</code></td><td>Dataset516 inference through nnU-Net's Python API</td></tr>
-            <tr><td><code>MRI2CBCT_core/ladder.py</code></td><td>one joint: surfaces, side cut, worker pool, the FLIP ladder</td></tr>
-            <tr><td><code>MRI2CBCT_core/reg/</code></td><td><code>pipeline.py</code> (constants, QC tag), <code>global_reg.py</code> (FPFH, RANSAC, ICP), <code>surface.py</code> (surface points and normals, largest component), <code>itk_io.py</code> (see §11)</td></tr>
-            <tr><td><code>MRI2CBCT_core/frames.py</code></td><td>RAS and LPS conversions, <code>.tfm</code> writing, header move, resampling</td></tr>
-            <tr><td><code>MRI2CBCT_core/layout.py</code></td><td>the <code>_steps/</code> tree, the manifest, the CLI progress protocol, <code>as_bool</code></td></tr>
-            <tr><td><code>MRI2CBCT_core/env.py</code>, <code>requirements.py</code></td><td>where models and Open3D live; what to install and download</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>One panel file, plus a Slicer-free package that holds the logic: the plan of the seven steps, the <a class="gterm" data-term="mri-pairing" href="MRI2CBCT.code.html#preparation-pairing" title="See the code">pairing</a>, the MRI preparation, the inference of the MRI network, the registration with its <a class="gterm" data-term="mri-ladder" href="MRI2CBCT.code.html#recalage-ladder" title="See the code">ladder</a>, the conversions between coordinate frames, and the setup of environment and models. Everything runs in Slicer&rsquo;s Python. The three new programs each need the manifest written by the first one and the files left by the earlier steps, so they are not usable alone.</p>
 
-      <p><strong>Everything runs in Slicer's Python.</strong> The three CLIs start with
-      <code>#!/usr/bin/env python-real</code>, there is no <code>conda run</code>, and the core package imports
-      nothing from Slicer so each step can also be run from <code>PythonSlicer</code>
-      (<code>MRI2CBCT_core/__init__.py</code>). Parameters are passed as strings; booleans arrive as
-      <code>"True"</code> or <code>"False"</code> and go through <code>layout.as_bool</code>
-      (<code>layout.py:84-85</code>).</p>
+            <a class="deep-link" href="MRI2CBCT.code.html#fichiers"><b>In the code</b><span>The file table, the three programs and their arguments</span></a>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>CLI</th><th>Arguments (positional, all required)</th><th>Reads</th><th>Writes</th></tr></thead>
-          <tbody>
-            <tr><td><span class="badge cli">MRI2CBCT_PREPARE</span></td><td><code>mri_folder</code>, <code>cbct_folder</code>, <code>output_folder</code>, <code>resample</code>, <code>separate</code>, <code>acquisition_spacing</code></td><td>the two input folders</td><td><code>_steps/0_cbct_in</code>, <code>_steps/1_mri</code>, <code>manifest.json</code></td></tr>
-            <tr><td><span class="badge cli">MRI2CBCT_SEGMENT_MRI</span></td><td><code>output_folder</code>, <code>model_folder</code>, <code>folds</code></td><td>manifest, <code>1_mri</code></td><td><code>_steps/4_mri_seg</code></td></tr>
-            <tr><td><span class="badge cli">MRI2CBCT_REGISTER</span></td><td><code>output_folder</code>, <code>on_cbct_grid</code>, <code>workers</code></td><td>manifest, <code>2_cbct_oriented</code> (ASO transform), <code>3_cbct_seg</code>, <code>1_mri</code>, <code>4_mri_seg</code></td><td><code>&lt;PID&gt;/…</code>, <code>summary.csv</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>The XML description of each says "Run by the MRI2CBCT module; every argument is required". The
-      two later CLIs are not self-contained: they open <code>_steps/manifest.json</code> written by
-      <code>MRI2CBCT_PREPARE</code> (<code>layout.py:36-38</code>) and the files left by the earlier steps.</p>
-
-      <div class="callout note">
-        <div class="callout-title">Note · not in VISOR</div>
-        <p><strong>Legacy only (3c67957); not present in <a href="../visor/MRI2CBCT/MRI2CBCT.html">VISOR</a>.</strong> MRI2CBCT is not a tool in SADT-VISOR (<code>SADT-VISOR PROVENANCE.md:46-47</code>) and the client modules are not built (<code>AutomatedDentalToolsRemote CMakeLists.txt:31-32</code>), so no VISOR code exists to check this against.</p>
-        <p><strong>The shared layer is used less than before.</strong> <a href="../ADTLib/ADTLib.html">ADTLib</a> now
-        serves the panel for <code>testdata</code> (test files and model downloads), <code>env.deps</code> and
-        <code>env.cuda</code> (what to install), and the leftover resample CLI for <code>logging_setup</code> and
-        <code>progress_protocol</code>. The module no longer uses ADTLib's <code>method.py</code> contract.</p>
-      </div>
 
       <h2 id="pipeline">3. Pipeline order, and what is actually mandatory</h2>
 
-      <pre class="ascii"><code>pair → [resample] [split L/R] → orient CBCT (ASO) → cranial base on CBCT → cranial base on MRI → register</code></pre>
+      <p>The order is: pair the patients, optionally resample and split left from right, orient the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>, predict the cranial base on the CBCT, predict it on the MRI, register. Steps 1 to 6 are all mandatory, because the registration (step 7) reads the files they leave behind; only resampling and the left-right split inside the first step are options, and both are on by default. Five optional review pauses are off by default. Click a box to read its section.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 1200 300" role="img" aria-label="MRI2CBCT data flow: an MRI lane and a CBCT lane, each ending in a predicted cranial base, converging on the registration">
+          <a class="d-link" href="#preparation-pairing">
           <rect class="d-box" x="10" y="30" width="150" height="54" rx="6"/>
           <text class="d-label" x="85" y="53" text-anchor="middle">MRI folder</text>
           <text class="d-label-s" x="85" y="68" text-anchor="middle">paired by patient ID</text>
+          </a>
 
           <path class="d-arrow" d="M160 57 H190"/>
           <path class="d-arrow-head" d="M190 57 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#preparation">
           <rect class="d-box" x="190" y="30" width="230" height="54" rx="6"/>
           <text class="d-label" x="305" y="53" text-anchor="middle">1 · MRI2CBCT_PREPARE</text>
           <text class="d-label-s" x="305" y="68" text-anchor="middle">pair, resample, split left / right</text>
+          </a>
 
           <path class="d-arrow" d="M420 57 H450"/>
           <path class="d-arrow-head" d="M450 57 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#segmentation">
           <rect class="d-box-n" x="450" y="30" width="230" height="54" rx="6"/>
           <text class="d-label" x="565" y="53" text-anchor="middle">6 · MRI2CBCT_SEGMENT_MRI</text>
           <text class="d-label-s" x="565" y="68" text-anchor="middle">predicted: cranial base (Dataset516)</text>
+          </a>
 
           <path class="d-arrow" d="M305 84 V200"/>
           <path class="d-arrow-head" d="M305 200 l-4 -7 h8 z"/>
           <text class="d-label-s" x="315" y="146" text-anchor="start">links the CBCTs</text>
 
+          <a class="d-link" href="#preparation-pairing">
           <rect class="d-box" x="10" y="200" width="150" height="54" rx="6"/>
           <text class="d-label" x="85" y="223" text-anchor="middle">CBCT folder</text>
           <text class="d-label-s" x="85" y="238" text-anchor="middle">one per patient</text>
+          </a>
 
           <path class="d-arrow" d="M160 227 H190"/>
           <path class="d-arrow-head" d="M190 227 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#orientation">
           <rect class="d-box" x="190" y="200" width="290" height="54" rx="6"/>
           <text class="d-label" x="335" y="223" text-anchor="middle">2 to 4 · orient the CBCT (ASO)</text>
           <text class="d-label-s" x="335" y="238" text-anchor="middle">PRE_ASO · ALI · SEMI_ASO</text>
+          </a>
 
           <path class="d-arrow" d="M480 227 H510"/>
           <path class="d-arrow-head" d="M510 227 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#segmentation">
           <rect class="d-box-n" x="510" y="200" width="170" height="54" rx="6"/>
           <text class="d-label" x="595" y="223" text-anchor="middle">5 · AMASSS_CLI</text>
           <text class="d-label-s" x="595" y="238" text-anchor="middle">predicted: CB</text>
+          </a>
 
           <path class="d-arrow" d="M680 57 H710 V115 H740"/>
           <path class="d-arrow-head" d="M740 115 l-7 -4 v8 z"/>
           <path class="d-arrow" d="M680 227 H710 V150 H740"/>
           <path class="d-arrow-head" d="M740 150 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#recalage">
           <rect class="d-box-a" x="740" y="85" width="230" height="95" rx="6"/>
           <text class="d-label" x="855" y="110" text-anchor="middle">7 · MRI2CBCT_REGISTER</text>
           <text class="d-label-s" x="855" y="127" text-anchor="middle">FPFH + RANSAC + ICP</text>
           <text class="d-label-s" x="855" y="141" text-anchor="middle">on the two cranial bases</text>
           <text class="d-label-s" x="855" y="155" text-anchor="middle">computed, FLIP ladder</text>
+          </a>
 
           <path class="d-arrow" d="M970 132 H1000"/>
           <path class="d-arrow-head" d="M1000 132 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#sortie">
           <rect class="d-box-a" x="1000" y="97" width="190" height="70" rx="6"/>
           <text class="d-label" x="1095" y="120" text-anchor="middle">results</text>
           <text class="d-label-s" x="1095" y="136" text-anchor="middle">_REG · _MASK · .tfm</text>
           <text class="d-label-s" x="1095" y="150" text-anchor="middle">summary.csv</text>
+          </a>
         </svg>
         <figcaption>The data flow as two lanes. The numbers are the order in which the panel runs
         the seven steps; the three ASO CLIs share one box (2 to 4). Both networks (shaded) only produce a cranial-base mask; the registration reads those
         two masks and nothing else.</figcaption>
       </figure>
 
-      <p>The panel counts seven steps (<code>plan.py:69-98</code>): PREPARE, PRE_ASO_CBCT, ALI_CBCT,
-      SEMI_ASO_CBCT, AMASSS_CLI, SEGMENT_MRI, REGISTER. The figure groups the three orientation CLIs in one box.</p>
+            <a class="deep-link" href="MRI2CBCT.code.html#pipeline"><b>In the code</b><span>The step table with its status, why and exit codes</span></a>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>Step</th><th>Status</th><th>Why</th></tr></thead>
-          <tbody>
-            <tr><td>1</td><td><code>MRI2CBCT_PREPARE</code></td><td><strong>mandatory</strong></td><td>pairs the patients and writes the manifest every later CLI reads; <em>resampling</em> and <em>left/right split</em> inside it are options (<code>MRI2CBCT.py:118-135</code>, both on by default)</td></tr>
-            <tr><td>2 to 4</td><td><code>PRE_ASO_CBCT</code>, <code>ALI_CBCT</code>, <code>SEMI_ASO_CBCT</code></td><td><strong>mandatory</strong></td><td>the AMASSS step runs on the oriented CBCT and REGISTER reads the ASO transform (<code>MRI2CBCT_REGISTER.py:51</code>); without it the patient fails "before registration" (<code>:52-56</code>)</td></tr>
-            <tr><td>5</td><td><code>AMASSS_CLI</code> (CB)</td><td><strong>mandatory</strong></td><td>the fixed surface</td></tr>
-            <tr><td>6</td><td><code>MRI2CBCT_SEGMENT_MRI</code></td><td><strong>mandatory</strong></td><td>the moving surface; exits with code 1 if any output is missing (<code>MRI2CBCT_SEGMENT_MRI.py:31-34</code>)</td></tr>
-            <tr><td>7</td><td><code>MRI2CBCT_REGISTER</code></td><td>the goal</td><td>exits with code 1 if no joint registered (<code>MRI2CBCT_REGISTER.py:119-120</code>)</td></tr>
-            <tr><td>pauses</td><td>five review points</td><td>optional</td><td>off by default (§9)</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>This is the main change from the six independent buttons of the previous version: the order and
-      the provenance of the files are now enforced by the plan, and a step that fails stops the run with
-      its error text (<code>MRI2CBCT.py:421-424</code>).</p>
 
       <h2 id="preparation">4. Pairing and MRI preparation</h2>
 
+      <p>Before any network runs, the module has to decide which MRI belongs to which <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> and what each MRI file contains.</p>
+
       <h3 id="preparation-pairing">4.1 Pairing by patient ID</h3>
 
-      <p><code>pair_folders</code> (<code>pairing.py:81</code>). The <strong>modality comes from the folder</strong> the
-      clinician chose, never from the file name (<code>pairing.py:3-4</code>). The ID is the leading letters
-      followed by a number, <code>^([A-Za-z]+)[_\-\s]*0*(\d+)</code> (<code>pairing.py:12</code>): <code>P01</code>,
-      <code>B038</code>, <code>A3_scan</code>. Leading zeros do not count, so <code>P1</code> and <code>P01</code> are the same
-      patient, and case does not either (<code>patient_key</code>, <code>:27-32</code>). Accepted extensions are
-      <code>.nii.gz</code>, <code>.nii</code> and <code>.nrrd</code> (<code>:11</code>), searched <strong>recursively</strong>
-      (<code>list_images</code>, <code>:41-47</code>).</p>
+      <p>The modality comes from the folder the clinician chose, never from the file name. The patient identifier is the leading letters followed by a number (<code>P01</code>, <code>B038</code>); leading zeros and capitals do not count, so <code>P1</code> and <code>p01</code> are the same patient. The folders are searched recursively. A file or a patient is left out, with a message, when no identifier can be read, when there is an MRI but no CBCT or the reverse, or when there is more than one CBCT for the same identifier. The panel lists them and asks for confirmation. The panel also checks whether the two folders were swapped, by looking only at file headers: an MRI has strongly non-cubic <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxels</a> or a small field, a CBCT has cubic voxels and a field of at least 12 cm.</p>
 
-      <p>A file or patient is left out, with a message, when: no ID can be read, there is an MRI but no
-      CBCT, a CBCT but no MRI, or <strong>more than one CBCT</strong> for the same ID
-      (<code>pairing.py:92</code>, <code>:98</code>, <code>:106</code>, <code>:109</code>, <code>:111-113</code>). The panel
-      lists them and asks for confirmation before going on (<code>MRI2CBCT.py:350</code>). A patient may have one
-      or two MRIs.</p>
+            <a class="deep-link" href="MRI2CBCT.code.html#preparation-pairing"><b>In the code</b><span>The pairing function, the regular expression and the swap detection with their thresholds</span></a>
 
-      <p><strong>Swapped folders.</strong> <code>folders_swapped</code> (<code>pairing.py:73-78</code>) reads only the headers
-      of up to four files per folder. <code>looks_like</code> (<code>:50-70</code>) calls a file an MRI if its
-      spacing is anisotropic by more than a factor 2 or if any extent is under 90 mm, and a CBCT if it is
-      isotropic within 5% and at least 120 mm across in every direction; anything else is "neither". The
-      panel then offers to swap the two folders (<code>MRI2CBCT.py:328-336</code>).</p>
 
       <h3 id="preparation-mri">4.2 Preparing each MRI</h3>
 
-      <p><code>MRI2CBCT_PREPARE.py</code>. First it <strong>deletes</strong> the whole <code>_steps/</code> folder of the output
-      (<code>:23-24</code>), then links each CBCT into <code>_steps/0_cbct_in/&lt;PID&gt;</code> (a symlink, a copy if
-      the link fails, <code>:45-48</code>), then for each MRI file asks <code>mri_prep.plan_joints</code> what the volume
-      is. The MRI's header is <strong>kept as is</strong>: the earlier "Orient" step overwrote the direction
-      matrix with a fixed one, which "throws away the only record of which way the slices run"
-      (<code>mri_prep.py:3-6</code>), so the new code reads the world coordinates from the native header.</p>
+      <p>The MRI&rsquo;s header is kept as it is: the earlier version overwrote the direction matrix, which threw away the only record of which way the slices run. For each file the module decides from its size and slice gaps whether it holds one joint or both, and, with the option on, separates them.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 1200 330" role="img" aria-label="How one MRI volume becomes joints: five cases depending on the separate option, the width, and a slice gap">
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box" x="10" y="140" width="140" height="50" rx="6"/>
           <text class="d-label" x="80" y="162" text-anchor="middle">one MRI file</text>
           <text class="d-label-s" x="80" y="177" text-anchor="middle">native header</text>
+          </a>
 
           <path class="d-arrow" d="M150 165 H175"/>
           <path class="d-rule" d="M175 40 V290"/>
@@ -383,21 +291,27 @@
           <path class="d-arrow" d="M175 214 H200"/><path class="d-arrow-head" d="M200 214 l-7 -4 v8 z"/>
           <path class="d-arrow" d="M175 272 H200"/><path class="d-arrow-head" d="M200 272 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box" x="200" y="15" width="370" height="50" rx="6"/>
           <text class="d-label" x="385" y="37" text-anchor="middle">separate · wider than 110 mm · gap</text>
           <text class="d-label-s" x="385" y="52" text-anchor="middle">slices spread over 1.2 × the acquisition spacing</text>
+          </a>
           <rect class="d-box" x="200" y="73" width="370" height="50" rx="6"/>
           <text class="d-label" x="385" y="95" text-anchor="middle">separate · wider than 110 mm · contiguous</text>
           <text class="d-label-s" x="385" y="110" text-anchor="middle">both joints, no gap</text>
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box" x="200" y="131" width="370" height="50" rx="6"/>
           <text class="d-label" x="385" y="153" text-anchor="middle">separate · narrower than 110 mm</text>
           <text class="d-label-s" x="385" y="168" text-anchor="middle">a single-joint slab</text>
+          </a>
           <rect class="d-box" x="200" y="189" width="370" height="50" rx="6"/>
           <text class="d-label" x="385" y="211" text-anchor="middle">no separation · wider than 110 mm</text>
           <text class="d-label-s" x="385" y="226" text-anchor="middle">both joints in one volume</text>
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box" x="200" y="247" width="370" height="50" rx="6"/>
           <text class="d-label" x="385" y="269" text-anchor="middle">no separation · narrower than 110 mm</text>
           <text class="d-label-s" x="385" y="284" text-anchor="middle">a single-joint slab</text>
+          </a>
 
           <path class="d-arrow" d="M570 40 H620"/><path class="d-arrow-head" d="M620 40 l-7 -4 v8 z"/>
           <path class="d-arrow" d="M570 98 H620"/><path class="d-arrow-head" d="M620 98 l-7 -4 v8 z"/>
@@ -405,21 +319,27 @@
           <path class="d-arrow" d="M570 214 H620"/><path class="d-arrow-head" d="M620 214 l-7 -4 v8 z"/>
           <path class="d-arrow" d="M570 272 H620"/><path class="d-arrow-head" d="M620 272 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box-a" x="620" y="15" width="350" height="50" rx="6"/>
-          <text class="d-label" x="795" y="37" text-anchor="middle">split_gapped</text>
-          <text class="d-label-s" x="795" y="52" text-anchor="middle">two stacks rebuilt at the acquisition spacing</text>
+          <text class="d-label" x="795" y="37" text-anchor="middle">Rebuild each stack</text>
+          <text class="d-label-s" x="795" y="52" text-anchor="middle">two stacks at the acquisition spacing</text>
+          </a>
           <rect class="d-box-a" x="620" y="73" width="350" height="50" rx="6"/>
-          <text class="d-label" x="795" y="95" text-anchor="middle">split_lr</text>
-          <text class="d-label-s" x="795" y="110" text-anchor="middle">cut in the middle of the left-right axis</text>
+          <text class="d-label" x="795" y="95" text-anchor="middle">Cut in the middle</text>
+          <text class="d-label-s" x="795" y="110" text-anchor="middle">cut at the middle of the left-right axis</text>
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box-a" x="620" y="131" width="350" height="50" rx="6"/>
           <text class="d-label" x="795" y="153" text-anchor="middle">not split</text>
           <text class="d-label-s" x="795" y="168" text-anchor="middle">side from the header position</text>
+          </a>
           <rect class="d-box-a" x="620" y="189" width="350" height="50" rx="6"/>
           <text class="d-label" x="795" y="211" text-anchor="middle">kept whole</text>
           <text class="d-label-s" x="795" y="226" text-anchor="middle">registered against the whole CBCT</text>
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box-a" x="620" y="247" width="350" height="50" rx="6"/>
           <text class="d-label" x="795" y="269" text-anchor="middle">not split</text>
           <text class="d-label-s" x="795" y="284" text-anchor="middle">side from the header position</text>
+          </a>
 
           <path class="d-arrow" d="M970 40 H1010"/><path class="d-arrow-head" d="M1010 40 l-7 -4 v8 z"/>
           <path class="d-arrow" d="M970 98 H1010"/><path class="d-arrow-head" d="M1010 98 l-7 -4 v8 z"/>
@@ -427,225 +347,170 @@
           <path class="d-arrow" d="M970 214 H1010"/><path class="d-arrow-head" d="M1010 214 l-7 -4 v8 z"/>
           <path class="d-arrow" d="M970 272 H1010"/><path class="d-arrow-head" d="M1010 272 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box" x="1010" y="15" width="180" height="50" rx="6"/>
           <text class="d-label" x="1100" y="45" text-anchor="middle">L and R</text>
+          </a>
           <rect class="d-box" x="1010" y="73" width="180" height="50" rx="6"/>
           <text class="d-label" x="1100" y="103" text-anchor="middle">L and R</text>
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box" x="1010" y="131" width="180" height="50" rx="6"/>
           <text class="d-label" x="1100" y="161" text-anchor="middle">L or R</text>
+          </a>
           <rect class="d-box" x="1010" y="189" width="180" height="50" rx="6"/>
           <text class="d-label" x="1100" y="219" text-anchor="middle">B (both)</text>
+          <a class="d-link" href="#preparation-mri">
           <rect class="d-box" x="1010" y="247" width="180" height="50" rx="6"/>
           <text class="d-label" x="1100" y="277" text-anchor="middle">L or R</text>
+          </a>
         </svg>
-        <figcaption><code>plan_joints</code> (<code>mri_prep.py:136-167</code>) decides per file. "Separate" is the
-        panel's "Separate left and right" option; 110 mm is <code>BILATERAL_MM</code>
-        (<code>:17</code>), measured on the lab's data (single joints at most 98 mm, merged slabs 120 to
-        130 mm, per the comment); the gap test is <code>has_gap</code> (<code>:131-133</code>). With resampling on,
-        every resulting joint then goes through <code>resample_iso</code>.</figcaption>
+        <figcaption>How the preparation step decides, for each MRI file, whether to separate the two joints. &ldquo;Separate&rdquo; is the panel option of the same name; a joint is called bilateral when the volume is wider than 110 mm, a limit measured on the lab&rsquo;s data. With resampling on, every resulting joint then goes to 0.3 mm voxels.</figcaption>
       </figure>
 
-      <ul>
-        <li><strong>Side from the header.</strong> <code>side_from_header</code> (<code>mri_prep.py:64-66</code>) calls a
-        slab LEFT if its world centre has LPS x &gt; 0, RIGHT otherwise. The docstring states the rule was
-        right 355 out of 355 on single-joint slabs of known side (97 patients).</li>
-        <li><strong>A gapped bilateral slab.</strong> NIfTI cannot store the gap between two stacks, so the file
-        spreads all slices evenly. The docstring's example is B038: 18 slices at 6.876 mm that are really
-        9 + 9 at 3.0 mm with 69 mm between them. Only the two end slices are in the right place, so each half is
-        rebuilt at the acquisition spacing anchored on its own end slice (<code>split_gapped</code>,
-        <code>:90-128</code>), assuming the two stacks have the same number of slices; an odd count adds
-        "check the split" to the note (<code>:150-151</code>). The acquisition spacing is the panel's field,
-        3.0 mm by default.</li>
-        <li><strong>Resampling.</strong> <code>resample_iso</code> (<code>:20-42</code>) brings the volume to 0.3 mm
-        isotropic, the spacing Dataset516 was trained on (<code>:12-13</code>), linear interpolation, and keeps the
-        <em>physical</em> extent: size is extent / spacing. The docstring notes the earlier resampler kept the
-        voxel count and shrank a 100 × 100 × 30 mm slab to 76.8 × 76.8 × 3 mm.</li>
-        <li><strong>One joint per side.</strong> A second MRI that would also be the patient's L (or R) joint is
-        skipped with a message (<code>MRI2CBCT_PREPARE.py:56-58</code>).</li>
-      </ul>
+      <p>The side of a single-joint slab is read from where its header puts it: a slab at positive left-right position is called left. If the two joints were acquired as two stacks separated by a gap, each stack is rebuilt at the acquisition spacing (3.0 mm by default). With resampling on, every resulting joint is brought to 0.3 mm isotropic voxels.</p>
 
-      <p>Output: <code>_steps/1_mri/&lt;PID&gt;_&lt;S&gt;_MRI.nii.gz</code> with S = L, R or B, plus the manifest listing,
-      per patient, the CBCT path and each joint's source file, side and note (<code>:38-40</code>, <code>:64-66</code>).</p>
+            <figure class="algo" data-scene="mri_resample" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a slab with thick slices is resampled onto a grid of small cubic voxels over the same physical box"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The MRI is resampled to cubic voxels of 0.3 mm, the spacing the network was trained on. The physical box stays the same, so there are many more, smaller voxels; the earlier resampler kept the voxel count and shrank the slab. The count is the physical extent divided by the voxel size, rounded.</p><p class="algo-tag">Illustration: the number of cells and the 3.0 mm label are made up for the picture (3.0 mm is the default acquisition spacing of the panel).</p><div class="formula"><math display="block"><mrow><mi class="k1">N</mi><mo>=</mo><mfrac><mi class="k2">L</mi><mi class="k3">s</mi></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>N</b>number of voxels along one axis after resampling</li><li class="k2"><b>L</b>physical extent of the volume along that axis, in mm</li><li class="k3"><b>s</b>voxel size: 0.3 mm</li></ul></div>
+      </figure>
+
+
+            <a class="deep-link" href="MRI2CBCT.code.html#preparation-mri"><b>In the code</b><span>The decision function, the side rule, the gap test and the resampler</span></a>
+
 
       <h2 id="orientation">5. Orienting the CBCT (ASO)</h2>
 
-      <p>Three CLIs borrowed from <a href="../ASO/ASO.html">ASO</a> and <a href="../ALI/ALI.html">ALI</a>, called "exactly as their own modules call them" (<code>plan.py:3-5</code>):</p>
+      <p>Three programs borrowed from ASO and ALI put the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> in a standard pose. The first centres the scan; the second places seven <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> (Ba, LPo, N, RPo, S, LOr, ROr) with ALI&rsquo;s trained models; the third turns the scan onto the Frankfurt horizontal and midsagittal reference computed from those points. The result is an oriented CBCT and the transform that maps back to the original scan. Orientation matters here for a concrete reason: the CBCT is cut into a left and a right half at the median of its cranial base (section 7), which only means something once the head is in a standard pose.</p>
 
-      <ol>
-        <li><code>PRE_ASO_CBCT</code> centres the scan: a translation by minus the physical position of the
-        image centre, then a resample. It receives a <code>model_folder</code> argument
-        (<code>plan.py:73-76</code>) that the CLI parses and never reads (<code>PRE_ASO_CBCT.py:272</code> is the only
-        use), which is why MRI2CBCT's downloads do not include the PreASO models.</li>
-        <li><code>ALI_CBCT</code> places seven landmarks: <code>Ba</code>, <code>LPo</code>, <code>N</code>,
-        <code>RPo</code>, <code>S</code>, <code>LOr</code>, <code>ROr</code> (<code>plan.py:14</code>), with the arguments
-        <code>spacing [1,0.3]</code>, <code>speed_per_scale [1,1]</code>, <code>agent_FOV [64,64,64]</code>,
-        <code>spawn_radius 10</code> (<code>plan.py:81-82</code>). One model per landmark is downloaded
-        (<code>requirements.py:43</code>).</li>
-        <li><code>SEMI_ASO_CBCT</code> turns the scan onto the Frankfurt horizontal and midsagittal reference
-        (<code>MAMP_0002_T1.mrk.json</code> in the reference folder, <code>plan.py:45</code>), suffix <code>Or</code>.</li>
-      </ol>
+            <a class="deep-link" href="MRI2CBCT.code.html#orientation"><b>In the code</b><span>The three programs, their arguments and the files they write</span></a>
 
-      <p>Outputs: <code>_steps/2_cbct_oriented/&lt;PID&gt;_Or.nii.gz</code> and
-      <code>&lt;PID&gt;_Or_transform.tfm</code> (<code>layout.py:57-62</code>). The transform maps oriented-frame points
-      back to the original CBCT, in the resampling convention (<code>frames.py:8-10</code>);
-      <code>aso_original_to_oriented_ras</code> (<code>frames.py:33-36</code>) turns it into the RAS point map the
-      registration needs. Orientation matters here for a concrete reason: the CBCT is cut into a left and a
-      right half at the median x of its cranial base (§7), which only means something once the head is in a
-      standard pose.</p>
 
       <h2 id="segmentation">6. The two networks</h2>
 
-      <p><strong>Neither network registers anything.</strong> Each produces one binary cranial-base mask; the
-      registration works on the surfaces of those two masks.</p>
+      <p><strong>Neither network registers anything.</strong> Each produces one binary mask of the cranial base: AMASSS on the oriented <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>, and a <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> trained for the purpose (called <a class="gterm" data-term="mri-dataset516" href="MRI2CBCT.code.html#segmentation" title="See the code">Dataset516</a>) on each prepared MRI joint. The registration then works on the surfaces of those two masks. The MRI network runs on the graphics card when there is one, on the processor otherwise, and can use all five of its folds or only the first one on a computer without a card. All joints of all patients go through one predictor in one call. How the MRI network was trained and evaluated is documented nowhere in the repository.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Element</th><th>CBCT: AMASSS</th><th>MRI: Dataset516</th></tr></thead>
-          <tbody>
-            <tr><td>Nature</td><td><span class="badge predit">predicted</span> nnU-Net, one binary model for the <code>CB</code> structure</td><td><span class="badge predit">predicted</span> nnU-Net <code>3d_fullres</code>, trainer <code>nnUNetTrainer_250epochs__nnUNetPlans__3d_fullres</code> (<code>env.py:20</code>)</td></tr>
-            <tr><td>Called as</td><td><code>AMASSS_CLI</code> through <code>slicer.cli.run</code>: <code>skullStructure = CB</code>, <code>merge = MERGE</code>, no VTK (<code>plan.py:87-92</code>)</td><td>nnU-Net's Python API in process, <em>not</em> the <code>nnUNetv2_predict</code> script, whose shebang "cannot find libpython outside Slicer's launcher" (<code>seg516.py:1-5</code>)</td></tr>
-            <tr><td>Input</td><td>the oriented CBCT, <code>2_cbct_oriented/&lt;PID&gt;_Or.nii.gz</code></td><td>each prepared joint, <code>1_mri/&lt;PID&gt;_&lt;S&gt;_MRI.nii.gz</code></td></tr>
-            <tr><td>Output</td><td><code>3_cbct_seg/&lt;PID&gt;_Or_Pred_CB.nii.gz</code> (<code>layout.py:65-66</code>)</td><td><code>4_mri_seg/&lt;PID&gt;_&lt;S&gt;_MRI_seg.nii.gz</code>, label 1 = cranial base (<code>seg516.py:15</code>)</td></tr>
-            <tr><td>Settings</td><td>those of the AMASSS module; the model folder must contain <code>CB</code> (<code>plan.py:50</code>)</td><td><code>tile_step_size 0.5</code>, Gaussian weighting, <strong>no mirroring</strong> (test-time augmentation off), <code>checkpoint_final.pth</code>, folds 0 to 4 or fold 0 only (<code>seg516.py:21-26</code>, <code>MRI2CBCT.py:358</code>)</td></tr>
-            <tr><td>Device</td><td>per AMASSS</td><td>CUDA if available, else CPU (<code>seg516.py:19</code>)</td></tr>
-            <tr><td>Weights</td><td><code>AMASSS_Models.zip</code> from the AMASSS release (<code>requirements.py:32-33</code>)</td><td><code>Dataset516_MRICBManual.zip</code> from the <code>MRI2CBCT_Dataset516</code> release (<code>env.py:22-25</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <a class="deep-link" href="MRI2CBCT.code.html#segmentation"><b>In the code</b><span>The comparison table of the two networks, the environment variables and the missing documentation</span></a>
 
-      <p>All joints of all patients go through one predictor in one call
-      (<code>predict_from_files_sequential</code>, <code>seg516.py:30</code>; the lists are built at
-      <code>MRI2CBCT_SEGMENT_MRI.py:23-26</code>). Two environment variables are forced before nnU-Net is
-      imported: <code>nnUNet_compile = f</code> because <code>torch.compile</code> breaks in Slicer's Python, and
-      dummy <code>nnUNet_raw</code>, <code>nnUNet_preprocessed</code>, <code>nnUNet_results</code> set to
-      <code>/unused</code>, which "must be set; never read for inference" (<code>seg516.py:9-11</code>).</p>
-
-      <p>The network's patch size, intensity normalization and training data live in the downloaded
-      <code>plans.json</code> and <code>dataset.json</code>: <strong>not determinable from the repository</strong>. Nothing in
-      the repository documents how Dataset516 was trained or evaluated; the archive name
-      (<code>MRICBManual</code>) is the only hint. There is no post-processing at inference; the MRI mask is
-      cleaned when the registration loads it (§7).</p>
 
       <h2 id="recalage">7. Registration</h2>
 
-      <p><code>MRI2CBCT_REGISTER</code> loads, per patient, the CBCT cranial-base mask once and the ASO
-      transform (<code>MRI2CBCT_REGISTER.py:50-51</code>), then registers each joint with
-      <code>ladder.register_joint</code> (<code>:70-73</code>). <strong>The images are not read at this point</strong>: the only
-      inputs are two masks.</p>
+      <p>For each patient, the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> cranial-base mask is loaded once, together with the orientation transform, and each joint is registered with it. <strong>The images are not read at this point:</strong> the only inputs are two masks.</p>
+
+            <a class="deep-link" href="MRI2CBCT.code.html#recalage"><b>In the code</b><span>The register loop and its inputs</span></a>
+
 
       <h3 id="recalage-surfaces">7.1 Surfaces</h3>
-      <ul>
-        <li><strong>MRI mask</strong> (<code>mri_surface</code>, <code>ladder.py:131-147</code>): threshold at 0.5, refuse a
-        mask under 50 voxels, keep the <strong>largest connected component</strong> (6-connectivity), sample the
-        surface. The component filter is called mandatory in <code>surface.py:35-41</code>, because normal
-        orientation is propagated across a connectivity graph and detached islands get their normals flipped.
-        The mask volume in cm³ is kept for the QC (§7.3).</li>
-        <li><strong>CBCT mask</strong> (<code>cbct_surface</code>, <code>:150-157</code>): same threshold and sampling, with
-        no component filter.</li>
-        <li><strong>Surface points</strong> (<code>surface_points_normals</code>, <code>surface.py:10-30</code>): the
-        voxels of mask minus its erosion, subsampled to 20 000 points with a fixed random seed
-        (<code>NPTS</code>, <code>reg/pipeline.py:14</code>), world coordinates in RAS, normals from the gradient of the
-        mask smoothed with σ = 1.5 voxels.</li>
-        <li><strong>Side cut</strong> (<code>side_cut</code>, <code>ladder.py:94-102</code>): for a joint labelled L or R, the
-        CBCT surface keeps the points up to <code>MARGIN = 5</code> mm past the median x of the whole surface on the
-        scanned side (RAS +x is the patient's right). This is what lets a one-joint MRI slab be registered
-        against a full-head CBCT. A joint labelled B (whole volume) uses the entire surface.</li>
-      </ul>
+
+      <p>Each mask becomes a cloud of surface points with normals. The MRI mask is first cleaned: it is thresholded, refused if it is under 50 <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxels</a>, and reduced to its largest connected piece, because detached islands would get their normals flipped in the next step. The CBCT surface is then cut to the <a class="gterm" data-term="mri-side-cut" href="MRI2CBCT.code.html#recalage-surfaces" title="See the code">scanned side</a> for a single-joint MRI, which is what lets a one-joint slab be registered against a full head.</p>
+
+            <figure class="algo" data-scene="mri_surface" data-ms="6400">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a binary mask is eroded, the difference with the mask is its shell, and points are sampled on the shell"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Registration works on surfaces, not on images. The surface of a mask is the set of its voxels that touch the outside: the mask minus its erosion. Up to 20 000 points are sampled from it (all of them if the surface has fewer), and each point gets a normal from the gradient of the smoothed mask.</p><p class="algo-tag">Illustration: the grid, the blob and the number of points drawn are made up for the picture; the 2D drawing stands for the 3D mask.</p><div class="formula"><math display="block"><mrow><mi class="k1">S</mi><mo>=</mo><mi class="k2">M</mi><mo>&#x2216;</mo><mi class="k3">erode</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">M</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi class="k4">n</mi><mo>&#x221D;</mo><mo>&#x2207;</mo><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k5">G</mi><mi class="k5">&#x3C3;</mi></msub><mo>&#x2217;</mo><mi class="k2">M</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>S</b>the surface voxels</li><li class="k2"><b>M</b>the binary mask</li><li class="k3"><b>erode</b>removes the voxels that touch the outside</li><li class="k4"><b>n</b>the normal at a surface point</li><li class="k5"><b>G<sub>&sigma;</sub></b>a Gaussian blur of 1.5 voxels</li></ul></div>
+      </figure>
+
+
+            <figure class="algo" data-scene="mri_sidecut" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a vertical line marks the middle of the head, the points on the far side fade out, and a one-joint MRI slab sits on the kept side"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">A one-joint MRI covers only one side of the head, so it is registered against only that half of the CBCT surface: the points on the scanned side of the middle, plus a margin of 5 mm past it. A whole-volume MRI uses the entire surface.</p><p class="algo-tag">Illustration: the points, the slab and the width of the margin are made up for the picture.</p><div class="formula"><math display="block"><mrow><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k1">x</mi><mi class="k1">p</mi></msub><mo>&#x2212;</mo><msub><mi class="k2">x</mi><mtext>mid</mtext></msub><mo stretchy="true" fence="true">)</mo></mrow><mo>&#xD7;</mo><mi class="k3">s</mi><mo>&#x2265;</mo><mo>&#x2212;</mo><mi class="k4">m</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>x<sub>p</sub></b>left-right coordinate of a CBCT surface point</li><li class="k2"><b>x<sub>mid</sub></b>median left-right coordinate of the whole surface</li><li class="k3"><b>s</b>+1 for a right joint, &minus;1 for a left joint</li><li class="k4"><b>m</b>the margin, 5 mm</li></ul></div>
+      </figure>
+
+
+            <a class="deep-link" href="MRI2CBCT.code.html#recalage-surfaces"><b>In the code</b><span>The surface functions, the component filter, the point count and the side-cut code</span></a>
+
 
       <h3 id="recalage-draw">7.2 One draw</h3>
-      <p><code>register</code> (<code>reg/global_reg.py:27-47</code>), parameters from <code>reg/pipeline.py:14-17</code>:</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Stage</th><th>Value</th></tr></thead>
-          <tbody>
-            <tr><td>Down-sampling</td><td>voxel 1.5 mm, then <code>orient_normals_consistent_tangent_plane(20)</code> (<code>:18-24</code>)</td></tr>
-            <tr><td>Descriptors</td><td><abbr title="Fast Point Feature Histograms">FPFH</abbr>, hybrid search radius 5 × voxel = 7.5 mm, at most 100 neighbours (<code>:31-35</code>)</td></tr>
-            <tr><td>Global search</td><td>RANSAC on feature matching, distance 1.5 × voxel, point-to-point without scaling, 3 points per sample, edge-length checker 0.9 and a distance checker, at most 4 000 000 iterations at 0.999 confidence (<code>:36-42</code>)</td></tr>
-            <tr><td>Refinement</td><td><a class="gterm" href="../glossary.html#g-icp" title="See glossary">ICP</a> point-to-plane from the RANSAC pose, threshold 1.5 × voxel (<code>:44-46</code>)</td></tr>
-            <tr><td>Score</td><td>the ICP's inlier fitness (and inlier RMSE)</td></tr>
-            <tr><td>Draws</td><td>50 independent draws, the highest fitness kept (<code>NDRAW</code>); only the draws run in parallel</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>One draw has three stages. Both clouds are thinned to a 1.5 mm grid. A fast global search then matches local shape descriptors, short lists of numbers that describe how the surface is curved around a point (<a class="gterm" data-term="mri-fpfh" href="MRI2CBCT.code.html#recalage-draw" title="See the code">FPFH</a>, computed in a 7.5 mm neighbourhood) between the two clouds, and a <a class="gterm" data-term="mri-ransac" href="MRI2CBCT.code.html#recalage-draw" title="See the code">RANSAC</a> loop (repeated random guesses, each scored by how many matches agree with it) picks three matches at a time, keeps the pose that agrees best and stops at 0.999 confidence or after four million tries. Finally a point-to-plane <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> polishes that pose. The global search is there because ICP alone is local and once settled on a 172-degree flip for one patient. The draws are independent and run in parallel in separate processes.</p>
 
-      <p>The module comment in <code>global_reg.py:1-12</code> gives the reason for this design: ICP is local and
-      "settled on a 172-degree flip for B108", where a global feature search handles partial overlap and an
-      unknown starting pose. The draws run in a pool of <code>spawn</code> processes (<code>ladder.py:64-86</code>);
-      the clouds are sent once per worker, not once per draw (<code>:35-44</code>), and each worker is limited to
-      <code>OMP_NUM_THREADS = 4</code> because Open3D "oversubscribes badly when unconstrained". The default
-      worker count is <code>cpu_count // 4</code>, between 1 and 50 (<code>:89-90</code>).</p>
+            <figure class="algo" data-scene="mri_draws" data-ms="7200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the MRI surface is placed by several independent draws, each with an overlap score, and the best one is kept"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The registration is a global search, repeated 50 times from independent random starts. Each draw finds a pose from matching local shape descriptors, then refines it, and gets a score: the share of MRI points that land close to the CBCT surface. The draw with the highest score is kept. The six draws shown stand for the fifty; the last one is the best.</p><p class="algo-tag">Illustration: the arc, the poses and the scores are made up for the picture. The formula for E is the standard definition of point-to-plane ICP; the code only calls <a class="gterm" data-term="mri-open3d" href="MRI2CBCT.code.html#environnement-open3d" title="See the code">Open3D</a>&rsquo;s ICP.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">T</mi><mo>*</mo></msub><mo>=</mo><munder><mo>argmax</mo><mrow><mi class="k2">d</mi><mo>=</mo><mn>1</mn><mo>&#x2026;</mo><mn>50</mn></mrow></munder><mi class="k3">fitness</mi><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k1">T</mi><mi class="k2">d</mi></msub><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi class="k4">E</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">T</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><munder><mo>&#x2211;</mo><mi class="k5">i</mi></munder><msup><mrow><mo>(</mo><mrow><mo>(</mo><mi class="k1">T</mi><msub><mi class="k5">p</mi><mi>i</mi></msub><mo>&#x2212;</mo><msub><mi class="k5">q</mi><mi>i</mi></msub><mo>)</mo><mo>&#xB7;</mo><msub><mi class="k5">n</mi><mi>i</mi></msub></mrow><mo>)</mo></mrow><mn>2</mn></msup></mrow></math></div><ul class="algo-legend"><li class="k1"><b>T</b>a rigid transform (rotation and translation)</li><li class="k2"><b>d</b>one of the 50 draws</li><li class="k3"><b>fitness</b>share of MRI points with a CBCT point within 2.25 mm (1.5 times the 1.5 mm grid)</li><li class="k4"><b>E</b>what the final refinement (point-to-plane ICP) minimises</li><li class="k5"><b>p<sub>i</sub>, q<sub>i</sub>, n<sub>i</sub></b>an MRI point, its matched CBCT point and the normal at that CBCT point</li></ul></div>
+      </figure>
+
+
+            <a class="deep-link" href="MRI2CBCT.code.html#recalage-draw"><b>In the code</b><span>The parameter table, the worker pool and the threads setting</span></a>
+
 
       <h3 id="recalage-qc">7.3 The verdict</h3>
-      <p><code>qc_tag</code> (<code>reg/pipeline.py:26-41</code>) needs no reference transform. It tests in this order:</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Tag</th><th>Condition</th><th>Meaning</th></tr></thead>
-          <tbody>
-            <tr><td><code>FLIP</code></td><td>rotation of the pose &gt; 90°</td><td>"impossible for one head"; the only criterion said to catch the laterality failures, which fitness did not</td></tr>
-            <tr><td><code>FLAG</code></td><td>fitness &lt; 0.75 (<code>GATE</code>)</td><td>weak overlap</td></tr>
-            <tr><td><code>SMALL</code></td><td>MRI mask &lt; 11.21 cm³</td><td>a pre-registration warning: the code's comment records that every flip came from this group (5 of 46 against 0 of 172, Fisher p = 3.5e-04)</td></tr>
-            <tr><td><code>OK</code></td><td>none of the above</td><td></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>The comment calls these settings and numbers "published" (<code>reg/pipeline.py:12</code>,
-      <code>:19</code>) and points to scripts (<code>run_02_register_w48.py</code>, <code>snap_icp.py</code>) that are
-      not in the repository; see §13.</p>
+
+      <p>A short test, needing no reference transform, gives each joint a tag, in this order: <strong>FLIP</strong> if the rotation exceeds 90 degrees (the only criterion that caught the left-right failures; fitness did not), <strong>FLAG</strong> if the fitness is under 0.75, <strong>SMALL</strong> if the MRI mask is smaller than 11.21 cm&sup3; (a warning: in the code&rsquo;s own comment, every flip came from this group), otherwise <strong>OK</strong>.</p>
+
+            <figure class="algo" data-scene="mri_angle" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: an arm sweeps from 0 to 172 degrees; past 90 degrees it changes colour"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The verdict needs no reference answer. It reads the rotation angle out of the pose: a head cannot be turned by more than 90 degrees between two scans of the same patient, so a larger angle is called a flip. A pose that is not a flip but overlaps poorly (fitness under 0.75) is flagged instead. This is the formula the code evaluates.</p><p class="algo-tag">Illustration: the arm sweeps through angles only to show where 90 degrees lies; it is not data.</p><div class="formula"><math display="block"><mrow><mi class="k1">&#x3B8;</mi><mo>=</mo><mi>arccos</mi><mo>(</mo><mfrac><mrow><mi>tr</mi><mo>&#x2061;</mo><mi class="k2">R</mi><mo>&#x2212;</mo><mn>1</mn></mrow><mn>2</mn></mfrac><mo>)</mo></mrow></math></div><ul class="algo-legend"><li class="k1"><b>&theta;</b>the rotation angle of the pose; above 90&deg; it is a flip</li><li class="k2"><b>R</b>the 3 by 3 rotation part of the 4 by 4 pose; tr is its trace</li></ul></div>
+      </figure>
+
+
+            <a class="deep-link" href="MRI2CBCT.code.html#recalage-qc"><b>In the code</b><span>The tag function with its thresholds and the cohort statistic quoted in the comment</span></a>
+
 
       <h3 id="recalage-ladder">7.4 The FLIP ladder</h3>
 
+      <p>When the best pose of rung 0 (the first registration, 50 draws) is a flip, the module climbs rungs 1 to 4 of a <a class="gterm" data-term="mri-ladder" href="MRI2CBCT.code.html#recalage-ladder" title="See the code">ladder</a> of increasingly drastic remedies, stopping at the first that gives a pose that is not a flip and has a fitness of at least 0.75:</p>
+
       <figure class="diagram">
         <svg viewBox="0 0 1200 290" role="img" aria-label="The recovery ladder: rung 0 and four rungs tried in turn when the pose flips, each able to accept the result, ending in a flagged result if none does">
+          <a class="d-link" href="#recalage-ladder">
           <rect class="d-box" x="10" y="30" width="160" height="70" rx="6"/>
           <text class="d-label" x="90" y="55" text-anchor="middle">0 · published</text>
           <text class="d-label-s" x="90" y="72" text-anchor="middle">50 draws,</text>
           <text class="d-label-s" x="90" y="86" text-anchor="middle">best fitness</text>
+          </a>
 
           <path class="d-arrow" d="M170 65 H210"/>
           <path class="d-arrow-head" d="M210 65 l-7 -4 v8 z"/>
           <text class="d-label-xs" x="190" y="58" text-anchor="middle">FLIP</text>
 
+          <a class="d-link" href="#recalage-ladder">
           <rect class="d-box" x="210" y="30" width="160" height="70" rx="6"/>
           <text class="d-label" x="290" y="55" text-anchor="middle">1 · more draws</text>
           <text class="d-label-s" x="290" y="72" text-anchor="middle">+100 draws,</text>
           <text class="d-label-s" x="290" y="86" text-anchor="middle">best non-flip</text>
+          </a>
 
           <path class="d-arrow" d="M370 65 H410"/>
           <path class="d-arrow-head" d="M410 65 l-7 -4 v8 z"/>
           <text class="d-label-xs" x="390" y="58" text-anchor="middle">fail</text>
 
+          <a class="d-link" href="#recalage-ladder">
           <rect class="d-box" x="410" y="30" width="160" height="70" rx="6"/>
           <text class="d-label" x="490" y="55" text-anchor="middle">2 · rotate 180</text>
           <text class="d-label-s" x="490" y="72" text-anchor="middle">flipped pose turned</text>
           <text class="d-label-s" x="490" y="86" text-anchor="middle">about x, y, z + ICP</text>
+          </a>
 
           <path class="d-arrow" d="M570 65 H610"/>
           <path class="d-arrow-head" d="M610 65 l-7 -4 v8 z"/>
           <text class="d-label-xs" x="590" y="58" text-anchor="middle">fail</text>
 
+          <a class="d-link" href="#recalage-ladder">
           <rect class="d-box" x="610" y="30" width="160" height="70" rx="6"/>
           <text class="d-label" x="690" y="55" text-anchor="middle">3 · other side</text>
           <text class="d-label-s" x="690" y="72" text-anchor="middle">CBCT cut to the</text>
           <text class="d-label-s" x="690" y="86" text-anchor="middle">opposite side</text>
+          </a>
 
           <path class="d-arrow" d="M770 65 H810"/>
           <path class="d-arrow-head" d="M810 65 l-7 -4 v8 z"/>
           <text class="d-label-xs" x="790" y="58" text-anchor="middle">fail</text>
 
+          <a class="d-link" href="#recalage-ladder">
           <rect class="d-box" x="810" y="30" width="160" height="70" rx="6"/>
           <text class="d-label" x="890" y="55" text-anchor="middle">4 · mirror the MRI</text>
           <text class="d-label-s" x="890" y="72" text-anchor="middle">mask mirrored</text>
           <text class="d-label-s" x="890" y="86" text-anchor="middle">left-right, 50 draws</text>
+          </a>
 
           <path class="d-arrow" d="M970 65 H1010"/>
           <path class="d-arrow-head" d="M1010 65 l-7 -4 v8 z"/>
           <text class="d-label-xs" x="990" y="58" text-anchor="middle">fail</text>
 
+          <a class="d-link" href="#recalage-ladder">
           <rect class="d-box" x="1010" y="30" width="180" height="70" rx="6"/>
           <text class="d-label" x="1100" y="55" text-anchor="middle">unresolved</text>
           <text class="d-label-s" x="1100" y="72" text-anchor="middle">rung 0's pose,</text>
           <text class="d-label-s" x="1100" y="86" text-anchor="middle">written _FLAGGED</text>
+          </a>
 
           <path class="d-arrow" d="M90 100 V190"/>
           <path class="d-arrow-head" d="M90 190 l-4 -7 h8 z"/>
@@ -670,296 +535,109 @@
           <text class="d-label-s" x="600" y="234" text-anchor="middle">rung 0 accepts any pose that is not a flip, even with fitness under 0.75 (tag FLAG)</text>
           <text class="d-label-s" x="600" y="248" text-anchor="middle">rungs 1 to 4 accept a pose that is not a flip and has fitness of at least 0.75; rung 4 adds the _MIRRORED suffix</text>
         </svg>
-        <figcaption>The ladder (<code>ladder.py:170-271</code>), climbed only when rung 0's best pose is a
-        FLIP. "Passes" means: not a FLIP and fitness at the gate (<code>_passes</code>,
-        <code>:166-167</code>).</figcaption>
+        <figcaption>The ladder is climbed only when the best pose of rung 0 is a flip. &ldquo;Passes&rdquo; means: not a flip and a fitness of at least 0.75.</figcaption>
       </figure>
 
       <ol>
-        <li><strong>Rung 0, the published registration</strong> (<code>:205-216</code>): 50 draws; if the best pose is not a
-        FLIP the result is accepted as it is.</li>
-        <li><strong>More draws</strong> (<code>:221-227</code>): <code>EXTRA_DRAWS = 100</code> more, the best passing pose
-        among all 150 is kept.</li>
-        <li><strong>Rotate 180°</strong> (<code>:229-242</code>): the flipped pose composed with a half-turn about each of
-        the three axes (<code>rot180</code>, <code>:105-113</code>) around the MRI surface's centroid, each refined by
-        point-to-plane ICP in parallel.</li>
-        <li><strong>The other side</strong> (<code>:244-254</code>), only for L or R: the CBCT is cut to the opposite
-        hemisphere and 50 draws are tried, because "the MRI side label may be wrong". If it passes, the joint
-        is relabelled (<code>side L → R</code>) in the log and the summary.</li>
-        <li><strong>Mirror</strong> (<code>:256-267</code>): the MRI surface is reflected across the plane normal to the
-        left-right index axis through its centroid (<code>mirror_matrix</code>, <code>:116-124</code>), and registered
-        again; the reflection is composed into the reported transform. It "fixes a left-right handedness error
-        in the file itself; a wrong mirror fits visibly badly". The QC is scored on the rigid part, because
-        <code>qc_tag</code> cannot read a rotation off a reflection (<code>:260-261</code>).</li>
-        <li><strong>Unresolved</strong> (<code>:269-271</code>): the result is written with the suffix
-        <code>_FLAGGED</code>.</li>
+        <li><strong>Rung 1, more draws:</strong> 100 more, keep the best passing pose among all 150.</li>
+        <li><strong>Rung 2, rotate 180 degrees:</strong> turn the flipped pose by 180 degrees about each of the three axes around the MRI surface&rsquo;s centre, and refine each with ICP.</li>
+        <li><strong>Rung 3, the other side:</strong> for a single-joint MRI, cut the CBCT to the opposite half and register again with 50 draws, because the side label may be wrong. If this works, the joint is relabelled.</li>
+        <li><strong>Rung 4, mirror:</strong> reflect the MRI surface left to right and register again with 50 draws; this repairs a file whose handedness is wrong.</li>
       </ol>
+      <p>If no rung passes, the case is unresolved: the best pose of rung 0 is written with the suffix <code>_FLAGGED</code>.</p>
 
-      <div class="callout ok">
-        <div class="callout-title">Verified · not in VISOR</div>
-        <p><strong>Legacy only (3c67957); not present in <a href="../visor/MRI2CBCT/MRI2CBCT.html">VISOR</a>.</strong> MRI2CBCT is not a tool in SADT-VISOR (<code>SADT-VISOR PROVENANCE.md:46-47</code>) and the client modules are not built (<code>AutomatedDentalToolsRemote CMakeLists.txt:31-32</code>), so no VISOR code exists to check this against.</p>
-        <p>The registration never looks at the MRI or CBCT intensities. <code>MRI2CBCT_REGISTER</code> feeds
-        <code>register_joint</code> the two segmentation files only (<code>MRI2CBCT_REGISTER.py:70</code>); the
-        images are read later, to be moved or resampled (§8). Whatever the segmentation misses or
-        invents, the registration inherits. This is the opposite of the earlier version, where the CBCT
-        segmentation was only a mask and the match was made on intensities.</p>
-      </div>
+            <figure class="algo" data-scene="mri_mirror" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: an asymmetric shape is reflected across a vertical plane through its centre"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Rung 4 of the ladder reflects the MRI surface left to right, through a plane that passes through its centre, then registers it again with 50 draws. It repairs a file whose left-right orientation is wrong. This is the matrix the code builds.</p><p class="algo-tag">Illustration: the shape is made up for the picture.</p><div class="formula"><math display="block"><mrow><mi class="k1">H</mi><mo>=</mo><mi class="k2">I</mi><mo>&#x2212;</mo><mn>2</mn><mi class="k3">n</mi><msub><mi class="k3">n</mi><mtext>&#x22A4;</mtext></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>H</b>the reflection matrix</li><li class="k2"><b>I</b>the identity matrix</li><li class="k3"><b>n</b>unit vector normal to the mirror plane (the left-right axis)</li></ul></div>
+      </figure>
+
+
+      <p>The registration never looks at image intensities: whatever the two segmentations miss or invent, the registration inherits. This is the opposite of the earlier version, where the CBCT segmentation was only a mask and the match was made on intensities.</p>
+
+            <a class="deep-link" href="MRI2CBCT.code.html#recalage-ladder"><b>In the code</b><span>The ladder code with the rotation and mirror matrices and the acceptance rules</span></a>
+
 
       <h2 id="sortie">8. Outputs, and the frame they are in</h2>
 
-      <p>Everything is written in the <strong>original CBCT's frame</strong>, not the ASO-oriented one:
-      <code>T = inv(T_aso) @ T_register</code> (<code>MRI2CBCT_REGISTER.py:93</code>). Per patient, in
-      <code>&lt;output&gt;/&lt;PID&gt;/</code> (<code>:4-8</code>, <code>:34-36</code>):</p>
+      <p>Everything is written in the <strong>original <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>&rsquo;s frame</strong>, not the oriented one: the final transform composes the registration with the inverse of the orientation transform. Per patient the module writes the MRI registered onto the CBCT, its cranial-base mask, the transform file (MRI to CBCT, in the convention ITK uses), and once per patient the CBCT cranial-base mask; one <code>summary.csv</code> holds a row per joint with the tag, the fitness, the rotation, the mask volume and which rung resolved it. By default the volumes keep the MRI&rsquo;s own <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxels</a> and only their position and direction are rewritten, so nothing is interpolated and the MRI opens on top of the CBCT in any viewer; an option resamples onto the CBCT grid instead. A patient that fails produces a row marked as failed and the others carry on.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Content</th></tr></thead>
-          <tbody>
-            <tr><td><code>&lt;PID&gt;_&lt;S&gt;_MRI_REG&lt;TAG&gt;.nii.gz</code></td><td>the MRI, registered onto the CBCT</td></tr>
-            <tr><td><code>&lt;PID&gt;_&lt;S&gt;_MRI_MASK&lt;TAG&gt;.nii.gz</code></td><td>its Dataset516 cranial base, registered</td></tr>
-            <tr><td><code>&lt;PID&gt;_&lt;S&gt;_MRI_transform&lt;TAG&gt;.tfm</code></td><td>the transform, MRI → CBCT</td></tr>
-            <tr><td><code>&lt;PID&gt;_CBCT_MASK.nii.gz</code></td><td>once per patient: the AMASSS cranial base, brought back to the original CBCT</td></tr>
-            <tr><td><code>summary.csv</code></td><td>one row per joint: <code>patient, side, status, qc, tag, fitness, rotation_deg, mask_cm3, resolved_by, ladder, note</code> (<code>:30-31</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <a class="deep-link" href="MRI2CBCT.code.html#sortie"><b>In the code</b><span>The file table, the frame conversions and the failure rows</span></a>
 
-      <p><code>TAG</code> is empty, <code>_MIRRORED</code> or <code>_FLAGGED</code> (<code>:92</code>).</p>
-
-      <ul>
-        <li><strong>Header move or resample.</strong> By default (<code>on_cbct_grid</code> off) the volumes keep the
-        MRI's own voxels and only their origin and direction are rewritten (<code>move_header</code>,
-        <code>frames.py:53-68</code>): nothing is interpolated, and the MRI "opens on top of the CBCT in any viewer
-        that reads the header", mirrored results included (a reflection gives a left-handed direction matrix,
-        which NIfTI stores). With the option on, the volumes are resampled onto the CBCT grid (linear for the
-        MRI, nearest neighbour for masks, <code>frames.py:71-79</code>).</li>
-        <li><strong>The <code>.tfm</code>.</strong> ITK stores the resampling direction, fixed → moving, in LPS:
-        <code>to_itk_resampling</code> (<code>frames.py:39-46</code>) applies <code>L @ inv(T) @ L</code> with
-        <code>L = diag(-1, -1, 1)</code>. Loading the <em>native</em> MRI in Slicer and giving it this transform
-        reproduces the result at full resolution.</li>
-        <li><strong>Side relabelling.</strong> If the ladder moved a joint to the other side, the files take the new
-        side, unless the patient already has a joint on that side, in which case the original name is kept and
-        the note says so (<code>:82-91</code>).</li>
-        <li><strong>Failures are rows.</strong> A patient whose CBCT surface or ASO transform cannot be read gets a
-        <code>failed</code> row per joint (<code>:52-56</code>), a joint that raises gets one too (<code>:73-78</code>);
-        the others carry on.</li>
-      </ul>
 
       <h2 id="interface">9. The panel</h2>
 
-      <p><code>MRI2CBCTWidget</code>. Top to bottom:</p>
+      <p>The panel shows a one-time setup line (packages and models, about 5 GB by its own estimate), the three folders and a button to use a sample patient, the options (resample to 0.3 mm, separate left and right with the acquisition spacing, and advanced choices: all five folds or one, put the result on the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> grid, keep the intermediate folder, number of registration workers), and the review pauses. At a pause the panel loads the image with the mask drawn as an outline in a four-up layout, one item per patient or joint, and the first pause offers a button to swap left and right for a patient. At the end a message lists each joint&rsquo;s verdict.</p>
 
-      <ul>
-        <li><strong>One-time setup</strong> (<code>MRI2CBCT.py:529</code>, <code>:544</code>): a line that reads "One-time setup
-        needed (packages and models, about 5 GB)" until everything is present, with a button; Run does it too.
-        <code>quick_status</code> only looks at installed packages and download markers, with no torch import and no
-        GPU query (<code>:529-542</code>). If PyTorch had to be installed or replaced, the panel asks for a Slicer
-        restart and stops (<code>:576-581</code>).</li>
-        <li><strong>Inputs</strong>: the MRI, CBCT and output folders, and <strong>Use test files</strong>
-        (<code>onTestFiles</code>, <code>:274</code>): downloads a sample patient (one CBCT, two MRIs) to
-        <code>SlicerDownloads/MRI2CBCT/TestFiles</code>, fills the three folders (output:
-        <code>TestFiles_output</code> beside it, <code>:286</code>) and points to <code>reference/</code>, the expected
-        result (<code>env.py:26-30</code>).</li>
-        <li><strong>Options</strong>: resample to 0.3 mm (on), separate left and right (on) with the acquisition
-        slice spacing (3.0 mm, range 0.5 to 10, enabled only when separating). <strong>Advanced</strong>, collapsed:
-        all 5 folds or 1 fold ("for computers without a GPU"), put the registered MRI on the CBCT grid (off), keep
-        the <code>_steps</code> folder (off), registration workers (0 = automatic).</li>
-        <li><strong>Review</strong>: "Pause during the run to check the results", with one checkbox per step
-        (<code>plan.REVIEW_STEPS</code>, <code>plan.py:17-28</code>): MRI joints and sides, CBCT oriented, CBCT cranial
-        base, MRI cranial base, Registration. The choice is remembered in <code>QSettings</code>. At a pause the
-        panel loads the image, with the mask drawn as an outline over it, in the four-up layout, one item per
-        patient or joint, Previous / Next (<code>MRI2CBCT.py:628-715</code>). The first pause also has
-        <strong>Swap left / right for this patient</strong> (<code>swap_sides</code>, <code>:717-736</code>), which
-        renames the joint files and edits the manifest; a whole-volume MRI (B) has nothing to swap. At the end a
-        message lists each joint's verdict (<code>_finish</code>, <code>:442-458</code>).</li>
-      </ul>
+            <a class="deep-link" href="MRI2CBCT.code.html#interface"><b>In the code</b><span>The panel code with lines for setup, test files, options and review</span></a>
 
-      <h2 id="predit-calcule">10. What is predicted vs what is computed</h2>
+
+      <h2 id="predit-calcule">10. Predicted or computed</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Step</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>Pairing, side from the header, left/right split, 0.3 mm resample</td><td><span class="badge calcule">computed</span> file names, header geometry, SimpleITK</td><td>PREPARE</td></tr>
-            <tr><td>CBCT centring</td><td><span class="badge calcule">computed</span> translation to the image centre</td><td>PRE_ASO_CBCT</td></tr>
-            <tr><td>Seven landmarks</td><td><span class="badge predit">predicted</span> ALI landmark models, one per landmark</td><td>ALI_CBCT</td></tr>
-            <tr><td>Frankfurt / midsagittal orientation</td><td><span class="badge calcule">computed</span> transform from the landmarks to the reference</td><td>SEMI_ASO_CBCT</td></tr>
-            <tr><td>Cranial base on the CBCT</td><td><span class="badge predit">predicted</span> AMASSS, structure <code>CB</code></td><td>AMASSS_CLI</td></tr>
-            <tr><td>Cranial base on the MRI</td><td><span class="badge predit">predicted</span> nnU-Net Dataset516, 5 folds or 1</td><td>SEGMENT_MRI</td></tr>
-            <tr><td>Surfaces, side cut, FPFH, RANSAC, ICP</td><td><span class="badge calcule">computed</span> numpy, SciPy, Open3D</td><td>REGISTER</td></tr>
-            <tr><td>QC tag, FLIP ladder</td><td><span class="badge calcule">computed</span> rotation angle, fitness, mask volume</td><td>REGISTER</td></tr>
-            <tr><td>Moving the volumes, <code>.tfm</code></td><td><span class="badge calcule">computed</span> header rewrite or resample</td><td>REGISTER</td></tr>
-            <tr><td>Side swap, pauses</td><td><span class="badge neutral">operator</span> the clinician's choice</td><td>panel</td></tr>
+            <tr><td><a class="gterm" data-term="mri-pairing" href="MRI2CBCT.code.html#preparation-pairing" title="See the code">Pairing</a>, side from the header, left-right split, 0.3 mm resampling</td><td><span class="badge calcule">computed</span> file names and header geometry</td></tr>
+            <tr><td><a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> centring and orientation</td><td><span class="badge calcule">computed</span> from the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a></td></tr>
+            <tr><td>Seven landmarks on the CBCT</td><td><span class="badge predit">predicted</span> by ALI&rsquo;s models</td></tr>
+            <tr><td>Cranial base on the CBCT and on the MRI</td><td><span class="badge predit">predicted</span> by AMASSS and by <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> <a class="gterm" data-term="mri-dataset516" href="MRI2CBCT.code.html#segmentation" title="See the code">Dataset516</a></td></tr>
+            <tr><td>Surfaces, <a class="gterm" data-term="mri-side-cut" href="MRI2CBCT.code.html#recalage-surfaces" title="See the code">side cut</a>, descriptors, <a class="gterm" data-term="mri-ransac" href="MRI2CBCT.code.html#recalage-draw" title="See the code">RANSAC</a>, <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a>, the verdict and the <a class="gterm" data-term="mri-ladder" href="MRI2CBCT.code.html#recalage-ladder" title="See the code">ladder</a></td><td><span class="badge calcule">computed</span></td></tr>
+            <tr><td>Moving the volumes and writing the transform</td><td><span class="badge calcule">computed</span></td></tr>
+            <tr><td>Side swap and review pauses</td><td><span class="badge neutral">operator</span> the clinician&rsquo;s choice</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>Nothing is learned at run time. The three networks (ALI's landmark models, AMASSS, Dataset516) are
-      pre-trained, and what they produce is what the registration is built on.</p>
+      <p>Nothing is learned at run time. The three networks are pre-trained, and what they produce is what the registration is built on.</p>
 
-      <h2 id="pieges">11. Traps and fragile spots</h2>
+            <a class="deep-link" href="MRI2CBCT.code.html#predit-calcule"><b>In the code</b><span>The same table with the program behind each block</span></a>
 
-      <div class="callout warn">
-        <div class="callout-title">Trap · not in VISOR</div>
-        <p><strong>Legacy only (3c67957); not present in <a href="../visor/MRI2CBCT/MRI2CBCT.html">VISOR</a>.</strong> MRI2CBCT is not a tool in SADT-VISOR (<code>SADT-VISOR PROVENANCE.md:46-47</code>) and the client modules are not built (<code>AutomatedDentalToolsRemote CMakeLists.txt:31-32</code>), so no VISOR code exists to check this against.</p>
-        <p><strong>A weak registration keeps a clean file name.</strong> The ladder only starts on a FLIP
-        (<code>ladder.py:215</code>). A pose that is not a flip but has fitness under 0.75 is accepted as it is,
-        tagged <code>FLAG</code> in <code>qc</code>, and written <strong>without</strong> a suffix, because the
-        <code>_FLAGGED</code> name is reserved for unresolved flips (<code>MRI2CBCT_REGISTER.py:92</code>,
-        <code>ladder.py:270</code>). Only <code>summary.csv</code> and the end-of-run message say <code>FLAG</code>.</p>
-      </div>
 
-      <div class="callout warn">
-        <div class="callout-title">Trap · not in VISOR</div>
-        <p><strong>Legacy only (3c67957); not present in <a href="../visor/MRI2CBCT/MRI2CBCT.html">VISOR</a>.</strong> MRI2CBCT is not a tool in SADT-VISOR (<code>SADT-VISOR PROVENANCE.md:46-47</code>) and the client modules are not built (<code>AutomatedDentalToolsRemote CMakeLists.txt:31-32</code>), so no VISOR code exists to check this against.</p>
-        <p><strong>An unresolved flip writes the first pose, not the best.</strong> The docstring says "the best
-        result is written with a _FLAGGED suffix" (<code>ladder.py:14</code>); the code writes <code>flipped</code>,
-        the best of rung 0's 50 draws (<code>:218</code>, <code>:271</code>), not the highest-fitness flip among the
-        150 collected by rung 1.</p>
-      </div>
+      <h2 id="pieges">11. Known issues</h2>
 
-      <div class="callout warn">
-        <div class="callout-title">Trap · not in VISOR</div>
-        <p><strong>Legacy only (3c67957); not present in <a href="../visor/MRI2CBCT/MRI2CBCT.html">VISOR</a>.</strong> MRI2CBCT is not a tool in SADT-VISOR (<code>SADT-VISOR PROVENANCE.md:46-47</code>) and the client modules are not built (<code>AutomatedDentalToolsRemote CMakeLists.txt:31-32</code>), so no VISOR code exists to check this against.</p>
-        <p><strong>The side comes from where the header puts the slab.</strong> A single-joint MRI is called LEFT
-        if its world x is positive in LPS (<code>mri_prep.py:64-66</code>). The rule was validated on the lab's own
-        slabs (<code>:5-7</code>); a file whose header does not centre the patient near x = 0 gets the wrong side
-        without any message. Two nets catch it: the swap button at the first pause, and rung 3 of the ladder
-        (but only once the pose has flipped).</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Trap · not in VISOR</div>
-        <p><strong>Legacy only (3c67957); not present in <a href="../visor/MRI2CBCT/MRI2CBCT.html">VISOR</a>.</strong> MRI2CBCT is not a tool in SADT-VISOR (<code>SADT-VISOR PROVENANCE.md:46-47</code>) and the client modules are not built (<code>AutomatedDentalToolsRemote CMakeLists.txt:31-32</code>), so no VISOR code exists to check this against.</p>
-        <p><strong>An output folder inside an input folder is read back.</strong> <code>list_images</code> walks
-        the folders recursively (<code>pairing.py:41-47</code>) and takes any <code>.nii.gz</code> whose name starts
-        with an ID. Results from an earlier run (<code>P01/P01_L_MRI_REG.nii.gz</code>,
-        <code>P01_CBCT_MASK.nii.gz</code>) sitting under the MRI or CBCT folder would join the next run: a second
-        CBCT for the same ID makes the whole patient "skipped" (<code>pairing.py:111-113</code>). Read from the
-        code, not run.</p>
-      </div>
-
-      <div class="callout">
-        <div class="callout-title">Note · not in VISOR</div>
-        <p><strong>Legacy only (3c67957); not present in <a href="../visor/MRI2CBCT/MRI2CBCT.html">VISOR</a>.</strong> MRI2CBCT is not a tool in SADT-VISOR (<code>SADT-VISOR PROVENANCE.md:46-47</code>) and the client modules are not built (<code>AutomatedDentalToolsRemote CMakeLists.txt:31-32</code>), so no VISOR code exists to check this against.</p>
-        <p><strong>The log file does not survive a successful run.</strong> The panel appends to
-        <code>_steps/run.log</code> (<code>MRI2CBCT.py:313</code>); <code>MRI2CBCT_PREPARE</code> deletes <code>_steps</code>
-        at the start (<code>:23-24</code>), so the first lines written before it are lost, and the panel deletes it
-        again after a successful run unless "Keep the intermediate files" is checked (<code>:455-457</code>).</p>
-      </div>
-
-      <div class="callout">
-        <div class="callout-title">Note · not in VISOR</div>
-        <p><strong>Legacy only (3c67957); not present in <a href="../visor/MRI2CBCT/MRI2CBCT.html">VISOR</a>.</strong> MRI2CBCT is not a tool in SADT-VISOR (<code>SADT-VISOR PROVENANCE.md:46-47</code>) and the client modules are not built (<code>AutomatedDentalToolsRemote CMakeLists.txt:31-32</code>), so no VISOR code exists to check this against.</p>
-        <p><strong>Only the MRI side gets the connected-component clean-up.</strong> <code>mri_surface</code> keeps
-        the largest component (<code>ladder.py:138</code>); <code>cbct_surface</code> does not (<code>:150-157</code>),
-        although <code>surface.py:35-41</code> calls the filter mandatory before registration. Whether a stray
-        island in the AMASSS mask ever matters has not been measured.</p>
-      </div>
+      <ul>
+        <li>A weak registration (fitness under 0.75, but not a flip) keeps a clean file name; only the summary table says so. See <a href="MRI2CBCT.code.html#f-weak-keeps-name">the trap</a>.</li>
+        <li>An unresolved flip writes the best pose of the first 50 draws, not the best found by the later rungs. See <a href="MRI2CBCT.code.html#f-unresolved-first-pose">the trap</a>.</li>
+        <li>The side comes from where the header puts the slab, so a badly centred file gets the wrong side without a message. See <a href="MRI2CBCT.code.html#f-side-from-header">the trap</a>.</li>
+        <li>An output folder placed inside an input folder is read back on the next run. See <a href="MRI2CBCT.code.html#f-output-in-input">the trap</a>.</li>
+        <li>The run log does not survive a successful run. See <a href="MRI2CBCT.code.html#f-log-lost">the note</a>.</li>
+        <li>Only the MRI surface is cleaned to its largest connected piece. See <a href="MRI2CBCT.code.html#f-cbct-no-component-filter">the note</a>.</li>
+      </ul>
 
       <h3 id="pieges-mort">Dead code and leftovers</h3>
 
-      <ul>
-        <li><code>plan.missing_models</code> (<code>plan.py:42-54</code>) is never called; the panel decides what is
-        missing from <code>requirements.downloads_plan</code> and download markers instead.</li>
-        <li><code>reg.pipeline.register_joint</code> and <code>cbct_surface</code> (<code>reg/pipeline.py:44-118</code>) and
-        all of <code>reg/itk_io.py</code> are exported by <code>reg/__init__.py</code> but called by nothing: the
-        ladder has its own <code>register_joint</code>, and <code>frames.py</code> repeats the RAS to ITK conversion.
-        <code>reg/__init__.py:2</code> also points to a <code>../REGISTRATION.md</code> that is not in the tree.</li>
-        <li><code>global_reg.register</code> takes a <code>seed</code> argument it never uses (<code>:27</code>).</li>
-        <li><code>env.DATASET516</code> (<code>env.py:98</code>), kept "for code written before the move", has no reader.</li>
-        <li>In <a href="../ADTLib/ADTLib.html">ADTLib</a>: <code>MRI2CBCT_TEST_FILES</code> and <code>TMJ_CROP_MODEL</code>
-        (<code>model_registry.py</code>) are referenced by nothing; <code>TMJ_CROP_MARKERS</code> (<code>naming.py:74</code>)
-        only by <code>Testing/Python/test_naming.py</code>.</li>
-      </ul>
+      <p>Several functions and constants are exported but never called, and two helpers duplicate each other; the list is on <a href="MRI2CBCT.code.html#pieges-mort">the code page</a>, along with the findings of the earlier page that were withdrawn because the code they described is gone (<a href="MRI2CBCT.code.html#f-withdrawn">note</a>).</p>
 
-      <div class="callout note">
-        <div class="callout-title">Findings of the earlier page, withdrawn · legacy only</div>
-        <p><strong>Legacy only (3c67957).</strong> The code of the previous version is the one still sitting, unbuilt, in the <a href="../visor/MRI2CBCT/MRI2CBCT.html#visor-where">VISOR client extension</a> (<code>AutomatedDentalToolsRemote MRI2CBCTRemote/MRI2CBCTRemote.py</code>, 2397 lines; <code>MRI2CBCT_CLIRemote/</code>), so those withdrawn findings would still describe that copy. It is not shipped.</p>
-        <p>The confirmed bugs and traps of the previous version described code that no longer exists: the lost
-        <code>CenterOfRotationPoint</code> in <code>MatrixRetrieval</code> (shared with
-        <a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a>, where it stays), the manual approximation's crash on
-        scene volumes, the resample's broken error handler and T2-without-T1 crash, the crossed left/right names
-        in the L/R crop, the origin permutation of the orient step, the two <code>.tfm</code> conventions, the
-        <code>nnunet_version==2.8.0</code> pip name that does not exist, the hard-coded <code>_T1</code> and
-        <code>_T2</code> suffixes of the TMJ crop. The resample CLI is untouched by this rewrite and its own
-        defects, if they persist, belong to AREG_IOSCBCT and VFACE, which call it; they were not rechecked here.</p>
-      </div>
+            <a class="deep-link" href="MRI2CBCT.code.html#pieges"><b>In the code</b><span>The five callouts with their evidence</span></a>
+
 
       <h2 id="environnement">12. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Element</th><th>Value</th></tr></thead>
-          <tbody>
-            <tr><td>Interpreter</td><td>Slicer's Python everywhere; the three CLIs use <code>#!/usr/bin/env python-real</code></td></tr>
-            <tr><td>Conda</td><td>none</td></tr>
-            <tr><td>GPU</td><td>optional for the MRI network (CPU fallback, <code>seg516.py:19</code>); the torch build is chosen from the GPU by <code>ADTLib.env.cuda.torch_install_arguments</code> and installed first (<code>requirements.py:11-12</code>, <code>MRI2CBCT.py:605</code>)</td></tr>
-            <tr><td>Packages</td><td><code>itk</code>, <code>pytorch_lightning</code>, <code>dicom2nifti&gt;=2.6.2</code>, <code>pydicom==3.0.2</code>, <code>monai==1.3.2</code>, <code>blosc2</code>, <code>einops</code>, <code>nibabel</code>, <code>scipy</code>, <code>nnunetv2&gt;=2.8.0</code> (<code>requirements.py:15-20</code>): the union of what ASO, ALI, AMASSS and nnU-Net import, with the pins those modules already use</td></tr>
-            <tr><td>numpy</td><td>restored <strong>last</strong> to <code>1.26.4</code>, because anything above may pull numpy 2 and break torch (<code>MRI2CBCT.py:624-626</code>)</td></tr>
-            <tr><td>Open3D</td><td><code>open3d==0.19.0</code> plus its pure-Python runtime (<code>plotly</code>, <code>addict</code>, <code>configargparse</code>, <code>pyquaternion</code>, <code>dash==2.18.2</code>, <code>flask</code>, <code>werkzeug</code>, <code>nest_asyncio</code>, <code>retrying</code>; <code>requirements.py:25-26</code>)</td></tr>
-            <tr><td>Models downloaded</td><td>ASO Frankfurt reference, seven ALI landmark models, AMASSS models, Dataset516 (<code>requirements.py:36-48</code>), in the layout ASO, ALI and AMASSS already use so nothing is fetched twice</td></tr>
-            <tr><td>Where</td><td><code>~/Documents/SlicerDownloads</code>; Dataset516 under <code>MRI2CBCT/Models/Dataset516/</code>, Open3D on Linux under <code>MRI2CBCT/py_deps/</code> (<code>env.py:1-9</code>). Overridable by <code>MRI2CBCT_DOWNLOADS</code>, <code>MRI2CBCT_DATASET516</code>, <code>MRI2CBCT_DATASET516_URL</code>, <code>MRI2CBCT_TESTFILES_URL</code>, <code>MRI2CBCT_PY_DEPS</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>Everything runs in Slicer&rsquo;s Python, with no conda. The graphics card is optional for the MRI network. On first use the panel installs the Python packages and downloads the models into the folders the borrowed modules already use, so nothing is fetched twice; the versions, the numpy handling and the paths are on the code page.</p>
+
+            <a class="deep-link" href="MRI2CBCT.code.html#environnement"><b>In the code</b><span>The environment table with versions, paths and override variables</span></a>
+
 
       <h3 id="environnement-open3d">12.1 Open3D on Linux</h3>
-      <p>Open3D needs a folder of its own on Linux: Slicer's <code>pip</code> caps the manylinux tag at 2_28,
-      while Open3D's wheel is 2_31 (<code>env.py:12-15</code>). The wheel runs on any glibc 2.31 or newer, so the
-      panel checks the system's glibc (an older one raises "Open3D needs glibc 2.31 or newer",
-      <code>MRI2CBCT.py:612-615</code>) and installs it with <code>--no-deps --only-binary :all: --platform
-      manylinux_2_31_x86_64 --target &lt;py_deps&gt;</code> (<code>:618-621</code>); other systems use a plain
-      <code>pip_install</code> (<code>:623</code>). Open3D is detected <em>on disk</em>, not by importing it, since a running
-      Slicer keeps an <code>open3d</code> it already imported after its folder is deleted while each CLI starts a
-      fresh interpreter (<code>env.py:67-78</code>). At run time <code>ensure_open3d</code> uses the interpreter's own
-      copy, else <code>py_deps</code>, <strong>appended</strong> to <code>sys.path</code> so that Slicer's numpy and SciPy win
-      (<code>env.py:81-94</code>). <code>ladder.py</code> calls it at import, so <code>MRI2CBCT_REGISTER</code> fails at
-      once with "Open3D is not installed" if neither exists; the panel itself does not import <code>ladder</code> and
-      opens without Open3D.</p>
+
+      <p><a class="gterm" data-term="mri-open3d" href="MRI2CBCT.code.html#environnement-open3d" title="See the code">Open3D</a>, the library behind the registration, needs a special install on Linux, which the panel does. The registration step fails at once with a clear message if Open3D is missing, while the panel itself opens without it; the details are on the code page.</p>
+
+            <a class="deep-link" href="MRI2CBCT.code.html#environnement-open3d"><b>In the code</b><span>The install arguments, the glibc check and the path order</span></a>
+
 
       <h2 id="litterature">13. Literature</h2>
 
-      <p>The paper linked from this tool is <strong>Novel CBCT-MRI Registration Approach for Enhanced Analysis of
-      Temporomandibular Degenerative Joint Disease</strong>, Leroux G. <em>et al.</em>, <em>Clinical Image-Based
-      Procedures</em> (CLIP 2024), LNCS vol. 15196, Springer. As this folder's bibliography reads its abstract, it
-      describes the earlier sequence: automatic orientation, resampling, MRI inversion, normalization, then
-      rigid registration by mutual information. <strong>That is not what the code does any more.</strong> The current
-      registration is a global search on two predicted surfaces and uses no intensity. The same goes for the two
-      NA-MIC reports kept beside this page: PW43 (2025) is the TorchReg plus elastix generation, PW45 (2026)
-      lists fixes to that generation and, as next steps, a more robust automated approximation, a wider elastix
-      capture range and validation on target registration error.</p>
-
-      <p>No document in the folder describes FPFH, RANSAC or the ladder. The code comments speak of
-      "published" settings, of a cohort statistic (5 of 46 against 0 of 172, <code>reg/pipeline.py:22-23</code>)
-      and of scripts outside the repository (<code>run_02_register_w48.py</code>, <code>run_03_export.py</code>,
-      <code>snap_icp.py</code>, <code>itk_io.py:10</code>, <code>surface.py:3-5</code>); the bibliography has found no
-      publication that carries them. That is a question for the maintainers, not something this page can
-      settle. FPFH (Rusu <em>et al.</em>, ICRA 2009) and Open3D (Zhou <em>et al.</em>, 2018) are the usual
-      references for the building blocks; neither is retrieved here.</p>
-
-      <ul>
-        <li><a href="https://link.springer.com/chapter/10.1007/978-3-031-73083-2_7">Novel CBCT-MRI Registration Approach… (CLIP 2024, LNCS 15196)</a>, earlier version</li>
-        <li><a href="https://journalotohns.biomedcentral.com/articles/10.1186/s40463-016-0144-4">MRI and CBCT image registration of TMJ: a systematic review</a></li>
-        <li><a href="https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0169555">Three-Dimensional Assessment of TMJ Using MRI-CBCT Image Registration (PLOS ONE)</a></li>
-        <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12360114/">Aligning MRI and CBCT for Advanced TMJ Diagnostics (PMC)</a>, case series on the earlier version</li>
-        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
-      </ul>
-
-      <p><strong>Full bibliography: <a href="SOURCES.html">SOURCES.html</a></strong>, verified references,
-      files retrieved into this folder (including the full text of Caleme <em>et al.</em> 2025 and two NA-MIC
-      Project Week reports), and what is left to check online. It also holds the only published numerical
-      evaluation of the module (sub-millimeter accuracy, 98.75% success rate, Gaydamour <em>et al.</em>,
-      CLIP 2025), which predates the rewrite: nothing published measures the current version.</p>
+      <p>The paper linked from this tool (Leroux et al., CLIP 2024) describes the <em>earlier</em> sequence: automatic orientation, resampling, MRI inversion, normalisation and rigid registration by mutual information. That is not what the code does any more: the current registration is a global search on two predicted surfaces and uses no intensity. No document in the folder describes the descriptor matching, the <a class="gterm" data-term="mri-ransac" href="MRI2CBCT.code.html#recalage-draw" title="See the code">RANSAC</a> or the <a class="gterm" data-term="mri-ladder" href="MRI2CBCT.code.html#recalage-ladder" title="See the code">ladder</a>, and the code comments cite scripts outside the repository; that is a question for the maintainers. The only published numerical evaluation predates the rewrite, so nothing published measures the current version. Full bibliography: <a href="SOURCES.html">the sources page</a>; the links are on <a href="MRI2CBCT.code.html#litterature">the code page</a>.</p>
 
       <footer class="footer">
         <a href="../index.html">← All tool pages</a> ·
         <a href="SOURCES.html">Bibliography for this tool</a>
       </footer>
-
     </article>
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/algo.js"></script>
+<script src="../../assets/algo-MRI2CBCT.js"></script>
 </body>
 </html>

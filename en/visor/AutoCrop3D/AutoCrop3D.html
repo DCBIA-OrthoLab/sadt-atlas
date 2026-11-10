@@ -23,8 +23,9 @@
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/AutoCrop3D.html">Guide</a>
       <a href="../../visor/AutoCrop3D/AutoCrop3D.html" aria-current="true">Atlas</a>
+      <a href="../../visor/AutoCrop3D/AutoCrop3D.code.html">Code</a>
     </div>
-    <p class="sec-hint">how it works in the code</p>
+    <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="visor">
     <div class="gen-legacy">
     <div class="nav-group"><h4>Registration</h4><ul>
@@ -122,391 +123,395 @@
         <img class="tool-icon" src="../../../assets/screens/AutoCrop3D/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../../index.html">SADT Atlas</a> › <a href="../index.html">VISOR</a> › Utilities</div>
         <h1>AutoCrop3D on VISOR</h1>
-        <p class="lede">How AutoCrop3D runs in VISOR (client and server), what changed from the legacy Slicer module, and what the code of the port does. The legacy module is described on <a href="../../AutoCrop3D/AutoCrop3D.html">its own page</a>.</p>
+        <p class="lede">AutoCrop3D cuts a scan down to a box drawn by the clinician, so that the next tool works on a smaller volume. This page explains how, step by step: how a scan finds its box, how the box becomes a block of <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a>, and how a surface is made from a cropped segmentation. Files, lines, arguments and findings are on <a href="AutoCrop3D.code.html">the code page</a>. The legacy module is on <a href="../../AutoCrop3D/AutoCrop3D.html">its own page</a>.</p>
         <div class="meta-row">
           <span class="badge neutral">VISOR</span>
+          <span class="badge neutral">Atlas (explanation)</span>
+          <a class="badge neutral" href="AutoCrop3D.code.html">Code (developers)</a>
           <a class="badge neutral" href="../../AutoCrop3D/AutoCrop3D.html">Legacy page</a>
           <a class="badge neutral" href="../guide/AutoCrop3D.html">Guide (VISOR)</a>
         </div>
       </header>
 
-<p>In VISOR, AutoCrop3D is a Python package that runs on the server: the Slicer side only draws or picks the box, sends the files and loads what comes back. The crop itself is the legacy arithmetic, kept on purpose; what changed is everything around it, how scans are paired with ROIs, what is checked, what is reported. This page follows the port from the request to the files that come back: position, files, each step of the crop and of the surface with the code that does it, the published arguments, the environment, the differences with the legacy module and the findings. It describes the port in SADT-VISOR (branch <code>tool/vface</code>, 6ba2a78, 2026-09-30), served by VISOR-serve (e9a7e5d) and driven from Slicer by the AutomatedDentalToolsRemote extension (19b95e8). The port was made from upstream commit <code>b1ae78c</code> (2026-05-26, <code>SADT-VISOR AutoCrop3D/README.md:15-16</code>), which predates the 3c67957 state described on the <a href="../../AutoCrop3D/AutoCrop3D.html">legacy page</a>. No claim is made here about a deployed server: everything below is read from the code, and the tool's test suite was run on the package.</p>
+      <h2 id="visor-overview">Overview: what goes in, what comes out</h2>
 
-      <div class="callout note">
-        <div class="callout-title">How references read on this page</div>
-        <p><code>SADT-VISOR AutoCrop3D/pipeline.py:272</code> is <code>tools/AutoCrop3D/src/sadt_autocrop3d/pipeline.py</code> in SADT-VISOR at 6ba2a78; a bare <code>pipeline.py</code> or <code>__init__.py</code> is the same package, and a bare <code>README.md</code>, <code>pyproject.toml</code> or <code>tests/…</code> is under <code>tools/AutoCrop3D/</code>. <code>VISOR-serve server/…</code> and <code>data-manifest.yml</code> (<code>VISOR-serve scripts/data-manifest.yml</code>) are at e9a7e5d; <code>AutomatedDentalToolsRemote …</code> is at 19b95e8. Legacy references (<code>AutoCrop3D_CLI.py</code>, <code>FilesType.py</code>, <code>GenerateVTKfromSeg.py</code>, <code>AutoCrop3D.py</code>) are files of <code>AutoCrop3D/</code> in SlicerAutomatedDentalTools at 3c67957.</p>
-      </div>
-
-      <h2 id="visor-status">1. Position in the chain</h2>
-
-      <p>AutoCrop3D is a utility at the head of a chain: it reduces a <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a>, or its segmentation, to the region a clinician
-      drew, before another tool works on it. In VISOR it calls nothing and nothing calls it. The ROI is drawn in Slicer, which
-      is why the client keeps that part.</p>
+      <p>The clinician draws a box (a region of interest, ROI) in Slicer. AutoCrop3D keeps only the <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a> inside that box, for one scan or for a whole folder. Nothing is predicted: it is geometry, and the voxels that remain are the original ones, not recomputed.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Item</th><th>Value</th></tr></thead>
+          <thead><tr><th>In</th><th>Out</th></tr></thead>
           <tbody>
-            <tr><td>State</td><td>Implemented and tested at tool level. <code>pytest</code> in <code>SADT-VISOR AutoCrop3D</code>: 103 passed on 2026-11-09 (6ba2a78, clean tree). The 15 client tests of <code>test_autocrop3d_client.py</code> were not run (see the findings).</td></tr>
-            <tr><td>API name</td><td><code>AutoCrop3D</code> (<code>AutomatedDentalToolsRemote AutoCrop3DRemote/AutoCrop3DRemote.py:55</code>)</td></tr>
-            <tr><td>Server package</td><td><code>tools/AutoCrop3D</code>, import <code>sadt_autocrop3d</code> (<code>__init__.py</code>, <code>pipeline.py</code>). Own venv, Python &gt;=3.11,&lt;3.12, SimpleITK 2.5.6, numpy 2.3.2, vtk 9.6.2, <code>sadt-areg-common</code> (<code>SADT-VISOR AutoCrop3D/pyproject.toml:5,10,11,15,20</code>). No weights, no GPU, no network.</td></tr>
-            <tr><td>Slicer panel</td><td>Module <code>AutoCrop3DRemote</code> (137 lines). The panel is generated from the server's <code>GET /tools</code> entry. The module adds: the ROI is picked among the scene's ROI nodes (<code>SCENE_INPUTS</code>, <code>:66</code>); cropped volumes and <code>*.vtk</code> models can be loaded (<code>:75-83</code>, at most 12, <code>:93</code>); volume rendering preset CT-AAA (<code>:88</code>); a status line "N of M scan(s) cropped. No ROI for: …" read from the report (<code>:104-137</code>).</td></tr>
-            <tr><td>Facade</td><td>None.</td></tr>
-            <tr><td>Called by / calls</td><td>Called by no other tool (grep over <code>SADT-VISOR tools/*/src</code>: <code>Agent/src/sadt_agent/ranking.py:102,125,128</code> only names it in comments about name matching). It calls no tool: <code>run()</code> has no <code>sup</code> parameter and the package contains no <code>sup.run</code> or subprocess.</td></tr>
+            <tr><td>one scan or a folder of scans (<code>.nii.gz</code>, <code>.nii</code>, <code>.nrrd</code>, <code>.gipl</code>), including segmentations</td><td>for each scan, the same volume reduced to the box, named with a suffix (<code>cropped</code> by default)</td></tr>
+            <tr><td>one box, or a folder with one box per patient (<code>.mrk.json</code>)</td><td>for a segmentation, a smoothed surface (<code>.vtk</code>) beside it</td></tr>
+            <tr><td></td><td>a report, <code>AutoCrop3D_report.json</code>: what was cropped, what failed, which scans had no box</td></tr>
           </tbody>
         </table>
       </div>
 
-      <figure class="diagram">
+      <h2 id="visor-status">1. Position in the chain</h2>
+
+      <p>AutoCrop3D sits at the head of a chain: it shrinks a <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a>, or its segmentation, before another tool works on it. It calls no other tool and no other tool calls it. The box is drawn in Slicer, which is why the Slicer side stays; the computation runs on the server, on the CPU, with no network and no weights.</p>
+
+            <figure class="diagram">
         <svg viewBox="0 0 980 250" role="img" aria-label="AutoCrop3D in VISOR: the ROI is drawn in Slicer, the scans and the ROI go to the server, the tool crops and optionally builds surfaces, and a zip of cropped volumes, surfaces and report comes back">
           <text class="d-label-s" x="10" y="16">Slicer scene</text>
           <text class="d-label-s" x="250" y="16">Slicer client</text>
           <text class="d-label-s" x="490" y="16">VISOR-serve</text>
           <text class="d-label-s" x="730" y="16">tool environment</text>
 
+          <a class="d-link" href="#visor-status">
           <rect class="d-box" x="10" y="30" width="210" height="56" rx="6"/>
-          <text class="d-label" x="115" y="53" text-anchor="middle">ROI node + scans</text>
+          <text class="d-label" x="115" y="53" text-anchor="middle">ROI box + scans</text>
           <text class="d-label-s" x="115" y="70" text-anchor="middle">box drawn by hand</text>
+          </a>
 
           <path class="d-arrow" d="M220 58 H248"/>
           <path class="d-arrow-head" d="M250 58 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-where">
           <rect class="d-box" x="250" y="30" width="210" height="56" rx="6"/>
           <text class="d-label" x="355" y="53" text-anchor="middle">AutoCrop3DRemote</text>
-          <text class="d-label-s" x="355" y="70" text-anchor="middle">ROI row, generated form</text>
+          <text class="d-label-s" x="355" y="70" text-anchor="middle">box picker, input form</text>
+          </a>
 
           <path class="d-arrow" d="M460 58 H488"/>
           <path class="d-arrow-head" d="M490 58 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-where">
           <rect class="d-box" x="490" y="30" width="210" height="56" rx="6"/>
           <text class="d-label" x="595" y="53" text-anchor="middle">Validate and stage</text>
-          <text class="d-label-s" x="595" y="70" text-anchor="middle">500 MB, no split</text>
+          <text class="d-label-s" x="595" y="70" text-anchor="middle">500 MB, one request</text>
+          </a>
 
           <path class="d-arrow" d="M700 58 H728"/>
           <path class="d-arrow-head" d="M730 58 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-pipeline">
           <rect class="d-box-a" x="730" y="30" width="240" height="56" rx="6"/>
-          <text class="d-label" x="850" y="53" text-anchor="middle">run(): crop, surface</text>
-          <text class="d-label-s" x="850" y="70" text-anchor="middle">SimpleITK + VTK, CPU</text>
+          <text class="d-label" x="850" y="53" text-anchor="middle">Crop, surface</text>
+          <text class="d-label-s" x="850" y="70" text-anchor="middle">image and mesh libraries, CPU</text>
+          </a>
 
           <path class="d-arrow" d="M850 86 V168"/>
           <path class="d-arrow-head" d="M850 170 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#visor-step-write">
           <rect class="d-box" x="730" y="170" width="240" height="56" rx="6"/>
           <text class="d-label" x="850" y="193" text-anchor="middle">output_dir, zipped</text>
           <text class="d-label-s" x="850" y="210" text-anchor="middle">volumes, _vtk.vtk, report</text>
+          </a>
 
           <path class="d-arrow" d="M730 198 H462"/>
           <path class="d-arrow-head" d="M460 198 l7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-where">
           <rect class="d-box" x="250" y="170" width="210" height="56" rx="6"/>
           <text class="d-label" x="355" y="193" text-anchor="middle">Unpack and load</text>
           <text class="d-label-s" x="355" y="210" text-anchor="middle">at most 12, status line</text>
+          </a>
         </svg>
-        <figcaption>Where AutoCrop3D sits in VISOR. No box is a network and nothing needs a GPU; the accent marks
-        where the computation runs.</figcaption>
+        <figcaption>Where AutoCrop3D sits in VISOR. No box is a network and AutoCrop3D itself uses no GPU; the accent marks where the computation runs. The boxes lead to the sections below.</figcaption>
       </figure>
+
+
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-status"><b>In the code</b><span>Position in the chain, who calls whom, the client panel</span></a>
+
 
       <h2 id="visor-files">2. Files involved</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File (SADT-VISOR <code>tools/AutoCrop3D/</code>)</th><th>Lines</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>src/sadt_autocrop3d/__init__.py</code></td><td>368</td><td><code>run()</code>, discovery of scans and ROIs, the per-scan loop, the report and its error messages</td></tr>
-            <tr><td><code>src/sadt_autocrop3d/pipeline.py</code></td><td>585</td><td>patient key, ROI reading, crop bounds, crop, re-padding, output names, the surface (padding, <a class="gterm" data-term="marching-cubes" href="../../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a>, smoothing, patient space, colours)</td></tr>
-            <tr><td><code>tests/test_run.py</code></td><td>1441</td><td>103 tests (passed on 2026-11-09), one per corrected defect among them</td></tr>
-            <tr><td><code>README.md</code></td><td>–</td><td>provenance (<code>b1ae78c</code>), the thirteen corrections and their tests (<code>:107-125</code>), what is not ported (<code>:159-180</code>)</td></tr>
-            <tr><td><code>pyproject.toml</code></td><td>40</td><td>pinned environment (see <a href="#visor-env">Environment</a>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The tool is two Python files (the run and its report; the geometry and the surface), a set of tests, and a short Slicer panel. The list, with line counts, is on the code page.</p>
 
-      <p>There is no <code>layout.py</code>: the panel is built from the server's naming conventions alone. Elsewhere:
-      <code>VISOR-serve scripts/data-manifest.yml:790-806</code> (hosted test scan and ROI), no <code>[tools.AutoCrop3D]</code>
-      section in <code>server/deployment.toml</code>, and on the client <code>AutoCrop3DRemote/AutoCrop3DRemote.py</code> (137 lines) with
-      <code>Testing/Python/test_autocrop3d_client.py</code> (15 tests). The patient key uses <code>split_scan_extension</code>,
-      <code>split_parts</code> and <code>has_token</code> from the shared <code>sadt_areg_common.pairing</code>, but not its
-      <code>patient_stem</code> (<code>pipeline.py:83-89</code>).</p>
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-files"><b>In the code</b><span>The files, their line counts, the tests</span></a>
+
 
       <h2 id="visor-where">3. What runs where</h2>
+
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Step</th><th>Server</th><th>Client (Slicer)</th></tr></thead>
+          <thead><tr><th>Step</th><th>Server</th><th>Slicer</th></tr></thead>
           <tbody>
-            <tr><td>Draw the box</td><td>–</td><td>The ROI is a Markups ROI node already in the scene, picked from the ROI row (<code>AutomatedDentalToolsRemote ServerToolsCore/ServerToolsCoreLib/formgen.py:354</code>); or a <code>.mrk.json</code> file or folder.</td></tr>
-            <tr><td>Send</td><td>Receives scans and ROI; default upload limit 500 MB (<code>VISOR-serve server/config.py:240</code>). Scans and ROI are two required <code>path</code> arguments, so the tool cannot be split by patient and a folder goes up in one request (<code>VISOR-serve server/registry/conventions.py:158-190</code>).</td><td>Uploads, or names a hosted test file.</td></tr>
-            <tr><td>Crop</td><td>Reads with SimpleITK, maps the box to indices, slices, optionally puts the crop back in the original geometry (<code>SADT-VISOR AutoCrop3D/pipeline.py:256-329</code>).</td><td>–</td></tr>
-            <tr><td>Surfaces</td><td>VTK <a class="gterm" data-term="marching-cubes" href="../../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a> and Laplacian smoothing (<code>SADT-VISOR AutoCrop3D/pipeline.py:438-499</code>).</td><td>–</td></tr>
-            <tr><td>Return</td><td><code>run()</code> returns a <code>Path</code>, which the server publishes as <code>output_kind "files"</code>: the output folder is zipped (<code>VISOR-serve server/registry/schema_tool.py:95-107</code>). No time limit (<code>TOOL_TIMEOUT_SECONDS = 0</code>, <code>VISOR-serve server/config.py:77</code>), no <code>[tools.AutoCrop3D]</code> section in <code>deployment.toml</code>.</td><td>Unpacks into the chosen folder, reads <code>AutoCrop3D_report.json</code>, loads at most 12 results.</td></tr>
+            <tr><td>Draw the box</td><td>nothing</td><td>the box is picked among the ROIs of the scene, or given as a file or folder</td></tr>
+            <tr><td>Send</td><td>receives scans and boxes; a folder goes up in one request, with a 500 MB default limit</td><td>uploads, or names a hosted test file</td></tr>
+            <tr><td>Crop and surface</td><td>reads the scans, maps the box to indices, slices, builds the surfaces</td><td>nothing</td></tr>
+            <tr><td>Return</td><td>the output folder, zipped</td><td>unpacks, reads the report, loads at most 12 results and shows how many scans were cropped</td></tr>
           </tbody>
         </table>
       </div>
+
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-where"><b>In the code</b><span>What runs where, with the server settings</span></a>
+
 
       <h2 id="visor-pipeline">4. The pipeline, step by step</h2>
 
-      <p>One call of <code>run()</code> crops every scan it finds (<code>SADT-VISOR AutoCrop3D/__init__.py:76-167</code>).</p>
+      <p>One call crops every scan it finds. A failure on one scan costs only that scan: the others go on.</p>
 
-      <figure class="diagram">
+            <figure class="diagram">
         <svg viewBox="0 0 980 380" role="img" aria-label="AutoCrop3D server pipeline: discover scans and ROIs, then for each scan its patient key and ROI, the ROI read in LPS, the box mapped to truncated indices and clamped, the slice, the optional re-padding, the write, the optional surface, and the report">
+          <a class="d-link" href="#visor-step-discovery">
           <rect class="d-box" x="10" y="30" width="300" height="60" rx="6"/>
           <text class="d-label" x="160" y="55" text-anchor="middle">Discover scans</text>
           <text class="d-label-s" x="160" y="73" text-anchor="middle">recursive, earlier outputs set aside</text>
+          </a>
 
           <path class="d-arrow" d="M310 60 H338"/>
           <path class="d-arrow-head" d="M340 60 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-discovery">
           <rect class="d-box" x="340" y="30" width="300" height="60" rx="6"/>
           <text class="d-label" x="490" y="55" text-anchor="middle">Discover ROIs</text>
           <text class="d-label-s" x="490" y="73" text-anchor="middle">one for all, or one per patient</text>
+          </a>
 
           <path class="d-arrow" d="M640 60 H668"/>
           <path class="d-arrow-head" d="M670 60 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-key">
           <rect class="d-box" x="670" y="30" width="300" height="60" rx="6"/>
           <text class="d-label" x="820" y="55" text-anchor="middle">Patient key → ROI</text>
-          <text class="d-label-s" x="820" y="73" text-anchor="middle">no ROI: listed in without_a_roi</text>
+          <text class="d-label-s" x="820" y="73" text-anchor="middle">no ROI: listed in the report</text>
+          </a>
 
           <path class="d-arrow" d="M820 90 V110 H160 V128"/>
           <path class="d-arrow-head" d="M160 130 l-4 -7 h8 z"/>
           <text class="d-label-s" x="490" y="104" text-anchor="middle">for each scan (a failure costs that scan only)</text>
 
+          <a class="d-link" href="#visor-step-roi">
           <rect class="d-box" x="10" y="130" width="300" height="60" rx="6"/>
-          <text class="d-label" x="160" y="155" text-anchor="middle">read_roi</text>
-          <text class="d-label-s" x="160" y="173" text-anchor="middle">center, size; RAS → LPS; rotation flagged</text>
+          <text class="d-label" x="160" y="155" text-anchor="middle">Read the box</text>
+          <text class="d-label-s" x="160" y="173" text-anchor="middle">centre and size, in LPS</text>
+          </a>
 
           <path class="d-arrow" d="M310 160 H338"/>
           <path class="d-arrow-head" d="M340 160 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-crop">
           <rect class="d-box" x="340" y="130" width="300" height="60" rx="6"/>
-          <text class="d-label" x="490" y="155" text-anchor="middle">crop_bounds</text>
-          <text class="d-label-s" x="490" y="173" text-anchor="middle">physical corners → int(index), clamp</text>
+          <text class="d-label" x="490" y="155" text-anchor="middle">Box to indices</text>
+          <text class="d-label-s" x="490" y="173" text-anchor="middle">two corners → whole indices, clamped</text>
+          </a>
 
           <path class="d-arrow" d="M640 160 H668"/>
           <path class="d-arrow-head" d="M670 160 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-crop">
           <rect class="d-box-a" x="670" y="130" width="300" height="60" rx="6"/>
-          <text class="d-label" x="820" y="155" text-anchor="middle">crop: image[x0:x1, y0:y1, z0:z1]</text>
+          <text class="d-label" x="820" y="155" text-anchor="middle">Crop: a block of voxels</text>
           <text class="d-label-s" x="820" y="173" text-anchor="middle">no resampling, geometry kept</text>
+          </a>
 
           <path class="d-arrow" d="M820 190 V228"/>
           <path class="d-arrow-head" d="M820 230 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#visor-step-crop">
           <rect class="d-box" x="670" y="230" width="300" height="60" rx="6"/>
-          <text class="d-label" x="820" y="255" text-anchor="middle">repad (keep_original_size)</text>
+          <text class="d-label" x="820" y="255" text-anchor="middle">Put back (keep original size)</text>
           <text class="d-label-s" x="820" y="273" text-anchor="middle">original grid, zero outside the box</text>
+          </a>
 
           <path class="d-arrow" d="M670 260 H642"/>
           <path class="d-arrow-head" d="M640 260 l7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-write">
           <rect class="d-box-a" x="340" y="230" width="300" height="60" rx="6"/>
-          <text class="d-label" x="490" y="255" text-anchor="middle">WriteImage</text>
-          <text class="d-label-s" x="490" y="273" text-anchor="middle">&lt;stem&gt;_&lt;suffix&gt;&lt;ext&gt;, tree mirrored</text>
+          <text class="d-label" x="490" y="255" text-anchor="middle">Write the file</text>
+          <text class="d-label-s" x="490" y="273" text-anchor="middle">name + suffix, folders mirrored</text>
+          </a>
 
           <path class="d-arrow" d="M340 260 H312"/>
           <path class="d-arrow-head" d="M310 260 l7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-surface">
           <rect class="d-box" x="10" y="230" width="300" height="60" rx="6"/>
           <text class="d-label" x="160" y="255" text-anchor="middle">Surface (if asked)</text>
-          <text class="d-label-s" x="160" y="273" text-anchor="middle">see the second diagram</text>
+          <text class="d-label-s" x="160" y="273" text-anchor="middle">see the diagram below</text>
+          </a>
 
           <path class="d-arrow" d="M160 290 V318"/>
           <path class="d-arrow-head" d="M160 320 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#visor-step-report">
           <rect class="d-box-a" x="10" y="320" width="300" height="50" rx="6"/>
-          <text class="d-label" x="160" y="341" text-anchor="middle">AutoCrop3D_report.json</text>
-          <text class="d-label-s" x="160" y="358" text-anchor="middle">written before "cropped nothing"</text>
+          <text class="d-label" x="160" y="341" text-anchor="middle">Report</text>
+          <text class="d-label-s" x="160" y="358" text-anchor="middle">written even if nothing was cropped</text>
+          </a>
         </svg>
-        <figcaption>The server pipeline, from <code>__init__.py:76-262</code> and <code>pipeline.py:158-344</code>. No step is a
-        network; the accent marks the crop itself and what is written.</figcaption>
+        <figcaption>The server pipeline. No step is a network; the accent marks the crop itself and what is written. Each box leads to its section.</figcaption>
       </figure>
 
-      <h3 id="visor-step-discovery">4.1 Finding the scans and the ROIs <span class="badge calcule">computed</span></h3>
 
-      <p><code>_discover_scans</code> takes a file, or walks a folder recursively, keeps <code>.nii.gz .nrrd.gz .gipl.gz .nii .nrrd .gipl</code>
-      (<code>pipeline.py:26</code>), skips hidden files, and sets aside files that look like this run's earlier output
-      (<code>pairing.is_previous_output</code>, a whole trailing token, so <code>Cropped_01</code> is not excluded); those are used only if nothing
-      else is found (<code>__init__.py:289-311</code>). <code>_discover_rois</code> accepts three shapes: one <code>.mrk.json</code> file, a folder holding
-      exactly one (both used for every scan), or a folder of several, matched by patient (<code>__init__.py:314-368</code>). Two ROIs with the
-      same patient key are refused by name rather than one silently winning (<code>:345-367</code>).</p>
+      <h3 id="visor-step-discovery">4.1 Finding the scans and the boxes <span class="badge calcule">computed</span></h3>
+
+      <p>Scans are searched in the folder and its subfolders; hidden files are skipped, and files that look like an earlier output of the same run (a name ending in the suffix) are set aside unless nothing else is found. The boxes come in three shapes: one file, a folder with exactly one file (both used for every scan), or a folder with one box per patient. Two boxes for the same patient are refused by name rather than letting one win silently.</p>
+
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-step-discovery"><b>In the code</b><span>Discovery of scans and boxes, with the lines</span></a>
+
 
       <h3 id="visor-step-key">4.2 The patient key <span class="badge calcule">computed</span></h3>
 
-      <p>One function serves both the scans and the ROIs (<code>pipeline.py:60-113</code>). It splits the stem into tokens and drops, as whole
-      tokens and never the first word, the vocabulary of the legacy chained splits plus the ROI words (<code>pipeline.py:51-57, 97-108</code>):</p>
+            <figure class="algo" data-scene="autocrop3d_key" data-ms="5000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the words Scan and ROI are dropped from two file names, and both become the same patient name"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">A scan and its ROI are paired by a <strong><a class="gterm" data-term="autocrop3d-patient-key" href="AutoCrop3D.code.html#visor-step-key" title="See the code">patient key</a></strong>. The file name is cut into words at underscores, dashes and dots; words that only describe the file (Scan, ROI, Seg, Mask and so on) are dropped, and what is left is the key. The same rule is applied to scans and to ROIs, so <code>Patient_01_Scan</code> and <code>Patient_01_ROI</code> meet on <code>Patient_01</code>.</p><ul class="algo-legend"><li class="k1"><b>kept</b>the words that identify the patient, and the time point if there is one</li><li class="k4"><b>dropped</b>words that only say what kind of file it is; never the first word</li></ul><p class="algo-tag">Illustration: the file names are examples. The rule is the one in the code, applied to both names.</p></div>
+      </figure>
 
-      <pre><code>IDENTITY_TOKENS_TO_DROP = frozenset({
-    "scan", "scans", "seg", "segmentation", "segmentations", "or", "mand",
-    "md", "max", "mx", "cb", "lm", "cl", "merged", "mask", "pred",
-    "roi", "rois", "mrk", "crop", "cropped", "box", "bbox",
-})</code></pre>
 
-      <p>The timepoint is kept, so <code>P01_T1</code> and <code>P01_T2</code> can have two boxes, and a patient called <code>MAX_01</code> stays
-      <code>MAX_01</code> (<code>pipeline.py:75-81, 100-105</code>). Run on 2026-11-09: <code>Patient_01_Scan</code> and <code>Patient_01_ROI</code> both
-      give <code>Patient_01</code>. A scan whose key has no ROI raises <code>_NoRoi</code> and is listed in <code>without_a_roi</code>
-      (<code>__init__.py:134-141, 206-208</code>).</p>
+      <p>The time point is kept, so <code>P01_T1</code> and <code>P01_T2</code> can have two different boxes. A scan whose key has no box is listed in the report, not guessed.</p>
+
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-step-key"><b>In the code</b><span>The vocabulary of dropped words, the function</span></a>
+
 
       <h3 id="visor-step-roi">4.3 Reading the box <span class="badge calcule">computed</span></h3>
 
-      <p><code>read_roi</code> takes <code>center</code> and <code>size</code> of the first markup and refuses, by file name, a file that is not JSON, has no
-      markup or has no box (<code>pipeline.py:158-187</code>). Then the frame (<code>pipeline.py:194-201</code>):</p>
+      <p>A box is a centre and a size. The file says in which frame the centre is written: ITK, which will convert it, works in <a class="gterm" data-term="lps" href="../../glossary.html#g-lps" title="See glossary">LPS</a>, so a centre saved in <a class="gterm" data-term="ras" href="../../glossary.html#g-ras" title="See glossary">RAS</a> has its first two coordinates flipped. An unknown frame is an error, not a guess.</p>
 
-      <pre><code>system = str(document.get("coordinateSystem", markup.get("coordinateSystem", "LPS"))).upper()
-center = [float(value) for value in center]
-if system in ("RAS", "0"):
-    center = [-center[0], -center[1], center[2]]
-elif system not in ("LPS", "1"):
-    raise ValueError(...)</code></pre>
+      <div class="formula"><math display="block"><mrow><msub><mi class="k1">c</mi><mtext>LPS</mtext></msub><mo>=</mo><mo>(</mo><mo>&#x2212;</mo><msub><mi class="k1">c</mi><mi>x</mi></msub><mo>,</mo><mo>&#x2212;</mo><msub><mi class="k1">c</mi><mi>y</mi></msub><mo>,</mo><msub><mi class="k1">c</mi><mi>z</mi></msub><mo>)</mo></mrow></math></div>
+      <p>The formula applies when the file says RAS. The size is taken as a positive number. A rotation stored in the file is <strong>not applied</strong>: the box stays aligned with the volume&rsquo;s axes, and the report says when a real rotation was ignored.</p>
 
-      <p>The centre ends up in <a class="gterm" href="../../glossary.html#g-lps" title="See glossary">LPS</a>, the frame of ITK's physical
-      points. The size is taken in absolute value (<code>:215</code>). A rotation in <code>orientation</code> is not applied: the box stays axis-aligned,
-      a warning is logged and <code>roi_orientation_ignored</code> is set, but only for a real rotation; a signed axis permutation, which maps the
-      box onto itself, does not count (<code>pipeline.py:203-211, 228-249</code>).</p>
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-step-roi"><b>In the code</b><span>Reading the box, the frame test, the rotation check</span></a>
 
-      <h3 id="visor-step-crop">4.4 From the box to indices, and the crop <span class="badge calcule">computed</span></h3>
 
-      <p>The two physical corners go through <code>TransformPhysicalPointToContinuousIndex</code> and are truncated toward zero, exactly as the
-      legacy <code>.astype(int)</code> did; the corners are swapped per axis if needed, then clamped to the volume
-      (<code>pipeline.py:269-283</code>):</p>
+      <h3 id="visor-step-crop">4.4 From the box to voxels, and the crop <span class="badge calcule">computed</span></h3>
 
-      <pre><code>lower_point = [c - s / 2.0 for c, s in zip(roi.center, roi.size)]
-upper_point = [c + s / 2.0 for c, s in zip(roi.center, roi.size)]
-lower = [int(value) for value in image.TransformPhysicalPointToContinuousIndex(lower_point)]
-upper = [int(value) for value in image.TransformPhysicalPointToContinuousIndex(upper_point)]
-...
-clamped = any(lower[axis] &lt; 0 or upper[axis] &gt; size[axis] for axis in range(3))</code></pre>
+            <figure class="algo" data-scene="autocrop3d_box" data-ms="6200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the two corners of the box fall between voxels, are cut to whole indices, and the block of voxels between them is selected"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The box is drawn in millimetres, the scan is a grid of <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a>. Each corner of the box is converted to a position in the grid, then <strong>cut to a whole number toward zero</strong> (not rounded). The voxels between the two corners are the crop. Nothing is resampled: the voxels keep their values.</p><div class="formula"><math display="block"><mrow><msub><mi class="k3">i</mi><mtext>lo</mtext></msub><mo>=</mo><mi>trunc</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">X</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">c</mi><mo>&#x2212;</mo><mfrac><mi class="k1">s</mi><mn>2</mn></mfrac><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mi class="k3">i</mi><mtext>hi</mtext></msub><mo>=</mo><mi>trunc</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">X</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">c</mi><mo>+</mo><mfrac><mi class="k1">s</mi><mn>2</mn></mfrac><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>c, s</b>centre and size of the box, in millimetres, per axis</li><li class="k2"><b>X</b>the conversion from a point in millimetres to a position in the voxel grid (a function of the ITK image library, which accounts for origin, spacing and direction)</li><li class="k3"><b>i<sub>lo</sub>, i<sub>hi</sub></b>the whole indices of the two corners; the slice is taken between them</li></ul><p class="algo-tag">Illustration: the grid, the box and the positions 2.7 and 8.4 are made up. The two formulas are the ones in the code.</p></div>
+      </figure>
 
-      <p>The crop is a SimpleITK slice, <code>image[lower[0]:upper[0], lower[1]:upper[1], lower[2]:upper[2]]</code>: no resampling, no
-      interpolation, and origin, spacing and direction carried over, so the cropped volume sits exactly where its <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a> were. An empty
-      range is refused with "The ROI does not overlap this volume" (<code>pipeline.py:286-301</code>). With <code>keep_original_size</code>, the
-      crop is copied back into a blank image of the original size and geometry, everything else zero (<code>pipeline.py:304-329</code>; numpy
-      indexes <code>(z, y, x)</code>, the bounds are <code>(x, y, z)</code>, <code>:320-325</code>).</p>
+            <figure class="algo" data-scene="autocrop3d_swap" data-ms="6000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: on an axis whose direction is reversed, the lower physical corner lands on the larger index, so the two indices are swapped"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">On a scan whose axis runs the other way, the lower physical corner gets the <em>larger</em> index. The two indices are put in order, then kept inside the volume. If the box reaches outside the scan, it is cropped to what exists and the report says so; if nothing is left, the scan is refused.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">l</mi><mi class="k2">a</mi></msub><mo>=</mo><mi>max</mi><mrow><mo stretchy="true" fence="true">(</mo><mn>0</mn><mo>,</mo><mi>min</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">p</mi><mo>,</mo><mi class="k4">q</mi><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mi class="k1">u</mi><mi class="k2">a</mi></msub><mo>=</mo><mi>min</mi><mrow><mo stretchy="true" fence="true">(</mo><msub><mi>N</mi><mi class="k2">a</mi></msub><mo>,</mo><mi>max</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">p</mi><mo>,</mo><mi class="k4">q</mi><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k2"><b>a</b>the axis (x, y or z)</li><li class="k3"><b>p</b>the index of the first corner</li><li class="k4"><b>q</b>the index of the second corner</li><li class="k1"><b>l, u</b>the final lower and upper bound; N is the size of the volume along that axis</li></ul><p class="algo-tag">Illustration: the ten voxels and the positions 2.3 and 7.6 are made up.</p></div>
+      </figure>
+
+      <p>The crop is a plain slice of the volume: no resampling and no interpolation, and the scan&rsquo;s origin, spacing and direction are carried over, so the cropped volume sits exactly where its voxels were. Since no voxel moves in millimetres, a registration computed on the full scan should still apply to the cropped one (deduced from the geometry being kept, not tested).</p>
+
+            <figure class="algo" data-scene="autocrop3d_repad" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the cropped block is put back at its place in an empty volume of the original size"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">With <em><a class="gterm" data-term="autocrop3d-keep-size" href="AutoCrop3D.code.html#visor-step-crop" title="See the code">keep original size</a></em>, the crop is pasted back into a blank volume with the same grid as the scan. Everything outside the box is zero and everything inside is exactly where it was, so the result still overlays the original scan.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">I</mi><mtext>out</mtext></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mrow><mo>{</mo><mtable columnalign="left"><mtr><mtd><mrow><mi class="k2">I</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">x</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><mi class="k3">x</mi><mo>&#x2208;</mo><mi>box</mi></mrow></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>I<sub>out</sub></b>the output volume, same size as the scan</li><li class="k3"><b>x</b>a voxel of the grid</li><li class="k2"><b>I</b>the scan</li></ul><p class="algo-tag">Illustration: the grid and the size of the block are made up.</p></div>
+      </figure>
+
+
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-step-crop"><b>In the code</b><span>Bounds, clamping, the slice, the putting back, with the lines</span></a>
+
 
       <h3 id="visor-step-write">4.5 Writing and naming <span class="badge calcule">computed</span></h3>
 
-      <p>The output mirrors the input tree under <code>output_dir</code> (<code>__init__.py:223-226, 277-286</code>), and the name keeps compound
-      extensions: <code>P1_scan.nii.gz</code> with suffix <code>cropped</code> gives <code>P1_scan_cropped.nii.gz</code>; an empty suffix adds nothing
-      (<code>pipeline.py:332-344</code>). The format follows the extension (<code>sitk.WriteImage</code>, <code>__init__.py:226</code>). A
-      <code>.nrrd.gz</code> is refused for that scan only, with the reason (<code>__init__.py:210-214</code>).</p>
+      <p>The output folder mirrors the input folders. The name keeps compound extensions: <code>P1_scan.nii.gz</code> with suffix <code>cropped</code> gives <code>P1_scan_cropped.nii.gz</code>. The format follows the extension. A gzipped NRRD (<code>.nrrd.gz</code>) is refused for that scan only, with the reason, because the reader does not exist.</p>
+
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-step-write"><b>In the code</b><span>Naming and writing, the refusal of gzipped NRRD</span></a>
+
 
       <h3 id="visor-step-surface">4.6 The surface of a cropped label map <span class="badge calcule">computed</span></h3>
 
-      <p>Built when <code>surfaces</code> is <code>all</code>, or <code>segmentations</code> and the file name holds a whole token among
-      <code>seg, segmentation, mask, pred, label, labels</code> (<code>__init__.py:246, 265-274</code>; <code>pipeline.py:124-134</code>).</p>
+      <p>A surface is built when the option says <code>all</code>, or <code>segmentations</code> (the default) and the file name holds a whole word among <code>seg, segmentation, mask, pred, label, labels</code>. Six steps turn a block of labels into a mesh: the labels present, a margin, <a class="gterm" data-term="autocrop3d-marching-cubes" href="AutoCrop3D.code.html#visor-step-surface" title="See the code">marching cubes</a> (one outline per label), smoothing, a move into the patient&rsquo;s space, and a colour per label with the file.</p>
 
-      <figure class="diagram">
+            <figure class="diagram">
         <svg viewBox="0 0 980 190" role="img" aria-label="Surface of a cropped label map: labels present, padding in millimetres on both sides, discrete marching cubes one contour per label, Laplacian smoothing, move to patient space, colour per cell, legacy VTK file">
+          <a class="d-link" href="#visor-step-surface">
           <rect class="d-box" x="10" y="20" width="300" height="60" rx="6"/>
           <text class="d-label" x="160" y="45" text-anchor="middle">Labels present</text>
-          <text class="d-label-s" x="160" y="63" text-anchor="middle">none: no file, surface null</text>
+          <text class="d-label-s" x="160" y="63" text-anchor="middle">none: no file is written</text>
+          </a>
 
           <path class="d-arrow" d="M310 50 H338"/>
           <path class="d-arrow-head" d="M340 50 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-surface">
           <rect class="d-box" x="340" y="20" width="300" height="60" rx="6"/>
-          <text class="d-label" x="490" y="45" text-anchor="middle">ConstantPad, both sides</text>
-          <text class="d-label-s" x="490" y="63" text-anchor="middle">surface_padding_mm → voxels per axis</text>
+          <text class="d-label" x="490" y="45" text-anchor="middle">Margin, both sides</text>
+          <text class="d-label-s" x="490" y="63" text-anchor="middle">margin in mm → voxels per axis</text>
+          </a>
 
           <path class="d-arrow" d="M640 50 H668"/>
           <path class="d-arrow-head" d="M670 50 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-surface">
           <rect class="d-box" x="670" y="20" width="300" height="60" rx="6"/>
-          <text class="d-label" x="820" y="45" text-anchor="middle">Discrete marching cubes</text>
-          <text class="d-label-s" x="820" y="63" text-anchor="middle">one contour per label</text>
+          <text class="d-label" x="820" y="45" text-anchor="middle">Marching cubes</text>
+          <text class="d-label-s" x="820" y="63" text-anchor="middle">one outline per label</text>
+          </a>
 
           <path class="d-arrow" d="M820 80 V98 H160 V108"/>
           <path class="d-arrow-head" d="M160 110 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#visor-step-surface">
           <rect class="d-box" x="10" y="110" width="300" height="60" rx="6"/>
           <text class="d-label" x="160" y="135" text-anchor="middle">Laplacian smoothing</text>
-          <text class="d-label-s" x="160" y="153" text-anchor="middle">N passes, angle 120, relaxation 0.6</text>
+          <text class="d-label-s" x="160" y="153" text-anchor="middle">a few smoothing passes</text>
+          </a>
 
           <path class="d-arrow" d="M310 140 H338"/>
           <path class="d-arrow-head" d="M340 140 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-surface">
           <rect class="d-box" x="340" y="110" width="300" height="60" rx="6"/>
           <text class="d-label" x="490" y="135" text-anchor="middle">To patient space</text>
-          <text class="d-label-s" x="490" y="153" text-anchor="middle">origin + direction · spacing, one 4×4</text>
+          <text class="d-label-s" x="490" y="153" text-anchor="middle">scan origin and orientation applied</text>
+          </a>
 
           <path class="d-arrow" d="M640 140 H668"/>
           <path class="d-arrow-head" d="M670 140 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-surface">
           <rect class="d-box-a" x="670" y="110" width="300" height="60" rx="6"/>
           <text class="d-label" x="820" y="135" text-anchor="middle">_vtk.vtk, colour per cell</text>
           <text class="d-label-s" x="820" y="153" text-anchor="middle">legacy table for labels 1 to 6</text>
+          </a>
         </svg>
-        <figcaption>The surface, <code>pipeline.py:400-585</code>. Computed, no network; the padded volume is a temporary
-        file in the run's own scratch directory.</figcaption>
+        <figcaption>The surface of a cropped label map. Computed, no network.</figcaption>
       </figure>
 
-      <ol class="steps">
-        <li><strong>Labels.</strong> The non-zero values actually present (<code>pipeline.py:400-412</code>). None: no file is written, the report
-        says <code>surface: null</code> (<code>pipeline.py:457-459</code>; <code>__init__.py:257-261</code>).</li>
-        <li><strong>Margin.</strong> <code>surface_padding_mm</code> converted to whole voxels per axis, at least one, then
-        <code>sitk.ConstantPad(image, margin, margin, 0)</code> on both bounds, so a structure touching the box is closed
-        (<code>pipeline.py:415-426, 461-462</code>).</li>
-        <li><strong><a class="gterm" data-term="marching-cubes" href="../../glossary.html#g-marching-cubes" title="See glossary">Marching cubes</a>.</strong> The padded volume is written to <code>padded.nii.gz</code> in the run's temporary directory and read
-        back with <code>vtkNIFTIImageReader</code>; <code>vtkDiscreteMarchingCubes</code> with one contour per label present
-        (<code>pipeline.py:463-478</code>).</li>
-        <li><strong>Smoothing.</strong> <code>vtkSmoothPolyDataFilter</code>, <code>surface_smoothing_iterations</code> passes, feature angle 120 and
-        relaxation 0.6 as constants (<code>pipeline.py:434-435, 480-485</code>).</li>
-        <li><strong>Patient space.</strong> The NIfTI reader leaves the qform to the caller, so the surface is moved by
-        <code>origin + direction @ diag(spacing / reader_spacing)</code>, one 4×4 matrix and no resampling (<code>pipeline.py:502-541</code>). The
-        <code>.vtk</code> then overlays the cropped volume (<code>tests/test_run.py:1242</code>, passed).</li>
-        <li><strong>Colour and write.</strong> Each cell gets the colour of its label: the legacy six-entry table, then a golden-ratio hue for higher
-        labels (<code>pipeline.py:359-384, 544-585</code>). Written with <code>vtkPolyDataWriter</code> at its default settings as
-        <code>&lt;stem&gt;_&lt;suffix&gt;_vtk.vtk</code> next to the volume (<code>pipeline.py:347-351, 491-494</code>); the temporary volume is removed in a
-        <code>finally</code> (<code>:495-497</code>).</li>
-      </ol>
+
+            <figure class="algo" data-scene="autocrop3d_surface" data-ms="7000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a margin of background is added around the crop so the outline of a structure cut by the box can close, then the outline is smoothed"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">A label map becomes a 3D surface. If a structure touches the face of the box, its outline would stay open there. A margin of empty voxels is added first, so the outline closes along the cut. The surface is then smoothed over a few passes.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">n</mi><mi class="k2">a</mi></msub><mo>=</mo><mi>max</mi><mrow><mo stretchy="true" fence="true">(</mo><mn>1</mn><mo>,</mo><mi>round</mi><mrow><mo stretchy="true" fence="true">(</mo><mfrac><mi class="k3">m</mi><msub><mi class="k4">s</mi><mi class="k2">a</mi></msub></mfrac><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>n<sub>a</sub></b>margin, in voxels, added on each side of axis a</li><li class="k3"><b>m</b>the margin asked for, in millimetres (default 5)</li><li class="k4"><b>s<sub>a</sub></b>voxel size along axis a, in millimetres</li><li class="k2"><b>a</b>the axis</li></ul><p class="algo-tag">Illustration: the voxel grid, the shape and the smoothing are made up. The margin formula is the one in the code.</p></div>
+      </figure>
+
+
+      <p>Smoothing then moves each vertex toward the average of its neighbours; five passes by default, with a fixed feature angle (120, VTK&rsquo;s threshold for a sharp edge) and relaxation factor (0.6, how far each vertex moves toward that average at each pass). The mesh is built in the grid&rsquo;s own units, so it is moved into the patient&rsquo;s space by one matrix: without it, the surface would not overlay the cropped volume.</p>
+
+      <div class="formula"><math display="block"><mrow><mi class="k1">p</mi><mo>=</mo><mi class="k2">o</mi><mo>+</mo><mi class="k3">D</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k4">s</mi><mo>&#x2299;</mo><mi class="k5">i</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div>
+      <ul class="algo-legend">
+        <li class="k1"><b>p</b>a point of the mesh, in patient space</li>
+        <li class="k2"><b>o</b>origin of the scan</li>
+        <li class="k3"><b>D</b>direction matrix of the scan</li>
+        <li class="k4"><b>s</b>voxel size</li>
+        <li class="k5"><b>i</b>the position in the grid; &#x2299; multiplies component by component</li>
+      </ul>
+
+      <p>Each cell then gets the colour of its label (six fixed colours, then a generated one).</p>
+
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-step-surface"><b>In the code</b><span>The six steps of the surface, with the VTK calls</span></a>
+
 
       <h3 id="visor-step-report">4.7 The report <span class="badge calcule">computed</span></h3>
 
-      <p><code>AutoCrop3D_report.json</code> at the root of <code>output_dir</code> (<code>__init__.py:96-109, 154-162, 228-261</code>):</p>
+      <p>The report lists each cropped scan with its patient, its box and the indices used, flags whether the box was <a class="gterm" data-term="autocrop3d-clamped" href="AutoCrop3D.code.html#visor-step-crop" title="See the code">clamped</a> to the volume or had a rotation ignored, then the failures and the scans without a box, with counts and the duration. It is written even when nothing was cropped; in that case the run stops with an error that says why, with the scan names and the box names side by side so the mismatch is visible.</p>
 
-      <pre><code>{"tool": "AutoCrop3D", "suffix": ..., "keep_original_size": ..., "surfaces": ..., "roi": ...,
- "cases": {"&lt;relative path&gt;": {"patient", "roi", "produced": [...], "index_lower", "index_upper",
-                               "size", "clamped_to_the_volume", "roi_orientation_ignored",
-                               "roi_coordinate_system", "surface"?, "surface_labels"?}},
- "failed": {"&lt;relative path&gt;": "&lt;Error&gt;: &lt;message&gt;"},
- "without_a_roi": [{"scan", "patient"}],
- "summary": {"scans_found", "cropped", "failed", "without_a_roi", "surfaces"},
- "duration_seconds": ...}</code></pre>
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-step-report"><b>In the code</b><span>The report, field by field</span></a>
 
-      <p>It is written before the final check. If nothing was cropped, <code>run()</code> raises a <code>ValueError</code> that says why: either every
-      scan failed (the first five reasons), or no scan matched an ROI, with up to eight scan keys and ROI keys side by side so the mismatch is
-      visible (<code>__init__.py:162-194</code>). A failure on one scan is recorded and the others go on (<code>:142-149</code>).</p>
 
-      <h2 id="visor-args">5. Arguments and schema</h2>
-      <p>Signature at <code>SADT-VISOR AutoCrop3D/__init__.py:32-47</code>; everything after <code>output_dir</code> is keyword-only. Panel sections come from the server's naming conventions, there is no <code>layout.py</code> for this tool, and no argument is hidden (<code>VISOR-serve server/registry/conventions.py:41-56,90-108</code>).</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Argument</th><th>Type</th><th>Default</th><th>Panel</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>scans</code></td><td>path</td><td>required</td><td>Inputs</td><td>A volume or a folder, searched recursively: <code>.nii.gz .nii .nrrd .gipl.gz .gipl</code> (<code>pipeline.py:26</code>). A <code>.nrrd.gz</code> is found but refused, file by file, because ITK has no reader for a gzipped NRRD (<code>pipeline.py:37</code>, <code>__init__.py:210-214</code>). Hosted test file offered: <code>MG_test_scan.nii.gz</code> (<code>data-manifest.yml:790-796</code>).</td></tr>
-            <tr><td><code>roi</code></td><td>path</td><td>required</td><td>Inputs</td><td>A <code>.mrk.json</code> or a folder of them. Hosted test file: <code>ROI_box</code> (<code>data-manifest.yml:803-806</code>).</td></tr>
-            <tr><td><code>output_dir</code></td><td>path</td><td>–</td><td>not shown</td><td>Filled by the server and removed from the published schema (<code>VISOR-serve server/registry/schema_tool.py:741</code>).</td></tr>
-            <tr><td><code>keep_original_size</code></td><td>bool</td><td><code>False</code></td><td>Options</td><td>Puts the crop back in a volume of the original geometry, zero outside the box.</td></tr>
-            <tr><td><code>surfaces</code></td><td><code>segmentations</code> | <code>all</code> | <code>none</code></td><td><code>segmentations</code></td><td>Options</td><td>Which cropped files also get a smoothed <code>.vtk</code>.</td></tr>
-            <tr><td><code>surface_padding_mm</code></td><td>float</td><td><code>5.0</code></td><td>Options</td><td>Background margin before <a class="gterm" data-term="marching-cubes" href="../../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a>; negative is an error (<code>pipeline.py:424-425</code>).</td></tr>
-            <tr><td><code>surface_smoothing_iterations</code></td><td>int</td><td><code>5</code></td><td>Options</td><td>Laplacian passes; negative is an error (<code>__init__.py:80-84</code>).</td></tr>
-            <tr><td><code>suffix</code></td><td>str</td><td><code>cropped</code></td><td>Outputs</td><td>Output suffix; may be empty.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>What the client does with it.</strong> The ROI row lists the scene's <code>vtkMRMLMarkupsROINode</code>s, declared in the module because
-      the name <code>roi</code> means nothing to the generic rule (<code>AutoCrop3DRemote.py:58-66</code>). After the run, the module loads the results and
-      shows "N of M scan(s) cropped." from <code>summary.cropped</code> and <code>summary.scans_found</code>, plus "No ROI for: …" with up to five
-      patients from <code>without_a_roi</code> (<code>AutoCrop3DRemote.py:97-137</code>).</p>
+      <h2 id="visor-args">5. What you can choose</h2>
+
+      <ul>
+        <li><strong>Scans and box:</strong> a file or a folder for each (both required).</li>
+        <li><strong><a class="gterm" data-term="autocrop3d-keep-size" href="AutoCrop3D.code.html#visor-step-crop" title="See the code">Keep original size</a>:</strong> off by default. On, the crop is put back in a volume of the original size, zero outside the box.</li>
+        <li><strong>Surfaces:</strong> only for segmentations (default), for every file, or none.</li>
+        <li><strong>Surface margin:</strong> 5 mm of background by default before the surface is built.</li>
+        <li><strong>Smoothing passes:</strong> 5 by default.</li>
+        <li><strong>Suffix:</strong> <code>cropped</code> by default, may be empty.</li>
+      </ul>
+
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-args"><b>In the code</b><span>The published arguments and the client side</span></a>
+
 
       <h2 id="visor-predicted">6. What is predicted vs computed</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Block</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>The box</td><td>drawn by hand in Slicer</td><td>client</td></tr>
-            <tr><td>Pairing, ROI frame, index bounds, crop, re-padding</td><td><span class="badge calcule">computed</span> geometry</td><td>tool</td></tr>
-            <tr><td>Surface</td><td><span class="badge calcule">computed</span> <a class="gterm" data-term="marching-cubes" href="../../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a> and smoothing</td><td>tool</td></tr>
+            <tr><td>The box</td><td>drawn by hand in Slicer</td></tr>
+            <tr><td>Pairing, frame of the box, indices, crop, putting back</td><td><span class="badge calcule">computed</span> geometry</td></tr>
+            <tr><td>Surface</td><td><span class="badge calcule">computed</span> <a class="gterm" data-term="autocrop3d-marching-cubes" href="AutoCrop3D.code.html#visor-step-surface" title="See the code">marching cubes</a> and smoothing</td></tr>
           </tbody>
         </table>
       </div>
@@ -515,105 +520,64 @@ clamped = any(lower[axis] &lt; 0 or upper[axis] &gt; size[axis] for axis in rang
 
       <h2 id="visor-env">7. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Value</th><th>Reference</th></tr></thead>
-          <tbody>
-            <tr><td>Python</td><td><code>&gt;=3.11,&lt;3.12</code></td><td><code>SADT-VISOR AutoCrop3D/pyproject.toml:5</code></td></tr>
-            <tr><td>Libraries</td><td><code>SimpleITK==2.5.6</code>, <code>numpy==2.3.2</code>, <code>vtk==9.6.2</code>, <code>sadt-areg-common</code> (local path <code>../AREG/common</code>)</td><td><code>pyproject.toml:6-21, 37-38</code></td></tr>
-            <tr><td>Models</td><td>none</td><td>–</td></tr>
-            <tr><td>Hosted test files</td><td><code>MG_test_scan.nii.gz</code> (98 611 496 bytes), <code>ROI_box</code></td><td><code>VISOR-serve scripts/data-manifest.yml:790-806</code></td></tr>
-            <tr><td>Deployment section</td><td>none</td><td><code>VISOR-serve server/deployment.toml</code> (grep)</td></tr>
-            <tr><td>Time limit, upload cap</td><td>none (<code>TOOL_TIMEOUT_SECONDS = 0</code>), 500 MB</td><td><code>server/config.py:77, 240</code></td></tr>
-            <tr><td>GPU admission</td><td>no <code>device</code> argument, so the server assumes the GPU</td><td><code>server/execution/dispatch.py:95-116</code></td></tr>
-            <tr><td>Threads</td><td>flat from 1 to 56 threads, about 1.0 s for one run, recorded in the server's code; the server caps ITK, OpenMP and OpenBLAS threads</td><td><code>server/execution/admission.py:405-431</code> (read, not re-measured)</td></tr>
-            <tr><td>Scratch</td><td>one <code>TemporaryDirectory</code> per run (<code>autocrop3d_…</code>)</td><td><code>__init__.py:116</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The tool has an environment of its own on the server, with no model, no GPU and no network access. Versions and the other server settings are on the code page.</p>
+
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-env"><b>In the code</b><span>Python, libraries, hosted test files, server limits</span></a>
+
 
       <h2 id="visor-changes">8. What changed from the legacy logic</h2>
-      <p>Each row gives both sides. Legacy lines are at 3c67957, VISOR lines at 6ba2a78. The legacy module is on <a href="../../AutoCrop3D/AutoCrop3D.html">its own page</a> (<a href="../../AutoCrop3D/AutoCrop3D.html#application">how the box is applied</a>, <a href="../../AutoCrop3D/AutoCrop3D.html#vtk">the surface</a>).</p>
+
+      <p>The crop arithmetic is kept on purpose, <a class="gterm" data-term="autocrop3d-truncation" href="AutoCrop3D.code.html#visor-step-crop" title="See the code">truncation</a> included. What changed is around it.</p>
+
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Subject</th><th>Legacy (3c67957)</th><th>VISOR (6ba2a78)</th></tr></thead>
+          <thead><tr><th>Subject</th><th>Legacy</th><th>VISOR</th></tr></thead>
           <tbody>
-            <tr><td>Patient key</td><td>Scans: fifteen chained <code>.split()</code> (<code>AutoCrop3D_CLI.py:52</code>). ROI: <code>split('_')[0]</code> (<code>FilesType.py:77</code>). Two rules.</td><td>One function for both sides (<code>pipeline.py:60-113</code>). <code>Patient_01_Scan</code> and <code>Patient_01_ROI</code> both give <code>Patient_01</code> (run on 2026-11-09).</td></tr>
-            <tr><td>Two ROIs, one patient</td><td>The last one silently wins (<code>FilesType.py:78</code>).</td><td><code>ValueError</code> naming the files (<code>__init__.py:345-367</code>).</td></tr>
-            <tr><td>A folder holding one ROI</td><td>The table is built only for more than one ROI; one ROI in a folder ends in <code>IsADirectoryError</code> (<code>AutoCrop3D_CLI.py:46, 56, 63</code>).</td><td>Used for every scan (<code>__init__.py:342-343</code>).</td></tr>
-            <tr><td>Scan with no ROI</td><td>Warning, skipped, exit 0 (<code>AutoCrop3D_CLI.py:59-61</code>).</td><td>Listed in <code>without_a_roi</code> (<code>__init__.py:134-141</code>); if nothing was cropped, <code>ValueError</code> naming the scan and ROI patients (<code>:164-165,174-194</code>).</td></tr>
-            <tr><td>ROI frame</td><td><code>center</code> and <code>size</code> only (<code>AutoCrop3D_CLI.py:63-65</code>).</td><td><code>coordinateSystem</code> read, <a class="gterm" data-term="ras" href="../../glossary.html#g-ras" title="See glossary">RAS</a> converted (<code>pipeline.py:194-201</code>); rotation flagged (<code>:203-211</code>).</td></tr>
-            <tr><td>Crop geometry</td><td><code>TransformPhysicalPointToContinuousIndex</code>, <code>astype(int)</code>, clamp, slice (<code>AutoCrop3D_CLI.py:70-80,96-98</code>).</td><td>Same arithmetic on purpose (<code>pipeline.py:272-273,301</code>).</td></tr>
-            <tr><td>Box outside the volume</td><td>No check; failure swallowed (<code>AutoCrop3D_CLI.py:128-138</code>).</td><td><code>ValueError</code> "does not overlap" (<code>pipeline.py:294-300</code>); a partial overlap is cropped and flagged <code>clamped_to_the_volume</code> (<code>pipeline.py:280</code>).</td></tr>
-            <tr><td><code>keep_original_size</code></td><td>Compared with the string <code>'True'</code> (<code>AutoCrop3D_CLI.py:100</code>).</td><td>A boolean; same arithmetic (<code>pipeline.py:304-329</code>).</td></tr>
-            <tr><td>Output name</td><td><code>basename.split('.')[0]</code> (<code>AutoCrop3D_CLI.py:118-119</code>), then <code>.replace(basename, filename)</code> (<code>:122,124</code>).</td><td><code>split_scan_extension</code> keeps compound extensions (<code>pipeline.py:332-344</code>); <code>relpath</code> (<code>__init__.py:223-225</code>).</td></tr>
-            <tr><td>Input extensions</td><td>CLI six forms (<code>AutoCrop3D_CLI.py:41</code>), panel three (<code>AutoCrop3D.py:641</code>).</td><td>Six forms (<code>pipeline.py:26</code>); <code>.nrrd.gz</code> refused per file (<code>__init__.py:210-215</code>).</td></tr>
-            <tr><td>Earlier outputs in the folder</td><td>Not handled.</td><td>Files of the scans folder that end in <code>_&lt;suffix&gt;</code> are set aside as earlier outputs, and used only if nothing else is found (<code>__init__.py:289-311</code>).</td></tr>
-            <tr><td>When a surface is built</td><td><code>"seg" in scan_out_path.lower()</code>, the whole output path (<code>AutoCrop3D_CLI.py:143</code>).</td><td>Argument <code>surfaces</code>; for <code>segmentations</code>, a whole token of the file name among <code>seg, segmentation, mask, pred, label, labels</code> (<code>pipeline.py:124-134</code>, <code>__init__.py:265-274</code>).</td></tr>
-            <tr><td>Surface margin</td><td><code>[50,50,10]</code> <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a>, lower bound only (<code>GenerateVTKfromSeg.py:83-85</code>).</td><td>Millimetres per axis, both bounds (<code>pipeline.py:415-426,462</code>).</td></tr>
-            <tr><td>Contours and colours</td><td><code>GenerateValues(100, 1, 100)</code> (<code>GenerateVTKfromSeg.py:46</code>); one colour for all cells (<code>:33,66</code>).</td><td>One contour per label present (<code>pipeline.py:475-478</code>); colour per cell (<code>:544-585</code>).</td></tr>
-            <tr><td>Smoothing</td><td>5 iterations, angle 120, relaxation 0.6, all fixed (<code>GenerateVTKfromSeg.py:52-54</code>).</td><td>Same angle and relaxation as constants; iterations an argument (<code>pipeline.py:434-435</code>).</td></tr>
-            <tr><td>Surface space</td><td>NIfTI reader without qform, padding not compensated (<code>GenerateVTKfromSeg.py:38-40,83-85</code>; a deduction, see <a href="../../AutoCrop3D/AutoCrop3D.html#vtk">section 7 of the legacy page</a>).</td><td>4x4 matrix from origin and direction applied (<code>pipeline.py:502-541</code>); test <code>test_the_surface_lands_on_the_volume_it_came_from</code> (<code>tests/test_run.py:1242</code>, passed).</td></tr>
-            <tr><td>Scratch file</td><td><code>image_padded.nii.gz</code> in the working directory (<code>GenerateVTKfromSeg.py:87</code>).</td><td><code>padded.nii.gz</code> in a temporary directory per run (<code>__init__.py:116</code>, <code>pipeline.py:463</code>), removed in a <code>finally</code> (<code>pipeline.py:495-497</code>).</td></tr>
-            <tr><td>Rotated ROI (Crop Volume)</td><td>Second engine (<code>AutoCrop3D.py:723-808</code>).</td><td>Not ported (<code>README.md:159-177</code>).</td></tr>
-            <tr><td>Progress</td><td>A <code>logPath</code> file (<code>AutoCrop3D_CLI.py:37-41,140-141</code>).</td><td>None from the tool: the package has no progress call (grep); the report records <code>duration_seconds</code> (<code>__init__.py:161</code>).</td></tr>
+            <tr><td><a class="gterm" data-term="autocrop3d-patient-key" href="AutoCrop3D.code.html#visor-step-key" title="See the code">Patient key</a></td><td>two different rules for scans and for boxes</td><td>one rule for both</td></tr>
+            <tr><td>Two boxes, one patient</td><td>the last one wins silently</td><td>an error naming the files</td></tr>
+            <tr><td>A folder holding one box</td><td>crashes</td><td>used for every scan</td></tr>
+            <tr><td>A scan with no box</td><td>warning and skipped</td><td>listed in the report; an error if nothing was cropped</td></tr>
+            <tr><td>Frame of the box</td><td>ignored</td><td>read; <a class="gterm" data-term="ras" href="../../glossary.html#g-ras" title="See glossary">RAS</a> is converted</td></tr>
+            <tr><td>A box outside the volume</td><td>not checked, failure swallowed</td><td>an explicit error, or a crop flagged as <a class="gterm" data-term="autocrop3d-clamped" href="AutoCrop3D.code.html#visor-step-crop" title="See the code">clamped</a></td></tr>
+            <tr><td>When a surface is built</td><td>the word <code>seg</code> anywhere in the output path</td><td>an option; whole words in the file name</td></tr>
+            <tr><td>Surface margin</td><td>50, 50, 10 <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a> on the lower side only</td><td>millimetres, on both sides</td></tr>
+            <tr><td>Surface position and colour</td><td>not moved into patient space; one colour for all cells</td><td>moved into patient space; one colour per label</td></tr>
+            <tr><td>Tilted box (Crop Volume)</td><td>a second engine in Slicer</td><td>not ported</td></tr>
+            <tr><td>Progress</td><td>a progress file</td><td>none; the report records the duration</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h2 id="visor-findings">9. Findings in VISOR</h2>
+            <a class="deep-link" href="AutoCrop3D.code.html#visor-changes"><b>In the code</b><span>The same table with legacy and VISOR lines</span></a>
 
-      <div class="callout bug">
-        <div class="callout-title">Server paths in the report</div>
-        <p>When a surface is written, the report names it with an absolute server path: <code>entry["surface"] = str(surface_path)</code> and the same string appended to <code>produced</code> (<code>SADT-VISOR AutoCrop3D/__init__.py:253-255</code>), while the comment just above says the report must stay relative to <code>output_dir</code> because it travels to the client (<code>:231-232</code>). The volume entry is relative (<code>:236</code>). The only test of the rule checks <code>produced[0]</code> (<code>tests/test_run.py:1424-1441</code>), which is the volume. Reproduced on 2026-11-09 by calling <code>run()</code> on a synthetic label map named <code>P1_Seg.nii.gz</code>: <code>produced</code> held <code>P1_Seg_cropped.nii.gz</code> and an absolute <code>…/out/P1_Seg_cropped_vtk.vtk</code>, and <code>surface</code> the same absolute path.</p>
-      </div>
 
-      <div class="callout warn">
-        <div class="callout-title">Default surface rule depends on the file name</div>
-        <p>With the default <code>surfaces = "segmentations"</code>, a surface is built only when the file name holds a whole token among <code>seg, segmentation, mask, pred, label, labels</code> (<code>SADT-VISOR AutoCrop3D/pipeline.py:124-134</code>). Checked on 2026-11-09 with the package's own <code>is_segmentation_name</code>: <code>P1_Seg.nii.gz</code> qualifies, <code>Mandible.nii.gz</code> does not and gets no surface unless <code>surfaces = "all"</code>. The legacy test was a substring <code>seg</code> anywhere in the output path (<code>AutoCrop3D_CLI.py:143@3c67957</code>).</p>
-      </div>
+      <h2 id="visor-findings">9. Known issues in VISOR</h2>
 
-      <div class="callout warn">
-        <div class="callout-title">A cohort is not split</div>
-        <p><code>scans</code> and <code>roi</code> are both required <code>path</code> arguments, so the server offers no batch axis (<code>VISOR-serve server/registry/conventions.py:158-190</code>, the comment names AutoCrop3D) and the whole folder goes in one request, under the 500 MB default upload limit (<code>VISOR-serve server/config.py:240</code>). The hosted test scan alone is 98 611 496 bytes (<code>data-manifest.yml:792-794</code>).</p>
-      </div>
+      <p>Each point is checked in the code and described, with its evidence, on the code page; the list also appears in the <a href="../../findings.html">findings</a>.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Client tests not registered</div>
-        <p><code>AutomatedDentalToolsRemote AutoCrop3DRemote/Testing/Python/test_autocrop3d_client.py</code> holds 15 tests, but <code>AutoCrop3DRemote/CMakeLists.txt</code> has no <code>add_test</code> or <code>add_subdirectory</code> and <code>Testing/</code> has no <code>CMakeLists.txt</code>, so the suite is not attached to ctest. The root <code>CMakeLists.txt:29</code> does add the module. AutoMatrixRemote and GreedyRegRemote do register theirs (<code>AutoMatrixRemote/CMakeLists.txt:34</code>, <code>GreedyRegRemote/CMakeLists.txt:34</code>, each an <code>add_subdirectory(Testing)</code>).</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Stale documentation around the port</div>
-        <p><code>AutomatedDentalToolsRemote README.md:508-546</code> still describes the old module: an icon path under <code>AutoCrop3D/</code> (the folder is <code>AutoCrop3DRemote</code>), <code>.nrrd.gz</code> accepted (the tool refuses it, <code>pipeline.py:37</code>), "Seg somewhere in the name" (now whole tokens), a ROI made through "Volume Rendering". The package's own README also announces 102 tests (<code>README.md:200</code>) where the suite holds 103. The code is what this page follows.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">A rotated ROI is still cropped as an axis-aligned box</div>
-        <p>The rotation is not applied; the crop uses the box's centre and size along the volume's index axes, as in the legacy CLI, and the
-        report says so with <code>roi_orientation_ignored</code> and a log warning (<code>SADT-VISOR AutoCrop3D/pipeline.py:203-211</code>). The
-        legacy module's second engine for tilted boxes, Slicer's Crop Volume, has no headless equivalent and is not ported (<code>README.md:159-177</code>).
-        The truncation of indices toward zero is also kept on purpose (<code>pipeline.py:257-264, 272-273</code>).</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">Thirteen legacy defects corrected, each with a test</div>
-        <p>The port lists its thirteen corrections, each with the name of its test, in <code>SADT-VISOR AutoCrop3D/README.md:107-125</code>; the suite ran green (103 passed, 2026-11-09). The unmatched-patient message of the Slicer panel names up to five patients (<code>AutomatedDentalToolsRemote AutoCrop3DRemote/AutoCrop3DRemote.py:129-136</code>).</p>
-      </div>
+      <ul>
+        <li><strong>Server paths in the report.</strong> When a surface is written, the report names it with an absolute server path instead of a relative one. <a href="AutoCrop3D.code.html#f-server-paths">Evidence</a>.</li>
+        <li><strong>The default surface rule depends on the file name.</strong> <code>Mandible.nii.gz</code> gets no surface unless the option is set to all. <a href="AutoCrop3D.code.html#f-surface-name">Evidence</a>.</li>
+        <li><strong>A cohort is not split.</strong> A whole folder goes up in one request, under the upload limit. <a href="AutoCrop3D.code.html#f-no-split">Evidence</a>.</li>
+        <li><strong>The client tests are not registered</strong> with the build, so they do not run. <a href="AutoCrop3D.code.html#f-client-tests">Evidence</a>.</li>
+        <li><strong>Documentation around the port is out of date.</strong> <a href="AutoCrop3D.code.html#f-stale-docs">Evidence</a>.</li>
+        <li><strong>A rotated box is still cropped as an aligned box</strong>, and the report says so. <a href="AutoCrop3D.code.html#f-rotated-roi">Evidence</a>.</li>
+      </ul>
 
       <h2 id="visor-literature">10. Literature</h2>
 
-      <p>AutoCrop3D is geometry with no method of its own to cite; the tool's bibliography is on <a href="../../AutoCrop3D/SOURCES.html">AutoCrop3D sources</a>.
-      For the VISOR mechanics shared by every tool, see <a href="../architecture.html">Architecture</a> and
-      <a href="../run-lifecycle.html">A run, step by step</a>; for using the panel, <a href="../guide/AutoCrop3D.html">the VISOR guide</a>.</p>
+      <p>AutoCrop3D is geometry with no method of its own to cite; the tool&rsquo;s bibliography is on <a href="../../AutoCrop3D/SOURCES.html">AutoCrop3D sources</a>. For the VISOR mechanics shared by every tool, see <a href="../architecture.html">Architecture</a> and <a href="../run-lifecycle.html">A run, step by step</a>; for using the panel, <a href="../guide/AutoCrop3D.html">the VISOR guide</a>.</p>
 
       <footer class="footer">
-        <a href="../../index.html">← All pages</a> · <a href="../../AutoCrop3D/AutoCrop3D.html">Legacy page for this tool</a> · <a href="../guide/AutoCrop3D.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a>
+        <a href="../../index.html">← All pages</a> · <a href="AutoCrop3D.code.html">Code page for this tool</a> · <a href="../../AutoCrop3D/AutoCrop3D.html">Legacy page for this tool</a> · <a href="../guide/AutoCrop3D.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a>
       </footer>
+
 
     </article>
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../../assets/algo.js"></script>
+<script src="../../../assets/algo-AutoCrop3D.js"></script>
 </body>
 </html>

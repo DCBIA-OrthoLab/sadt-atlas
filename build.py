@@ -98,7 +98,7 @@ class Page(HTMLParser):
             kinds = [k for k in ("bug", "warn", "ok") if k in cls.split()]
             self.call_stack.append({"kind": kinds[0] if kinds else "note",
                                     "title": "", "text": [], "depth": 1,
-                                    "section": self.cur["id"] if self.cur else ""})
+                                    "section": a.get("id") or (self.cur["id"] if self.cur else "")})
         elif self.call_stack and tag == "div":
             if "callout-title" in cls:
                 self.in_call_title = True
@@ -426,12 +426,12 @@ def page_params(rel):
     if folder == "visor" and len(rest) == 3:      # visor/<Outil>/<Outil>.html, visor/guide/<Outil>.html
         if rest[1] == "guide":
             return lang, "guide", "visor/" + os.path.splitext(rest[2])[0], 3, rel
-        return lang, "atlas", "visor/" + rest[1], 3, rel
+        return lang, ("code" if rest[2].endswith(".code.html") else "atlas"), "visor/" + rest[1], 3, rel
     if folder == "guide":
         return lang, "guide", ("home" if f == "index.html" else os.path.splitext(f)[0]), 2, rel
     if folder == "visor":
         return lang, "atlas", "visor/" + os.path.splitext(f)[0], 2, rel
-    return lang, "atlas", folder, 2, rel
+    return lang, ("code" if f.endswith(".code.html") else "atlas"), folder, 2, rel
 
 
 def sync_nav():

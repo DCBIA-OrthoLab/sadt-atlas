@@ -150,7 +150,9 @@ UI = {
         "guide":     "Guide",
         "atlas":     "Atlas",
         "guide_hint":"how to use the tools",
-        "atlas_hint":"how it works in the code",
+        "atlas_hint":"how it works, step by step",
+        "code":      "Code",
+        "code_hint": "for developers: files, lines, arguments",
         "cross":     "Cross-cutting",
         "shared":    "Shared code",
         "findings":  "Findings",
@@ -268,6 +270,10 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     dans les autres langues (à l'accueil, faute de le connaître)."""
     up = "../" * (depth - 1)          # vers la racine de la langue
     ui, fl = UI[lang], FILES[lang]
+    on_code = section == "code"       # page code d'un outil : on reste dans l'atlas, la bascule en marque la 3e case
+    hint_key = section
+    if on_code:
+        section = "atlas"
 
     def rel_of(tool):
         return f"guide/{tool}.html" if section == "guide" else f"{tool}/{tool}.html"
@@ -323,7 +329,8 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     cur_s = str(current)
     on_visor = lang == "en" and (cur_s == VISOR_GUIDE[0] or cur_s.startswith("visor/"))
     vt = cur_s[6:] if on_visor and cur_s.startswith("visor/") and cur_s[6:] in VISOR_TOOLS else None
-    T = current if on_tool else vt                     # l'outil de la page, s'il y en a un
+    on_shared = lang == "en" and current in SHARED   # autres langues : inchange
+    T = current if (on_tool or on_shared) else vt      # l'outil de la page, s'il y en a un
     if vt:
         sw = (("guide", f"visor/guide/{vt}.html" if vt in {t for t, _ in TOOLS} else f"guide/{VISOR_GUIDE[0]}.html"),
               ("atlas", f"visor/{vt}/{vt}.html"))
@@ -331,7 +338,12 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         sw = (("guide", f"guide/{VISOR_GUIDE[0]}.html"), ("atlas", "visor/index.html"))
     else:
         sw = (("guide", f"guide/{current}.html" if on_tool else "guide/index.html"),
-              ("atlas", f"{current}/{current}.html" if on_tool else "index.html"))
+              ("atlas", f"{current}/{current}.html" if (on_tool or on_shared) else "index.html"))
+    # 3e case, « Code », anglais seulement et seulement si la page code de cet outil existe
+    if lang == "en" and T:
+        code_rel = f"visor/{T}/{T}.code.html" if on_visor else f"{T}/{T}.code.html"
+        if os.path.exists(os.path.join(ROOT, lang, code_rel)):
+            sw = tuple(sw) + (("code", code_rel),)
     # bascule Legacy / VISOR (anglais seulement) : AU-DESSUS de Guide / Atlas. Elle mene a la
     # page de l'autre generation pour le meme outil et la meme section.
     mode0 = "visor" if on_visor else "legacy"
@@ -340,6 +352,9 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         if T and T in tools_all:
             lg = f"guide/{T}.html" if section == "guide" else f"{T}/{T}.html"
             vi = f"visor/guide/{T}.html" if section == "guide" else f"visor/{T}/{T}.html"
+        elif T and on_shared:                            # ADTLib : une page legacy, pas de VISOR
+            lg = f"{T}/{T}.html"
+            vi = "visor/index.html"
         elif T:                                          # Crown_Seg : pas de page legacy
             lg = "index.html"
             vi = f"visor/{T}/{T}.html"
@@ -347,6 +362,11 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
             lg, vi = "guide/index.html", f"guide/{VISOR_GUIDE[0]}.html"
         else:
             lg, vi = "index.html", "visor/index.html"
+        if on_code:                                      # sur une page code, la bascule garde la case Code
+            def _code(r):
+                c = r[:-5] + ".code.html" if r.endswith(".html") else r
+                return c if os.path.exists(os.path.join(ROOT, lang, c)) else r
+            lg, vi = _code(lg), _code(vi)
         cur_attr = ' aria-current="true"'
         on_lg = cur_attr if mode0 == "legacy" else ""
         on_vi = cur_attr if mode0 == "visor" else ""
@@ -356,7 +376,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         out.append('    </div>')
     out.append('    <div class="sec-switch" role="group">')
     for key, r in sw:
-        on = ' aria-current="true"' if key == section else ""
+        on = ' aria-current="true"' if (key == "code" and on_code) or (key == section and not on_code and key != "code") else ""
         # Même règle que link() : la contrepartie n'existe pas forcément dans
         # cette langue. Y pointer quand même donnait un lien mort: sur les
         # pages thaïes dont le guide manque, c'était le seul lien cassé de la
@@ -373,7 +393,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     # La phrase d'orientation ne se repete pas dans chaque segment : elle suit
     # le controle, et ne decrit que la section ou l'on est. Deux legendes dans
     # deux cases bordees se lisaient comme deux objets, pas comme un choix.
-    out.append(f'    <p class="sec-hint">{esc(ui[section + "_hint"])}</p>')
+    out.append(f'    <p class="sec-hint">{esc(ui[hint_key + "_hint"])}</p>')
 
     if lang == "en":
         out.append(f'    <div class="gen-wrap" data-gen="{mode0}">')

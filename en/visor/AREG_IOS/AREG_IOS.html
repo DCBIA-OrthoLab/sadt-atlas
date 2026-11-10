@@ -23,8 +23,9 @@
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/AREG_IOS.html">Guide</a>
       <a href="../../visor/AREG_IOS/AREG_IOS.html" aria-current="true">Atlas</a>
+      <a href="../../visor/AREG_IOS/AREG_IOS.code.html">Code</a>
     </div>
-    <p class="sec-hint">how it works in the code</p>
+    <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="visor">
     <div class="gen-legacy">
     <div class="nav-group"><h4>Registration</h4><ul>
@@ -122,9 +123,10 @@
         <img class="tool-icon" src="../../../assets/screens/AREG_IOS/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../../index.html">SADT Atlas</a> › <a href="../index.html">VISOR</a> › Registration</div>
         <h1>AREG_IOS on VISOR</h1>
-        <p class="lede">How AREG_IOS runs in VISOR (client and server), what changed from the legacy Slicer module, and what the code of the port does, step by step. The legacy module is described on <a href="../../AREG_IOS/AREG_IOS.html">its own page</a>.</p>
+        <p class="lede">AREG_IOS puts two intraoral scans of the same patient, taken at different times, in the same position, using a part of the mouth that treatment does not move. This page explains how, step by step, with the maths: what goes in, what each step does to it, and what comes out. Where the code does something worth checking, a link leads to <a href="AREG_IOS.code.html">the code page</a>. The legacy module is on <a href="../../AREG_IOS/AREG_IOS.html">its own page</a>.</p>
         <div class="meta-row">
           <span class="badge neutral">VISOR</span>
+          <a class="badge neutral" href="AREG_IOS.code.html">Code (developers)</a>
           <span class="badge cli">AREG_IOS</span>
           <span class="badge neutral">reached as AREG, mode <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a></span>
           <span class="badge neutral">torch 2.11, pytorch3d, GPU or CPU</span>
@@ -134,27 +136,28 @@
         </div>
       </header>
 
-<p>AREG_IOS registers a follow-up intraoral scan (T2) onto the baseline scan (T1) of the same patient by a rigid <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> on a patch that treatment does not move: the palate on the upper arch, or a band along the mucogingival line on the lower arch. In VISOR the whole computation runs on a server, including the network that finds the palatal patch; Slicer only shows the form, sends the folders and opens what comes back. This page describes that port, read at SADT-VISOR 6ba2a78 (branch <code>tool/vface</code>), VISOR-serve e9a7e5d and AutomatedDentalToolsRemote 19b95e8. The legacy module it is compared with is SlicerAutomatedDentalTools 3c67957, described on <a href="../../AREG_IOS/AREG_IOS.html">its own page</a>; legacy paths below are at that commit.</p>
-<p>Abbreviations used on this page: <code>ios/</code> is <code>SADT-VISOR tools/AREG/AREG_IOS/src/sadt_areg_ios/</code>, <code>common/</code> is <code>SADT-VISOR tools/AREG/common/src/sadt_areg_common/</code>, and <code>server/</code> paths are in VISOR-serve. &ldquo;Observed&rdquo; marks what was executed (tests, <code>scripts/describe.py</code>, short Python probes) during the study of the port; everything else was read in the code.</p>
 
-      <h2 id="visor-status">1. Position in the chain</h2>
+      <h2 id="visor-overview">Overview: what goes in, what comes out</h2>
 
-      <p>A client never names <code>AREG_IOS</code>: the Slicer module sends <code>AREG</code> with <code>mode = "IOS"</code>, and the server swaps the facade for this engine. The engine owns the pairing, the palatal network, the mucogingival band and the <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a>; tooth labels, orientation and the mucogingival <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> come from three other tools it calls through the supervisor.</p>
+      <p>A patient&rsquo;s teeth are scanned with an intraoral scanner twice: at the start (T1) and later (T2). To compare them, the two meshes must be put in the same position, and that can only be done on a part of the mouth that treatment does not move. AREG_IOS picks such a <strong>patch</strong> and finds the <strong>rigid motion</strong> (a rotation and a translation) that makes the T2 patch coincide with the T1 patch. On the upper arch the patch is the palate, found by a network; on the lower arch, which has no such plateau, it is a band along the mucogingival line, built from 13 <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Item</th><th>State</th></tr></thead>
+          <thead><tr><th></th><th>What it takes and gives</th></tr></thead>
           <tbody>
-            <tr><td>API name</td><td><code>AREG_IOS</code> (<code>SADT-VISOR tools/AREG/AREG_IOS/pyproject.toml:25-27</code>). A client sends <code>AREG</code> with <code>mode = "IOS"</code> (<code>VISOR-serve server/deployment.toml:186-193</code>; the facade is composed in <code>server/registry/facade.py:98</code> and swapped for its target in <code>server/main.py:1888-1918</code>).</td></tr>
-            <tr><td>Source and environment</td><td><code>SADT-VISOR tools/AREG/AREG_IOS</code>, Python 3.11, its own environment (see <a href="#environment">Environment</a>). The split from the <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> engine exists because pytorch3d is built against one exact torch (<code>ios/__init__.py:6-11</code>).</td></tr>
-            <tr><td>Client</td><td>Module <code>AREG Remote</code>, the same panel as for AREG_CBCT, with the fields of mode &ldquo;<a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a>&rdquo; (<code>AutomatedDentalToolsRemote AREGRemote/AREGRemote.py:47-48,99,109</code>). The result loader accepts models <code>.vtk</code> and <code>.vtp</code> and loads at most 12 files (<code>AREGRemote.py:114-130</code>).</td></tr>
-            <tr><td>Calls (<code>sup.run</code>)</td><td>The published schema declares <code>supervisor: true</code> and <code>calls = [ALI_IOS, ASO, Crown_Seg]</code> (observed with <code>scripts/describe.py</code>). The static graph lists ALI_CBCT under ASO (<code>VISOR-serve docs/TOOL_GRAPH.md:16-18</code>), but AREG_IOS calls ASO with modality IOS, which ASO handles by aligning tooth centroids rather than by asking ALI_CBCT for landmarks (<code>ios/tools.py:87-89</code>; <code>SADT-VISOR tools/ASO/src/sadt_aso/dispatch.py:537</code> is its only <code>sup.run</code>, in the CBCT path).</td></tr>
-            <tr><td>Called by</td><td>No other tool.</td></tr>
-            <tr><td>Declared resources</td><td>None. <code>[tools.AREG_IOS]</code> sets <code>data_dir</code> and <code>server_selectable</code> only (<code>server/deployment.toml:47-68</code>); the global <code>TOOL_TIMEOUT_SECONDS = 0</code> means no limit (<code>server/config.py:77</code>).</td></tr>
-            <tr><td>State</td><td>Implemented and tested: 63 tests pass in the tool's environment (observed, run with the repository's own <code>sadt_areg_common</code> on the path, because the copy installed in that environment differs from <code>common/catalogs.py</code>), with the network stubbed. The AREG README states that the IOS engine is unvalidated, since it needs pytorch3d and a segmented lower arch (<code>SADT-VISOR tools/AREG/README.md:134-136</code>). The engine's own README reports that two identical runs of the ICP differ by about 0.19 mm on average and 0.38 mm at most on one pair (<code>SADT-VISOR tools/AREG/AREG_IOS/README.md:10-41</code>), not re-measured here.</td></tr>
+            <tr><td>Input</td><td>a T1 and a T2 intraoral mesh per patient (<code>.vtk</code>, <code>.vtp</code>, <code>.stl</code>, <code>.obj</code>), each naming its jaw in the file name; in Semi-Automated mode, meshes that already carry a tooth number on every vertex and are already oriented</td></tr>
+            <tr><td>Patch</td><td>Palate (upper arch, the lower arch follows) or Mucogingival (lower arch alone)</td></tr>
+            <tr><td>Method</td><td>mark the patch on each mesh, then rigid <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> between the two patches (<a href="#icp">section 3.5</a>)</td></tr>
+            <tr><td>Output</td><td>the T1 and the T2 moved onto it, both carrying the patch as a 0/1 array, a transform file (<code>.tfm</code>, a Slicer transform) and a report (<code>AREG_report.json</code>)</td></tr>
           </tbody>
         </table>
       </div>
+
+      <p>Unlike AREG_CBCT, this engine holds a network of its own, for the palatal patch. The tooth labels, the orientation and the mucogingival landmarks come from three other tools it calls.</p>
+
+      <h2 id="visor-status">1. Position in the chain</h2>
+
+      <p>A client never names <code>AREG_IOS</code>. The Slicer module sends a request to the server tool <strong>AREG</strong> with the mode &ldquo;<a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a>&rdquo;, and the server hands it to this engine. The engine owns the pairing, the palatal network, the <a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="See the code">mucogingival band</a> and the <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a>. In Fully-Automated mode it asks Crown_Seg for tooth labels and ASO for the orientation; for the mucogingival patch without <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> it asks ALI_IOS. Nothing calls AREG_IOS back.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 960 300" role="img" aria-label="Who calls whom. The AREG Remote module in Slicer sends one request to the facade AREG with mode IOS. The server runs the AREG_IOS engine. In Fully-Automated mode it calls Crown_Seg then ASO for each time point; for the mucogingival patch without landmarks it calls ALI_IOS. Each tool runs in its own environment.">
@@ -162,250 +165,230 @@
           <rect class="d-band" x="190" y="8" width="770" height="284" rx="8"/>
           <text class="d-label-s" x="12" y="28">clinician's machine</text>
           <text class="d-label-s" x="202" y="28">server: one environment per tool, chained by the supervisor</text>
+          <a class="d-link" href="#visor-status">
 
           <rect class="d-box" x="12" y="60" width="156" height="78" rx="6"/>
           <text class="d-label" x="90" y="84" text-anchor="middle">AREG Remote</text>
           <text class="d-label-s" x="90" y="104" text-anchor="middle">panel from schema</text>
-          <text class="d-label-xs" x="90" y="122" text-anchor="middle">AREGRemote.py, 156 lines</text>
-
-          <path class="d-arrow" d="M168 99 H213"/>
+          <text class="d-label-xs" x="90" y="122" text-anchor="middle">form built from the schema</text>
+          </a><path class="d-arrow" d="M168 99 H213"/>
           <path class="d-arrow-head" d="M220 99 l-7 -4 v8 z"/>
+          <a class="d-link" href="#visor-status">
 
           <rect class="d-box" x="222" y="60" width="190" height="78" rx="6"/>
           <text class="d-label" x="317" y="84" text-anchor="middle">Facade AREG</text>
           <text class="d-label-s" x="317" y="104" text-anchor="middle">mode = "IOS"</text>
-          <text class="d-label-xs" x="317" y="122" text-anchor="middle">deployment.toml:186-193</text>
-
-          <path class="d-arrow" d="M412 99 H457"/>
+          <text class="d-label-xs" x="317" y="122" text-anchor="middle">declared by the server</text>
+          </a><path class="d-arrow" d="M412 99 H457"/>
           <path class="d-arrow-head" d="M464 99 l-7 -4 v8 z"/>
+          <a class="d-link" href="#visor-where">
 
           <rect class="d-box-n" x="466" y="60" width="210" height="78" rx="6"/>
           <text class="d-label" x="571" y="84" text-anchor="middle">AREG_IOS</text>
           <text class="d-label-s" x="571" y="104" text-anchor="middle">palate network, MGL band</text>
           <text class="d-label-xs" x="571" y="122" text-anchor="middle">ICP, transforms, report</text>
-
-          <path class="d-arrow" d="M500 138 V183"/>
+          </a><path class="d-arrow" d="M500 138 V183"/>
           <path class="d-arrow-head" d="M500 190 l-4 -7 h8 z"/>
           <path class="d-arrow" d="M640 138 V183"/>
           <path class="d-arrow-head" d="M640 190 l-4 -7 h8 z"/>
           <text class="d-label-xs" x="492" y="166" text-anchor="end">Fully-Automated, T1 then T2</text>
           <text class="d-label-xs" x="648" y="166" text-anchor="start">MGL patch, no landmarks sent</text>
+          <a class="d-link" href="#upstream">
 
           <rect class="d-box-n" x="226" y="192" width="170" height="70" rx="6"/>
           <text class="d-label" x="311" y="216" text-anchor="middle">Crown_Seg</text>
           <text class="d-label-s" x="311" y="236" text-anchor="middle">tooth labels</text>
-          <path class="d-arrow" d="M396 227 H413"/>
+          </a><path class="d-arrow" d="M396 227 H413"/>
           <path class="d-arrow-head" d="M420 227 l-7 -4 v8 z"/>
+          <a class="d-link" href="#upstream">
           <rect class="d-box" x="422" y="192" width="160" height="70" rx="6"/>
           <text class="d-label" x="502" y="216" text-anchor="middle">ASO, IOS</text>
           <text class="d-label-s" x="502" y="236" text-anchor="middle">orients each jaw</text>
-
-          <rect class="d-box-n" x="600" y="192" width="170" height="70" rx="6"/>
+          </a>
+          <a class="d-link" href="#mgl"><rect class="d-box-n" x="600" y="192" width="170" height="70" rx="6"/>
           <text class="d-label" x="685" y="216" text-anchor="middle">ALI_IOS</text>
           <text class="d-label-s" x="685" y="236" text-anchor="middle">Mucogingival only</text>
           <text class="d-label-xs" x="685" y="252" text-anchor="middle">13 points per lower arch</text>
-
-          <path class="d-arrow" d="M676 99 H760" stroke-dasharray="4 4"/>
+          </a><path class="d-arrow" d="M676 99 H760" stroke-dasharray="4 4"/>
           <path class="d-arrow-head" d="M767 99 l-7 -4 v8 z"/>
+          <a class="d-link" href="#visor-io">
           <rect class="d-box" x="769" y="60" width="175" height="78" rx="6"/>
           <text class="d-label" x="856" y="84" text-anchor="middle">Output archive</text>
           <text class="d-label-s" x="856" y="104" text-anchor="middle">meshes, .tfm, report</text>
           <text class="d-label-xs" x="856" y="122" text-anchor="middle">back to Slicer, unzipped</text>
-        </svg>
-        <figcaption>One request from Slicer, up to three other tools on the server. Purple boxes hold a network; unlike AREG_CBCT, the engine itself holds one, the palatal patch predictor. The calls are those of <code>ios/tools.py:83-169</code>, triggered from <code>ios/dispatch.py:168-229</code>.</figcaption>
+          </a></svg>
+        <figcaption>One request from Slicer, up to three other tools on the server. Purple boxes hold a network; unlike AREG_CBCT, the engine itself holds one, the palatal patch predictor. The tools it calls label the teeth, orient the jaws, and place the mucogingival landmarks.</figcaption>
       </figure>
+
+      <p><strong>What has been checked.</strong> The engine is implemented and tested: 63 automated tests pass, with the network replaced by a dummy. The AREG documentation states that the IOS engine is <em>unvalidated</em>, since it needs pytorch3d and a segmented lower arch. The engine&rsquo;s own notes report that two identical runs of the ICP differ by about 0.19&nbsp;mm on average and 0.38&nbsp;mm at most on one pair of scans; this was not re-measured here. No timeout, width or memory limit is declared.</p>
+
+      <a class="deep-link" href="AREG_IOS.code.html#visor-status"><b>In the code</b><span>Facade, schema, who calls whom, with files and lines</span></a>
 
       <h2 id="files">2. Files involved</h2>
 
-      <p>Line counts at SADT-VISOR 6ba2a78. Every heavy import (torch, monai, pytorch3d) sits inside a function, so the tool can be imported to publish its schema on a machine that lacks them (<code>ios/net.py:16-19</code>).</p>
+      <p>The engine is split by job: the published form, a dispatcher that checks every rule and drives the run, the three calls to other tools, the pipeline (pairing, the two ways to paint a patch, writing), the network with its cameras and renderer, the palate predictor, the orientation, the cleaning of the patch on the mesh graph, the <a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="See the code">mucogingival band</a>, the reading of <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> files, the <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> with the transform writing, and the reading and writing of meshes. The heavy libraries (torch, monai, pytorch3d) are only imported inside functions, so the form can be published on a machine that lacks them.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Lines</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>ios/__init__.py</code></td><td>90</td><td><code>run()</code>: the published signature (<code>ios/__init__.py:23-41</code>)</td></tr>
-            <tr><td><code>ios/layout.py</code></td><td>96</td><td>sections, labels, <code>visible_when</code>, hidden model fields</td></tr>
-            <tr><td><code>ios/dispatch.py</code></td><td>479</td><td><code>main</code> resolves the hosted bundles and checks every rule (<code>:416-479</code>, <code>_check_ios</code> <code>:100-139</code>); <code>register</code> (<code>:348-413</code>); <code>_run_ios</code>, the pipeline (<code>:142-254</code>); <code>_collect_transforms</code> (<code>:257-279</code>)</td></tr>
-            <tr><td><code>ios/tools.py</code></td><td>169</td><td><code>label_crowns</code> (Crown_Seg), <code>orient_scans</code> (ASO), <code>predict_mucogingival</code> (ALI_IOS)</td></tr>
-            <tr><td><code>ios/pipeline.py</code></td><td>258</td><td><code>discover</code>, <code>pair</code>, the two painters, <code>register_patient</code>, <code>_write</code></td></tr>
-            <tr><td><code>ios/net.py</code></td><td>214</td><td>the multi-view network: seven cameras, pytorch3d renderer, monai 2D UNet, <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> loading</td></tr>
-            <tr><td><code>ios/butterfly.py</code></td><td>224</td><td>device, checkpoint search, <code>PatchPredictor</code> (orientation, prediction, face votes, cleaning), <code>patch_cloud</code></td></tr>
-            <tr><td><code>ios/orientation.py</code></td><td>146</td><td>canonical frame from the centroids of teeth 3, 8, 9, 14</td></tr>
-            <tr><td><code>ios/postprocess.py</code></td><td>204</td><td>triangulation, CSR adjacency, island removal, dilation and erosion</td></tr>
-            <tr><td><code>ios/mgl.py</code></td><td>239</td><td>the mucogingival band: <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> order, spline, snapping, geodesic growth, crown exclusion</td></tr>
-            <tr><td><code>ios/landmarks.py</code></td><td>160</td><td>reading Slicer markups and matching a landmark file to its scan</td></tr>
-            <tr><td><code>ios/icp.py</code></td><td>112</td><td>vtk rigid <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a>, composition with ASO's transform, <code>.tfm</code> writing</td></tr>
-            <tr><td><code>ios/surfaces.py</code></td><td>194</td><td>mesh reading and writing, jaw from the name, label arrays, normals, unit scaling</td></tr>
-            <tr><td><code>ios/progress.py</code></td><td>103</td><td>progress lines the server relays</td></tr>
-            <tr><td><code>common/pairing.py</code>, <code>common/catalogs.py</code></td><td>404, 197</td><td>patient stem, jaw tokens, patch choices, shared with the two other AREG engines</td></tr>
-            <tr><td><code>tests/test_run.py</code></td><td>996</td><td>the engine's tests, network stubbed</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>Outside the tool: <code>VISOR-serve server/deployment.toml</code> (facade at lines 186-193, <code>[tools.AREG_IOS]</code> at lines 47-68), <code>scripts/data-manifest.yml</code> (the palate checkpoint <code>AREG_model.zip</code> from the HUTIN1/AREG v1.0.0 release, lines 295-296, and the orientation reference <code>IOS_Gold_files</code>, line 321), and on the client <code>AutomatedDentalToolsRemote AREGRemote/AREGRemote.py</code>, which carries no pipeline logic.</p>
+      <a class="deep-link" href="AREG_IOS.code.html#files"><b>In the code</b><span>The file table with line counts and roles</span></a>
 
       <h2 id="visor-where">3. What runs where, and the pipeline</h2>
 
+      <p>Everything computed runs on the server, the network included. Slicer builds the form from the published schema, sends the folders, then unpacks the archive and optionally loads the meshes (at most 12 files).</p>
+
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Step</th><th>Server</th><th>Client (Slicer)</th></tr></thead>
+          <thead><tr><th>Step</th><th>Server</th><th>Slicer</th></tr></thead>
           <tbody>
-            <tr><td>Form</td><td>publishes the schema; the fields of the other modes stay hidden by <code>visible_when</code></td><td>builds the panel; hosted cohorts <code>IOS_T1</code> and <code>IOS_T2</code> are offered (<code>server/deployment.toml:68</code>)</td></tr>
-            <tr><td>Pairing</td><td>one folder per time point, searched recursively, the jaw read from the name (<code>ios/pipeline.py:38-116</code>)</td><td>sends the folders</td></tr>
-            <tr><td>Labels and orientation</td><td>Fully-Automated: <code>sup.run("Crown_Seg")</code> on T1, then T2, then <code>sup.run("ASO")</code> on T1, then T2 (<code>ios/dispatch.py:172-181</code>)</td><td>nothing</td></tr>
-            <tr><td>Patch</td><td>palate: network in <code>ios/butterfly.py</code>; mucogingival: <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> sent, or <code>sup.run("ALI_IOS")</code> asked for the Mucogingival network alone (<code>ios/dispatch.py:226</code>, <code>ios/tools.py:133-169</code>), then the band (<code>ios/mgl.py</code>)</td><td>nothing</td></tr>
-            <tr><td><a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> and writing</td><td>vtk ICP, meshes, transform, report (<code>ios/icp.py</code>, <code>ios/pipeline.py</code>)</td><td>unpacks the archive; optional loading in the scene</td></tr>
+            <tr><td>Form</td><td>publishes the schema; fields of the other patch stay hidden</td><td>builds the panel; test cohorts can be picked</td></tr>
+            <tr><td>Pairing</td><td>one folder per time point, searched recursively; the jaw read from the file name</td><td>sends the folders</td></tr>
+            <tr><td>Labels and orientation</td><td>Fully-Automated: Crown_Seg on T1 and on T2, then ASO on T1 and on T2</td><td>nothing</td></tr>
+            <tr><td>Patch</td><td>palate: network in the engine; mucogingival: <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> sent, or asked of ALI_IOS, then the band</td><td>nothing</td></tr>
+            <tr><td><a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> and writing</td><td>ICP, meshes, transform, report</td><td>unpacks the archive; optional loading into the scene</td></tr>
           </tbody>
         </table>
       </div>
 
       <figure class="diagram">
         <svg viewBox="0 0 960 360" role="img" aria-label="The pipeline of _run_ios. Inputs linked into a scratch folder. In Fully-Automated mode Crown_Seg labels then ASO orients both time points, and ASO's transforms of the upper arches are collected. The meshes are paired on the arch the patch lives on. Then the patch is painted on each time point, by the palate network or by the mucogingival band, the ICP aligns T2's patch onto T1's, and the meshes and the transform are written.">
+          <a class="d-link" href="#pairing">
           <rect class="d-box" x="10" y="20" width="160" height="70" rx="6"/>
           <text class="d-label" x="90" y="44" text-anchor="middle">① Inputs</text>
           <text class="d-label-s" x="90" y="62" text-anchor="middle">linked into .areg_work</text>
-          <text class="d-label-xs" x="90" y="78" text-anchor="middle">dispatch.py:370-374</text>
-          <path class="d-arrow" d="M170 55 H193"/><path class="d-arrow-head" d="M200 55 l-7 -4 v8 z"/>
+          <text class="d-label-xs" x="90" y="78" text-anchor="middle">one folder each</text>
+          </a><path class="d-arrow" d="M170 55 H193"/><path class="d-arrow-head" d="M200 55 l-7 -4 v8 z"/>
+          <a class="d-link" href="#upstream">
 
           <rect class="d-box-n" x="202" y="20" width="180" height="70" rx="6"/>
           <text class="d-label" x="292" y="44" text-anchor="middle">② Crown_Seg, ASO</text>
           <text class="d-label-s" x="292" y="62" text-anchor="middle">T1 then T2</text>
           <text class="d-label-xs" x="292" y="78" text-anchor="middle">Fully-Automated only</text>
-          <path class="d-arrow" d="M382 55 H405"/><path class="d-arrow-head" d="M412 55 l-7 -4 v8 z"/>
+          </a><path class="d-arrow" d="M382 55 H405"/><path class="d-arrow-head" d="M412 55 l-7 -4 v8 z"/>
+          <a class="d-link" href="#pairing">
 
           <rect class="d-box" x="414" y="20" width="180" height="70" rx="6"/>
           <text class="d-label" x="504" y="44" text-anchor="middle">③ Pair on one arch</text>
           <text class="d-label-s" x="504" y="62" text-anchor="middle">upper or lower</text>
-          <text class="d-label-xs" x="504" y="78" text-anchor="middle">pipeline.py:81-116</text>
-          <path class="d-arrow" d="M594 55 H617"/><path class="d-arrow-head" d="M624 55 l-7 -4 v8 z"/>
+          <text class="d-label-xs" x="504" y="78" text-anchor="middle">by jaw and key</text>
+          </a><path class="d-arrow" d="M594 55 H617"/><path class="d-arrow-head" d="M624 55 l-7 -4 v8 z"/>
+          <a class="d-link" href="#upstream">
 
           <rect class="d-box" x="626" y="20" width="324" height="70" rx="6"/>
           <text class="d-label" x="788" y="44" text-anchor="middle">④ Choose the painter</text>
           <text class="d-label-s" x="788" y="62" text-anchor="middle">palate network, or MGL landmarks (sent or ALI_IOS)</text>
-          <text class="d-label-xs" x="788" y="78" text-anchor="middle">dispatch.py:199-232</text>
-
-          <path class="d-arrow" d="M788 90 V112 H20 V140"/><path class="d-arrow-head" d="M20 147 l-4 -7 h8 z"/>
-          <text class="d-label-s" x="30" y="132">for each patient (dispatch.py:234-254)</text>
+          <text class="d-label-xs" x="788" y="78" text-anchor="middle">chosen per patch</text>
+          </a><path class="d-arrow" d="M788 90 V112 H20 V140"/><path class="d-arrow-head" d="M20 147 l-4 -7 h8 z"/>
+          <text class="d-label-s" x="30" y="132">for each patient</text>
+          <a class="d-link" href="#palate">
 
           <rect class="d-box-n" x="10" y="150" width="210" height="80" rx="6"/>
           <text class="d-label" x="115" y="174" text-anchor="middle">⑤a Palate patch</text>
           <text class="d-label-s" x="115" y="192" text-anchor="middle">orient, 7 views, UNet, vote</text>
-          <text class="d-label-xs" x="115" y="210" text-anchor="middle">butterfly.py:109-166</text>
-
-          <rect class="d-box" x="10" y="246" width="210" height="80" rx="6"/>
+          <text class="d-label-xs" x="115" y="210" text-anchor="middle">one network pass</text>
+          </a>
+          <a class="d-link" href="#mgl"><rect class="d-box" x="10" y="246" width="210" height="80" rx="6"/>
           <text class="d-label" x="115" y="270" text-anchor="middle">⑤b MGL band</text>
           <text class="d-label-s" x="115" y="288" text-anchor="middle">spline, snap, geodesic band</text>
-          <text class="d-label-xs" x="115" y="306" text-anchor="middle">mgl.py:182-239</text>
-
-          <path class="d-arrow" d="M220 190 H246 V238 H263"/>
+          <text class="d-label-xs" x="115" y="306" text-anchor="middle">no network</text>
+          </a><path class="d-arrow" d="M220 190 H246 V238 H263"/>
           <path class="d-arrow" d="M220 286 H246 V238"/>
           <path class="d-arrow-head" d="M270 238 l-7 -4 v8 z"/>
+          <a class="d-link" href="#icp">
 
           <rect class="d-box" x="272" y="198" width="180" height="80" rx="6"/>
           <text class="d-label" x="362" y="222" text-anchor="middle">⑥ Patch clouds</text>
           <text class="d-label-s" x="362" y="240" text-anchor="middle">points labelled 1</text>
-          <text class="d-label-xs" x="362" y="258" text-anchor="middle">butterfly.py:193-224</text>
-          <path class="d-arrow" d="M452 238 H470"/><path class="d-arrow-head" d="M477 238 l-7 -4 v8 z"/>
+          <text class="d-label-xs" x="362" y="258" text-anchor="middle">vertices at 1</text>
+          </a><path class="d-arrow" d="M452 238 H470"/><path class="d-arrow-head" d="M477 238 l-7 -4 v8 z"/>
+          <a class="d-link" href="#icp">
 
           <rect class="d-box-a" x="479" y="198" width="180" height="80" rx="6"/>
           <text class="d-label" x="569" y="222" text-anchor="middle">⑦ ICP, T2 onto T1</text>
           <text class="d-label-s" x="569" y="240" text-anchor="middle">rigid, 1000 iterations</text>
-          <text class="d-label-xs" x="569" y="258" text-anchor="middle">icp.py:36-56</text>
-          <path class="d-arrow" d="M659 238 H677"/><path class="d-arrow-head" d="M684 238 l-7 -4 v8 z"/>
+          <text class="d-label-xs" x="569" y="258" text-anchor="middle">centroids first</text>
+          </a><path class="d-arrow" d="M659 238 H677"/><path class="d-arrow-head" d="M684 238 l-7 -4 v8 z"/>
+          <a class="d-link" href="#visor-io">
 
           <rect class="d-box" x="686" y="198" width="264" height="80" rx="6"/>
           <text class="d-label" x="818" y="222" text-anchor="middle">⑧ Write meshes and .tfm</text>
           <text class="d-label-s" x="818" y="240" text-anchor="middle">other arch follows (palate)</text>
-          <text class="d-label-xs" x="818" y="258" text-anchor="middle">pipeline.py:200-250</text>
+          <text class="d-label-xs" x="818" y="258" text-anchor="middle">T2 moved onto T1</text>
 
-          <text class="d-label-s" x="272" y="318">then: remove .areg_work, write AREG_report.json (dispatch.py:408-412)</text>
-        </svg>
-        <figcaption>The pipeline of <code>_run_ios</code> in the order the code runs it. ② is skipped in Semi-Automated mode, which expects meshes that already carry tooth labels and orientation. The patch choice decides the painter (⑤a or ⑤b) and the arch that is registered (<code>common/catalogs.py:191-197</code>); the palatal painter is the only network inside the engine.</figcaption>
+          <text class="d-label-s" x="272" y="318">then: remove the scratch folder, write AREG_report.json</text>
+          </a></svg>
+        <figcaption>The pipeline in the order it runs. The tooth labels and orientation (box 2) are skipped in Semi-Automated mode, which expects meshes that already carry them. The patch choice decides the painter (5a or 5b) and the arch that is registered; the palatal painter is the only network inside the engine.</figcaption>
       </figure>
+      <a class="deep-link" href="AREG_IOS.code.html#visor-where"><b>In the code</b><span>Who does what, with the file and line of each step</span></a>
 
       <h3 id="pairing">3.1 Inputs and pairing</h3>
 
-      <p>As in the <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> engine, each input becomes a directory under <code>&lt;output_dir&gt;/.areg_work/</code>, a single file being linked into a folder of its own (<code>ios/dispatch.py:311-329,368-374</code>). Meshes are <code>.vtk .vtp .stl .obj</code> (<code>ios/surfaces.py:35,48-49</code>), read with all their point arrays (<code>ios/surfaces.py:52-76</code>).</p>
+      <p>Each input becomes a folder under a scratch folder (a single file is linked into a folder of its own). Meshes are found recursively. The <strong>jaw</strong> is read on whole words of the file name: u, up, upper, maxilla, max or mx for the upper arch; l, low, lower, mandible, mand or md for the lower. The <strong>key</strong> of a patient is the relative folder plus the file stem without the jaw words and the time-point words, so <code>P1_T1_U.vtk</code> and <code>P1_T2_Upper.vtk</code> share the key <code>P1</code>.</p>
 
-      <p><code>discover</code> walks one time-point folder recursively and files every mesh under a key and a jaw (<code>ios/pipeline.py:38-59</code>). The key is the relative folder plus <code>patient_stem</code> with the jaw tokens dropped as well as the time-point tokens, so <code>P1_T1_U.vtk</code> and <code>P1_T2_Upper.vtk</code> share the key <code>P1</code>. The jaw is read on <em>whole tokens</em> of the base name: <code>u up upper maxilla max mx</code> for the upper arch, <code>l low lower mandible mandibule mand md</code> for the lower (<code>ios/surfaces.py:113-130</code>, <code>common/catalogs.py:175-180</code>). A file left by a previous run with the same suffix is skipped (<code>ios/pipeline.py:53-54</code>).</p>
+      <p>A subject is kept only if the arch the patch lives on exists at both time points; with the palate, the opposite arch also travels along when both times have it. Nothing is guessed. What does not pair is listed in the report under three reasons: meshes with no jaw in their name, patients without that arch, and patients present at one time point only. When nothing pairs at all, the run stops with an error that gives the naming rule.</p>
 
-      <p><code>pair</code> keeps a subject only if the arch the patch lives on exists at both time points, and with the palate it also carries the opposite arch when both times have it (<code>ios/pipeline.py:81-116</code>). Nothing is guessed: what does not pair is listed in the report under three reasons.</p>
-      <pre><code>"unmatched": {
-  "registered_jaw": "Upper",
-  "meshes_without_a_jaw_in_their_name": [...],
-  "patients_without_a_upper_arch": [...],
-  "patients_present_at_only_one_timepoint": [...]}     # pipeline.py:72-78</code></pre>
-      <p>When no subject pairs at all, the run stops with an error that gives the naming rule and the counts (<code>ios/dispatch.py:189-197</code>).</p>
+      <a class="deep-link" href="AREG_IOS.code.html#pairing"><b>In the code</b><span>Folder handling, the jaw and key rules, the pairing functions and the report block</span></a>
 
-      <h3 id="upstream">3.2 Labels and orientation: the supervised calls</h3>
+      <h3 id="upstream">3.2 Labels and orientation: the calls to other tools</h3>
 
-      <p><code>main</code> resolves two hosted bundles before anything else: <code>registration_model</code> left empty becomes <code>DATA/AREG/models/AREG_model</code>, <code>ios_reference</code> left empty becomes <code>DATA/AREG/models/IOS_Gold_files</code> (<code>ios/dispatch.py:87-97,457-459</code>). <code>_check_ios</code> then refuses, before a file is read: an unknown patch; the palate with no <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> found; the mucogingival patch with no landmarks and no supervisor to reach ALI_IOS; a negative height; Fully-Automated without a supervisor or without a reference (<code>ios/dispatch.py:100-139</code>). Fully-Automated requires Crown_Seg and ASO for both patches.</p>
+      <p>Before any mesh is read, the engine refuses what cannot work: an unknown patch, the palate with no <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a>, the mucogingival patch with neither landmarks nor a way to ask ALI_IOS, a negative height, or Fully-Automated without the other tools or a reference.</p>
 
-      <p>In Fully-Automated mode the two time points go through two calls each, in this order (<code>ios/dispatch.py:168-183</code>, <code>ios/tools.py:83-130</code>):</p>
-      <pre><code>t1 = sup.run("Crown_Seg", meshes=&lt;T1 folder&gt;, suffix="Seg" [, model=crown_model])
-t2 = sup.run("Crown_Seg", meshes=&lt;T2 folder&gt;, suffix="Seg" [, model=crown_model])
-t1 = sup.run("ASO", input=t1, reference=&lt;IOS_Gold_files&gt;, modality="IOS",
-             automation="Fully-Automated", output_suffix="Or")
-t2 = sup.run("ASO", input=t2, reference=..., modality="IOS", ...)
-prior_transforms = _collect_transforms(t2, suffix="Or")    # upper arches only</code></pre>
-      <p>Crown_Seg is left at <code>skip_segmented</code>'s default, so a mesh that already carries labels passes through untouched (<code>ios/tools.py:113-122</code>); no <code>device</code> is sent. ASO is called with its defaults for the teeth and the occlusion (see the <a href="#visor-findings">findings</a>). <code>_collect_transforms</code> indexes the <code>.tfm</code> files ASO wrote for the <em>upper</em> arches of T2 by patient key (<code>ios/dispatch.py:257-279</code>); they are composed into the transform written at the end, so that it refers to the mesh the caller sent (<a href="#visor-io">3.6</a>).</p>
+      <p>In <strong>Fully-Automated</strong> mode the two time points go through two tools, in this order: <strong>Crown_Seg</strong> puts a tooth number on every vertex of T1 and then of T2 (a mesh that already has them passes untouched), then <strong>ASO</strong> orients each jaw of T1 and then of T2 onto a reference. ASO&rsquo;s transforms for the upper arches of the T2 are kept, because they are composed into the transform written at the end, so that it refers to the mesh you sent. In <strong>Semi-Automated</strong> mode none of this happens: the meshes must already carry labels and be oriented.</p>
 
-      <p>For the mucogingival patch without <code>mgl_landmarks</code>, ALI_IOS is asked, for T1 and for T2, for its Mucogingival network alone, and both results are copied into one folder, <code>.areg_work/mgl_predicted</code> (<code>ios/dispatch.py:213-229</code>):</p>
-      <pre><code>sup.run("ALI_IOS", input=&lt;folder&gt;, networks=["Mucogingival"] [, model=mgl_model])</code></pre>
-      <p>Naming that network alone keeps ALI from also running its <a class="gterm" data-term="occlusal" href="../../glossary.html#g-occlusal" title="See glossary">occlusal</a> and cervical passes (<code>ios/tools.py:140-145</code>).</p>
+      <p>For the mucogingival patch without a landmark folder, <strong>ALI_IOS</strong> is asked, for the T1 and for the T2, for its Mucogingival network alone, which keeps it from also running its <a class="gterm" data-term="occlusal" href="../../glossary.html#g-occlusal" title="See glossary">occlusal</a> and cervical passes.</p>
+
+      <a class="deep-link" href="AREG_IOS.code.html#upstream"><b>In the code</b><span>The four supervised calls with their arguments</span></a>
 
       <h3 id="palate">3.3 The palatal patch: the network inside the engine</h3>
 
-      <p><code>PatchPredictor</code> is built once per run, so the checkpoint is loaded once for the whole batch (<code>ios/butterfly.py:96-107</code>, <code>ios/dispatch.py:199-206</code>). The device is <code>cuda</code> when a card is visible, otherwise <code>cpu</code> with a warning (<code>ios/butterfly.py:41-54</code>); the report records the device and the checkpoint's file name. The checkpoint is the single <code>.ckpt</code> or <code>.pth</code> found under the bundle folder; zero or several are refused, naming the candidates (<code>ios/butterfly.py:57-93</code>). It is loaded with <code>map_location</code> set to that device and must hold <code>model.*</code> weights (<code>ios/net.py:188-214</code>).</p>
+      <p>The network is loaded once per run. For each mesh the engine goes through five steps: orient the mesh into a <a class="gterm" data-term="areg-ios-standard-frame" href="AREG_IOS.code.html#palate" title="See the code">standard frame</a>, scale it into the unit sphere and turn the surface normals into colours, render seven views and let a network label each pixel, let the pixels vote for the triangles they show, then clean the result. The mesh is first triangulated if it holds anything else, because the face list is read as triangles.</p>
 
-      <p>For each mesh (<code>ios/butterfly.py:109-141</code>):</p>
-      <ol>
-        <li><strong>Triangulate</strong> if the mesh holds anything but triangles, because the face tensor is read as <code>reshape(-1, 4)</code>, which reads wrong indices silently otherwise (<code>ios/postprocess.py:22-50</code>).</li>
-        <li><strong>Orient into the canonical frame</strong>: the centroids of teeth 3, 8, 9 and 14 (UR6, UR1, UL1, UL6 in Universal numbering) are aligned onto a fixed reference triangle (<code>ios/orientation.py:29-30,111-146</code>). This needs a tooth-label array, <code>Universal_ID</code>, <code>PredictedID</code> or <code>UniversalID</code> (<code>ios/surfaces.py:39,103-110</code>). If it fails, the prediction goes on with the mesh as it is and a note is kept for the report (<code>ios/butterfly.py:117-131</code>). The orientation is used for rendering only: the patch array is written on the original mesh.</li>
-        <li><strong>Normalise</strong>: centre on the bounding box, scale into the unit sphere, compute point normals; the normals mapped to RGB (<code>n * 0.5 + 0.5</code>) are the only texture the network sees (<code>ios/surfaces.py:159-192</code>, <code>ios/butterfly.py:169-190</code>).</li>
-        <li><strong>Render and segment</strong> seven views (below), then vote the per-pixel probabilities back onto faces and vertices.</li>
-        <li><strong>Clean</strong>: islands of either class under 200 points are absorbed by their surround, then the patch is closed, dilation 2 then erosion 2 (<code>ios/postprocess.py:192-204</code>).</li>
-      </ol>
+      <p><strong>Standard frame.</strong> The centroid (centre) of each of the two upper first molars and the midpoint of the two upper central incisors (teeth 3, 8, 9 and 14 in the Universal numbering, the standard 1 to 32 tooth numbers) are three points; they are brought onto a fixed reference triangle by two rotations and a translation. This frame is only used to render: the patch is written on the mesh as you sent it. If the tooth labels are missing, the prediction goes on without the standard frame and the report carries a note.</p>
+
+      <figure class="algo" data-scene="sphere" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a mesh is centred on its bounding box and scaled until its farthest corner touches the unit circle"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The mesh is centred on the middle of its bounding box, then divided by the distance from that centre to the farthest corner. Whatever its size or position, the arch then fits in a sphere of radius 1, which is the scale the network was trained on.</p><p class="algo-tag">Illustration: the outline stands for a mesh, it is not a real scan.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">p</mi><mtext>unit</mtext></msub><mo>=</mo><mfrac><mrow><mi class="k1">p</mi><mo>&#x2212;</mo><mi class="k2">c</mi></mrow><mrow><mo>&#x2225;</mo><mrow><msub><mi class="k3">b</mi><mtext>max</mtext></msub><mo>&#x2212;</mo><mi class="k2">c</mi></mrow><mo>&#x2225;</mo></mrow></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p</b>a vertex of the mesh</li><li class="k2"><b>c</b>middle of the bounding box</li><li class="k3"><b>b<sub>max</sub></b>the corner of the box with the largest coordinates</li></ul></div>
+      </figure>
+
+      <p>The surface normals, mapped to colours (<em>normal &times; 0.5 + 0.5</em>), are the only texture the network sees. Each view is that colour image plus a depth map: four channels.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Element</th><th>Value in VISOR</th><th>Source</th></tr></thead>
+          <thead><tr><th>Element</th><th>Value in VISOR</th></tr></thead>
           <tbody>
-            <tr><td>Network</td><td><code>monai.networks.nets.UNet</code>, 2D, <code>in_channels=4</code>, <code>out_channels=2</code>, channels <code>(16, 32, 64, 128, 256)</code>, strides <code>(2, 2, 2, 2)</code>, <code>num_res_units=2</code>, wrapped in <code>TimeDistributed</code> over the views</td><td><code>ios/net.py:113-137</code></td></tr>
-            <tr><td>Cameras</td><td>seven positions clustered at <code>z = 0.9</code>: <code>(0,0)</code>, <code>(±0.2,0)</code>, <code>(0,±0.2)</code>, <code>(-0.2,-0.2)</code>, <code>(0.2,-0.2)</code>, each looking at the origin</td><td><code>ios/net.py:36-44,166-169</code></td></tr>
-            <tr><td>Rasteriser</td><td><code>image_size=320</code>, <code>blur_radius=0</code>, <code>faces_per_pixel=1</code>, <code>max_faces_per_bin=200000</code>, <code>perspective_correct=True</code>, <code>FoVPerspectiveCameras</code>, <code>HardPhongShader</code> with <code>AmbientLights</code></td><td><code>ios/net.py:141-155</code></td></tr>
-            <tr><td>One view</td><td>RGB of the rendering plus the depth map, 4 channels; the pixel-to-face map kept beside it</td><td><code>ios/net.py:171-176</code></td></tr>
-            <tr><td>Training code</td><td>removed: loss, metrics, optimiser and the Lightning base class; a plain <code>torch.nn.Module</code> loads the <code>state_dict</code></td><td><code>ios/net.py:10-14</code></td></tr>
+            <tr><td>Network</td><td>a 2D UNet (<a class="gterm" data-term="monai" href="../../glossary.html#g-monai" title="See glossary">MONAI</a>), 4 channels in, 2 out (background or patch), applied to every view</td></tr>
+            <tr><td>Views</td><td>seven cameras clustered at height 0.9: one straight above the origin, four shifted by 0.2 along the two horizontal axes, two on diagonals; all look at the origin</td></tr>
+            <tr><td>Image</td><td>320 &times; 320 pixels, one triangle kept per pixel, a plain ambient light</td></tr>
+            <tr><td>Training code</td><td>removed: this is inference only</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>As in the legacy, each view rasterises twice: once through the renderer with the camera's <code>R</code> and <code>T</code>, once through the rasteriser alone to get <code>zbuf</code> and <code>pix_to_face</code> (<code>ios/net.py:171-172</code>). The vote (<code>ios/butterfly.py:143-166</code>):</p>
-      <pre><code>logits, _views, pixel_to_face = self.model((vertices, faces, colors))
-probabilities = softmax(logits * (pixel_to_face &gt;= 0), dim=2)
-face_votes = torch.zeros(2, n_faces)
-for view_faces, view_probabilities in zip(pixel_to_face, probabilities):   # 7 views
-    hit = view_faces &gt;= 0                       # background pixels left out
-    face_votes[:, view_faces[hit]] += view_probabilities[:, hit]
-face_labels = torch.argmax(face_votes, dim=0)
-vertex_labels[faces[0, :, 0]] = face_labels      # first corner of each face
-return (vertex_labels &gt;= 1)</code></pre>
-      <p>Two legacy defects are fixed: background pixels (index -1, which addressed the last face) no longer vote, and the device is no longer hard-coded to CUDA (<code>ios/butterfly.py:11-23</code>). Two are kept: repeated faces in one view do not accumulate, and only the first corner of each face receives the label; see the <a href="#visor-findings">findings</a>. The result is the point array <code>Butterfly</code>, 0 or 1 (<code>ios/butterfly.py:39,138-141</code>).</p>
+      <figure class="algo" data-scene="areg_ios_vote" data-ms="6200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: three views each give a probability to the triangles they see; the probabilities add up and each triangle takes the larger class"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Each of the seven views gives every pixel a probability of being patch. A pixel that shows a triangle votes for it; the votes of the views add up and the triangle takes the class with the larger total (three views shown).</p><p class="algo-tag">Illustration: the probabilities, the three views and the three triangles are made up for the picture (the real vote uses seven views and every triangle of the mesh).</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">V</mi><mi class="k2">c</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">f</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><munder><mo>&#x2211;</mo><mi class="k4">v</mi></munder><msub><mi>p</mi><mrow><mi class="k4">v</mi><mo>,</mo><mi class="k2">c</mi></mrow></msub><mrow><mo stretchy="true" fence="true">(</mo><msub><mo>&#x3c0;</mo><mi class="k4">v</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">f</mi><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi>label</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">f</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><munder><mo>argmax</mo><mi class="k2">c</mi></munder><msub><mi class="k1">V</mi><mi class="k2">c</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">f</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>V<sub>c</sub>(f)</b>total vote of class c for triangle f</li><li class="k2"><b>c</b>class: patch or background</li><li class="k3"><b>f</b>a triangle of the mesh</li><li class="k4"><b>v, p<sub>v,c</sub></b>a view, and the probability it gives to class c</li><li class="k4"><b>&#x3c0;<sub>v</sub>(f)</b>the pixel of view v that shows f</li></ul></div>
+      </figure>
+
+      <p>Two legacy defects are fixed: pixels that show no triangle no longer vote, and the device is no longer hard-coded to a GPU. Two are kept: several pixels of one view that show the same triangle do not add up, and only the first corner of each triangle receives its label (<a href="AREG_IOS.code.html#f-duplicate-faces">details</a>). That second point leaves holes in the patch, which the cleaning repairs.</p>
+
+      <figure class="algo" data-scene="areg_ios_closing" data-ms="6000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a patch with holes is grown twice by one ring of neighbours, then shrunk twice, and the holes are gone"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The vote leaves holes and specks. Small islands are absorbed by their surroundings, then the patch is closed: grown by two rings of neighbouring vertices, then shrunk by two. The holes fill and the outline comes back about where it was.</p><p class="algo-tag">Illustration: a small grid with hand-placed holes stands for the mesh; each point has 4 neighbours here, a real vertex has about 6.</p><div class="formula"><math display="block"><mrow><msup><mi class="k1">P</mi><mo>&#x2032;</mo></msup><mo>=</mo><msup><mi class="k3">E</mi><mn>2</mn></msup><mrow><mo stretchy="true" fence="true">(</mo><msup><mi class="k2">D</mi><mn>2</mn></msup><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">P</mi><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>P</b>the patch: the set of vertices labelled 1</li><li class="k2"><b>D</b>dilation: add every neighbour of a vertex of the patch</li><li class="k3"><b>E</b>erosion: remove every vertex of the patch that touches a vertex outside it</li></ul></div>
+      </figure>
+
+      <p>Before the closing, any island of either class under 200 points is absorbed by what surrounds it. The result is stored on the mesh as a 0/1 point array named <code>Butterfly</code>.</p>
+
+      <a class="deep-link" href="AREG_IOS.code.html#palate"><b>In the code</b><span>The five steps, the network and renderer settings, and the vote as code</span></a>
 
       <h3 id="mgl">3.4 The mucogingival band</h3>
 
-      <p>On the lower arch there is no plateau, so the patch is built from the 13 landmarks ALI places along the mucogingival line, <code>LL6MG</code> to <code>LR6MG</code> through <code>L0MG</code>, or the same names without <code>MG</code> (<code>ios/mgl.py:46-52</code>). It needs no network and no GPU (<code>ios/mgl.py:15-18</code>). Landmark files are Slicer markups (<code>.json</code>, <code>.mrk.json</code>); each scan finds its file by a key that keeps the time point, by equality or prefix of tokens, and an ambiguity is an error that names the candidates (<code>ios/landmarks.py:68-160</code>, <code>ios/pipeline.py:136-157</code>).</p>
+      <p>On the lower arch there is no plateau, so the patch is built from the 13 landmarks ALI places along the mucogingival line. This needs no network and no GPU. At least 3 landmarks are needed; missing ones are noted. The steps are: order the landmarks along the arch; draw a smooth curve through them (a spline, sampled at 300 points); snap each sample to its nearest vertex; grow a band around those vertices that reaches the chosen height on each side; then remove the vertices that carry a lower-crown label, if the mesh is labelled.</p>
 
-      <p><code>build_patch</code> (<code>ios/mgl.py:182-239</code>):</p>
-      <ol>
-        <li>order the landmarks along the arch; at least 3 are needed, missing ones are noted (<code>ios/mgl.py:79-96</code>);</li>
-        <li>with a height of 0: snap the landmarks themselves to their nearest vertices, and stop there, no curve and no band (<code>ios/mgl.py:204-207</code>);</li>
-        <li>otherwise: sample a B-spline through them at 300 points, snap each sample to its nearest vertex, and grow a band of <code>height</code> mm around those seeds by Dijkstra along the mesh edges, never through space, so the band cannot jump to the lingual side (<code>ios/mgl.py:99-163,208-210</code>);</li>
-        <li>remove the vertices that carry a lower crown label, 18 to 31, if the mesh is labelled (<code>ios/mgl.py:72,166-179,212-216</code>);</li>
-        <li>write the result as the point array <code>Bottom_MGL</code>; an empty band is an error for that patient (<code>ios/mgl.py:57,218-227</code>).</li>
-      </ol>
-      <p>Each time point builds its band from its own landmarks; the legacy restriction to landmarks common to both times, the filter on doubtful landmarks and the landmark-based start of the ICP are not in the port (<a href="#visor-changes">section 7</a>).</p>
+      <figure class="algo" data-scene="areg_ios_band" data-ms="6400">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a curve is drawn through landmarks, snapped to mesh vertices, and a band grows along the mesh from those vertices"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The lower arch has no flat plateau, so the patch is a band along the gum line. A smooth curve is drawn through the 13 landmarks, snapped to the nearest vertices, and the band is everything within a given distance of them, measured along the surface, not through the air.</p><p class="algo-tag">Illustration: 6 landmarks instead of 13, on a flat grid; the numbers are made up for the picture. The removal of the crowns is not drawn.</p><div class="formula"><math display="block"><mrow><mi class="k1">d</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><munder><mo>min</mo><mrow><mi class="k3">s</mi><mo>&#x2208;</mo><mi>seeds</mi></mrow></munder><msub><mi>dist</mi><mi>mesh</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">s</mi><mo>,</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi>band</mi><mo>=</mo><mo>{</mo><mi class="k2">v</mi><mo>:</mo><mi class="k1">d</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2264;</mo><mi class="k4">h</mi><mo>}</mo></mrow></math></div><ul class="algo-legend"><li class="k1"><b>d(v)</b>distance from vertex v to the nearest seed, walking along the mesh edges</li><li class="k2"><b>v</b>a vertex of the mesh</li><li class="k3"><b>s</b>a seed: a vertex under the curve</li><li class="k4"><b>h</b>the <a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="See the code">patch height</a>, in millimetres (how far the band reaches on each side of the curve, so the band is about twice as wide)</li></ul></div>
+      </figure>
+
+      <p>A height of <strong>0</strong> builds no curve and no band: the patch is only the 13 snapped landmarks (<a href="AREG_IOS.code.html#f-patch-height-zero">and this is the panel&rsquo;s default</a>). Each time point builds its band from its own landmarks. Three steps of the legacy module are not in the port: dropping the landmarks ALI marked as doubtful, restricting both bands to the landmarks found at both times, and starting the ICP from the paired landmarks (<a href="AREG_IOS.code.html#f-mgl-port-behind">details</a>). The result is the point array <code>Bottom_MGL</code>.</p>
+
+      <a class="deep-link" href="AREG_IOS.code.html#mgl"><b>In the code</b><span>The landmark order, the band functions, the file matching and the exact steps</span></a>
 
       <h3 id="icp">3.5 The ICP</h3>
 
@@ -416,7 +399,7 @@ return (vertex_labels &gt;= 1)</code></pre>
         </div>
         <ol class="v3d-chips v3d-steps">
           <li data-step="0">1. the two time points, still apart</li>
-          <li data-step="1">2. the Butterfly patch, predicted on the palate</li>
+          <li data-step="1">2. the <a class="gterm" data-term="areg-ios-butterfly" href="AREG_IOS.code.html#palate" title="See the code">Butterfly</a> patch, predicted on the palate</li>
           <li data-step="2">3. rigid ICP, on the patch alone</li>
           <li data-step="3">4. registered mean gap on the patch</li>
         </ol>
@@ -429,70 +412,49 @@ return (vertex_labels &gt;= 1)</code></pre>
           <i data-k="icp">rigid ICP, on the patch alone</i>
           <i data-k="done">registered, mean gap on the patch</i>
         </span>
-        <figcaption>T1 in blue, T2 in orange, the patch in green. The geometry comes from the published AREG_IOS test set (no patient data) and from the output the <em>legacy</em> module wrote on it: the <code>Butterfly</code> array, <strong>9529 of 75867 vertices</strong>, and the rigid motion, recovered by <a class="gterm" data-term="kabsch" href="../../glossary.html#g-kabsch" title="See glossary">Kabsch</a> from the input and registered T2 (residual 3&times;10<sup>&minus;5</sup>&nbsp;mm); gap on the patch 0.38&nbsp;&rarr;&nbsp;0.18&nbsp;mm. The three steps shown are those of the VISOR palate mode, in this order: the patch is predicted on each time point (<code>ios/pipeline.py:192-193</code>), and the ICP runs on the patch clouds alone, T2 onto T1, rigid, 1000 iterations, centroids matched first (<code>ios/pipeline.py:195-198</code>, <code>ios/icp.py:36-56</code>). VISOR loads the same released checkpoint (<code>AREG_model.zip</code>, HUTIN1/AREG v1.0.0, <code>VISOR-serve scripts/data-manifest.yml:295-296</code>) but votes without the background pixels, so its patch is <strong>not proven identical</strong>; the scene was not re-run with the VISOR engine. Not shown: the Crown_Seg and ASO steps of Fully-Automated mode, which run before, and the mucogingival band, which replaces step 2 on the lower arch.</figcaption>
+        <figcaption>T1 in blue, T2 in orange, the patch in green. The geometry comes from the published AREG_IOS test set (no patient data) and from the output the <em>legacy</em> module wrote on it: the Butterfly array, <strong>9529 of 75867 vertices</strong> (counts and distances are those of the full published test meshes, not recomputed here; the meshes drawn are simplified), and the rigid motion, recovered by <a class="gterm" data-term="kabsch" href="../../glossary.html#g-kabsch" title="See glossary">Kabsch</a> (a best fit of two matching point sets) from the input and registered T2 (leftover error 0.00003&nbsp;mm); gap on the patch 0.38&nbsp;&rarr;&nbsp;0.18&nbsp;mm. The steps shown are those of the VISOR palate mode, in this order: the patch is predicted on each time point, and the ICP runs on the patch clouds alone, T2 onto T1, rigid, 1000 iterations, centroids matched first. VISOR loads the same released checkpoint (the AREG model, release v1.0.0) but votes without the background pixels, so its patch is <strong>not proven identical</strong>; the scene was not re-run with the VISOR engine. Not shown: the Crown_Seg and ASO steps of Fully-Automated mode, which run before, and the <a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="See the code">mucogingival band</a>, which replaces step 2 on the lower arch.</figcaption>
       </figure>
 
-      <p><code>patch_cloud</code> turns each painted mesh into a vertex-only cloud of the points whose array value is 1, and refuses an empty one (<code>ios/butterfly.py:193-224</code>). <code>icp.align</code> then runs the same vtk filter as the legacy:</p>
-      <pre><code>icp = vtk.vtkIterativeClosestPointTransform()
-icp.SetSource(t2_patch); icp.SetTarget(t1_patch)
-icp.GetLandmarkTransform().SetModeToRigidBody()     # 6 degrees of freedom
-icp.SetMaximumNumberOfIterations(1000)
-icp.StartByMatchingCentroidsOn()</code></pre>
-      <p>A matrix with a non-finite entry is refused (<code>ios/icp.py:36-56</code>). The legacy <code>vtkICP.__call__</code> returned its source unmoved, harmless with a single method; the port has one alignment and no list to compose (<code>ios/icp.py:8-14</code>). The matrix moves the T2 mesh's points onto T1; the whole T2 mesh, not only its patch, is transformed with it (<code>ios/pipeline.py:206</code>).</p>
+      <p>The vertices labelled 1 on each mesh become a point cloud of their own (an empty cloud is an error). The T2 cloud is moved onto the T1 cloud by the ICP of the visualisation toolkit: rigid body (six degrees of freedom), at most 1000 iterations, starting by matching the two centres.</p>
+
+      <figure class="algo" data-scene="areg_ios_icp" data-ms="7000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a cloud of points is first moved onto the centre of another, then pair by pair rotated and shifted until the two coincide"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">ICP repeats two moves. Pair each point of the T2 patch with the closest point of the T1 patch, then find the rigid motion that brings the pairs closest. It starts by matching the centres of the two clouds and stops after at most 1000 rounds.</p><p class="algo-tag">Illustration: 26 points in 2D and 5 rounds stand for the real 3D clouds; the numbers are made up. The ICP formula is the standard definition of a rigid fit; the code only calls the ICP filter of VTK, it does not write this sum itself.</p><div class="formula"><math display="block"><mrow><munder><mo>argmin</mo><mrow><mi class="k2">R</mi><mo>,</mo><mi class="k3">t</mi></mrow></munder><munder><mo>&#x2211;</mo><mi class="k1">i</mi></munder><msup><mrow><mo>&#x2225;</mo><mrow><mi class="k2">R</mi><msub><mi class="k1">s</mi><mi class="k1">i</mi></msub><mo>+</mo><mi class="k3">t</mi><mo>&#x2212;</mo><mi class="k4">q</mi><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k1">s</mi><mi class="k1">i</mi></msub><mo stretchy="true" fence="true">)</mo></mrow></mrow><mo>&#x2225;</mo></mrow><mn>2</mn></msup></mrow></math></div><ul class="algo-legend"><li class="k1"><b>s<sub>i</sub></b>a point of the T2 patch (moving)</li><li class="k4"><b>q(s<sub>i</sub>)</b>the closest point of the T1 patch (fixed)</li><li class="k2"><b>R</b>rotation</li><li class="k3"><b>t</b>translation</li></ul></div>
+      </figure>
+
+      <p>A matrix with a non-finite entry is refused. The matrix is then applied to the <strong>whole</strong> T2 mesh, not only to its patch.</p>
+
+      <a class="deep-link" href="AREG_IOS.code.html#icp"><b>In the code</b><span>The patch clouds and the exact ICP call</span></a>
 
       <h3 id="visor-io">3.6 Outputs, transform and report</h3>
 
-      <p>The tool returns one path, so there are no named outputs: the output folder is archived. Under each patient's relative folder (<code>ios/pipeline.py:200-233,253-258</code>):</p>
-      <pre><code>&lt;output_dir&gt;/&lt;relative folder&gt;/
-    &lt;T1 stem&gt;_&lt;suffix&gt;.vtk|.vtp       # T1, carrying Butterfly or Bottom_MGL
-    &lt;T2 stem&gt;_&lt;suffix&gt;.vtk|.vtp       # T2 moved onto T1, patch array too
-    &lt;other arch T1&gt;_&lt;suffix&gt;           # palate only: untouched copy
-    &lt;other arch T2&gt;_&lt;suffix&gt;           # palate only: moved by the same matrix
-    &lt;patient&gt;_&lt;suffix&gt;_transform.tfm
-AREG_report.json</code></pre>
-      <p>A <code>.vtp</code> input stays <code>.vtp</code>; anything else is written as binary legacy <code>.vtk</code>, since <code>.stl</code> cannot hold the label array (<code>ios/surfaces.py:79-100</code>). The stem is that of the file actually registered, which in Fully-Automated mode is the labelled and oriented copy (<code>ios/pipeline.py:253-258</code>). With the mucogingival patch only the lower arch is written: the upper arch is not carried (<code>ios/pipeline.py:13-17</code>).</p>
+      <p>The tool returns one folder, archived and sent back. Under each patient&rsquo;s relative folder: the T1 mesh carrying the patch array, the T2 mesh moved onto the T1 (patch array too), a transform file named <code>&lt;patient&gt;_&lt;suffix&gt;_transform.tfm</code>, and, for the palate, an untouched copy of the other T1 arch and the other T2 arch moved by the same matrix. With the mucogingival patch only the lower arch is written. A <code>.vtp</code> input stays <code>.vtp</code>; anything else is written as <code>.vtk</code>.</p>
 
-      <p><strong>The transform</strong> (<code>ios/icp.py:88-112</code>). The ICP matrix moves points; a <code>.tfm</code> is consumed the other way, so the inverse is written, as the CBCT engine does. When ASO oriented the meshes first, ASO's transform for the upper arch of T2 is composed in, <code>matrix @ inv(prior)</code>, so the file relates the mesh the caller sent to the registered result; <code>matrix_of</code> reads ASO's transform with its centre of rotation (<code>ios/icp.py:63-85</code>). The report says which case applies (<code>ios/pipeline.py:240-244</code>).</p>
+      <p><strong>The transform.</strong> The ICP gives a matrix that moves points, while a <code>.tfm</code> is read the other way, so the inverse is written. When ASO oriented the meshes first, its own transform for the T2 upper arch is composed in, so that the file relates the mesh you sent to the registered result. The report says which case applies. <code>AREG_report.json</code> lists, per patient, whether it worked, on which patch and jaw, the direction of the transform and any note, plus the subjects that did not pair and a summary count.</p>
 
-      <p><code>AREG_report.json</code> (<code>ios/dispatch.py:155-232,376-381,410-412</code>, <code>ios/pipeline.py:235-250</code>):</p>
-      <pre><code>{"modality": "IOS", "automation": "...", "output_suffix": "Reg",
- "patch": "Palate (upper arch)", "registered_jaw": "Upper",
- "labelled_and_oriented": true,             # Fully-Automated
- "unmatched": {...},
- "device": "cuda", "model_checkpoint": "&lt;file&gt;",           # palate
- "mgl_landmarks": "sent with the request" | "predicted by 'ALI_IOS'",
- "mgl_patch_height_mm": 0.0,                # mucogingival
- "patients": {"&lt;key&gt;": {"status": "ok", "registered_on": "Butterfly",
-     "registered_jaw": "Upper", "jaws": [...],
-     "transform_maps": "the T2 mesh you sent -&gt; T1 space",
-     "outputs": [...], "notes": [...]}},
- "summary": {"patients": N, "registered": n, "failed": m}}</code></pre>
-      <p>A patient fails alone on a registration, surface, patch or landmark error, with its reason (<code>ios/dispatch.py:238-254</code>).</p>
+      <a class="deep-link" href="AREG_IOS.code.html#visor-io"><b>In the code</b><span>Output tree, how the matrix is inverted and composed, and the exact report schema</span></a>
 
       <h2 id="visor-args">4. Arguments and schema</h2>
 
-      <p>Types and defaults are those of the published schema (observed: <code>scripts/describe.py</code>); layout comes from <code>ios/layout.py</code>. Five arguments opt out of the hosted-model convention (<code>server_selectable ... = "none"</code>, <code>VISOR-serve server/deployment.toml:47-68</code>): left to that convention they would receive the whole <code>models/</code> folder, sixty <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoints</a>, instead of one bundle. <code>keep_intermediate</code> and <code>stop_after</code> are injected by the server and hidden (<code>ios/layout.py:33,40</code>).</p>
+      <p>What can be chosen in the panel, in plain words. Models are hosted by the server and normally left empty.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Argument</th><th>Published type</th><th>Default</th><th>Widget and rule</th></tr></thead>
+          <thead><tr><th>Choice</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>t1</code>, <code>t2</code></td><td>path, required</td><td>–</td><td>pickers &ldquo;T1 (baseline)&rdquo;, &ldquo;T2 (follow-up)&rdquo; (<code>ios/layout.py:42-43</code>); meshes <code>.vtk .vtp .stl .obj</code>, each naming its jaw (<code>ios/surfaces.py:35,113-130</code>)</td></tr>
-            <tr><td><code>output_dir</code></td><td>path, required</td><td>–</td><td>not shown; filled by the server</td></tr>
-            <tr><td><code>automation</code></td><td>str, 2 choices</td><td><code>Fully-Automated</code></td><td>drop-down (<code>ios/layout.py:52</code>); Semi-Automated takes meshes that already carry labels and orientation</td></tr>
-            <tr><td><code>patch</code></td><td>str, 2 choices</td><td><code>Palate (upper arch)</code></td><td>&ldquo;Registration patch&rdquo; (<code>ios/layout.py:54</code>); it also decides which arch is registered: palate registers the upper arch, the lower one follows; mucogingival registers the lower arch alone (<code>common/catalogs.py:191-197</code>, <code>ios/pipeline.py:81-116</code>)</td></tr>
-            <tr><td><code>ios_reference</code></td><td>path</td><td>empty</td><td>hidden; Fully-Automated; empty means <code>DATA/AREG/models/IOS_Gold_files</code> (<code>ios/dispatch.py:89,459</code>)</td></tr>
-            <tr><td><code>registration_model</code></td><td>path</td><td>empty</td><td>hidden; palate; empty means the deployment's <code>DATA/AREG/models/AREG_model</code> (<code>ios/dispatch.py:88,92-97,457-458</code>); the palate is refused in either mode when no checkpoint can be found (<code>ios/dispatch.py:124-129</code>)</td></tr>
-            <tr><td><code>crown_model</code></td><td>path</td><td>empty</td><td>hidden; Fully-Automated; empty lets Crown_Seg find its own checkpoint</td></tr>
-            <tr><td><code>mgl_model</code></td><td>path</td><td>empty</td><td>hidden; mucogingival; empty lets ALI_IOS find its bundle</td></tr>
-            <tr><td><code>mgl_landmarks</code></td><td>path</td><td>empty</td><td>&ldquo;Mucogingival <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>&rdquo;, mucogingival only (<code>ios/layout.py:88</code>): your own 13 landmarks per lower scan</td></tr>
-            <tr><td><code>mgl_patch_height</code></td><td>float</td><td><code>0.0</code></td><td>&ldquo;Patch height (mm)&rdquo;, mucogingival only (<code>ios/layout.py:91</code>). <strong>0 means no band</strong>: see the first of the <a href="#visor-findings">findings</a></td></tr>
-            <tr><td><code>output_suffix</code></td><td>str</td><td><code>Reg</code></td><td>text field (<code>ios/layout.py:95</code>); a path separator is refused (<code>ios/dispatch.py:441-443</code>)</td></tr>
+            <tr><td>T1 (baseline), T2 (follow-up)</td><td>the two folders or files; test cohorts are offered</td></tr>
+            <tr><td>Automation</td><td>Fully-Automated (the default), or Semi-Automated for meshes that already carry labels and orientation</td></tr>
+            <tr><td>Registration patch</td><td>Palate (upper arch, the lower follows; the default) or Mucogingival (lower arch only)</td></tr>
+            <tr><td>Mucogingival <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a></td><td>your own 13 landmarks per lower scan; left empty, ALI_IOS places them</td></tr>
+            <tr><td><a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="See the code">Patch height</a> (mm)</td><td>mucogingival only; <strong>0 means no band</strong>, and 0 is the default; there is no maximum</td></tr>
+            <tr><td>Output suffix</td><td>appended to the output names; <code>Reg</code> by default; no path separator allowed</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>The client adds nothing of its own to these: the panel is generated from the schema, and the switch between the checkpoint field of the palate and the landmark folder of the mucogingival patch is <code>visible_when</code> in the schema, not code in the module (<code>AREGRemote.py:90-96</code>).</p>
+      <p>Hidden fields hold the orientation reference, the palate <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a>, the Crown_Seg model and the mucogingival model; empty means the bundle the server holds.</p>
+
+      <a class="deep-link" href="AREG_IOS.code.html#visor-args"><b>In the code</b><span>The full argument table with types, defaults and the rule enforced for each</span></a>
 
       <h2 id="predicted">5. What is predicted vs computed</h2>
 
@@ -502,39 +464,43 @@ AREG_report.json</code></pre>
           <tbody>
             <tr><td>Tooth labels (Crown_Seg)</td><td><span class="badge predit">predicted</span> network, see <a href="../Crown_Seg/Crown_Seg.html">Crown_Seg on VISOR</a></td><td>separate tool, Fully-Automated</td></tr>
             <tr><td>Orientation (ASO, <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a>)</td><td><span class="badge calcule">computed</span> from tooth centroids onto the reference, see <a href="../ASO/ASO.html">ASO on VISOR</a></td><td>separate tool, Fully-Automated</td></tr>
-            <tr><td>Canonical frame for rendering</td><td><span class="badge calcule">computed</span> four tooth centroids</td><td>engine</td></tr>
+            <tr><td><a class="gterm" data-term="areg-ios-standard-frame" href="AREG_IOS.code.html#palate" title="See the code">Standard frame</a> for rendering</td><td><span class="badge calcule">computed</span> four tooth centroids</td><td>engine</td></tr>
             <tr><td><strong>Palatal patch</strong></td><td><span class="badge predit">predicted</span> 2D UNet on seven renderings, voted back onto the mesh</td><td>engine, GPU if present</td></tr>
             <tr><td>Patch cleaning</td><td><span class="badge calcule">computed</span> islands, dilation, erosion</td><td>engine</td></tr>
             <tr><td>Mucogingival <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> (ALI_IOS)</td><td><span class="badge predit">predicted</span> network, see <a href="../ALI/ALI.html">ALI on VISOR</a></td><td>separate tool, unless sent</td></tr>
-            <tr><td>Mucogingival band</td><td><span class="badge calcule">computed</span> spline, snapping, geodesic growth</td><td>engine, CPU</td></tr>
-            <tr><td><strong>Registration</strong></td><td><span class="badge calcule">computed</span> vtk rigid <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> on the patch</td><td>engine, CPU</td></tr>
+            <tr><td><a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="See the code">Mucogingival band</a></td><td><span class="badge calcule">computed</span> spline, snapping, geodesic growth</td><td>engine, CPU</td></tr>
+            <tr><td><strong>Registration</strong></td><td><span class="badge calcule">computed</span> rigid <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> on the patch</td><td>engine, CPU</td></tr>
           </tbody>
         </table>
       </div>
 
       <figure class="diagram">
         <svg viewBox="0 0 960 150" role="img" aria-label="The palate chain coloured by nature: crown labels predicted, orientation computed, palatal patch predicted inside the engine, cleaning and ICP computed.">
+          <a class="d-link" href="#upstream">
           <rect class="d-box-n" x="10" y="20" width="160" height="56" rx="6"/>
           <text class="d-label" x="90" y="43" text-anchor="middle">Crown labels</text>
           <text class="d-label-s" x="90" y="60" text-anchor="middle">Crown_Seg</text>
-          <path class="d-arrow" d="M170 48 H190"/><path class="d-arrow-head" d="M197 48 l-7 -4 v8 z"/>
+          </a><path class="d-arrow" d="M170 48 H190"/><path class="d-arrow-head" d="M197 48 l-7 -4 v8 z"/>
+          <a class="d-link" href="#upstream">
           <rect class="d-box" x="199" y="20" width="150" height="56" rx="6"/>
           <text class="d-label" x="274" y="43" text-anchor="middle">Orientation</text>
           <text class="d-label-s" x="274" y="60" text-anchor="middle">ASO</text>
-          <path class="d-arrow" d="M349 48 H369"/><path class="d-arrow-head" d="M376 48 l-7 -4 v8 z"/>
+          </a><path class="d-arrow" d="M349 48 H369"/><path class="d-arrow-head" d="M376 48 l-7 -4 v8 z"/>
+          <a class="d-link" href="#palate">
           <rect class="d-box-n" x="378" y="20" width="200" height="56" rx="6"/>
           <text class="d-label" x="478" y="43" text-anchor="middle">Palatal patch</text>
           <text class="d-label-s" x="478" y="60" text-anchor="middle">7 views, 2D UNet</text>
-          <path class="d-arrow" d="M578 48 H598"/><path class="d-arrow-head" d="M605 48 l-7 -4 v8 z"/>
+          </a><path class="d-arrow" d="M578 48 H598"/><path class="d-arrow-head" d="M605 48 l-7 -4 v8 z"/>
+          <a class="d-link" href="#palate">
           <rect class="d-box" x="607" y="20" width="150" height="56" rx="6"/>
           <text class="d-label" x="682" y="43" text-anchor="middle">Cleaning</text>
           <text class="d-label-s" x="682" y="60" text-anchor="middle">morphology</text>
-          <path class="d-arrow" d="M757 48 H777"/><path class="d-arrow-head" d="M784 48 l-7 -4 v8 z"/>
+          </a><path class="d-arrow" d="M757 48 H777"/><path class="d-arrow-head" d="M784 48 l-7 -4 v8 z"/>
+          <a class="d-link" href="#icp">
           <rect class="d-box-a" x="786" y="20" width="164" height="56" rx="6"/>
           <text class="d-label" x="868" y="43" text-anchor="middle">ICP</text>
           <text class="d-label-s" x="868" y="60" text-anchor="middle">rigid, vtk</text>
-
-          <rect class="d-box" x="10" y="108" width="26" height="18" rx="3"/>
+          </a><rect class="d-box" x="10" y="108" width="26" height="18" rx="3"/>
           <text class="d-label-s" x="44" y="122">computed</text>
           <rect class="d-box-n" x="180" y="108" width="26" height="18" rx="3"/>
           <text class="d-label-s" x="214" y="122">network-predicted</text>
@@ -546,99 +512,58 @@ AREG_report.json</code></pre>
 
       <h2 id="environment">6. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Value</th></tr></thead>
-          <tbody>
-            <tr><td>Python</td><td><code>requires-python = "&gt;=3.11,&lt;3.12"</code> (<code>SADT-VISOR tools/AREG/AREG_IOS/pyproject.toml:5</code>)</td></tr>
-            <tr><td>Dependencies</td><td><code>sadt-areg-common</code>, <code>torch==2.11.0</code>, <code>torchvision==0.26.0</code>, <code>pytorch3d==0.7.9+pt2110cu128</code>, <code>monai==1.6.0</code>, <code>SimpleITK==2.5.6</code>, <code>numpy==2.3.2</code>, <code>vtk==9.6.2</code> (<code>pyproject.toml:10-23</code>), locked in <code>uv.lock</code>. torch and torchvision come from the <code>pytorch-cu128</code> index, pytorch3d from a prebuilt wheel index (<code>pyproject.toml:39-54</code>)</td></tr>
-            <tr><td>Data the deployment holds</td><td><code>DATA/AREG/models/AREG_model</code> (released <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a>, <code>VISOR-serve scripts/data-manifest.yml:295-296</code>), <code>DATA/AREG/models/IOS_Gold_files</code> (orientation reference, line 321); test cohorts <code>IOS_T1</code> and <code>IOS_T2</code> (<code>server/deployment.toml:68</code>)</td></tr>
-            <tr><td>Resources and timeouts</td><td>none declared (<code>server/deployment.toml:47-68,186-193</code>); global timeout 0, no limit (<code>server/config.py:77</code>)</td></tr>
-            <tr><td>GPU</td><td>used by the palate network when visible, CPU otherwise (<code>ios/butterfly.py:41-54</code>). The mucogingival patch needs neither pytorch3d nor a GPU: a deployment without pytorch3d still registers lower arches (<code>ios/mgl.py:15-18</code>); <code>net.check_dependencies</code> is called only for the palate (<code>ios/dispatch.py:164-165</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The engine runs in a Python environment of its own, built from a lock file (a list of exact versions), with the deep-learning libraries pinned to one exact version of torch because pytorch3d, the 3D rendering library, is built against it (this is why the <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> and <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a> engines are separate). The palate network uses a GPU when the server has one and falls back to the CPU otherwise. The mucogingival patch needs neither pytorch3d nor a GPU. The server holds the palate <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> (the saved network weights) and the orientation reference; no time limit is set.</p>
+
+      <a class="deep-link" href="AREG_IOS.code.html#environment"><b>In the code</b><span>Versions, locked dependencies, data paths and resource settings</span></a>
 
       <h2 id="visor-changes">7. What changed from the legacy logic</h2>
 
+      <p>The network and the <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> are the same. What changed is the plumbing around them, and the mucogingival path lost three refinements.</p>
+
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Subject</th><th>Legacy (3c67957)</th><th>VISOR (6ba2a78)</th></tr></thead>
+          <thead><tr><th>Subject</th><th>Legacy</th><th>VISOR</th></tr></thead>
           <tbody>
-            <tr><td>Where it runs</td><td>a conda environment launched by the <code>AREG</code> widget with <code>python -m</code></td><td>server engine in a locked environment, reached through the facade <code>AREG</code></td></tr>
-            <tr><td>Pairing</td><td><code>Sort</code>: <code>replace("T1","")</code>, jaw tested on the whole path, case-sensitive; an unnamed jaw counts as lower (<code>AREG_IOS/AREG_IOS_utils/dataset.py:89-165,209-282</code>)</td><td>patient stem with the jaw tokens dropped, jaw read on whole tokens of the base name, meshes without a jaw reported (<code>ios/pipeline.py:38-116</code>, <code>ios/surfaces.py:113-130</code>)</td></tr>
-            <tr><td>Teeth kept out of the band</td><td>Universal ids <code>range(17, 33)</code>, that is 17 to 32: the comment explains that the third molars belong in this list (<code>AREG_IOS/AREG_IOS_utils/mgl_patch.py:47-55</code>)</td><td><code>tuple(range(18, 32))</code>, 18 to 31, so the third molars are not kept out; the comment calls it the upstream range &ldquo;verbatim&rdquo; (<code>ios/mgl.py:62-72</code>)</td></tr>
-            <tr><td><a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">Landmark</a> filtering</td><td><code>DropDoubtfulLandmarks</code> removes the points ALI marked as forced, fallback, arch fit, off the aim or extrapolated, and points under confidence 0.785, while at least 3 remain (<code>mgl_patch.py:65-125</code>)</td><td>absent</td></tr>
-            <tr><td>Landmarks common to T1 and T2</td><td><code>SharedLandmarks</code> restricts both bands to the landmarks present at both times (<code>mgl_patch.py:128-153</code>)</td><td>absent: each time builds its band with its own landmarks (<code>ios/pipeline.py:155-157</code>)</td></tr>
-            <tr><td>Start of the <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a></td><td>rigid <a class="gterm" data-term="svd" href="../../glossary.html#g-svd" title="See glossary">SVD</a> on the paired landmarks first (<code>mgl_patch.py:156-199</code>; <code>AREG_IOS/AREG_IOS.py:152-158</code>)</td><td>absent: the ICP starts by matching centroids (<code>ios/icp.py:49</code>)</td></tr>
-            <tr><td>Patch height</td><td>default 5.0 mm, widget clamped to [0, 20] (<code>mgl_patch.py:43</code>; <code>AREG/AREG.py:870-881</code>)</td><td>engine default 5.0 mm (<code>ios/mgl.py:59</code>) but the published default is 0.0, and there is no maximum</td></tr>
-            <tr><td>Orientation in Fully-Automated mode</td><td>segmentation only for the mucogingival patch; for the palate <code>list_teeth "UR6,UR4,UL4,UL6"</code> and <code>occlusion "true"</code> when lower files exist (<code>AREG/AREG_Method/IOS.py:598-634</code>)</td><td>Crown_Seg then ASO for both patches, ASO called with its defaults for the teeth and the occlusion (<code>ios/tools.py:83-110</code>, <code>ios/dispatch.py:172-181</code>)</td></tr>
-            <tr><td>Crown segmentation</td><td><code>CrownSegmentationcli</code> through conda, with a by-hand bypass for already segmented files</td><td>the Crown_Seg tool, <code>skip_segmented</code> at its default (<code>ios/tools.py:113-130</code>)</td></tr>
-            <tr><td>Palate network</td><td><code>torch.device("cuda")</code> hard-coded; background pixels voted into face 0; <code>RemoveIslands(...,33,500)</code> dead (<code>PredPatch.py:29,59-60,75</code>)</td><td>CUDA when the server has a card, otherwise CPU; background pixels left out; the dead call removed (<code>ios/butterfly.py:41-54,104-107,151-157</code>, <code>ios/postprocess.py:12-15</code>)</td></tr>
-            <tr><td><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">Checkpoint</a> loading</td><td>one load per CLI call, first <code>.ckpt</code> found</td><td>one load per run, exactly one checkpoint required, <code>map_location</code> set (<code>ios/butterfly.py:60-107</code>, <code>ios/net.py:188-214</code>)</td></tr>
-            <tr><td>Canonical orientation</td><td><code>vtkMeanTeeth</code>, failure logged (<code>dataset.py:43-48</code>)</td><td>centroids of teeth 3, 8, 9, 14, NaN handled, failure written as a note in the report (<code>ios/orientation.py:14-19,29</code>, <code>ios/butterfly.py:117-131</code>)</td></tr>
-            <tr><td>ICP</td><td>vtk rigid ICP, 1000 iterations, centroids first (<code>AREG_IOS/AREG_IOS_utils/ICP.py:79-103</code>)</td><td>the same (<code>ios/icp.py:29,36-56</code>)</td></tr>
-            <tr><td>Transforms</td><td>only in <code>Auto_IOS</code> palate mode, plus a copy for T1 (<code>AREG_IOS/AREG_IOS.py:264-289</code>)</td><td>always one <code>.tfm</code>; when ASO oriented the meshes, the transform of the upper arch of T2 is composed so that it refers to the meshes you sent (<code>ios/pipeline.py:226-233</code>, <code>ios/icp.py:88-112</code>)</td></tr>
-            <tr><td>Output names</td><td>flat folder, <code>&lt;name&gt;&lt;suffix&gt;</code> plus the input extension, <code>.vtk</code> when vtk has no writer for it (<code>ADT/ADTLib/io/surface.py:192-217</code>)</td><td>relative folder kept, <code>&lt;stem&gt;_&lt;suffix&gt;</code> plus <code>.vtp</code> for a <code>.vtp</code> input, <code>.vtk</code> otherwise (<code>ios/pipeline.py:253-258</code>, <code>ios/surfaces.py:93-100</code>)</td></tr>
-            <tr><td>Review pauses</td><td>pauses with manual adjustment in the widget</td><td>none: <code>stop_after</code> hidden (<code>ios/layout.py:40</code>)</td></tr>
-            <tr><td>Dependencies</td><td>runtime compatibility checks and a WSL branch (<code>AREG_IOS.py:29-58</code>)</td><td>locked environment, no platform test</td></tr>
+            <tr><td>Where it runs</td><td>a conda environment launched by the AREG widget</td><td>a server engine in a locked environment</td></tr>
+            <tr><td>Pairing</td><td>the characters T1 or T2 stripped from the name; jaw looked for anywhere in the path; an unnamed jaw counts as lower</td><td>whole words only; a mesh with no jaw is reported</td></tr>
+            <tr><td>Doubtful <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> (mucogingival)</td><td>dropped before building the band</td><td>kept</td></tr>
+            <tr><td>Landmarks common to T1 and T2</td><td>both bands use only those</td><td>each time uses its own</td></tr>
+            <tr><td>Start of the ICP (mucogingival)</td><td>a rigid fit on the paired landmarks</td><td>matching the centres</td></tr>
+            <tr><td><a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="See the code">Patch height</a></td><td>default 5 mm, clamped to 0 to 20 mm</td><td>engine default 5 mm, but the published default is 0, and there is no maximum</td></tr>
+            <tr><td>Teeth kept out of the band</td><td>labels 17 to 32</td><td>labels 18 to 31</td></tr>
+            <tr><td>Orientation in Fully-Automated mode</td><td>segmentation only for the mucogingival patch; the palate had its own orientation settings</td><td>Crown_Seg then ASO for both patches, with ASO&rsquo;s defaults</td></tr>
+            <tr><td>Palate network</td><td>GPU hard-coded; background pixels voted into one face; a cleaning call that does nothing</td><td>GPU if present, else CPU; background left out; the dead call removed</td></tr>
+            <tr><td>Transforms</td><td>only in the automatic palate mode</td><td>always one, composed with ASO&rsquo;s when ASO oriented the meshes</td></tr>
+            <tr><td>Output names</td><td>flat folder</td><td>relative folder kept; <code>.vtp</code> stays <code>.vtp</code></td></tr>
+            <tr><td>Review pauses</td><td>pauses with manual adjustment</td><td>none</td></tr>
           </tbody>
         </table>
       </div>
 
+      <a class="deep-link" href="AREG_IOS.code.html#visor-changes"><b>In the code</b><span>The same table with legacy and VISOR files and lines</span></a>
+
       <h2 id="visor-findings">8. Findings in VISOR</h2>
 
-      <div class="callout bug">
-        <div class="callout-title">The default patch height is 0, which means no band</div>
-        <p><code>run()</code> publishes <code>mgl_patch_height: float = 0.0</code> and documents it as &ldquo;0 uses the engine's default&rdquo; (<code>SADT-VISOR ios/__init__.py:36,65-66</code>). The code does the opposite: only <code>None</code> is replaced by the 5.0 mm default (<code>ios/dispatch.py:395-397</code>), and a height of 0 builds no curve and no band, only the snapped <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>, which the <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> then uses alone (<code>ios/mgl.py:196-211</code>; the check says &ldquo;0 registers on the landmarks alone, without any band&rdquo;, <code>ios/dispatch.py:119-123</code>). Observed: calling <code>run()</code> with the mucogingival patch and no height hands the engine (<code>_run_ios</code>, stubbed) <code>mgl_patch_height = 0.0</code>, in the tool's environment. So a mucogingival registration launched with the panel's defaults registers on about 13 points, not on a band of 5 mm. The report states it (<code>mgl_patch_height_mm</code>, <code>ios/dispatch.py:232</code>); the panel does not. Legacy: default 5.0 (<code>AREG/AREG.py:42-44,870-882</code>).</p>
-      </div>
+      <p>Each point is checked in the code and written up, with its evidence, on the code page; the list also appears in the <a href="../../findings.html">findings</a>.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">The MGL port is behind the legacy at 3c67957</div>
-        <p>Three steps that the legacy module has at 3c67957 are absent from VISOR (grep over <code>tools/AREG/AREG_IOS/src</code>, observed): the doubtful-landmark filter, the restriction to landmarks common to both time points, and the landmark-based start of the ICP; see <a href="#visor-changes">What changed from the legacy logic</a>. The lower teeth kept out of the band are 18 to 31 in VISOR against 17 to 32 in the legacy, and the VISOR comment calls its range the upstream one, &ldquo;verbatim&rdquo; (<code>ios/mgl.py:66-72</code>), which 3c67957 contradicts (<code>mgl_patch.py:47-55</code>, where 17 and 32 are listed on purpose). The chronology of the two histories was not established, so this may be a port of an earlier version.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Duplicate faces lose votes in the palate network</div>
-        <p>In <code>face_votes[:, view_faces[hit]] += view_probabilities[:, hit]</code> (<code>ios/butterfly.py:157</code>) an indexed addition does not accumulate repeated indices. Observed with torch in the tool's environment: adding ones to the same column three times in one indexed operation leaves 1. The legacy has the same accumulation (<code>AREG_IOS/AREG_IOS_utils/PredPatch.py:59-60</code>); VISOR fixed the background pixels but not this. The vote is then written on the first corner of each face only (<code>ios/butterfly.py:161-166</code>), which is why the patch has holes that the morphological closing repairs (<code>ios/postprocess.py:192-204</code>).</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Fully-Automated orients each jaw on its own</div>
-        <p>The call to ASO sends no <code>ios_occlusion</code> (<code>ios/tools.py:96-102</code>), and ASO's default is &ldquo;Orient each jaw independently&rdquo; (<code>SADT-VISOR tools/ASO/src/sadt_aso/__init__.py:63-65</code>). The registration then moves the other arch with the registered arch's matrix &ldquo;so the captured occlusion survives&rdquo; (<code>ios/pipeline.py:13-15,209-224</code>), but if the two jaws were oriented separately, the occlusion captured in the scan is not what is carried. The legacy passed <code>occlusion = "true"</code> when the folder held lower arches (<code>AREG/AREG_Method/IOS.py:621,633</code>). Read in code; no run compared the two outputs, so the size of the effect is unknown.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">No maximum on the patch height</div>
-        <p>The check refuses a negative height and nothing else (<code>ios/dispatch.py:119-123</code>). The legacy widget kept the value in [0, 20] mm, (<code>AREG/AREG.py:42-44,870-882</code>). Read in code.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">The scratch folder is not removed when a run fails</div>
-        <p><code>register</code> removes <code>.areg_work/</code> after the engine returns, with no <code>try/finally</code> (<code>ios/dispatch.py:348-413</code>, <code>shutil.rmtree</code> at line 408; the engine runs at lines 385-403). An exception that is not caught per patient would leave the copies of the inputs and the labelled and oriented meshes in the archived output folder. AREG_IOSCBCT has the <code>finally</code>. Read in code; not triggered.</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">A failed orientation is written in the report</div>
-        <p>The patch is still predicted, but <code>notes</code> in the patient's entry say that it was predicted without the canonical orientation, with the reason (<code>ios/butterfly.py:117-131</code>, <code>ios/pipeline.py:247-249</code>). Read in code.</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">A transform is always written</div>
-        <p>Every registered patient gets a <code>.tfm</code>, in both modes and for both patches, with a sentence in the report saying which way it maps (<code>ios/pipeline.py:226-244</code>). Read in code.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">Crown_Seg is not told which device to use</div>
-        <p><code>label_crowns</code> sends only <code>meshes</code>, <code>suffix</code> and an optional <code>model</code> (<code>ios/tools.py:124-130</code>). Crown_Seg then uses its own default, with the server's device setting applied when the caller names none, and falls back to the CPU with a warning when no card is visible; see <a href="../Crown_Seg/Crown_Seg.html">Crown_Seg on VISOR</a>. Not a fault, an asymmetry with ALI_IOS, which passes its device on. Read in code.</p>
-      </div>
+      <ul>
+        <li><strong>The default <a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="See the code">patch height</a> is 0, which means no band.</strong> The form says 0 uses the engine&rsquo;s default, the code does the opposite, so a mucogingival registration launched with the defaults uses about 13 points. <a href="AREG_IOS.code.html#f-patch-height-zero">Evidence</a>.</li>
+        <li><strong>The mucogingival path is behind the legacy:</strong> three refinements are absent. <a href="AREG_IOS.code.html#f-mgl-port-behind">Evidence</a>.</li>
+        <li><strong>Duplicate faces lose votes</strong> in the palate network, as in the legacy. <a href="AREG_IOS.code.html#f-duplicate-faces">Evidence</a>.</li>
+        <li><strong>Fully-Automated orients each jaw on its own,</strong> so the occlusion captured in the scan may not be what is carried to the other arch. <a href="AREG_IOS.code.html#f-orient-each-jaw">Evidence</a>.</li>
+        <li><strong>No maximum on the patch height.</strong> <a href="AREG_IOS.code.html#f-no-max-height">Evidence</a>.</li>
+        <li><strong>The scratch folder is not removed when a run fails</strong> in an unexpected way. Not triggered. <a href="AREG_IOS.code.html#f-scratch-not-removed">Evidence</a>.</li>
+        <li><strong>A failed orientation is written in the report,</strong> and <strong>a transform is always written.</strong> <a href="AREG_IOS.code.html#f-orientation-failure-noted">Evidence</a>, <a href="AREG_IOS.code.html#f-transform-always">evidence</a>.</li>
+        <li><strong>Crown_Seg is not told which device to use;</strong> an asymmetry, not a fault. <a href="AREG_IOS.code.html#f-crown-seg-device">Evidence</a>.</li>
+      </ul>
 
       <h2 id="literature">9. Literature</h2>
 
       <p>The method (a palatal patch predicted by a multi-view network, then <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a>) is the one published for the legacy module; the bibliography of the tool is on <a href="../../AREG_IOS/SOURCES.html">its sources page</a> and in <a href="../../AREG_IOS/AREG_IOS.html#litterature">section 12 of the legacy page</a>. The port adds no publication of its own.</p>
 
+      
       <footer class="footer">
-        <a href="../../index.html">← All pages</a> · <a href="../../AREG_IOS/AREG_IOS.html">Legacy page for this tool</a> · <a href="../guide/AREG_IOS.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a> · <a href="../architecture.html">Architecture</a>
+        <a href="../../index.html">← All pages</a> · <a href="AREG_IOS.code.html">Code page for this tool</a> · <a href="../../AREG_IOS/AREG_IOS.html">Legacy page for this tool</a> · <a href="../guide/AREG_IOS.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a> · <a href="../architecture.html">Architecture</a>
       </footer>
 
     </article>
@@ -648,5 +573,7 @@ AREG_report.json</code></pre>
 <script src="../../../assets/scene3d.js"></script>
 <script src="../../../assets/areg-ios-mesh.js"></script>
 <script src="../../../assets/areg-3d.js"></script>
+<script src="../../../assets/algo.js"></script>
+<script src="../../../assets/algo-AREG_IOS.js"></script>
 </body>
 </html>

@@ -23,8 +23,9 @@
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/SurgMovPred.html">Guide</a>
       <a href="../../visor/SurgMovPred/SurgMovPred.html" aria-current="true">Atlas</a>
+      <a href="../../visor/SurgMovPred/SurgMovPred.code.html">Code</a>
     </div>
-    <p class="sec-hint">how it works in the code</p>
+    <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="visor">
     <div class="gen-legacy">
     <div class="nav-group"><h4>Registration</h4><ul>
@@ -119,10 +120,12 @@
     <article class="content">
 
       <header class="page-head">
+        
         <div class="breadcrumb"><a href="../../index.html">SADT Atlas</a> › <a href="../index.html">VISOR</a> › Analysis</div>
         <h1>SurgMovPred on VISOR</h1>
-        <p class="lede">In VISOR, SurgMovPred runs on the server under the API name <code>Surg_Mov_Pred</code>: the Slicer panel uploads a table of pre-operative measurements and the surgical plan, and saves back two tables of predicted post-operative movements. The algorithm, 112 stacking regressors applied one target at a time, is the legacy one, unchanged; what changed is the ordering, the error handling and the environment. The legacy Slicer module is described on <a href="../../SurgMovPred/SurgMovPred.html">its own page</a>.</p>
+        <p class="lede">SurgMovPred predicts the post-operative movement of 28 <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> points from a table of measurements and a surgical plan. This page explains how, step by step, with the maths: what goes in, what each step does to it, and what comes out. The files, lines, arguments and findings are on <a href="SurgMovPred.code.html">the code page</a>. The legacy Slicer module is on <a href="../../SurgMovPred/SurgMovPred.html">its own page</a>.</p>
         <div class="meta-row">
+          <a class="badge neutral" href="SurgMovPred.code.html">Code (developers)</a>
           <span class="badge neutral">VISOR</span>
           <span class="badge predit">112 regressors</span>
           <span class="badge neutral">CPU only</span>
@@ -131,111 +134,107 @@
         </div>
       </header>
 
-      <p>References on this page name a repository, then a path inside it, then a line:
-      <em>SADT-VISOR</em> is the tool catalogue (commit 6ba2a78), <em>VISOR-serve</em> the
-      server (e9a7e5d), <em>Remote</em> the Slicer client (AutomatedDentalToolsRemote 19b95e8),
-      <em>legacy</em> SlicerAutomatedDentalTools at 3c67957. A bare path such as <code>pipeline.py:173</code> is in
-      SADT-VISOR <code>tools/Surg_Mov_Pred/src/sadt_surgmovpred/</code>; <code>README.md</code> and <code>pyproject.toml</code>
-      without a repository are in <code>tools/Surg_Mov_Pred/</code>. Everything was read in the code; nothing on this page
-      comes from a run. Overview of the stack: <a href="../index.html">VISOR</a> and <a href="../architecture.html">its architecture</a>.</p>
 
-      <h2 id="visor-status">1. Position in the chain</h2>
+      <p>The file names, line numbers and every finding are on <a href="SurgMovPred.code.html">the code page</a>. Repositories named here: the SADT-VISOR tool catalogue at 6ba2a78, VISOR-serve at e9a7e5d, the Slicer client AutomatedDentalToolsRemote at 19b95e8 and the legacy module SlicerAutomatedDentalTools at 3c67957. Everything was read in the code; nothing was run for this page.</p>
+
+      <h2 id="visor-overview">Overview: what goes in, what comes out</h2>
+
+      <p>SurgMovPred predicts how far the bones will be moved in an orthognathic operation. It reads a table with one row per patient (cephalometric measurements before the operation, plus the planned movement) and returns a table of predicted post-operative movements: 28 <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> points, each with four values. It does not read any scan or mesh, and it changes nothing in Slicer.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Item</th><th>Value</th></tr></thead>
+          <thead><tr><th></th><th>SurgMovPred on VISOR</th></tr></thead>
           <tbody>
-            <tr><td>API name</td><td><code>Surg_Mov_Pred</code>. The Slicer panel is called SurgMovPred. The tool was packaged as <code>Surg_Mov_Pred</code>, and the server accepts the old spelling in lookups (VISOR-serve <code>server/registry/__init__.py:282-293</code>).</td></tr>
-            <tr><td>Tool folder</td><td>SADT-VISOR <code>tools/Surg_Mov_Pred</code>: <code>src/sadt_surgmovpred/{__init__,pipeline,layout}.py</code>.</td></tr>
-            <tr><td>Slicer module</td><td><code>SurgMovPredRemote</code>, a thin panel: <code>TOOL_NAME = "Surg_Mov_Pred"</code> (Remote <code>SurgMovPredRemote/SurgMovPredRemote.py:33</code>), <code>RESULT_KIND = "save_as"</code> (<code>:46</code>), built by Remote <code>CMakeLists.txt:45</code>.</td></tr>
-            <tr><td>Calls, called by</td><td>None, none. No <code>sup</code> argument (<code>__init__.py:37-46</code>). It is a leaf and no other tool calls it, as in the legacy module.</td></tr>
-            <tr><td>Server declaration</td><td>No <code>[tools.Surg_Mov_Pred]</code> section in VISOR-serve <code>server/deployment.toml</code>: it runs on the server conventions. The data manifest lists its models (<code>all_models.zip</code>, 740 MB, extracted) and test files (<code>TestFiles.zip</code>) (VISOR-serve <code>scripts/data-manifest.yml:89-105</code>).</td></tr>
-            <tr><td>State</td><td>Implemented, with 105 test functions in five files under <code>tests/</code> (not run for this page). The README reports a comparison with the previous <em>server</em> implementation (not with the legacy Slicer module): same 101 patients and 112 packages, maximum absolute difference 0.000e+00 (<code>README.md:90-104</code>). That comparison was read from the README, not re-run for this page.</td></tr>
-            <tr><td>Provenance</td><td>ported from <code>SurgMovPred_CLI/SurgMovPred_CLI.py</code> at upstream commit <code>d7702ae</code> (2026-06-24), by way of an earlier server's <code>tools/SurgMovPred/</code> (<code>README.md:7-14</code>).</td></tr>
+            <tr><td>Input</td><td>one CSV, XLSX or ODS table of measurements and plan, or a flat folder of such tables</td></tr>
+            <tr><td>Method</td><td>112 trained models, one per target; each re-scales its 145 inputs and predicts with a <a class="gterm" data-term="smp-stacking" href="SurgMovPred.code.html#visor-predict" title="See the code">stack of</a> three regressors</td></tr>
+            <tr><td>Output</td><td>two tables with the same content, <code>predictions_outputs.xlsx</code> and <code>.csv</code>: patient identifier, then one column per predicted target</td></tr>
+            <tr><td>Where</td><td>on the server, on the processor only; the Slicer panel uploads the table and saves the two results</td></tr>
           </tbody>
         </table>
       </div>
 
+      <p>The algorithm is the legacy one, unchanged. What changed is the ordering, the error handling and the environment (<a href="#visor-changes">What changed</a>).</p>
+
+      <h2 id="visor-status">1. Position in the chain</h2>
+
+      <p>SurgMovPred is a leaf: it calls no other tool and no other tool calls it, as in the legacy module. The Slicer panel is a thin client generated from the server&rsquo;s description of the tool. The tool was packaged under the name <code>Surg_Mov_Pred</code>, and the server also accepts the old spelling. It is covered by automated tests in its repository, and its README reports that its output matched the previous server implementation on 101 patients and 112 models (read, not re-run for this page).</p>
+
       <figure class="diagram">
         <svg viewBox="0 0 980 210" role="img" aria-label="The Slicer panel uploads the measurement table to VISOR-serve, which runs Surg_Mov_Pred in its own virtual environment on the CPU and sends back the two prediction tables. It calls no other tool.">
+<a class="d-link" href="#visor-where">
 <rect class="d-box-a" x="20" y="60" width="240" height="80" rx="6"/>
-<text class="d-label" x="140" y="89" text-anchor="middle">Slicer: SurgMovPredRemote</text>
-<text class="d-label-s" x="140" y="104" text-anchor="middle">panel generated from GET /tools</text>
+<text class="d-label" x="140" y="89" text-anchor="middle">Slicer panel</text>
+<text class="d-label-s" x="140" y="104" text-anchor="middle">panel built from the tool description</text>
 <text class="d-label-s" x="140" y="119" text-anchor="middle">saves the two tables</text>
+</a>
 <path class="d-arrow" d="M260 85 H348"/>
 <path class="d-arrow-head" d="M348 85 l-7 -4 v8 z"/>
 <text class="d-label-s" x="304" y="77" text-anchor="middle">table</text>
 <path class="d-arrow" d="M350 118 H262"/>
 <path class="d-arrow-head" d="M262 118 l7 -4 v8 z"/>
 <text class="d-label-s" x="306" y="134" text-anchor="middle">one archive</text>
+<a class="d-link" href="#visor-where">
 <rect class="d-box" x="350" y="40" width="260" height="120" rx="6"/>
 <text class="d-label" x="480" y="81.5" text-anchor="middle">VISOR-serve</text>
 <text class="d-label-s" x="480" y="96.5" text-anchor="middle">name Surg_Mov_Pred</text>
 <text class="d-label-s" x="480" y="111.5" text-anchor="middle">injects data_root</text>
 <text class="d-label-s" x="480" y="126.5" text-anchor="middle">runner: one process per run</text>
+</a>
 <path class="d-arrow" d="M610 100 H698"/>
 <path class="d-arrow-head" d="M698 100 l-7 -4 v8 z"/>
 <text class="d-label-s" x="654" y="92" text-anchor="middle">run()</text>
+<a class="d-link" href="#visor-pipeline">
 <rect class="d-box" x="700" y="40" width="260" height="120" rx="6"/>
-<text class="d-label" x="830" y="81.5" text-anchor="middle">Surg_Mov_Pred venv</text>
+<text class="d-label" x="830" y="81.5" text-anchor="middle">Surg_Mov_Pred environment</text>
 <text class="d-label-s" x="830" y="96.5" text-anchor="middle">CPU only, no torch</text>
 <text class="d-label-s" x="830" y="111.5" text-anchor="middle">112 stacking packages</text>
 <text class="d-label-s" x="830" y="126.5" text-anchor="middle">writes .xlsx + .csv</text>
 <text class="d-label-s" x="490" y="195" text-anchor="middle">no sup argument: Surg_Mov_Pred calls no tool, and no tool calls it</text>
+</a>
 </svg>
         <figcaption>SurgMovPred is a leaf in VISOR as in legacy. The panel uploads one table (or a folder of tables, zipped on the way out) and saves the result; nothing is loaded into the scene.</figcaption>
       </figure>
 
+            <a class="deep-link" href="SurgMovPred.code.html#visor-status"><b>In the code</b><span>API name, tool folder, server declaration, provenance and test counts</span></a>
+
+
       <h3 id="visor-where">1.1 What runs where</h3>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Where</th><th>What</th></tr></thead>
-          <tbody>
-            <tr><td>Server</td><td>Everything: reading the table, cleaning the column names, the 112 stacking regressors, writing the two tables. CPU only: <code>torch</code> is not installed in the tool's environment, and a test asserts it (<code>README.md:106-107</code>). Python 3.12, numpy 2.2.6, scikit-learn 1.7.2, <a class="gterm" data-term="lightgbm" href="../../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> 4.7.0 (<code>pyproject.toml:7,14-20</code>).</td></tr>
-            <tr><td>Client (Slicer)</td><td>A generated panel with one field, the measurements (<code>layout.py:25</code>: "Measurements and plan"). The table, or a folder zipped on the way out, is uploaded. The two result tables come back as one zip, which the panel unpacks next to the file you chose (<code>RESULT_KIND = "save_as"</code>; Remote <code>ServerToolsCore/ServerToolsCoreLib/base_widget.py:1397-1413</code>); nothing is loaded into the scene.</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The server does everything: reading the table, cleaning the <a class="gterm" data-term="smp-column-names" href="SurgMovPred.code.html#visor-input" title="See the code">column names</a>, running the 112 models on the processor and writing the two tables. The panel has one field, the measurements, uploads the table (a folder is zipped on the way out), then saves the returned archive next to the file you chose. Nothing is loaded into the Slicer scene.</p>
 
-      <p>Run mechanics: <a href="../run-lifecycle.html">Anatomy of a run</a>. What protects the upload:
-      <a href="../security.html">Security and privacy</a>.</p>
+            <a class="deep-link" href="SurgMovPred.code.html#visor-where"><b>In the code</b><span>The server and client duties with the lines that decide them</span></a>
+
 
       <h2 id="visor-files">2. Files involved</h2>
 
-      <p>Line counts at 6ba2a78. Legacy was <code>SurgMovPred/SurgMovPred.py</code> (878 lines, the panel, with a pip install at each
-      Apply) and <code>SurgMovPred_CLI/SurgMovPred_CLI.py</code> (323 lines, the computation).</p>
+      <p>The tool is two small Python files (a run function and the pipeline), a layout file that hides the model argument and renames the field, the environment definition and the tests. The legacy module was a 878-line panel plus a 323-line command-line script.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Lines</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>src/sadt_surgmovpred/__init__.py</code></td><td>73</td><td><code>run()</code>: resolves the models folder (<code>_own_models</code>, <code>:22-34</code>) and calls <code>predict</code></td></tr>
-            <tr><td><code>src/sadt_surgmovpred/pipeline.py</code></td><td>319</td><td>everything else: <code>clean_name</code>, <code>find_id_column</code>, table and package loading, <code>predict_all_targets</code>, <code>save_results</code>, <code>predict</code></td></tr>
-            <tr><td><code>src/sadt_surgmovpred/layout.py</code></td><td>26</td><td>hides <code>model</code>, labels <code>measurements</code> "Measurements and plan"</td></tr>
-            <tr><td><code>pyproject.toml</code>, <code>uv.lock</code></td><td>66, 306</td><td>the venv (<a href="#visor-env">section 6</a>)</td></tr>
-            <tr><td><code>tests/</code></td><td>1624</td><td><code>test_discovery.py</code>, <code>test_outputs.py</code>, <code>test_prediction_path.py</code>, <code>test_provenance.py</code>, <code>test_run.py</code>, <code>conftest.py</code>, plus <code>tests/data/README.md</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+            <a class="deep-link" href="SurgMovPred.code.html#visor-files"><b>In the code</b><span>The file table with line counts</span></a>
+
 
       <h2 id="visor-pipeline">3. The pipeline</h2>
+
+      <p>Once per run the tool loads all model files and reads the table. Then, for each of the 112 targets in turn, it finds the columns that model needs, scales them, predicts and keeps the result. At the end it assembles one table. Click a box to read its section.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 1440 370" role="img" aria-label="Surg_Mov_Pred pipeline on VISOR: load every model package in sorted order, load the measurement tables, find the patient identifier, clean the column names; then for each of the 112 packages resolve its features, skip it if any is missing, scale and predict one target; finally write the predictions as Excel and CSV.">
 <text class="d-label" x="14" y="75" text-anchor="start">per run</text>
+<a class="d-link" href="#visor-models">
 <rect class="d-box" x="120" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="235" y="73.5" text-anchor="middle">Load packages</text>
-<text class="d-label-s" x="235" y="88.5" text-anchor="middle">sorted **/stacking_package.pkl</text>
+<text class="d-label-s" x="235" y="88.5" text-anchor="middle">one file per target, sorted</text>
+</a>
 <rect class="d-box" x="384" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="499" y="73.5" text-anchor="middle">Load measurements</text>
 <text class="d-label-s" x="499" y="88.5" text-anchor="middle">csv, xlsx, ods; folder concat</text>
+<a class="d-link" href="#visor-input">
 <rect class="d-box" x="648" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="763" y="73.5" text-anchor="middle">Find ID column</text>
 <text class="d-label-s" x="763" y="88.5" text-anchor="middle">#, ID, PatientID...</text>
+</a>
 <rect class="d-box" x="912" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="1027" y="73.5" text-anchor="middle">Clean column names</text>
-<text class="d-label-s" x="1027" y="88.5" text-anchor="middle">clean_name, as at training</text>
+<text class="d-label-s" x="1027" y="88.5" text-anchor="middle">as at training time</text>
 <path class="d-arrow" d="M350 77 H382"/>
 <path class="d-arrow-head" d="M382 77 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M614 77 H646"/>
@@ -244,21 +243,27 @@
 <path class="d-arrow-head" d="M910 77 l-7 -4 v8 z"/>
 <text class="d-label" x="14" y="175" text-anchor="start">per target</text>
 <text class="d-label-s" x="14" y="191" text-anchor="start">112 packages</text>
+<a class="d-link" href="#visor-predict">
 <rect class="d-box" x="120" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="235" y="173.5" text-anchor="middle">Resolve features</text>
 <text class="d-label-s" x="235" y="188.5" text-anchor="middle">exact name, or name without _T0</text>
+</a>
 <rect class="d-box" x="384" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="499" y="173.5" text-anchor="middle">Missing feature?</text>
 <text class="d-label-s" x="499" y="188.5" text-anchor="middle">model skipped, warning</text>
+<a class="d-link" href="#visor-predict">
 <rect class="d-box" x="648" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="763" y="173.5" text-anchor="middle">Order columns</text>
 <text class="d-label-s" x="763" y="188.5" text-anchor="middle">features_names of the package</text>
+</a>
 <rect class="d-box" x="912" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="1027" y="173.5" text-anchor="middle">Scale</text>
 <text class="d-label-s" x="1027" y="188.5" text-anchor="middle">the package&#x27;s own scaler</text>
+<a class="d-link" href="#visor-predict">
 <rect class="d-box-n" x="1176" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="1291" y="173.5" text-anchor="middle">Stacking regressor</text>
-<text class="d-label-s" x="1291" y="188.5" text-anchor="middle">model.predict, one target</text>
+<text class="d-label-s" x="1291" y="188.5" text-anchor="middle">predicts one target</text>
+</a>
 <path class="d-arrow" d="M350 177 H382"/>
 <path class="d-arrow-head" d="M382 177 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M614 177 H646"/>
@@ -268,15 +273,19 @@
 <path class="d-arrow" d="M1142 177 H1174"/>
 <path class="d-arrow-head" d="M1174 177 l-7 -4 v8 z"/>
 <text class="d-label" x="14" y="275" text-anchor="start">outputs</text>
+<a class="d-link" href="#visor-io">
 <rect class="d-box" x="120" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="235" y="273.5" text-anchor="middle">No prediction at all?</text>
 <text class="d-label-s" x="235" y="288.5" text-anchor="middle">then RuntimeError</text>
+</a>
 <rect class="d-box" x="384" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="499" y="273.5" text-anchor="middle">Assemble table</text>
 <text class="d-label-s" x="499" y="288.5" text-anchor="middle">IDPatient + one column per target</text>
+<a class="d-link" href="#visor-io">
 <rect class="d-box" x="648" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="763" y="273.5" text-anchor="middle">predictions_outputs.xlsx</text>
 <text class="d-label-s" x="763" y="288.5" text-anchor="middle">index column first</text>
+</a>
 <rect class="d-box" x="912" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="1027" y="273.5" text-anchor="middle">predictions_outputs.csv</text>
 <text class="d-label-s" x="1027" y="288.5" text-anchor="middle">same table</text>
@@ -296,211 +305,125 @@
 <rect class="d-box-n" x="301" y="340" width="26" height="16" rx="4"/>
 <text class="d-label-s" x="335" y="352" text-anchor="start">regressor: predicts</text>
 </svg>
-        <figcaption>Surg_Mov_Pred on the server, SADT-VISOR <code>tools/Surg_Mov_Pred/src/sadt_surgmovpred/pipeline.py</code>. Each of the 112 packages predicts one target on its own (violet outline); nothing ties the targets together afterwards.</figcaption>
+        <figcaption>Surg_Mov_Pred on the server. Each of the 112 <a class="gterm" data-term="smp-packages" href="SurgMovPred.code.html#visor-models" title="See the code">packages</a> predicts one target on its own (violet outline); nothing ties the targets together afterwards.</figcaption>
       </figure>
+
+            <a class="deep-link" href="SurgMovPred.code.html#visor-pipeline"><b>In the code</b><span>The function behind each box of the diagram</span></a>
+
 
       <h3 id="visor-models">3.1 Loading the model packages</h3>
 
-      <p><code>model</code> is optional and hidden. When it is empty, <code>run()</code> uses <code>&lt;data_root&gt;/Surg_Mov_Pred/models</code>
-      (<code>__init__.py:19,22-34,71</code>). <code>load_model_packages</code> then takes every <code>stacking_package.pkl</code> below it, in sorted
-      order, and loads each with joblib (<code>pipeline.py:162-195</code>):</p>
+      <p>Each target has its own folder with one file, a package holding four things: the target&rsquo;s name, the ordered list of the 145 input columns it expects, its fitted <a class="gterm" data-term="smp-scaler" href="SurgMovPred.code.html#visor-models" title="See the code">scaler</a> and its fitted model. The tool loads every package found under the models folder, in sorted order, so the columns of the result come out in the same order on every run. A package that cannot be read is logged and <a class="gterm" data-term="smp-skipped" href="SurgMovPred.code.html#f-skipped-target" title="See the code">skipped</a>, and if none loads the run stops. All 112 packages expect the same 145 columns; 28 of them end in <code>_T0</code> (the state before the operation) and 25 in <code>_Total</code> (the planned total movement), which is why the table must hold the plan as well as the measurements.</p>
 
-      <pre><code>package_files = sorted(model.glob("**/stacking_package.pkl"))   # legacy: list(...), filesystem order
-for pkl_path in package_files:
-    package = joblib.load(pkl_path)        # {target_name, features_names, scaler, model}
-    packages[package["target_name"]] = package</code></pre>
+            <a class="deep-link" href="SurgMovPred.code.html#visor-models"><b>In the code</b><span>The load loop, the package keys, the LightGBM requirement and the silenced version warning</span></a>
 
-      <p>An unreadable package is logged and skipped; if none loads, <code>RuntimeError</code> (<code>pipeline.py:180-192</code>). The comment in
-      <code>layout.py:16-24</code> describes the shipped set: 112 packages, each asking for the same 145 columns, of which 28 carry the suffix
-      <code>_T0</code> (pre-operative state) and 25 the suffix <code>_Total</code> (the planned total movement). The table therefore holds the plan as
-      well as the measurements, hence the label "Measurements and plan". The stacking regressors contain <a class="gterm" data-term="lightgbm" href="../../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> sub-estimators, so
-      <code>lightgbm</code> must be installed for <code>joblib.load</code> to succeed (<code>pyproject.toml:18-20</code>). The packages were pickled under
-      scikit-learn 1.6.1 and are loaded under 1.7.2; the version warning is silenced on purpose, as upstream did
-      (<code>pipeline.py:101-115</code>, <code>README.md:72-75</code>).</p>
 
       <h3 id="visor-input">3.2 Reading the measurements</h3>
 
-      <ul>
-        <li><strong>One file or a flat folder.</strong> A file is read by extension: <code>.csv</code> with <code>read_csv</code>, <code>.xlsx</code> with
-        <code>read_excel</code>, <code>.ods</code> with <code>read_excel(engine="odf")</code> (<code>pipeline.py:22,118-129</code>). A folder is not walked
-        recursively: its files with one of the three extensions, case ignored, are sorted and concatenated row-wise (<code>:132-159</code>). Legacy read
-        only a folder, globbing lower- and upper-case extensions and deduplicating with <code>set()</code>, so the row order changed between runs
-        (legacy <code>SurgMovPred_CLI/SurgMovPred_CLI.py:151-157</code>).</li>
-        <li><strong>Patient identifier.</strong> <code>find_id_column</code> tries eight patterns in order (<code>#</code>, <code>id</code>, <code>id patient</code>,
-        <code>patient id</code>, <code>patient number</code>, <code>subject id</code>, <code>patient</code>, <code>subject</code>, case-insensitive), then any column whose name
-        contains both "patient" and "id" (<code>pipeline.py:65-98</code>). Without one, <code>IDPatient</code> is left empty with a warning
-        (<code>:303-312</code>).</li>
-        <li><strong>Column names</strong> are cleaned to the training-time form by <code>clean_name</code>: strip, drop quotes, backslashes and brackets, every
-        run of characters other than letters, digits, underscore and apostrophe becomes one underscore, <code>total</code> becomes <code>Total</code>, a
-        leading digit gets <code>f_</code> (<code>pipeline.py:27-50</code>). A name that cannot be cleaned raises <code>ValueError</code>
-        (<code>:51-60</code>); legacy returned <code>'f_unnamed'</code>, so two such columns shadowed each other (legacy <code>SurgMovPred_CLI.py:63-66</code>).</li>
-      </ul>
+      <p>A file is read according to its extension (CSV, XLSX, ODS); a folder is not searched recursively, and its tables are sorted and stacked one under the other. The patient identifier column is found by trying a list of usual names (<code>#</code>, <code>id</code>, <code>patient id</code>, and so on); without one, the identifier column of the output is left empty with a warning. <a class="gterm" data-term="smp-column-names" href="SurgMovPred.code.html#visor-input" title="See the code">Column names</a> are cleaned to the spelling used when the models were trained: quotes and brackets are removed, anything that is not a letter, a digit, an underscore or an apostrophe becomes an underscore, and a name starting with a digit gets a prefix. A name that cannot be cleaned is an error.</p>
+
+            <a class="deep-link" href="SurgMovPred.code.html#visor-input"><b>In the code</b><span>The reading code, the eight identifier patterns and the cleaning rules with lines</span></a>
+
 
       <h3 id="visor-predict">3.3 One target per package</h3>
 
-      <pre><code>for target_name, pack in packages.items():                    # pipeline.py:216-250
-    for f in pack["features_names"]:
-        if f in df_cleaned.columns:                    source = f
-        elif f.endswith("_T0") and f[:-3] in df_cleaned.columns:  source = f[:-3]
-        else:                                          missing.append(f)
-    if missing: warn and skip this target
-    X = df_cleaned[[sources in features_names order]]
-    X_scaled = pack["scaler"].transform(X)
-    predictions[target_name] = pack["model"].predict(X_scaled)</code></pre>
+      <p>For each package the tool looks for each required column in the table. The only tolerance is a missing <code>_T0</code> suffix: a model that asks for <code>X_T0</code> accepts a column named <code>X</code>. Any other missing column removes that target from the output, with a warning. A blank cell is not filled in: the model refuses it, the error is logged, and that target is left out for every patient. The columns are put in the order the model expects, scaled, and given to the model.</p>
 
-      <p>The only tolerance is the missing <code>_T0</code> suffix; any other missing column removes that target from the output with a warning
-      (<code>pipeline.py:224-236</code>). An exception while predicting one target is logged and the loop goes on (<code>:249-250</code>). If no target
-      at all was predicted the run raises <code>RuntimeError</code> instead of writing tables without predictions (<code>:252-264</code>). Legacy wrote
-      those tables.</p>
+            <figure class="algo" data-scene="smp_scale" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: four measurements on different scales are moved onto one common axis centred on 0"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The 145 inputs do not share a scale: some are millimetres, some degrees, some ratios. Before prediction each input is re-expressed as how many standard deviations it lies from the average of the training data, using the mean and spread stored with the model. This is the standard definition of a standard scaler; the code only calls the scaler stored in each model file.</p><p class="algo-tag">Illustration: the four measurements, their units and their positions are made up for the picture.</p><div class="formula"><math display="block"><mrow><mi class="k1">z</mi><mo>=</mo><mfrac><mrow><mi class="k2">x</mi><mo>&#x2212;</mo><mi class="k3">&#x3BC;</mi></mrow><mi class="k4">&#x3C3;</mi></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>z</b>the value the model sees</li><li class="k2"><b>x</b>the measurement, in its own unit</li><li class="k3"><b>&mu;</b>average of that measurement in the training data</li><li class="k4"><b>&sigma;</b>standard deviation of that measurement in the training data</li></ul></div>
+      </figure>
+
+
+            <figure class="algo" data-scene="smp_stack" data-ms="6000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: three base estimates are weighted and added into one final prediction"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Each target is predicted by a <a class="gterm" data-term="smp-stacking" href="SurgMovPred.code.html#visor-predict" title="See the code">stack of</a> models. Three different regressors each make their own estimate from the scaled inputs; a final linear regression weighs the three estimates and adds them. The formula is the standard definition of a stacking model; the code only calls the stored model.</p><p class="algo-tag">Illustration: the bar heights and the weights are made up for the picture; the real weights are stored in the model files.</p><div class="formula"><math display="block"><mrow><mi class="k1">&#x177;</mi><mo>=</mo><msub><mi class="k2">&#x3B2;</mi><mn>0</mn></msub><mo>+</mo><munderover><mo>&#x2211;</mo><mrow><mi class="k3">k</mi><mo>=</mo><mn>1</mn></mrow><mn>3</mn></munderover><msub><mi class="k2">&#x3B2;</mi><mi class="k3">k</mi></msub><msub><mi class="k4">f</mi><mi class="k3">k</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k5">z</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>&ycirc;</b>the predicted movement for this target</li><li class="k2"><b>&beta;</b>weights of the final linear regression</li><li class="k3"><b>k</b>one of the three base models</li><li class="k4"><b>f<sub>k</sub></b>the estimate of base model k</li><li class="k5"><b>z</b>the scaled inputs</li></ul></div>
+      </figure>
+
+
+            <figure class="algo" data-scene="smp_targets" data-ms="7000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: 112 cells, one per target, are filled one after the other; a few are skipped"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">There are 112 targets: 28 <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> points, each with 4 values (three signed directions and a total). Each has its own model file, and they are run one after the other. A target whose required columns are missing from the table is skipped with a warning (the two hollow cells show that case).</p><p class="algo-tag">Illustration: the order of the cells and the positions of the two hollow cells are made up for the picture.</p><ul class="algo-legend"><li class="k1"><b>filled</b>a target that has been predicted</li><li class="k1"><b>hollow</b>a target skipped because an input column is missing</li></ul></div>
+      </figure>
+
+
+      <p>A failure while predicting one target is logged and the loop goes on. Only when no target at all was predicted does the run stop with an error, rather than write tables with no predictions.</p>
+
+            <a class="deep-link" href="SurgMovPred.code.html#visor-predict"><b>In the code</b><span>The loop with the feature resolution, the skip rules and the error cases</span></a>
+
 
       <h3 id="visor-io">3.4 Outputs</h3>
 
-      <p>The predictions become one DataFrame, <code>IDPatient</code> is inserted as first column, and the table is written twice
-      (<code>pipeline.py:266,314-317,276-287</code>):</p>
+      <p>The predictions become one table with the patient identifier as the first data column, written twice, as Excel and as CSV. Both start with an unnamed column numbering the rows, which matters when reading column positions. Both files are handed back to the client, and there is no report file.</p>
 
-      <pre><code>output_dir/predictions_outputs.xlsx     df.to_excel(..., index=True)
-output_dir/predictions_outputs.csv      df.to_csv(..., index=True)
-columns:  &lt;unnamed index 0..n-1&gt;, IDPatient, &lt;one column per predicted target&gt;</code></pre>
+            <a class="deep-link" href="SurgMovPred.code.html#visor-io"><b>In the code</b><span>The two files, the column layout and the return value</span></a>
 
-      <p><code>run()</code> returns <code>{"excel": ..., "csv": ...}</code>, a <code>dict[str, Path]</code>, so the server hands both back as a set of files
-      (VISOR-serve <code>server/registry/schema_tool.py:99-103</code>). The order of the target columns follows the sorted package paths, the same on
-      every run. There is no JSON report.</p>
 
-      <h2 id="visor-args">4. Arguments and schema</h2>
+      <h2 id="visor-args">4. What you can choose</h2>
+
+      <ul>
+        <li><strong>The measurements:</strong> a single table, or a flat folder of tables. This is the only field shown in the panel.</li>
+        <li><strong>Not offered:</strong> the models (the server&rsquo;s own set is used), the output folder (set by the server) and any option on targets or thresholds. All 112 targets are always attempted.</li>
+      </ul>
+
+            <a class="deep-link" href="SurgMovPred.code.html#visor-args"><b>In the code</b><span>The argument table, the output type and what the server declares for resources</span></a>
+
+
+      <h2 id="visor-predicted">5. Predicted or computed</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Argument</th><th>Type</th><th>Default</th><th>Panel</th></tr></thead>
+          <thead><tr><th>Step</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td><code>measurements</code></td><td>one CSV, XLSX or ODS table, or a folder of them (required)</td><td>–</td><td>visible, labelled "Measurements and plan" (<code>layout.py:25</code>); may be picked from the server's test files</td></tr>
-            <tr><td><code>model</code></td><td>folder of model packages</td><td>empty: every <code>stacking_package.pkl</code> found under the models folder of the tool's data</td><td>hidden (<code>layout.py:14</code>), still accepted by the API</td></tr>
-            <tr><td><code>output_dir</code></td><td>folder</td><td>filled by the server</td><td>not published (VISOR-serve <code>server/registry/conventions.py:36</code>)</td></tr>
-            <tr><td><code>data_root</code></td><td>injected by the runner</td><td>–</td><td>–</td></tr>
+            <tr><td>Reading, identifier detection, cleaning <a class="gterm" data-term="smp-column-names" href="SurgMovPred.code.html#visor-input" title="See the code">column names</a>, matching columns</td><td><span class="badge calcule">computed</span> deterministic</td></tr>
+            <tr><td><a class="gterm" data-term="smp-scaler" href="SurgMovPred.code.html#visor-models" title="See the code">Scaling</a> the inputs</td><td><span class="badge calcule">computed</span> each <a class="gterm" data-term="smp-packages" href="SurgMovPred.code.html#visor-models" title="See the code">package</a>&rsquo;s own fitted scaler</td></tr>
+            <tr><td>Each post-operative movement</td><td><span class="badge predit">predicted</span> a <a class="gterm" data-term="smp-stacking" href="SurgMovPred.code.html#visor-predict" title="See the code">stack of</a> regressors (scikit-learn with <a class="gterm" data-term="lightgbm" href="../../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> inside), one per target, 112 in the shipped set</td></tr>
+            <tr><td>Assembling and writing the tables</td><td><span class="badge calcule">computed</span></td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>Signature: <code>__init__.py:37-46</code>. The output is a dictionary with two files,
-      <code>predictions_outputs.xlsx</code> and <code>predictions_outputs.csv</code>
-      (<code>pipeline.py:276-287</code>), so the server hands them back as a set of files
-      (VISOR-serve <code>server/registry/schema_tool.py:100-103</code>). Each has an <code>IDPatient</code>
-      column and one column per predicted target, preceded by an unnamed index column
-      (<code>to_excel(index=True)</code>, <code>pipeline.py:283-284</code>; the same at <code>:268-269</code> in
-      the legacy CLI). The models are looked for under <code>DATA/Surg_Mov_Pred/models</code>
-      (<code>__init__.py:19</code>). No resource, timeout or batch setting is declared for this tool, so the server defaults apply: no timeout
-      (VISOR-serve <code>server/config.py:77</code>). A comment in the server's admission code records a timing of this tool: 4.60 s with
-      one thread, 4.45 s with eight, 7.80 s with 56, on a machine with 28 physical cores, so it gets slower above
-      eight threads (VISOR-serve <code>server/execution/admission.py:406-421</code>). The same comment gives this as the reason the server caps the threads it grants (<code>:433-434</code>).</p>
+            <a class="deep-link" href="SurgMovPred.code.html#visor-predicted"><b>In the code</b><span>The table with where each block runs</span></a>
 
-      <h2 id="visor-predicted">5. What is predicted vs computed</h2>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
-          <tbody>
-            <tr><td>Reading, ID detection, column cleaning, feature resolution</td><td><span class="badge calcule">computed</span> deterministic</td><td>server, Surg_Mov_Pred venv</td></tr>
-            <tr><td>Standardisation</td><td><span class="badge calcule">computed</span> each package's own fitted scaler</td><td>server</td></tr>
-            <tr><td>Each post-operative movement</td><td><span class="badge predit">predicted</span> <strong>stacking regressor</strong> (scikit-learn, with <a class="gterm" data-term="lightgbm" href="../../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> sub-estimators), one per target, 112 in the shipped set</td><td>server, CPU</td></tr>
-            <tr><td>Table assembly and writing</td><td><span class="badge calcule">computed</span></td><td>server</td></tr>
-          </tbody>
-        </table>
-      </div>
 
       <h2 id="visor-env">6. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Value</th><th>Where</th></tr></thead>
-          <tbody>
-            <tr><td>Python</td><td><code>&gt;=3.12,&lt;3.13</code> (CLIC, CNE and DOCShapeAXI target 3.11)</td><td><code>pyproject.toml:5-7</code></td></tr>
-            <tr><td>Libraries</td><td><code>numpy==2.2.6</code>, <code>pandas==2.3.3</code>, <code>scikit-learn==1.7.2</code>, <code>joblib==1.5.3</code>, <code>lightgbm==4.7.0</code>, <code>openpyxl==3.1.5</code>, <code>odfpy==1.4.1</code></td><td><code>pyproject.toml:13-25</code></td></tr>
-            <tr><td>No GPU stack</td><td>torch absent, asserted by a test</td><td><code>README.md:106-107</code></td></tr>
-            <tr><td>Models expected</td><td><code>DATA/Surg_Mov_Pred/models/</code>, from <code>all_models.zip</code> (740 183 656 bytes), extracted to one folder per target</td><td>VISOR-serve <code>scripts/data-manifest.yml:91-99</code></td></tr>
-            <tr><td>Resources and timeout</td><td>none declared; no timeout; threads capped by the server's admission rule</td><td>VISOR-serve <code>server/config.py:77</code>, <code>server/execution/admission.py:403-438</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The tool has its own Python environment on the server (Python 3.12 with pinned versions of numpy, pandas, scikit-learn, <a class="gterm" data-term="lightgbm" href="../../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> and the spreadsheet readers) and no graphics-card software at all. The models are staged on the server as one archive of about 740 MB (706 MiB). Nothing is installed at run time.</p>
 
-      <p>Legacy ran inside Slicer's interpreter and called <code>slicer.util.pip_install("numpy==2.4.0")</code> at every Apply (legacy
-      <code>SurgMovPred/SurgMovPred.py:171</code>); the port did not adopt that pin because 2.2.6 is what produced the reference predictions
-      (<code>README.md:76-81</code>). How the deployment image provides Python 3.12 for this venv was not checked.</p>
+            <a class="deep-link" href="SurgMovPred.code.html#visor-env"><b>In the code</b><span>The pinned versions with lines, the models archive and the timing comment</span></a>
+
 
       <h2 id="visor-changes">7. What changed from the legacy logic</h2>
 
-      <p>Legacy file: <code>SurgMovPred_CLI/SurgMovPred_CLI.py</code> (<code>cli</code>) at 3c67957. VISOR file:
-      <code>pipeline.py</code>. The algorithm itself is the same (<code>README.md</code>, "Changes from upstream").</p>
+      <ul>
+        <li>The tool runs on the server in its own environment, instead of inside Slicer&rsquo;s Python with a <a class="gterm" data-term="smp-packages" href="SurgMovPred.code.html#visor-models" title="See the code">package</a> install at every Apply.</li>
+        <li>The input can be a file or a flat folder; the legacy took a folder only, and its folder reading had no stable order.</li>
+        <li>Models and tables are read in sorted order, so two runs give the same rows and columns in the same order.</li>
+        <li>A <a class="gterm" data-term="smp-column-names" href="SurgMovPred.code.html#visor-input" title="See the code">column name</a> that cannot be cleaned is an error, instead of a shared placeholder name that made two columns collide.</li>
+        <li>A run where no model predicts is an error instead of two tables with no predictions.</li>
+        <li>Both output files are returned, and ODS files can be read because the reader is installed.</li>
+      </ul>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Point</th><th>Legacy</th><th>VISOR</th></tr></thead>
-          <tbody>
-            <tr><td>Where it runs</td><td>Slicer CLI module, Slicer's Python</td><td>server, own venv, CPU</td></tr>
-            <tr><td>Input form</td><td>a folder only</td><td>a file or a flat folder (<code>pipeline.py:132-159</code>)</td></tr>
-            <tr><td>Column name that cannot be cleaned</td><td>returns <code>'f_unnamed'</code>, so two bad columns collide (<code>cli:63,66</code>)</td><td>raises a <code>ValueError</code> naming the column (<code>pipeline.py:57</code>)</td></tr>
-            <tr><td>Order of the models</td><td><code>list(base_path.glob(...))</code>, filesystem order (<code>cli:121</code>)</td><td><code>sorted(model.glob(...))</code>, same column order on every run (<code>pipeline.py:173</code>)</td></tr>
-            <tr><td>Folder of tables</td><td><code>glob</code> then <code>list(set(all_files))</code>, no stable order (<code>cli:154-157</code>)</td><td>sorted list of files, searched flat (<code>pipeline.py:143-147</code>; <code>README.md:56-62</code>)</td></tr>
-            <tr><td><code>_T0</code> tolerance</td><td><code>cli:219,225</code></td><td>identical (<code>pipeline.py:223-232</code>)</td></tr>
-            <tr><td>Model missing a feature</td><td>skipped with a warning (<code>cli:231</code>)</td><td>same (<code>pipeline.py:235</code>)</td></tr>
-            <tr><td>No model predicts</td><td>writes tables without predictions</td><td>raises <code>RuntimeError</code> (<code>pipeline.py:260</code>)</td></tr>
-            <tr><td>Outputs</td><td>writes both files, returns only the xlsx path (<code>cli:268-272</code>)</td><td>returns both (<code>pipeline.py:287</code>)</td></tr>
-            <tr><td>Environment</td><td><code>slicer.util.pip_install("numpy==2.4.0")</code> at every Apply (<code>SurgMovPred/SurgMovPred.py:171</code>)</td><td>own environment, numpy 2.2.6 (<code>pyproject.toml:14</code>); <code>odfpy</code> is declared, so <code>.ods</code> files can be read (<code>:24</code>)</td></tr>
-            <tr><td>Logging</td><td>its own stdout handler</td><td>module logger, the runner owns the handlers (<code>README.md:31-34</code>); the folder path is not logged, only the table count (<code>pipeline.py:152-154</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <a class="deep-link" href="SurgMovPred.code.html#visor-changes"><b>In the code</b><span>The legacy against VISOR table with lines</span></a>
 
-      <h2 id="visor-findings">8. Findings in VISOR</h2>
 
-      <div class="callout note">
-        <div class="callout-title">Unnamed index column in both tables</div>
-        <p>Both result files start with a column holding 0, 1, 2 and so on, before <code>IDPatient</code>
-        (<code>pipeline.py:283-284</code>). The legacy CLI does the same
-        (legacy <code>SurgMovPred_CLI/SurgMovPred_CLI.py:268-269</code>). Account for it when reading column positions.</p>
-      </div>
+      <h2 id="visor-findings">8. Known issues</h2>
 
-      <div class="callout note">
-        <div class="callout-title">Stale comments in the client</div>
-        <p>The client says <code>output_kind</code> "is file" (Remote <code>SurgMovPredRemote/SurgMovPredRemote.py:44</code>)
-        and the base widget gives "SurgMovPred's single predictions_outputs.xlsx" as its example
-        (Remote <code>ServerToolsCore/ServerToolsCoreLib/base_widget.py:1390-1391</code>). The tool returns two files, which the schema code publishes as a set of files
-        (VISOR-serve <code>server/registry/schema_tool.py:100-103</code>). The panel still handles them, since it unpacks any zip it receives.</p>
-      </div>
+      <ul>
+        <li>Both result files start with an unnamed index column; see <a href="SurgMovPred.code.html#f-index-column">the finding</a>.</li>
+        <li>Some comments in the client describe a single output file; see <a href="SurgMovPred.code.html#f-client-comments">the finding</a>.</li>
+        <li>The tool README gives a stale data folder name; see <a href="SurgMovPred.code.html#f-readme-path">the finding</a>.</li>
+        <li>Targets are predicted independently, so the movements of the points of one bone segment need not agree, and nothing is applied to the scene; see <a href="SurgMovPred.code.html#f-independent-targets">the finding</a>.</li>
+        <li>A <a class="gterm" data-term="smp-skipped" href="SurgMovPred.code.html#f-skipped-target" title="See the code">skipped</a> target is visible only in the server log; see <a href="SurgMovPred.code.html#f-skipped-target">the finding</a>.</li>
+        <li>On the positive side, the order is reproducible and an empty result is no longer silent; see <a href="SurgMovPred.code.html#f-verified">the check</a>.</li>
+      </ul>
 
-      <div class="callout note">
-        <div class="callout-title">Stale data path in the README</div>
-        <p>The tool README gives the model folder as <code>/DATA/SurgMovPred/models</code> (<code>README.md:45</code>),
-        while the code looks under <code>Surg_Mov_Pred</code> (<code>__init__.py:19,34</code>), the name the data manifest also uses
-        (VISOR-serve <code>scripts/data-manifest.yml:91</code>). The code is the reference.</p>
-      </div>
+            <a class="deep-link" href="SurgMovPred.code.html#visor-findings"><b>In the code</b><span>The six callouts with their evidence</span></a>
 
-      <div class="callout warn">
-        <div class="callout-title">Still true from legacy: independent targets, nothing applied to the scene</div>
-        <p>Every target is a separate <code>model.predict</code> on the same row (<code>pipeline.py:216-247</code>), so the predicted
-        displacements of points of one rigid segment are not constrained to agree with each other (legacy page,
-        <a href="../../SurgMovPred/SurgMovPred.html#pieges">pitfalls</a>). The output is the two tables only: no transform, no Slicer node,
-        and the panel saves the archive rather than loading anything (<code>RESULT_KIND = "save_as"</code>, Remote
-        <code>SurgMovPredRemote.py:46</code>). Read in the code.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">A skipped target is visible only in the server log</div>
-        <p>A package whose features are missing from the table is skipped with a <code>logger.warning</code>, and a target that fails to predict
-        with <code>logger.exception</code> (<code>pipeline.py:234-236,249-250</code>). The run then succeeds with fewer columns. There is no report
-        file, so the user sees the missing targets only by counting columns. The one guard is the all-or-nothing case
-        (<code>:252-264</code>). Read in the code.</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">Verified: reproducible order and no silent empty result</div>
-        <p>Packages and tables are sorted, so two runs on the same input give the same rows and columns in the same order
-        (<code>pipeline.py:143-147,173</code>); a run where no model predicts is an error, not two empty tables (<code>:252-264</code>); a bad
-        column name is an error, not a shadowed feature (<code>:51-60</code>). Read in the code.</p>
-      </div>
 
       <h2 id="visor-literature">9. Literature</h2>
 
-      <p>The model and its sources are the tool's: see the <a href="../../SurgMovPred/SOURCES.html">SurgMovPred sources page</a>.
-      VISOR adds no new model.</p>
+      <p>The method and its publications are those of the tool, whatever runs it: see the <a href="../../SurgMovPred/SOURCES.html">SurgMovPred sources page</a>. VISOR adds no new model.</p>
 
       <footer class="footer">
         <a href="../../index.html">← All pages</a> · <a href="../../SurgMovPred/SurgMovPred.html">Legacy page for this tool</a> · <a href="../guide/SurgMovPred.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a>
@@ -509,5 +432,7 @@ columns:  &lt;unnamed index 0..n-1&gt;, IDPatient, &lt;one column per predicted 
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../../assets/algo.js"></script>
+<script src="../../../assets/algo-SurgMovPred.js"></script>
 </body>
 </html>

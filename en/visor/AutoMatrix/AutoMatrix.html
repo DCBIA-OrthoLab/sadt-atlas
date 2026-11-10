@@ -23,8 +23,9 @@
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/AutoMatrix.html">Guide</a>
       <a href="../../visor/AutoMatrix/AutoMatrix.html" aria-current="true">Atlas</a>
+      <a href="../../visor/AutoMatrix/AutoMatrix.code.html">Code</a>
     </div>
-    <p class="sec-hint">how it works in the code</p>
+    <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="visor">
     <div class="gen-legacy">
     <div class="nav-group"><h4>Registration</h4><ul>
@@ -122,79 +123,83 @@
         <img class="tool-icon" src="../../../assets/screens/AutoMatrix/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../../index.html">SADT Atlas</a> › <a href="../index.html">VISOR</a> › Utilities</div>
         <h1>AutoMatrix on VISOR</h1>
-        <p class="lede">How AutoMatrix runs in VISOR (client and server), what changed from the legacy Slicer module, and what the code of the port does. The legacy module is described on <a href="../../AutoMatrix/AutoMatrix.html">its own page</a>.</p>
+        <p class="lede">AutoMatrix applies registration transforms to scans, segmentations and <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> files, a whole folder at a time. This page explains how, step by step: how files and transforms find each other, which way each one moves, and where the result lands. Files, lines, arguments and findings are on <a href="AutoMatrix.code.html">the code page</a>. The legacy module is on <a href="../../AutoMatrix/AutoMatrix.html">its own page</a>.</p>
         <div class="meta-row">
           <span class="badge neutral">VISOR</span>
+          <span class="badge neutral">Atlas (explanation)</span>
+          <a class="badge neutral" href="AutoMatrix.code.html">Code (developers)</a>
           <a class="badge neutral" href="../../AutoMatrix/AutoMatrix.html">Legacy page</a>
           <a class="badge neutral" href="../guide/AutoMatrix.html">Guide (VISOR)</a>
         </div>
       </header>
 
-<p>In VISOR, AutoMatrix is a Python package that runs on the server: Slicer sends the files and the transforms, the server pairs them by patient, resamples the volumes, moves the <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> points and sends the results back. The transform convention is the legacy one (the volume is resampled through the transform, points move through its inverse); what changed is the pairing rule, the output grid when no reference is given, the formats, and a report of what was paired and what failed. This page follows the port from the request to the files that come back: position, files, each step with the code that does it, the published arguments, the environment, the differences with the legacy module and the findings. It describes the port in SADT-VISOR (branch <code>tool/vface</code>, 6ba2a78, 2026-09-30), served by VISOR-serve (e9a7e5d) and driven from Slicer by the AutomatedDentalToolsRemote extension (19b95e8). The port was made from an upstream state older than 3c67957 (the AutoMatrix and Automatrix_CLI files changed between <code>b1ae78c</code> and 3c67957), so a few details of the <a href="../../AutoMatrix/AutoMatrix.html">legacy page</a>, which reads 3c67957, may differ from what the port started from. Nothing here claims a deployed server: it is read from the code, and the behaviours marked "run on 2026-11-09" were reproduced by calling the package's <code>run()</code> in its own virtual environment on synthetic volumes.</p>
+      <h2 id="visor-overview">Overview: what goes in, what comes out</h2>
 
-      <div class="callout note">
-        <div class="callout-title">How references read on this page</div>
-        <p><code>SADT-VISOR AutoMatrix/pipeline.py:127</code> is <code>tools/AutoMatrix/src/sadt_automatrix/pipeline.py</code> in SADT-VISOR at 6ba2a78; a bare <code>pipeline.py</code>, <code>__init__.py</code> or <code>layout.py</code> is the same package, and a bare <code>README.md</code>, <code>pyproject.toml</code> or <code>tests/…</code> is under <code>tools/AutoMatrix/</code>. <code>VISOR-serve server/…</code> and <code>data-manifest.yml</code> (<code>VISOR-serve scripts/data-manifest.yml</code>) are at e9a7e5d; <code>AutomatedDentalToolsRemote …</code> and a bare <code>AutoMatrixRemote.py</code> or <code>test_automatrix_client.py</code> (under <code>AutoMatrixRemote/</code>) are at 19b95e8. In the comparison table, a bare legacy line such as <code>:279</code> is <code>Automatrix_CLI/Automatrix_CLI.py</code> in SlicerAutomatedDentalTools at 3c67957.</p>
-      </div>
-
-      <h2 id="visor-status">1. Position in the chain</h2>
-
-      <p>AutoMatrix is the only tool of this group that another VISOR tool calls: VFACE drives it through the supervisor, once to mirror
-      the scans and once to move <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> by each patient's registration transform. It calls nothing itself. Its inputs are typically
-      the outputs of a registration (AREG, GreedyReg, FlexReg) or the hosted mirror matrix.</p>
+      <p>A registration tool (AREG, GreedyReg, FlexReg) finds a <strong>transform</strong>: how to move one scan onto another. AutoMatrix takes that file and applies it to other files of the same patient: a scan, a segmentation, or a set of <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> points. Nothing is predicted: it is geometry.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Item</th><th>Value</th></tr></thead>
+          <thead><tr><th>In</th><th>Out</th></tr></thead>
           <tbody>
-            <tr><td>State</td><td>Implemented and tested at tool level. <code>pytest</code> in <code>SADT-VISOR AutoMatrix</code>: 234 passed on 2026-11-09 (6ba2a78, clean tree). The 25 client tests of <code>test_automatrix_client.py</code> are registered with ctest (<code>AutomatedDentalToolsRemote AutoMatrixRemote/CMakeLists.txt:27-35</code>, then <code>Testing/Python/CMakeLists.txt:12-16</code>, an <code>add_test</code>) and were not run.</td></tr>
-            <tr><td>API name</td><td><code>AutoMatrix</code> (<code>AutomatedDentalToolsRemote AutoMatrixRemote/AutoMatrixRemote.py:72</code>)</td></tr>
-            <tr><td>Server package</td><td><code>tools/AutoMatrix</code>, import <code>sadt_automatrix</code>: <code>__init__.py</code> (358 lines), <code>pipeline.py</code> (296), <code>layout.py</code> (59), <code>progress.py</code> (103). Own venv, Python &gt;=3.11,&lt;3.12, SimpleITK 2.5.6, numpy 2.3.2, <code>sadt-areg-common</code> (<code>SADT-VISOR AutoMatrix/pyproject.toml:5,9,10,16</code>). No weights, no network.</td></tr>
-            <tr><td>Slicer panel</td><td>Module <code>AutoMatrixRemote</code> (235 lines), panel generated from <code>GET /tools</code>. It adds a check box <b>Use the mirror matrix</b> (<code>AutoMatrixRemote.py:132-134</code>): ticking it fills Transforms with the hosted test file <code>Mirror</code> and ticks "Same transform for every patient" (<code>:183-201</code>); it is greyed out when the server does not host that file (<code>:150-159</code>). Loads up to 12 results (<code>:91</code>), preset CT-AAA (<code>:97</code>), volumes and <code>.mrk.json</code> (<code>:105-110</code>), and a final status line (<code>:207-235</code>).</td></tr>
-            <tr><td>Facade</td><td>None.</td></tr>
-            <tr><td>Called by</td><td>VFACE, through <code>sup.run</code>: the mirror call (<code>same_transform_for_every_patient=True</code>, <code>output_suffix="mir"</code>, no <code>reference</code>, <code>SADT-VISOR tools/VFACE/src/sadt_vface/tools.py:179-187</code>) and the call that moves landmarks by each patient's transform (<code>output_suffix="reg"</code>, <code>content="Automatic"</code>, <code>:205-212</code>).</td></tr>
-            <tr><td>Calls</td><td>Nothing: no <code>sup</code> parameter, no <code>sup.run</code>.</td></tr>
+            <tr><td>scans and segmentations (<code>.nii.gz</code>, <code>.nrrd</code>, <code>.gipl</code>), landmarks (<code>.mrk.json</code>), or a folder of them</td><td>the same files moved by their transform, with a suffix (<code>Reg</code> by default), in a copy of the input folders</td></tr>
+            <tr><td>transforms (<code>.tfm</code>, <code>.mat</code>, <code>.h5</code>, <code>.hdf5</code>, <code>.txt</code>), or a folder of them</td><td>a report, <code>AutoMatrix_report.json</code>: what was paired, what failed, what had no partner</td></tr>
           </tbody>
         </table>
       </div>
 
-      <figure class="diagram">
+      <h2 id="visor-status">1. Position in the chain</h2>
+
+      <p>AutoMatrix is the only tool of its group that another VISOR tool calls: VFACE calls it in two ways: to mirror (the scans of an asymmetry study, and its <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>), and to move landmarks by each patient&rsquo;s registration transform, one call per region. It calls nothing itself. Its transforms usually come from a registration, or from the hosted <a class="gterm" data-term="automatrix-mirror" href="AutoMatrix.code.html#visor-step-resample" title="See the code">mirror matrix</a>. The computation runs on the server, on the CPU, with no network and no weights.</p>
+
+            <figure class="diagram">
         <svg viewBox="0 0 980 290" role="img" aria-label="AutoMatrix in VISOR: called from the Slicer client or by VFACE through the supervisor, it receives files and transforms, pairs them, resamples volumes and moves landmarks, and returns a zip with the report">
           <text class="d-label-s" x="10" y="16">callers</text>
           <text class="d-label-s" x="250" y="16">VISOR-serve</text>
           <text class="d-label-s" x="490" y="16">tool environment</text>
           <text class="d-label-s" x="760" y="16">inputs it expects</text>
 
+          <a class="d-link" href="#visor-where">
           <rect class="d-box" x="10" y="30" width="210" height="56" rx="6"/>
           <text class="d-label" x="115" y="53" text-anchor="middle">AutoMatrixRemote</text>
-          <text class="d-label-s" x="115" y="70" text-anchor="middle">form + "Use the mirror matrix"</text>
+          <text class="d-label-s" x="115" y="70" text-anchor="middle">form + mirror matrix box</text>
+          </a>
 
+          <a class="d-link" href="#visor-status">
           <rect class="d-box" x="10" y="120" width="210" height="56" rx="6"/>
-          <text class="d-label" x="115" y="143" text-anchor="middle">VFACE (sup.run)</text>
+          <text class="d-label" x="115" y="143" text-anchor="middle">VFACE (server)</text>
           <text class="d-label-s" x="115" y="160" text-anchor="middle">mirror, then apply transforms</text>
+          </a>
 
           <path class="d-arrow" d="M220 58 H248"/>
           <path class="d-arrow-head" d="M250 58 l-7 -4 v8 z"/>
           <path class="d-arrow" d="M220 148 H235 V70 H248"/>
 
+          <a class="d-link" href="#visor-where">
           <rect class="d-box" x="250" y="30" width="210" height="56" rx="6"/>
           <text class="d-label" x="355" y="53" text-anchor="middle">Validate and stage</text>
-          <text class="d-label-s" x="355" y="70" text-anchor="middle">one folder per argument</text>
+          <text class="d-label-s" x="355" y="70" text-anchor="middle">each input kept apart</text>
+          </a>
 
           <path class="d-arrow" d="M460 58 H488"/>
           <path class="d-arrow-head" d="M490 58 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-pipeline">
           <rect class="d-box-a" x="490" y="30" width="250" height="56" rx="6"/>
-          <text class="d-label" x="615" y="53" text-anchor="middle">run(): pair, resample, move</text>
+          <text class="d-label" x="615" y="53" text-anchor="middle">Pair, resample, move</text>
           <text class="d-label-s" x="615" y="70" text-anchor="middle">SimpleITK, CPU</text>
+          </a>
 
+          <a class="d-link" href="#visor-step-pairing">
           <rect class="d-box" x="760" y="30" width="210" height="56" rx="6"/>
           <text class="d-label" x="865" y="53" text-anchor="middle">Files</text>
           <text class="d-label-s" x="865" y="70" text-anchor="middle">scans, segmentations, .mrk.json</text>
+          </a>
 
+          <a class="d-link" href="#visor-step-read">
           <rect class="d-box" x="760" y="120" width="210" height="56" rx="6"/>
           <text class="d-label" x="865" y="143" text-anchor="middle">Transforms</text>
           <text class="d-label-s" x="865" y="160" text-anchor="middle">from AREG, GreedyReg, FlexReg</text>
+          </a>
 
           <path class="d-arrow" d="M760 58 H742"/>
           <path class="d-arrow-head" d="M740 58 l7 -4 v8 z"/>
@@ -203,263 +208,247 @@
           <path class="d-arrow" d="M615 86 V208"/>
           <path class="d-arrow-head" d="M615 210 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#visor-step-write">
           <rect class="d-box" x="490" y="210" width="250" height="56" rx="6"/>
-          <text class="d-label" x="615" y="233" text-anchor="middle">output_dir, zipped</text>
-          <text class="d-label-s" x="615" y="250" text-anchor="middle">moved files, AutoMatrix_report.json</text>
+          <text class="d-label" x="615" y="233" text-anchor="middle">Output folder, zipped</text>
+          <text class="d-label-s" x="615" y="250" text-anchor="middle">moved files and a report</text>
+          </a>
 
           <path class="d-arrow" d="M490 238 H115 V180"/>
           <path class="d-arrow-head" d="M115 178 l-4 7 h8 z"/>
           <text class="d-label-s" x="355" y="228" text-anchor="middle">back to the caller</text>
         </svg>
-        <figcaption>Where AutoMatrix sits in VISOR. No box is a network; the accent marks where the computation runs.
-        The transforms usually come from a registration tool, or from the hosted mirror matrix.</figcaption>
+        <figcaption>Where AutoMatrix sits in VISOR. No box is a network; the accent marks where the computation runs. The transforms usually come from a registration tool, or from the hosted mirror matrix. The boxes lead to the sections below.</figcaption>
       </figure>
+
+
+            <a class="deep-link" href="AutoMatrix.code.html#visor-status"><b>In the code</b><span>Who calls whom, the client panel, the tests</span></a>
+
 
       <h2 id="visor-files">2. Files involved</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File (SADT-VISOR <code>tools/AutoMatrix/</code>)</th><th>Lines</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>src/sadt_automatrix/__init__.py</code></td><td>358</td><td><code>run()</code>, discovery, the legacy-name fallback pairing, the per-file loop, output names, the report</td></tr>
-            <tr><td><code>src/sadt_automatrix/pipeline.py</code></td><td>296</td><td>patient key, formats, <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> through the inverse, resampling, transform reading with the 4×4 text fallback, legacy cut lists, scan or segmentation detection</td></tr>
-            <tr><td><code>src/sadt_automatrix/layout.py</code></td><td>59</td><td>sections and labels; hides <code>reference</code> and <code>content</code></td></tr>
-            <tr><td><code>src/sadt_automatrix/progress.py</code></td><td>103</td><td>"patient i of n" events, a copy of the shared progress writer</td></tr>
-            <tr><td><code>tests/</code> (<code>conftest.py</code> and six test files)</td><td>2287</td><td>landmarks, patient key, transform reading, resampling, run options, run: 234 tests collected and passed on 2026-11-09</td></tr>
-            <tr><td><code>pyproject.toml</code></td><td>39</td><td>pinned environment (see <a href="#visor-env">Environment</a>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The tool is a package of four Python files (the run and its report; the key, the formats and the geometry; the panel layout; progress), a set of tests, and a short Slicer panel with a &ldquo;Use the <a class="gterm" data-term="automatrix-mirror" href="AutoMatrix.code.html#visor-step-resample" title="See the code">mirror matrix</a>&rdquo; box. The list, with line counts, is on the code page.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Elsewhere</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td>VISOR-serve <code>server/deployment.toml:224-230</code></td><td><code>[tools.AutoMatrix]</code>: <code>server_selectable = { reference = "none" }</code>, nothing else</td></tr>
-            <tr><td>VISOR-serve <code>scripts/data-manifest.yml:730-751</code></td><td>hosted test files: <code>AutoMatrixRelease1</code> to <code>4</code> and <code>Mirror</code></td></tr>
-            <tr><td>VISOR-serve <code>server/main.py:1146-1166</code></td><td>stages each argument in its own sub-folder, so <code>files_A1</code> and <code>transforms_A1</code> cannot happen</td></tr>
-            <tr><td>SADT-VISOR <code>tools/VFACE/src/sadt_vface/tools.py:179-212</code></td><td>the two supervised calls</td></tr>
-            <tr><td>AutomatedDentalToolsRemote <code>AutoMatrixRemote/AutoMatrixRemote.py</code></td><td>235 lines: generated form, mirror box, loading, status line</td></tr>
-            <tr><td>AutomatedDentalToolsRemote <code>AutoMatrixRemote/Testing/Python/test_automatrix_client.py</code></td><td>392 lines, 25 tests, hand-written schema</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <a class="deep-link" href="AutoMatrix.code.html#visor-files"><b>In the code</b><span>The files, the line counts, what is elsewhere</span></a>
+
 
       <h2 id="visor-where">3. What runs where</h2>
+
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Step</th><th>Server</th><th>Client (Slicer)</th></tr></thead>
+          <thead><tr><th>Step</th><th>Server</th><th>Slicer</th></tr></thead>
           <tbody>
-            <tr><td>Choose files and transforms</td><td>Receives them. Each argument is staged in its own sub-folder so the argument name cannot leak into the patient key (<code>VISOR-serve server/main.py:1146-1166</code>).</td><td>Pickers take a file or a folder. Hosted test files can be chosen in the dropdowns (<code>AutoMatrixRelease1</code> to <code>4</code>, <code>Mirror</code>).</td></tr>
-            <tr><td>Pair, read, resample, move points</td><td>All of it: discovery and pairing, transform reading with the 4x4 text fallback, <code>ResampleImageFilter</code>, <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> points through the inverse, scan or segmentation detection, report (<code>SADT-VISOR AutoMatrix/pipeline.py:71-180,264-296</code>, <code>__init__.py:68-185</code>).</td><td>–</td></tr>
-            <tr><td>Return</td><td>The output folder, zipped (<code>output_kind "files"</code>, <code>VISOR-serve server/registry/schema_tool.py:95-107</code>). No time limit (<code>VISOR-serve server/config.py:77</code>), upload limit 500 MB (<code>:240</code>), no batch axis (two required <code>path</code> arguments, <code>VISOR-serve server/registry/conventions.py:158-190</code>).</td><td>Unpacks, reads <code>AutoMatrix_report.json</code>, loads at most 12 results.</td></tr>
+            <tr><td>Choose files and transforms</td><td>receives them, each input kept in its own folder so that its argument name cannot leak into the <a class="gterm" data-term="automatrix-patient-key" href="AutoMatrix.code.html#visor-step-pairing" title="See the code">patient key</a></td><td>pickers for a file or a folder; hosted test files can be chosen in the lists</td></tr>
+            <tr><td>Pair, read, resample, move points</td><td>all of it</td><td>nothing</td></tr>
+            <tr><td>Return</td><td>the output folder, zipped; a whole cohort goes up in one request, with a 500 MB default limit</td><td>unpacks, reads the report, loads at most 12 results</td></tr>
           </tbody>
         </table>
       </div>
+
+            <a class="deep-link" href="AutoMatrix.code.html#visor-where"><b>In the code</b><span>What runs where, the server limits</span></a>
+
 
       <h2 id="visor-pipeline">4. The pipeline, step by step</h2>
 
-      <p>One call of <code>run()</code> applies every patient's transforms to every file of that patient
-      (<code>SADT-VISOR AutoMatrix/__init__.py:68-185</code>).</p>
+      <p>One call applies every patient&rsquo;s transforms to every file of that patient.</p>
 
-      <figure class="diagram">
+            <figure class="diagram">
         <svg viewBox="0 0 980 380" role="img" aria-label="AutoMatrix server pipeline: discover files and transforms keyed by patient, legacy fallback pairing, optional reference, then for each file and transform: read the transform with a text fallback, and either move landmark points through the inverse or detect scan or segmentation and resample, then write and report">
+          <a class="d-link" href="#visor-step-pairing">
           <rect class="d-box" x="10" y="30" width="300" height="60" rx="6"/>
           <text class="d-label" x="160" y="55" text-anchor="middle">Discover files, transforms</text>
-          <text class="d-label-s" x="160" y="73" text-anchor="middle">recursive, one patient_of for both</text>
+          <text class="d-label-s" x="160" y="73" text-anchor="middle">recursive, one key rule for both</text>
+          </a>
 
           <path class="d-arrow" d="M310 60 H338"/>
           <path class="d-arrow-head" d="M340 60 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-fallback">
           <rect class="d-box" x="340" y="30" width="300" height="60" rx="6"/>
           <text class="d-label" x="490" y="55" text-anchor="middle">Fallback pairing</text>
-          <text class="d-label-s" x="490" y="73" text-anchor="middle">share one, legacy cuts; paired_by</text>
+          <text class="d-label-s" x="490" y="73" text-anchor="middle">share one, legacy cuts, recorded</text>
+          </a>
 
           <path class="d-arrow" d="M640 60 H668"/>
           <path class="d-arrow-head" d="M670 60 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-resample">
           <rect class="d-box" x="670" y="30" width="300" height="60" rx="6"/>
-          <text class="d-label" x="820" y="55" text-anchor="middle">Reference (hidden)</text>
+          <text class="d-label" x="820" y="55" text-anchor="middle">Reference (optional)</text>
           <text class="d-label-s" x="820" y="73" text-anchor="middle">read once if given</text>
+          </a>
 
           <path class="d-arrow" d="M820 90 V110 H160 V128"/>
           <path class="d-arrow-head" d="M160 130 l-4 -7 h8 z"/>
           <text class="d-label-s" x="490" y="104" text-anchor="middle">for each patient, each file, each of its transforms</text>
 
+          <a class="d-link" href="#visor-step-read">
           <rect class="d-box" x="10" y="130" width="300" height="60" rx="6"/>
-          <text class="d-label" x="160" y="155" text-anchor="middle">read_transform</text>
+          <text class="d-label" x="160" y="155" text-anchor="middle">Read the transform</text>
           <text class="d-label-s" x="160" y="173" text-anchor="middle">ITK formats, else a 4×4 in text</text>
+          </a>
 
           <path class="d-arrow" d="M310 160 H338"/>
           <path class="d-arrow-head" d="M340 160 l-7 -4 v8 z"/>
           <text class="d-label-s" x="324" y="124" text-anchor="middle">landmark file</text>
 
+          <a class="d-link" href="#visor-step-landmarks">
           <rect class="d-box-a" x="340" y="130" width="300" height="60" rx="6"/>
           <text class="d-label" x="490" y="155" text-anchor="middle">Points through the inverse</text>
           <text class="d-label-s" x="490" y="173" text-anchor="middle">all groups, defined points only</text>
+          </a>
 
           <path class="d-arrow" d="M160 190 V228"/>
           <path class="d-arrow-head" d="M160 230 l-4 -7 h8 z"/>
           <text class="d-label-s" x="170" y="214" text-anchor="start">image</text>
 
+          <a class="d-link" href="#visor-step-resample">
           <rect class="d-box" x="10" y="230" width="300" height="60" rx="6"/>
           <text class="d-label" x="160" y="255" text-anchor="middle">Scan or segmentation?</text>
           <text class="d-label-s" x="160" y="273" text-anchor="middle">content, or read off the voxels</text>
+          </a>
 
           <path class="d-arrow" d="M310 260 H338"/>
           <path class="d-arrow-head" d="M340 260 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-resample">
           <rect class="d-box-a" x="340" y="230" width="300" height="60" rx="6"/>
-          <text class="d-label" x="490" y="255" text-anchor="middle">ResampleImageFilter</text>
+          <text class="d-label" x="490" y="255" text-anchor="middle">Resample</text>
           <text class="d-label-s" x="490" y="273" text-anchor="middle">nearest or linear; grid: see 4.5</text>
+          </a>
 
           <path class="d-arrow" d="M640 160 H700 V228"/>
           <path class="d-arrow-head" d="M700 230 l-4 -7 h8 z"/>
           <path class="d-arrow" d="M640 260 H668"/>
           <path class="d-arrow-head" d="M670 260 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-step-write">
           <rect class="d-box" x="670" y="230" width="300" height="60" rx="6"/>
-          <text class="d-label" x="820" y="255" text-anchor="middle">Write, mirrored tree</text>
+          <text class="d-label" x="820" y="255" text-anchor="middle">Write, folders mirrored</text>
           <text class="d-label-s" x="820" y="273" text-anchor="middle">&lt;stem&gt;_Reg[_&lt;transform&gt;]&lt;ext&gt;</text>
+          </a>
 
           <path class="d-arrow" d="M820 290 V318"/>
           <path class="d-arrow-head" d="M820 320 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#visor-step-write">
           <rect class="d-box-a" x="670" y="320" width="300" height="50" rx="6"/>
-          <text class="d-label" x="820" y="341" text-anchor="middle">AutoMatrix_report.json</text>
+          <text class="d-label" x="820" y="341" text-anchor="middle">Report</text>
           <text class="d-label-s" x="820" y="358" text-anchor="middle">only if something was written</text>
+          </a>
         </svg>
-        <figcaption>The server pipeline, from <code>__init__.py:68-358</code> and <code>pipeline.py</code>. No step is a network;
-        the accent marks the two ways a file is moved and the report.</figcaption>
+        <figcaption>The server pipeline. No step is a network; the accent marks the two ways a file is moved and the report. Each box leads to its section.</figcaption>
       </figure>
+
 
       <h3 id="visor-step-pairing">4.1 Discovery and the patient key <span class="badge calcule">computed</span></h3>
 
-      <p><code>_walk</code> takes a file as itself or walks a folder recursively, skips hidden files, and keys every file with the same function
-      (<code>__init__.py:267-298</code>). Accepted: images <code>.nii.gz .nrrd.gz .gipl.gz .nii .nrrd .gipl</code>, <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> <code>.mrk.json</code>,
-      transforms <code>.tfm .mat .h5 .hdf5 .txt</code> (<code>pipeline.py:45-67</code>). The key is the shared <code>patient_stem</code> plus the
-      transform and region vocabulary (<code>pipeline.py:27-42</code>):</p>
+      <p>Files are searched in the folder and its subfolders, hidden files are skipped, and every file is keyed with the same function. If there is no file at all, or no transform at all, the run stops before reading anything.</p>
 
-      <pre><code>PATIENT_TOKENS_TO_DROP = (
-    "transform", "matrix", "warp", "reg", "cbreg", "mandreg", "maxreg",
-    "cb", "mand", "max", "md", "mx",
-)
-def patient_of(filename: str) -&gt; str:
-    return pairing.patient_stem(filename, also_drop=PATIENT_TOKENS_TO_DROP)</code></pre>
+            <figure class="algo" data-scene="automatrix_key" data-ms="5000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the words that only describe the file are dropped from a transform name, and what remains is the patient key"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Files and transforms are paired by a <strong><a class="gterm" data-term="automatrix-patient-key" href="AutoMatrix.code.html#visor-step-pairing" title="See the code">patient key</a></strong>: the name is cut into words at the underscores, dashes and dots, and words that describe the kind of file (transform, matrix, reg, CB, MAND, MAX and so on) and time-point words such as T1 are dropped. The same rule is applied to the scans and to the transforms, so <code>C_0001_CB_Reg_transform.tfm</code> becomes <code>C_0001</code>, like the scan it belongs to.</p><ul class="algo-legend"><li class="k1"><b>kept</b>the words that identify the patient</li><li class="k4"><b>dropped</b>words that only name the file&rsquo;s role</li></ul><p class="algo-tag">Illustration: the two file names are examples; the words kept and dropped follow the rule above.</p></div>
+      </figure>
 
-      <p>So <code>C_0001_CB_Reg_transform.tfm</code> keys to <code>C_0001</code>, like its scan (run on 2026-11-09). No file at all, or no transform at
-      all, is a <code>ValueError</code> before anything is read (<code>__init__.py:72-84</code>).</p>
+
+            <a class="deep-link" href="AutoMatrix.code.html#visor-step-pairing"><b>In the code</b><span>Discovery, the vocabulary of dropped words</span></a>
+
 
       <h3 id="visor-step-fallback">4.2 The fallback pairing <span class="badge calcule">computed</span></h3>
 
-      <p><code>_pair_like_legacy</code> runs after the normal rule and can only add pairs, never change one (<code>__init__.py:188-264</code>):</p>
+      <p>After the normal rule, a <a class="gterm" data-term="automatrix-fallback" href="AutoMatrix.code.html#visor-step-fallback" title="See the code">second chance</a> can only <em>add</em> pairs, never change one. Each rule used is recorded in the report. In order:</p>
+
       <ol class="steps">
-        <li>With <code>same_transform_for_every_patient</code> and exactly one transform, that transform goes to every patient,
-        recorded as "asked to share one transform" (<code>:215-220</code>).</li>
-        <li>Patients left unpaired are keyed again with the legacy substring cuts, which differ on the two sides on purpose
-        (<code>pipeline.py:200-237</code>), and matched against transforms nobody else took: "legacy file names" (<code>__init__.py:222-249</code>).</li>
-        <li>One patient and one transform, still unpaired: applied, "the only transform, applied to every patient" (<code>:258-262</code>).</li>
+        <li>With the option &ldquo;same transform for every patient&rdquo; and exactly one transform, that transform goes to every patient.</li>
+        <li>Patients still unpaired are keyed again with the cuts of the legacy module, and matched against transforms nobody else took.</li>
+        <li>One patient and one transform, still unpaired: the transform is applied.</li>
       </ol>
-      <p>Each rule used is recorded in <code>paired_by</code> (<code>__init__.py:110-111</code>). Files without a transform and transforms without a file
-      are listed in the report (<code>:105-106</code>).</p>
+
+      <p>Files without a transform, and transforms without a file, are listed in the report rather than ignored.</p>
+
+            <a class="deep-link" href="AutoMatrix.code.html#visor-step-fallback"><b>In the code</b><span>The three fallback rules, with the lines</span></a>
+
 
       <h3 id="visor-step-read">4.3 Reading a transform <span class="badge calcule">computed</span></h3>
 
-      <p><code>sitk.ReadTransform</code> first; if ITK refuses it, a plain 4×4 matrix written as four lines of four numbers, which is what Greedy
-      writes under a <code>.mat</code> name, becomes an <code>AffineTransform</code>; otherwise a <code>RuntimeError</code> that names the file and quotes
-      ITK (<code>pipeline.py:138-180</code>):</p>
+      <p>The transform is read with ITK (the open-source imaging toolkit that SimpleITK wraps, the library doing the reading and resampling here). If ITK refuses the file but it holds a plain 4&times;4 matrix (four lines of four numbers, which is what Greedy writes under a <code>.mat</code> name), it is turned into an affine transform (a linear map plus a shift): the first three numbers of the first three rows form a matrix <em>A</em>, the last number of each row a translation <em>t</em>. Otherwise the error names the file. With several transforms for one patient, each is applied to the original file; none is composed with another.</p>
 
-      <pre><code>try:
-    return sitk.ReadTransform(path)
-except RuntimeError as itk_error:
-    matrix = _read_plain_matrix(path)
-    ...
-    affine = sitk.AffineTransform(3)
-    affine.SetMatrix([value for row in matrix[:3] for value in row[:3]])
-    affine.SetTranslation([row[3] for row in matrix[:3]])
-    return affine</code></pre>
+      <div class="formula"><math display="block"><mrow><mi class="k1">T</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mi class="k3">A</mi><mi class="k2">x</mi><mo>+</mo><mi class="k4">t</mi></mrow></math></div>
+      <ul class="algo-legend">
+        <li class="k1"><b>T</b>the transform</li>
+        <li class="k2"><b>x</b>a point in millimetres</li>
+        <li class="k3"><b>A</b>the 3&times;3 part of the matrix (rotation, scaling, reflection)</li>
+        <li class="k4"><b>t</b>the translation, the last number of each of the first three rows</li>
+      </ul>
 
-      <p>The transform is read per file (<code>__init__.py:311</code>). With several transforms for one patient, each is applied to the original file;
-      none is composed with another (<code>__init__.py:130-143</code>).</p>
+            <a class="deep-link" href="AutoMatrix.code.html#visor-step-read"><b>In the code</b><span>read_transform and the 4x4 text fallback</span></a>
+
 
       <h3 id="visor-step-landmarks">4.4 Landmarks: points through the inverse <span class="badge calcule">computed</span></h3>
 
-      <p>A <code>.mrk.json</code> has its points moved by <code>transform.GetInverse()</code>, in every markup group; a point whose
-      <code>positionStatus</code> is absent counts as defined, any other status is left where it was; <code>coordinateSystem</code> is not read
-      (<code>pipeline.py:71-104</code>). The reason is the resampler's convention: <code>ResampleImageFilter</code> maps each output point through the
-      transform to find where to read the input, so the content of the image moves by the inverse, and points have to follow the same way
-      (docstring <code>pipeline.py:3-6, 74-78</code>). The output is <code>&lt;stem&gt;[_&lt;tail&gt;].mrk.json</code> and is listed in both
-      <code>outputs</code> (with <code>points_moved</code>) and <code>produced</code> (<code>__init__.py:327-333</code>).</p>
+            <figure class="algo" data-scene="automatrix_sync" data-ms="7000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: for each pixel of the output, the transform tells where to read in the input, so the content moves the opposite way; a landmark point is moved by the inverse transform and stays on the same part of the shape"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">A resampler works backwards: for each pixel of the <em>output</em>, it applies the transform to find where to <em>read</em> in the input. So the image content moves by the <strong><a class="gterm" data-term="automatrix-inverse" href="AutoMatrix.code.html#visor-step-landmarks" title="See the code">inverse</a></strong> of the transform. For the <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> points to follow the same motion, the code applies the inverse transform to them explicitly. The scan and its points then stay in step.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">I</mi><mtext>out</mtext></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><msub><mi class="k2">I</mi><mtext>in</mtext></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">T</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi class="k4">p</mi><mo>&#x2032;</mo><mo>=</mo><msup><mi class="k3">T</mi><mo>&#x2212;1</mo></msup><mrow><mo stretchy="true" fence="true">(</mo><mi class="k4">p</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>I<sub>out</sub>, x</b>the output image, and a pixel of it</li><li class="k2"><b>I<sub>in</sub></b>the input image, read where T points</li><li class="k3"><b>T</b>the transform from the file</li><li class="k4"><b>p, p&prime;</b>a landmark point before and after</li></ul><p class="algo-tag">Illustration: the grid, the shape and the shift of 3 cells are made up for the picture. The formula for the output image is the standard resampling convention of ITK (the library that reads and resamples the image); the code only hands the transform to the resampler.</p></div>
+      </figure>
 
-      <h3 id="visor-step-resample">4.5 Images: interpolation and output grid <span class="badge calcule">computed</span></h3>
 
-      <p>The interpolator is nearest neighbour for a segmentation and linear for a scan (<code>pipeline.py:120-125</code>). Which one a file is
-      comes from <code>content</code>; with the default <code>Automatic</code>, from the <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a> (<code>__init__.py:350-354</code>;
-      <code>pipeline.py:264-296</code>): a floating-point image is a scan, a negative value or a value above 1000 is a scan, and more than 128 distinct
-      values, counted chunk by chunk, is a scan; anything else is a label map. The answer is recorded per file as <code>detected</code>.</p>
+      <p>In a landmark file, every group of points is moved. A point with no status counts as defined; any other status is left where it was. The frame declared in the file is not read: the points are moved as they are written.</p>
 
-      <p>The output grid (<code>pipeline.py:127-133</code>):</p>
+            <a class="deep-link" href="AutoMatrix.code.html#visor-step-landmarks"><b>In the code</b><span>Points through the inverse, with the lines</span></a>
 
-      <pre><code>if reference is not None:
-    resampler.SetReferenceImage(reference)
-else:
-    resampler.SetSize(image.GetSize())
-    resampler.SetOutputSpacing(image.GetSpacing())
-    resampler.SetOutputDirection(image.GetDirection())
-    resampler.SetOutputOrigin(transform.TransformPoint(image.GetOrigin()))</code></pre>
 
-      <p>Without a reference, which is the default since <code>reference</code> is hidden, the grid keeps the input's size, spacing and direction and
-      its origin is moved by the transform. For a translation this keeps the content in the box; for a reflection it does not (see the
-      <a href="#visor-findings">findings</a>). Outside the input, voxels are 0 (<code>pipeline.py:125</code>).</p>
+      <h3 id="visor-step-resample">4.5 Images: interpolation and output box <span class="badge calcule">computed</span></h3>
+
+      <p><strong>Scan or segmentation?</strong> The choice sets the <a class="gterm" data-term="automatrix-interp" href="AutoMatrix.code.html#visor-step-resample" title="See the code">interpolation</a>. By default it is read off the <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a>: a floating-point image is a scan; so is one with a negative value, a value above 1000, or more than 128 distinct values; anything else is a label map. The answer is recorded per file.</p>
+
+            <figure class="algo" data-scene="automatrix_interp" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: at a boundary between two labels, linear interpolation produces an in-between value while nearest neighbour keeps an existing label"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">When a pixel falls between two input pixels, a value has to be chosen. For a <strong>scan</strong> the two neighbours are blended (linear, first output row). For a <strong>segmentation</strong> blending would invent a label that does not exist (1.5 between 0 and 3), so the <strong>nearest</strong> neighbour is used instead (second output row). Outside the input, the value is 0.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">I</mi><mtext>lin</mtext></msub><mo>=</mo><mrow><mo stretchy="true" fence="true">(</mo><mn>1</mn><mo>&#x2212;</mo><mi class="k3">u</mi><mo stretchy="true" fence="true">)</mo></mrow><msub><mi>I</mi><mi>i</mi></msub><mo>+</mo><mi class="k3">u</mi><msub><mi>I</mi><mi>i+1</mi></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>I<sub>lin</sub></b>the blended value, used for scans</li><li class="k2"><b>nearest</b>the value of the closest input pixel, used for segmentations</li><li class=""><b>I<sub>i</sub>, I<sub>i+1</sub></b>the two input pixels on each side of the point (top row)</li><li class="k3"><b>u</b>how far the point is from the first one, between 0 and 1</li></ul><p class="algo-tag">Illustration: a one-dimensional sketch with made-up values; a real volume blends the 8 neighbouring voxels (trilinear), not two. The formula is the standard definition. Halfway between two voxels the nearest neighbour is a tie; the picture takes the left one.</p></div>
+      </figure>
+
+
+      <p><strong>Where the result lands.</strong> If a <a class="gterm" data-term="automatrix-reference" href="AutoMatrix.code.html#visor-step-resample" title="See the code">reference image</a> is given, its grid is used. If not (the default, since the reference is hidden), the output has the input&rsquo;s size, spacing and direction, and its origin is moved by the transform.</p>
+
+            <figure class="algo" data-scene="automatrix_grid" data-ms="7000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: without a reference, the output box has its origin moved through the transform; after a translation part of the content is cut, after a reflection the content falls outside the box, and with the input as its own reference it is kept"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Without a reference, the output box keeps the input size and direction, but its <strong>origin is moved through the transform</strong>. After a translation the box follows the content only partly; after a reflection it lands on the other side of the origin and the result is empty. Given the input as its own reference, the box does not move and the content is kept. Rows, top to bottom: the input, a translation, a reflection, the reflection with the input as reference.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">o</mi><mtext>out</mtext></msub><mo>=</mo><mi class="k3">T</mi><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k1">o</mi><mtext>in</mtext></msub><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>o<sub>out</sub>, o<sub>in</sub></b>origin (corner) of the output box and of the input box</li><li class="k3"><b>T</b>the transform from the file</li><li class="k2"><b>content</b>the part that stays inside the output box; dashed, the part that is lost</li></ul><p class="algo-tag">Illustration: the boxes and the content are one-dimensional shapes with made-up positions; only the behaviour (which rows keep the content) follows the code.</p></div>
+      </figure>
+
+
+            <a class="deep-link" href="AutoMatrix.code.html#visor-step-resample"><b>In the code</b><span>Scan or label map, the interpolator, the output grid</span></a>
+
 
       <h3 id="visor-step-write">4.6 Names, failures, report <span class="badge calcule">computed</span></h3>
 
-      <p>The output mirrors the input tree (<code>__init__.py:323-325</code>). The tail is <code>output_suffix</code>, then the transform's full stem when
-      <code>name_output_after_transform</code> is on or the patient has more than one transform; parts are joined with <code>_</code>, an empty suffix adds
-      nothing, and compound extensions are kept (<code>__init__.py:141, 301-303, 317-322, 335-342</code>). Example run on 2026-11-09:
-      <code>p1.nii.gz</code> with <code>p1_CBReg_matrix.tfm</code> and <code>p1_MANDReg_matrix.tfm</code> gives <code>p1_Reg_p1_CBReg_matrix.nii.gz</code> and <code>p1_Reg_p1_MANDReg_matrix.nii.gz</code>. A file that fails is recorded
-      in <code>cases[patient].failed</code> with its exception, and the loop goes on (<code>__init__.py:144-155</code>). If nothing was written,
-      <code>ValueError</code> with the first five failures or the two unpaired counts, and no report (<code>:164-184</code>). Otherwise
-      <code>AutoMatrix_report.json</code>:</p>
+      <p>The output mirrors the input folders. The name is the original name, then the suffix, then the transform&rsquo;s name when that option is on or when the patient has several transforms (so two transforms never write the same file). For example <code>p1.nii.gz</code> with <code>p1_CBReg_matrix.tfm</code> and <code>p1_MANDReg_matrix.tfm</code> gives <code>p1_Reg_p1_CBReg_matrix.nii.gz</code> and <code>p1_Reg_p1_MANDReg_matrix.nii.gz</code> (run on 2026-11-09). A file that fails is recorded with its error and the others go on. If nothing was written, the run stops with the first reasons; otherwise <code>AutoMatrix_report.json</code> lists, per patient, the transforms, the files moved, the failures, and then the unpaired files and transforms.</p>
 
-      <pre><code>{"tool": "AutoMatrix", "content": ..., "reference": &lt;file name or null&gt;, "output_suffix": ...,
- "cases": {"&lt;patient&gt;": {"transforms": [...],
-                         "outputs": [{"file", "detected"} | {"file", "points_moved"}],
-                         "produced": [...], "failed"?: [...]}},
- "without_a_transform": [...], "transforms_without_a_file": [...], "paired_by"?: {...},
- "summary": {"cases", "files_written"}, "duration_seconds": ...}</code></pre>
+            <a class="deep-link" href="AutoMatrix.code.html#visor-step-write"><b>In the code</b><span>Names, failures and the report fields</span></a>
 
-      <h2 id="visor-args">5. Arguments and schema</h2>
-      <p>Signature at <code>SADT-VISOR AutoMatrix/__init__.py:30-39</code>; unlike AutoCrop3D, no argument is keyword-only. Sections, labels and the two hidden arguments come from <code>SADT-VISOR AutoMatrix/layout.py</code>. A hidden argument is neither shown nor sent: the server applies its default (<code>AutomatedDentalToolsRemote ServerToolsCore/ServerToolsCoreLib/formgen.py:2272-2277,2813-2820</code>).</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Argument</th><th>Type</th><th>Default</th><th>Panel</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>files</code></td><td>path</td><td>required</td><td>Inputs · "Files to transform" (<code>layout.py:8</code>)</td><td>A scan, a segmentation, a <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> <code>.mrk.json</code>, or a folder searched recursively.</td></tr>
-            <tr><td><code>transforms</code></td><td>path</td><td>required</td><td>Inputs · "Transforms" (<code>layout.py:9</code>)</td><td><code>.tfm .mat .h5 .hdf5 .txt</code> (<code>pipeline.py:46</code>), file or folder.</td></tr>
-            <tr><td><code>output_dir</code></td><td>path</td><td>–</td><td>not shown</td><td>Filled by the server.</td></tr>
-            <tr><td><code>same_transform_for_every_patient</code></td><td>bool</td><td><code>False</code></td><td>Inputs (<code>layout.py:56-58</code>)</td><td>Applies one transform to all patients; needs exactly one transform (<code>__init__.py:215-220</code>).</td></tr>
-            <tr><td><code>name_output_after_transform</code></td><td>bool</td><td><code>False</code></td><td>Outputs · "Include the transform name" (<code>layout.py:48-50</code>)</td><td>Forced on when a patient has several transforms (<code>__init__.py:141</code>).</td></tr>
-            <tr><td><code>output_suffix</code></td><td>str</td><td><code>Reg</code></td><td>Outputs · "Output suffix" (<code>layout.py:51</code>)</td><td>Joined with <code>_</code>; may be empty.</td></tr>
-            <tr><td><code>content</code></td><td><code>Automatic</code> | <code>Scan</code> | <code>Segmentation</code></td><td><code>Automatic</code></td><td>Advanced · "How to resample" · <b>hidden</b> (<code>layout.py:43</code>)</td><td><code>Automatic</code> decides per file (<code>looks_like_a_label_map</code>, <code>pipeline.py:264-296</code>); <code>Segmentation</code> is nearest neighbour, <code>Scan</code> linear (<code>pipeline.py:122-124</code>).</td></tr>
-            <tr><td><code>reference</code></td><td>path</td><td>empty</td><td>Advanced · "Reference volume" · <b>hidden</b> (<code>layout.py:28</code>)</td><td>Output grid. <code>server_selectable = { reference = "none" }</code> so it is an ordinary upload, not a hosted model (<code>VISOR-serve server/deployment.toml:224-230</code>).</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>What the client does with it.</strong> Besides the generated form, the "Use the mirror matrix" box downloads the hosted <code>Mirror</code>
-      file into Transforms and ticks "Same transform for every patient"; it unticks itself when Transforms stops holding that file
-      (<code>AutoMatrixRemote.py:132-201</code>). After the run it loads the results and writes a status line from the report (see the findings).</p>
+
+      <h2 id="visor-args">5. What you can choose</h2>
+
+      <ul>
+        <li><strong>Files and transforms:</strong> a file or a folder for each (both required).</li>
+        <li><strong>Same transform for every patient:</strong> off by default; needs exactly one transform.</li>
+        <li><strong>Include the transform name:</strong> off by default, forced on when a patient has several transforms.</li>
+        <li><strong>Output suffix:</strong> <code>Reg</code> by default, may be empty.</li>
+        <li><strong>Hidden in the panel:</strong> how to resample (automatic by default) and the reference volume.</li>
+        <li><strong>Use the <a class="gterm" data-term="automatrix-mirror" href="AutoMatrix.code.html#visor-step-resample" title="See the code">mirror matrix</a></strong> (Slicer panel): fills Transforms with the hosted mirror file and ticks the same-transform option.</li>
+      </ul>
+
+            <a class="deep-link" href="AutoMatrix.code.html#visor-args"><b>In the code</b><span>The published arguments and what the client does</span></a>
+
 
       <h2 id="visor-predicted">6. What is predicted vs computed</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Block</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>Pairing</td><td><span class="badge calcule">computed</span> file-name rules</td><td>tool</td></tr>
-            <tr><td>Scan or segmentation</td><td><span class="badge calcule">computed</span> three value tests and a count of distinct values</td><td>tool</td></tr>
-            <tr><td>Resampling, <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> points</td><td><span class="badge calcule">computed</span> SimpleITK</td><td>tool</td></tr>
-            <tr><td>The transforms themselves</td><td>computed upstream, by a registration (AREG, GreedyReg, FlexReg), or the fixed mirror matrix</td><td>before the request</td></tr>
+            <tr><td>Pairing</td><td><span class="badge calcule">computed</span> file-name rules</td></tr>
+            <tr><td>Scan or segmentation</td><td><span class="badge calcule">computed</span> three value tests and a count of distinct values</td></tr>
+            <tr><td>Resampling, <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> points</td><td><span class="badge calcule">computed</span> SimpleITK</td></tr>
+            <tr><td>The transforms themselves</td><td>computed upstream, by a registration (AREG, GreedyReg, FlexReg), or the fixed <a class="gterm" data-term="automatrix-mirror" href="AutoMatrix.code.html#visor-step-resample" title="See the code">mirror matrix</a></td></tr>
           </tbody>
         </table>
       </div>
@@ -468,108 +457,65 @@ else:
 
       <h2 id="visor-env">7. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Value</th><th>Reference</th></tr></thead>
-          <tbody>
-            <tr><td>Python</td><td><code>&gt;=3.11,&lt;3.12</code></td><td><code>SADT-VISOR AutoMatrix/pyproject.toml:5</code></td></tr>
-            <tr><td>Libraries</td><td><code>SimpleITK==2.5.6</code>, <code>numpy==2.3.2</code>, <code>sadt-areg-common</code></td><td><code>pyproject.toml:6-17</code></td></tr>
-            <tr><td>Models</td><td>none (the tool's README speaks of 1.4 GB of models, see the findings)</td><td>–</td></tr>
-            <tr><td>Hosted test files</td><td><code>AutoMatrixRelease1</code> to <code>4</code> (247 961 348, 247 962 104, 254 256 972 and 787 127 578 bytes), <code>Mirror</code> (468 bytes)</td><td><code>VISOR-serve scripts/data-manifest.yml:731-751</code></td></tr>
-            <tr><td>Deployment section</td><td><code>[tools.AutoMatrix]</code>: <code>server_selectable</code> only</td><td><code>VISOR-serve server/deployment.toml:224-230</code></td></tr>
-            <tr><td>Time limit, upload cap</td><td>none (<code>TOOL_TIMEOUT_SECONDS = 0</code>), 500 MB, no split of a cohort</td><td><code>server/config.py:77, 240</code></td></tr>
-            <tr><td>GPU admission</td><td>no <code>device</code> argument, so the server assumes the GPU</td><td><code>server/execution/dispatch.py:95-116</code></td></tr>
-            <tr><td>Threads</td><td>the only tool of the five measured that gets faster with threads: 9.44 s at one thread, 7.33 s at 10, 7.03 s at 42, saturating by 14</td><td><code>server/execution/admission.py:407-411, 422-424</code> (read, not re-measured)</td></tr>
-            <tr><td>Memory</td><td><code>looks_like_a_label_map</code> copies the <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxel</a> array: about 190 MB for a 512×512×365 <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> stored as 16-bit integers (computed from the size, not measured)</td><td><code>pipeline.py:285</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The tool has an environment of its own on the server (SimpleITK and numpy, no model, no network). Versions, hosted test files, thread behaviour and memory are on the code page.</p>
+
+            <a class="deep-link" href="AutoMatrix.code.html#visor-env"><b>In the code</b><span>Versions, hosted test files, threads, memory</span></a>
+
 
       <h2 id="visor-changes">8. What changed from the legacy logic</h2>
-      <p>Legacy lines are at 3c67957 (<code>Automatrix_CLI.py</code>), VISOR lines at 6ba2a78. The legacy module is on <a href="../../AutoMatrix/AutoMatrix.html">its own page</a> (<a href="../../AutoMatrix/AutoMatrix.html#convention">the transformation convention</a>, <a href="../../AutoMatrix/AutoMatrix.html#reechantillonnage">resampling and reference</a>, <a href="../../AutoMatrix/AutoMatrix.html#appariement">matching</a>).</p>
+
+      <p>The transform convention is the legacy one. What changed is around it.</p>
+
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Subject</th><th>Legacy (3c67957)</th><th>VISOR (6ba2a78)</th></tr></thead>
+          <thead><tr><th>Subject</th><th>Legacy</th><th>VISOR</th></tr></thead>
           <tbody>
-            <tr><td>Patient key, files</td><td>Sixteen chained <code>.split</code>, a <code>.split('.')</code>, and a <code>_T0</code> to <code>_T49</code> loop (<code>:77-79</code>).</td><td><code>pairing.patient_stem(…, also_drop=PATIENT_TOKENS_TO_DROP)</code>, both sides (<code>pipeline.py:27-42</code>).</td></tr>
-            <tr><td>Patient key, transforms</td><td>Another token list (<code>:130-133</code>).</td><td>Same function; <code>C_0001_CB_Reg_transform.tfm</code> gives <code>C_0001</code> (run on 2026-11-09).</td></tr>
-            <tr><td>Second chance</td><td>None.</td><td>Substring cuts like the legacy, only for patients left unpaired, recorded in <code>paired_by</code> (<code>pipeline.py:200-237</code>, <code>__init__.py:188-264</code>).</td></tr>
-            <tr><td>One transform for all</td><td>Any single transform file goes to every patient (<code>:138-140</code>).</td><td>Only with <code>same_transform_for_every_patient</code> and exactly one transform (<code>__init__.py:215-220</code>), or one patient and one transform (<code>:258-262</code>). Otherwise <code>transformed nothing</code>.</td></tr>
-            <tr><td>Input formats</td><td><code>.vtk .vtp .stl .off .obj .nii .nii.gz .nrrd .mrk.json</code> (<code>:45</code>).</td><td><code>.nii.gz .nrrd.gz .gipl.gz .nii .nrrd .gipl</code> and <code>.mrk.json</code> (<code>pipeline.py:54-55</code>); no meshes. <code>.nrrd.gz</code> is discovered but ITK cannot read it: run on 2026-11-09, it failed per file with <code>Unable to determine ImageIO reader</code>, listed under <code>failed</code>.</td></tr>
-            <tr><td>Transform formats</td><td><code>.npy .h5 .tfm .mat .txt</code> (<code>:110</code>).</td><td><code>.tfm .mat .h5 .hdf5 .txt</code> (<code>pipeline.py:46</code>).</td></tr>
-            <tr><td>Reading a transform</td><td><code>sitk.ReadTransform</code>, failure logged and skipped (<code>:258-261</code>).</td><td>Same, then a 4x4 text fallback, then a named <code>RuntimeError</code> (<code>pipeline.py:138-180</code>).</td></tr>
-            <tr><td>Output grid, no reference</td><td>The input image itself (<code>:279</code>); the origin-moving branch is never reached (<code>:186-194</code>).</td><td>Input size, spacing, direction, origin moved by the transform (<code>pipeline.py:127-133</code>).</td></tr>
-            <tr><td>Composite transform</td><td>Reference guessed from the <code>.tfm</code> path (<code>:165-175</code>).</td><td>Not ported (no handling of <code>Composite</code> in <code>src/</code>).</td></tr>
-            <tr><td>Mirror matrix</td><td>If the matrix name contains "mirror", the image is its own reference (<code>:276-277</code>).</td><td>Not ported (<code>README.md:89-92</code>); a transform called mirror gets no special treatment (<code>tests/test_run_options.py:311-331</code>).</td></tr>
-            <tr><td>Interpolation</td><td>One check box for the whole run (<code>:206</code>).</td><td><code>content</code>; <code>Automatic</code> per file (<code>__init__.py:350-354</code>, <code>pipeline.py:122-124</code>).</td></tr>
-            <tr><td><a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">Landmark</a> groups and status</td><td>First group only, <code>positionStatus == 'defined'</code> strictly (<code>:154-155</code>).</td><td>All groups; an absent status counts as defined; other statuses left unchanged (<code>pipeline.py:86-87,95-96</code>).</td></tr>
-            <tr><td>Uninvertible transform, landmarks</td><td>Warning and return, no file (<code>:148-152</code>).</td><td><code>RuntimeError</code>, recorded in <code>cases[patient].failed</code> (<code>pipeline.py:83</code>; <code>__init__.py:144-155</code>).</td></tr>
-            <tr><td>Several transforms</td><td>One output per transform, may overwrite (<code>:256-264</code>).</td><td>Name forced when a patient has more than one (<code>__init__.py:141</code>).</td></tr>
-            <tr><td>Output name</td><td><code>args.suffix</code> concatenated, UI default <code>_apply</code> (<code>AutoMatrix.ui:325</code>); path built by <code>replace</code> and <code>split(extension_scan)[0]</code> (<code>:224-226,281</code>).</td><td>Default <code>Reg</code>, separator added by the tool (<code>__init__.py:36,301-303</code>); <code>relpath</code> and <code>Path</code> (<code>:323-325</code>).</td></tr>
-            <tr><td>Unmatched files</td><td>Ignored without a word.</td><td>Reported (<code>__init__.py:105-106</code>); <code>ValueError</code> when nothing is written (<code>:164-182</code>).</td></tr>
-            <tr><td>Hidden files</td><td>Not filtered.</td><td>Names starting with a dot are skipped (<code>__init__.py:283</code>).</td></tr>
-            <tr><td>"From AReg" branch</td><td><code>suffix_map</code> and a missing argument (<code>:200-204,232-252</code>).</td><td>Removed (<code>README.md:16-45</code>).</td></tr>
-            <tr><td>Progress</td><td><code>emit_event(PATIENT_DONE)</code> (<code>:27,287</code>).</td><td><code>progress.report(index, total, "patient")</code> (<code>__init__.py:117</code>).</td></tr>
+            <tr><td><a class="gterm" data-term="automatrix-patient-key" href="AutoMatrix.code.html#visor-step-pairing" title="See the code">Patient key</a></td><td>two different cut lists for files and transforms</td><td>one rule for both; the legacy cuts only as a recorded <a class="gterm" data-term="automatrix-fallback" href="AutoMatrix.code.html#visor-step-fallback" title="See the code">second chance</a></td></tr>
+            <tr><td>One transform for all</td><td>any single transform goes to every patient</td><td>only when asked, or with one patient and one transform</td></tr>
+            <tr><td>Input formats</td><td>images and <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>; meshes are found by the search but fail when read</td><td>images and landmarks; no meshes</td></tr>
+            <tr><td>Reading a transform</td><td>failure logged and skipped</td><td>a plain 4&times;4 text matrix is accepted; otherwise a named error</td></tr>
+            <tr><td><a class="gterm" data-term="automatrix-reference" href="AutoMatrix.code.html#visor-step-resample" title="See the code">Output box</a>, no reference</td><td>the input image itself</td><td>input size and direction, origin moved by the transform</td></tr>
+            <tr><td><a class="gterm" data-term="automatrix-mirror" href="AutoMatrix.code.html#visor-step-resample" title="See the code">Mirror matrix</a></td><td>a matrix named mirror uses the image as its own reference</td><td>no special treatment</td></tr>
+            <tr><td><a class="gterm" data-term="automatrix-interp" href="AutoMatrix.code.html#visor-step-resample" title="See the code">Interpolation</a></td><td>one check box for the whole run</td><td>automatic, per file</td></tr>
+            <tr><td>Landmark groups and status</td><td>first group only, strictly &ldquo;defined&rdquo;</td><td>all groups; no status counts as defined</td></tr>
+            <tr><td>Several transforms</td><td>outputs overwrite each other when the matrix name is not added</td><td>the transform name is forced</td></tr>
+            <tr><td>Unmatched files</td><td>ignored without a word</td><td>listed in the report</td></tr>
+            <tr><td>&ldquo;From AReg&rdquo;</td><td>a hard-coded naming branch</td><td>removed</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h2 id="visor-findings">9. Findings in VISOR</h2>
+            <a class="deep-link" href="AutoMatrix.code.html#visor-changes"><b>In the code</b><span>The same table with legacy and VISOR lines</span></a>
 
-      <div class="callout bug">
-        <div class="callout-title">The status line always says "0 file(s) written"</div>
-        <p><code>AutoMatrixRemote._summarize</code> reads <code>report.get("written")</code> and <code>report.get("skipped")</code> (<code>AutomatedDentalToolsRemote AutoMatrixRemote/AutoMatrixRemote.py:227-235</code>). The report written by the tool has neither key: it carries <code>summary.files_written</code> and the lists <code>without_a_transform</code> and <code>transforms_without_a_file</code> (<code>SADT-VISOR AutoMatrix/__init__.py:105-106,158-161</code>). Run on 2026-11-09: the report of a run that wrote one file held <code>summary.files_written = 1</code> and no <code>written</code> key, so, reading the code of <code>_summarize</code>, the message is <code>AutoMatrix: 0 file(s) written.</code> whatever happened, and unpaired files are never signalled in Slicer. No test covers <code>_summarize</code> (nothing in <code>test_automatrix_client.py</code> names it). AutoCrop3DRemote reads the right keys (<code>AutoCrop3DRemote.py:119-120</code>).</p>
-      </div>
 
-      <div class="callout bug">
-        <div class="callout-title">Without a reference the output box follows the transform</div>
-        <p>With no <code>reference</code> (the default, and the hidden argument), the output keeps the input size and direction and takes the origin <code>transform.TransformPoint(origin)</code> (<code>SADT-VISOR AutoMatrix/pipeline.py:133</code>). The legacy grid was the image's own (<code>Automatrix_CLI.py:279@3c67957</code>). Run on 2026-11-09 on a 20×20×20 volume of 1 mm <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a> with its origin at -10 mm on each axis, holding a 10×10×10 block (1000 non-zero voxels) at indices 2 to 11, resampled as a segmentation: a translation of <code>(5,0,0)</code> moved the origin to -5 and kept 200 of the 1000 voxels; a reflection <code>diag(-1,1,1)</code> (a substitute for the hosted mirror file, whose content was not downloaded) moved the origin from -10 to +10 and kept none; the same reflection with the volume as its own reference kept all 1000. This is the path of the "Use the mirror matrix" box and of VFACE's mirror (<code>SADT-VISOR tools/VFACE/src/sadt_vface/tools.py:179-187</code>, no <code>reference</code>). Tests pin the translation behaviour (<code>tests/test_run_options.py:265-277</code>, <code>tests/test_resample.py:108-115</code>), and one relies on it (<code>tests/test_resample.py:44-53</code>).</p>
-        <p><strong>Not delivered.</strong> A fix exists on the branch <code>fix/automatrix-mirrors-into-an-empty-box</code> (commit <code>ce4f6fb</code>, 2026-09-28, local and <code>origin</code>): it keeps the input origin unless the transform is a pure translation. That branch is not an ancestor of <code>tool/vface</code> (6ba2a78), so the behaviour described above is the one in this tree.</p>
-      </div>
+      <h2 id="visor-findings">9. Known issues in VISOR</h2>
 
-      <div class="callout warn">
-        <div class="callout-title"><code>produced</code> stays empty for volumes</div>
-        <p>Each case starts with <code>"produced": []</code> (<code>SADT-VISOR AutoMatrix/__init__.py:127-128</code>) and the only append is in the <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> branch (<code>:332</code>). Run on 2026-11-09 with a volume: <code>outputs</code> held the file and <code>produced</code> was <code>[]</code>. The comment at <code>:125-126</code> says <code>produced</code> is the flat list every tool of the catalogue answers; AutoCrop3D fills it for its volumes (<code>SADT-VISOR tools/AutoCrop3D/src/sadt_autocrop3d/__init__.py:236</code>). The consequence for clients that read it was not traced.</p>
-      </div>
+      <p>Each point is checked in the code and described, with its evidence, on the code page; the list also appears in the <a href="../../findings.html">findings</a>.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">An uninvertible transform does not stop the run</div>
-        <p>For a transform that cannot be inverted the landmark file of that patient fails and is listed in <code>cases[patient].failed</code>, while the patient's volume is written (<code>SADT-VISOR AutoMatrix/__init__.py:144-155</code>). Run on 2026-11-09 with a zero displacement field stored as <code>.h5</code>: <code>GetInverse</code> raised <code>Unable to create inverse!</code>, the volume was written and <code>files_written</code> was 1. The run raises only when nothing at all was written (<code>:164</code>), and in that case no report is written, because the report is saved after that check (<code>:184</code>). The Slicer panel does not show <code>failed</code> (see the status-line finding).</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Documentation of the Remote module contradicts the code</div>
-        <p><code>AutomatedDentalToolsRemote AutoMatrixRemote/AutoMatrixRemote.py:16-19</code> says the server still applies a matrix whose name contains "mirror" in the scan's own space; the port does not (<code>SADT-VISOR AutoMatrix/README.md:89-92</code>, <code>tests/test_run_options.py:311-331</code>). <code>AutoMatrixRemote.py:12-15</code> says "nothing is hidden" while <code>reference</code> and <code>content</code> are hidden (<code>layout.py:28,43</code>). The client test builds its schema by hand with <code>hidden: False</code> everywhere and other section names (<code>test_automatrix_client.py:72-186</code>), so <code>test_nothing_is_marked_hidden</code> (<code>:255-257</code>) checks that copy, not the server's schema. The comment in <code>SADT-VISOR AutoMatrix/layout.py:22-27</code> says VFACE passes <code>"None"</code> at eight call sites; <code>SADT-VISOR tools/VFACE/src/sadt_vface/tools.py:179-187,205-212</code> passes no <code>reference</code>.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title"><code>coordinateSystem</code> of a landmark file is not read</div>
-        <p>Points are moved as they are written, whatever frame the file declares, and the output keeps the declaration (<code>SADT-VISOR AutoMatrix/pipeline.py:71-104</code>, no read of the field). Points whose status is neither absent nor "defined" stay at their old coordinates in a file reported as transformed (<code>:95-96</code>). Both behaviours are those of the legacy CLI (<a href="../../AutoMatrix/AutoMatrix.html">legacy page</a>). Read in code.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">What the VISOR README and manifest say</div>
-        <p><code>VISOR-serve scripts/data-manifest.yml:730</code> still reads "NOT PORTED YET (test data only)" although the tool's source is mounted in <code>VISOR-serve docker-compose.dev.yml:51</code>; <code>SADT-VISOR AutoMatrix/README.md:111-113</code> speaks of 1.4 GB of models while the manifest lists test archives (<code>data-manifest.yml:731-751</code>). The hosted files are <code>AutoMatrixRelease1</code> to <code>4</code> (247 961 348, 247 962 104, 254 256 972 and 787 127 578 bytes) and <code>Mirror</code> (468 bytes).</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">Pairing, naming and failures are reported</div>
-        <p>One naming rule for both sides, with the legacy cuts as a recorded second chance (<code>paired_by</code>); unpaired files and transforms named in the report; a failing file costs that file (<code>SADT-VISOR AutoMatrix/__init__.py:105-111,144-155</code>); two transforms of one patient never write the same name (<code>tests/test_run_options.py:224-243</code>). All 234 tests of the package passed on 2026-11-09.</p>
-      </div>
+      <ul>
+        <li><strong>The status line always says &ldquo;0 file(s) written&rdquo;</strong> in Slicer, and unpaired files are never signalled. <a href="AutoMatrix.code.html#f-status-line">Evidence</a>.</li>
+        <li><strong>Without a reference, the <a class="gterm" data-term="automatrix-reference" href="AutoMatrix.code.html#visor-step-resample" title="See the code">output box</a> follows the transform</strong>: a reflection, such as the <a class="gterm" data-term="automatrix-mirror" href="AutoMatrix.code.html#visor-step-resample" title="See the code">mirror matrix</a>, leaves the box empty. A fix exists on a branch that is not merged. <a href="AutoMatrix.code.html#f-output-box">Evidence</a>.</li>
+        <li><strong>The list of produced files stays empty for volumes.</strong> <a href="AutoMatrix.code.html#f-produced-empty">Evidence</a>.</li>
+        <li><strong>An uninvertible transform does not stop the run:</strong> the <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> fail, the volume is written. <a href="AutoMatrix.code.html#f-uninvertible">Evidence</a>.</li>
+        <li><strong>Documentation of the Remote module contradicts the code.</strong> <a href="AutoMatrix.code.html#f-remote-docs">Evidence</a>.</li>
+        <li><strong>The declared frame of a landmark file is not read.</strong> <a href="AutoMatrix.code.html#f-coordinate-system">Evidence</a>.</li>
+        <li><strong>The README and the data manifest are out of date</strong> on this tool. <a href="AutoMatrix.code.html#f-readme-manifest">Evidence</a>.</li>
+      </ul>
 
       <h2 id="visor-literature">10. Literature</h2>
 
-      <p>AutoMatrix applies transforms and has no method of its own to cite; the tool's bibliography is on <a href="../../AutoMatrix/SOURCES.html">AutoMatrix sources</a>.
-      For the VISOR mechanics shared by every tool, see <a href="../architecture.html">Architecture</a> and
-      <a href="../run-lifecycle.html">A run, step by step</a>; for using the panel, <a href="../guide/AutoMatrix.html">the VISOR guide</a>.</p>
+      <p>AutoMatrix applies transforms and has no method of its own to cite; the tool&rsquo;s bibliography is on <a href="../../AutoMatrix/SOURCES.html">AutoMatrix sources</a>. For the VISOR mechanics shared by every tool, see <a href="../architecture.html">Architecture</a> and <a href="../run-lifecycle.html">A run, step by step</a>; for using the panel, <a href="../guide/AutoMatrix.html">the VISOR guide</a>.</p>
 
       <footer class="footer">
-        <a href="../../index.html">← All pages</a> · <a href="../../AutoMatrix/AutoMatrix.html">Legacy page for this tool</a> · <a href="../guide/AutoMatrix.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a>
+        <a href="../../index.html">← All pages</a> · <a href="AutoMatrix.code.html">Code page for this tool</a> · <a href="../../AutoMatrix/AutoMatrix.html">Legacy page for this tool</a> · <a href="../guide/AutoMatrix.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a>
       </footer>
+
 
     </article>
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../../assets/algo.js"></script>
+<script src="../../../assets/algo-AutoMatrix.js"></script>
 </body>
 </html>

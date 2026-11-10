@@ -23,8 +23,9 @@
     <div class="sec-switch" role="group">
       <a href="../guide/FlexReg.html">Guide</a>
       <a href="../FlexReg/FlexReg.html" aria-current="true">Atlas</a>
+      <a href="../FlexReg/FlexReg.code.html">Code</a>
     </div>
-    <p class="sec-hint">how it works in the code</p>
+    <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="legacy">
     <div class="gen-legacy">
     <div class="nav-group"><h4>Registration</h4><ul>
@@ -121,9 +122,11 @@
       <header class="page-head">
         <img class="tool-icon" src="../../assets/screens/FlexReg/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Registration</div>
-        <h1>FlexReg</h1>
-        <p class="lede">Patient-by-patient registration of Intra Oral Scans, with a registration patch built by hand (palatal butterfly, free curve, or mucogingival band) instead of being predicted by a network: the interactive counterpart to AREG_IOS.</p>
+        <h1>FlexReg: patch-based registration</h1>
+        <p class="lede">Patient-by-patient registration of intraoral scans, with a registration patch built by hand (palatal <a class="gterm" data-term="flexreg-butterfly-legacy" href="FlexReg.code.html#path-a" title="See the code">butterfly</a>, free curve, or <a class="gterm" data-term="flexreg-mucogingival-legacy" href="FlexReg.code.html#path-c" title="See the code">mucogingival band</a>) instead of being predicted by a network: the interactive counterpart to AREG_IOS. This page explains how, step by step, with the maths; the files, lines and pitfalls are on <a href="FlexReg.code.html">the code page</a>.</p>
         <div class="meta-row">
+          <a class="badge neutral" href="FlexReg.code.html">Code (developers)</a>
+          <a class="badge neutral" href="../guide/FlexReg.html">Guide</a>
           <a class="badge nopaper" href="SOURCES.html" title="Unpublished, and its MGL path even more so.">unpublished</a>
           <span class="badge cli">FlexReg_CLI</span>
           <span class="badge neutral">conda env: shapeaxi</span>
@@ -132,85 +135,100 @@
         </div>
       </header>
 
-      <div class="callout note">
-        <div class="callout-title">Two code bases</div>
-        <p>Everything numbered below describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port, which runs the same tool on a server, is described on its own page, <a href="../visor/FlexReg/FlexReg.html">FlexReg on VISOR</a>. The VISOR port keeps the patch preview in Slicer and does the rest on the server; it does not carry the free curve, the patch deletion, the mucogingival patch computation or the automatic crown segmentation.</p>
-      </div>
+      <h2 id="overview">Overview: what goes in, what comes out</h2>
 
-      <h2 id="situation">1. Position in the chain</h2>
-
-      <p>Nothing in the repository calls FlexReg: it is a terminal tool, driven by
-      the operator. It does, however, call two pretrained networks, and it
-      <strong>produces the input to <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></strong>: both tools read exactly
-      the same point array.</p>
+      <p>Between two visits the teeth can move, and the gums too; the palate hardly does. FlexReg registers the second scan onto the first by looking only at a patch of the palate (upper arch) or of the <a class="gterm" data-term="flexreg-mucogingival-legacy" href="FlexReg.code.html#path-c" title="See the code">mucogingival line</a> (lower arch), so the teeth themselves are free to have moved. Unlike AREG_IOS, which has the patch <em>predicted</em> by a network, FlexReg builds it geometrically, by hand.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Called</th><th>When</th><th>Why</th></tr></thead>
+          <thead><tr><th></th><th>What it is</th></tr></thead>
           <tbody>
-            <tr><td><code>dentalmodelseg</code> (ShapeAXI / <a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a>)</td><td>if the mesh has no <code>Universal_ID</code> array</td><td>segment and number the crowns</td></tr>
-            <tr><td><code>ALI_IOS</code> (weights <code>Lower_MG_*.pth</code>)</td><td>lower-arch mode only</td><td>place the 13 mucogingival landmarks</td></tr>
+            <tr><td>Input</td><td>two intraoral scans of a patient (T1, the fixed one, and T2, the moving one), <code>.vtk</code> or <code>.stl</code></td></tr>
+            <tr><td>Idea</td><td>label the crowns, orient the arch, draw a patch (<a class="gterm" data-term="flexreg-butterfly-legacy" href="FlexReg.code.html#path-a" title="See the code">butterfly</a>, free curve or band), then register T2 onto T1 on the patch with a rigid <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a></td></tr>
+            <tr><td>Output</td><td>the registered mesh and a <code>.tfm</code> transform; the patch itself is stored in the mesh as a 0/1 array, which AREG_IOS reads</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>Downstream, <code>AREG_IOS.py:364</code> does
-      <code>vtkMeshTeeth(list_teeth=[1], property="Butterfly")</code> and
-      <code>AREG_IOS.py:378</code> the same on <code>MGL_ARRAY_NAME</code>:
-      a patch built in FlexReg is directly consumable by AREG_IOS, and
-      vice versa. The difference is where the patch comes from: AREG_IOS has it predicted
-      by a network (<code>PredPatch.py</code>, a multi-view
-      <code>MonaiUNetHRes</code>), FlexReg builds it geometrically.</p>
+      <p>Everything numbered below describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port, which runs the same tool on a server, is described on its own page, <a href="../visor/FlexReg/FlexReg.html">FlexReg on VISOR</a>. It keeps the patch preview in Slicer and does the rest on the server; it does not carry the free curve, the patch deletion, the mucogingival patch computation or the automatic crown segmentation.</p>
+
+      <h2 id="situation">1. Position in the chain</h2>
+
+      <p>Nothing in the repository calls FlexReg: it is a terminal tool, driven by the operator. It does call two pretrained networks, and it <strong>produces the input to <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a></strong>: both tools read exactly the same point array. A patch built in FlexReg is directly usable by AREG_IOS, and the other way round; the difference is where the patch comes from.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Network called</th><th>When</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a></td><td>if the mesh has no tooth-label array</td><td>segment and number the crowns</td></tr>
+            <tr><td><a href="../ALI/ALI.html#ali-ios">ALI_IOS</a></td><td>lower-arch mode only</td><td>place the 13 mucogingival <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a></td></tr>
+          </tbody>
+        </table>
+      </div>
 
       <figure class="diagram">
         <svg viewBox="0 0 980 230" role="img" aria-label="Overview of the FlexReg pipeline, from the IOS input to the outputs consumed by AREG_IOS">
+          <a class="d-link" href="#entrees">
           <rect class="d-box" x="10" y="30" width="110" height="48" rx="6"/>
           <text class="d-label" x="65" y="50" text-anchor="middle">IOS T1 / T2</text>
           <text class="d-label-s" x="65" y="64" text-anchor="middle">.stl / .vtk</text>
+          </a>
 
           <path class="d-arrow" d="M120 54 H148"/>
           <path class="d-arrow-head" d="M150 54 l-7 -4 v8 z"/>
           <text class="d-label-s" x="134" y="20" text-anchor="middle">raw mesh</text>
 
+          <a class="d-link" href="#modeles">
           <rect class="d-box-n" x="150" y="30" width="140" height="48" rx="6"/>
           <text class="d-label" x="220" y="50" text-anchor="middle">dentalmodelseg</text>
           <text class="d-label-s" x="220" y="64" text-anchor="middle">segments the crowns</text>
+          </a>
 
           <path class="d-arrow" d="M290 54 H318"/>
           <path class="d-arrow-head" d="M320 54 l-7 -4 v8 z"/>
           <text class="d-label-s" x="304" y="20" text-anchor="middle">Universal_ID per vertex</text>
 
+          <a class="d-link" href="#entrees">
           <rect class="d-box" x="320" y="30" width="140" height="48" rx="6"/>
           <text class="d-label" x="390" y="50" text-anchor="middle">Orientation</text>
           <text class="d-label-s" x="390" y="64" text-anchor="middle">canonical, 4 centroids</text>
+          </a>
 
           <path class="d-arrow" d="M460 54 H488"/>
           <path class="d-arrow-head" d="M490 54 l-7 -4 v8 z"/>
           <text class="d-label-s" x="474" y="20" text-anchor="middle">oriented surface</text>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box-a" x="490" y="30" width="160" height="48" rx="6"/>
           <text class="d-label" x="570" y="50" text-anchor="middle">Patch</text>
           <text class="d-label-s" x="570" y="64" text-anchor="middle">butterfly / draw / MGL</text>
+          </a>
 
           <path class="d-arrow" d="M650 54 H678"/>
           <path class="d-arrow-head" d="M680 54 l-7 -4 v8 z"/>
           <text class="d-label-s" x="664" y="20" text-anchor="middle">patch, 0/1 array</text>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box" x="680" y="30" width="130" height="48" rx="6"/>
           <text class="d-label" x="745" y="50" text-anchor="middle">Rigid ICP</text>
           <text class="d-label-s" x="745" y="64" text-anchor="middle">VTK, on the patch</text>
+          </a>
 
           <path class="d-arrow" d="M810 54 H838"/>
           <path class="d-arrow-head" d="M840 54 l-7 -4 v8 z"/>
           <text class="d-label-s" x="824" y="20" text-anchor="middle">4×4 matrix</text>
 
+          <a class="d-link" href="#sorties">
           <rect class="d-box-a" x="840" y="30" width="130" height="48" rx="6"/>
           <text class="d-label" x="905" y="50" text-anchor="middle">Outputs</text>
           <text class="d-label-s" x="905" y="64" text-anchor="middle">.vtk + .tfm</text>
+          </a>
 
+          <a class="d-link" href="#modeles">
           <rect class="d-box-n" x="490" y="150" width="160" height="48" rx="6"/>
           <text class="d-label" x="570" y="170" text-anchor="middle">ALI_IOS</text>
           <text class="d-label-s" x="570" y="184" text-anchor="middle">13 MG landmarks (lower arch)</text>
+          </a>
           <path class="d-arrow" d="M570 150 V80"/>
           <path class="d-arrow-head" d="M570 78 l-4 7 h8 z"/>
           <text class="d-label-s" x="580" y="118" text-anchor="start">MGL path only</text>
@@ -219,565 +237,240 @@
           <path class="d-arrow-head" d="M905 130 l-4 -7 h8 z"/>
           <text class="d-label-s" x="905" y="148" text-anchor="middle">read afterward by AREG_IOS</text>
         </svg>
-        <figcaption>Full chain: crown segmentation and the mucogingival
-        landmarks are predicted by pretrained networks (purple boxes),
-        everything else, orientation, patch, <a class="gterm" href="../glossary.html#g-icp" title="See glossary">ICP</a>, is computed geometrically.</figcaption>
+        <figcaption>Full chain: crown segmentation and the mucogingival landmarks are predicted by pretrained networks (purple boxes); everything else, orientation, patch, <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a>, is computed geometrically.</figcaption>
       </figure>
+      <a class="deep-link" href="FlexReg.code.html#situation"><b>In the code</b><span>The two calls and what AREG_IOS reads downstream</span></a>
 
       <h2 id="fichiers">2. Files involved</h2>
 
-      <div class="callout note">
-        <div class="callout-title">Note (legacy only)</div>
-        <p><strong>Part of this module now lives in the shared layer.</strong> <a href="../ADTLib/ADTLib.html">ADTLib</a> centralises what several modules carried in copies: from here, <code>geometry.py</code>, <code>io/landmarks.py</code>, <code>labels.py</code> and the contract of <code>method.py</code>. Its page records how many copies each file replaced.</p>
-        <p><strong>Legacy (3c67957); not present in VISOR:</strong> the VISOR tool imports nothing from ADTLib; its utilities are local copies
-        (<code>SADT-VISOR tools/FlexReg/src/sadt_flexreg/util.py</code>, <code>transformation.py</code>).</p>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
-          <tbody>
-            <tr><td><code>FlexReg/FlexReg.py</code></td><td>Slicer widget, 4400 lines: UI, joysticks, previews, full MGL path</td><td>Slicer's Python</td></tr>
-            <tr><td><code>FlexReg_CLI/FlexReg_CLI.py</code></td><td>the CLI: butterfly, curve, delete, icp, icp_mgl</td><td>Slicer's Python via <code>slicer.cli.run</code>, <strong>CUDA required</strong></td></tr>
-            <tr><td><code>FlexReg_Method/</code> (<code>FlexReg_CLI/FlexReg_Method</code>)</td><td>orientation, butterfly, geodesic dilation, ICP</td><td>same</td></tr>
-            <tr><td><code>FlexReg_utils/</code> (<code>FlexReg/FlexReg_utils</code>)</td><td>butterfly preview (numpy, CPU), MGL patch (numpy/scipy), pytorch3d installation</td><td>Slicer's Python</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="callout">
-        <div class="callout-title">Non-obvious point (legacy only)</div>
-        <p>The CLI does <strong>not</strong> run inside the conda environment. It goes
-        through <code>slicer.cli.run(slicer.modules.flexreg_cli, ...)</code>
-        (<code>FlexReg.py:766-767</code>), so inside Slicer's own Python, hence
-        why <code>ensureBooted</code> installs <code>torch</code> inside Slicer
-        itself. Only <code>dentalmodelseg</code> and
-        <code>ALI_IOS</code> go through <code>conda run -n shapeaxi</code>.</p>
-        <p><strong>Legacy (3c67957); not present in VISOR:</strong> the tool runs in its own server environment
-        (Python 3.11 or 3.12, torch 2.8.0, vtk 9.3.1, numpy 1.26.4: <code>SADT-VISOR tools/FlexReg/pyproject.toml:8-18</code>),
-        and nothing is installed in Slicer (<code>AutomatedDentalToolsRemote FlexRegRemote/FlexRegRemote.py:8-12</code>).</p>
-      </div>
-
-      <p><code>setup_cli_command()</code> (<code>FlexReg.py:852</code>), which
-      would launch the CLI via conda, is never called anywhere: dead code.</p>
+      <p>The widget (about 4150 lines, mostly user interface) drives a command-line tool that builds the patch and runs the <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a>. The geometric core (orientation, patch, <a class="gterm" data-term="flexreg-flood-legacy" href="FlexReg.code.html#path-a" title="See the code">geodesic fill</a>, ICP) is a small library; the preview and the <a class="gterm" data-term="flexreg-mucogingival-legacy" href="FlexReg.code.html#path-c" title="See the code">mucogingival band</a> live in the widget. The command-line tool needs CUDA; it runs in Slicer&rsquo;s own Python, not in conda.</p>
+      <a class="deep-link" href="FlexReg.code.html#fichiers"><b>In the code</b><span>Every file with its role and where it runs</span></a>
 
       <h2 id="entrees">3. Inputs and preprocessing</h2>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall: file conversion (legacy only)</div>
-        <p><code>ensureVtkInput()</code> (<code>FlexReg.py:3199</code>) converts a
-        <code>.stl</code> to <code>.vtk</code> before any operation. This is not
-        cosmetic: <code>dental_model_seg.py</code> does
-        <code>os.remove(args.stl)</code> and would destroy the source file if it
-        were handed the <code>.stl</code> directly (<code>FlexReg.py:3409</code>).</p>
-        <p><strong>Legacy (3c67957); not present in VISOR:</strong> <code>read_surface</code> reads <code>.vtk</code>, <code>.vtp</code> and
-        <code>.stl</code> directly, by extension, and refuses an empty mesh (<code>SADT-VISOR sadt_flexreg/pipeline.py:50-78</code>);
-        no segmentation is run, so no source file is deleted.</p>
-      </div>
+      <p>An <code>.stl</code> is first converted to <code>.vtk</code>, because the segmentation tool would otherwise delete the source file. The computation then runs in <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="See glossary">RAS</a>: the mesh, in <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>, is mirrored in x and y on reading and flipped back before writing.</p>
 
-      <p><strong><a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a> ↔ <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> flip.</strong> The CLI reads the <code>.vtk</code> (LPS),
-      applies <code>Scale(-1,-1,1)</code> to work in RAS like Slicer, and
-      flips back before writing (<code>FlexReg_CLI.py:228, 297</code>). All internal
-      computation is therefore in RAS.</p>
-
-      <p><strong>Canonical framing</strong>, the key preprocessing step,
-      <code>orientation.py</code>:</p>
-
-      <ol>
-        <li>centroids of teeth <code>Universal_ID</code> <strong>3, 5, 12, 14</strong> (UR6, UR4, UL4, UL6);</li>
-        <li>local basis on each side: normal of the plane through the three points (cross product of two vectors toward the midpoint), then the perpendicular direction;</li>
-        <li>two successive rotations, axis = cross product, angle = <code>arccos</code> of the dot product, via <code>RotationMatrix</code> (Rodrigues);</li>
-        <li>translation to make the centroids coincide.</li>
-      </ol>
-
-      <p>The target is <code>[[-0.5,-0.5,0], [0,0,0], [0.5,-0.5,0]]</code>: right
-      molar at <code>x&lt;0</code>, left molar at <code>x&gt;0</code>,
-      premolars at the origin. Result: <strong><a class="gterm" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane ≈ z=0</strong>,
-      <strong>+y = anterior</strong>, <strong>+x = left side</strong>. No scaling:
-      this is a rigid 3-point registration.</p>
-
-      <p>Direct consequence: the entire butterfly computation that follows is a
-      <strong>2D calculation in the XY plane</strong>, with the z component simply ignored.</p>
+      <p><strong><a class="gterm" data-term="flexreg-canonical-legacy" href="FlexReg.code.html#entrees" title="See the code">Canonical framing</a></strong> is the key preprocessing step. The centroids of teeth 3, 5, 12 and 14 (UR6, UR4, UL4, UL6; the tooth numbers follow the Universal system, 1 to 16 along the upper arch from the right third molar, 17 to 32 along the lower arch from the left third molar) are brought onto a fixed triangle by two rotations and a translation, with no scaling: the <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane ends up near z = 0, +y points to the front and +x to the patient&rsquo;s left. This oriented copy only serves to draw the patch (the patch is written back into the original mesh); it is not the RAS frame used for the registration. Everything the <a class="gterm" data-term="flexreg-butterfly-legacy" href="FlexReg.code.html#path-a" title="See the code">butterfly</a> does next is a <strong>2D calculation in the XY plane</strong>, with z ignored (the drawn patch, below, measures in 3D).</p>
+      <a class="deep-link" href="FlexReg.code.html#entrees"><b>In the code</b><span>The file conversion, the flip and the orientation algorithm</span></a>
 
       <h2 id="modeles">4. The models</h2>
 
-      <h3>4.1 Crown segmentation: <a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a> <span class="badge predit">predicted</span></h3>
+      <h3 id="seg-model">4.1 Crown segmentation: <a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a> <span class="badge predit">predicted</span></h3>
 
-      <p><code>checkSegmentation()</code> (<code>FlexReg.py:3402</code>) does not
-      test for the array's presence: it <strong>attempts the orientation above</strong> and
-      reads the exception.</p>
+      <p>The widget does not test whether the tooth-label array exists: it tries the orientation and reads the error. A missing array launches the segmentation, and a missing reference tooth stops with a message. The output is a point array with the universal tooth numbers 1 to 32, written into the input file. Its architecture lives in a package outside the repository, so what happens inside it is not described here.</p>
+      <a class="deep-link" href="FlexReg.code.html#seg-model"><b>In the code</b><span>The command, its arguments and the dead download code</span></a>
 
-      <ul>
-        <li><code>ToothNoExist</code> → the mesh is segmented but one of the 4 reference teeth is missing → message, stop.</li>
-        <li><code>NoSegmentationSurf</code> → no segmentation array → <code>shapeaxi_conda()</code>.</li>
-      </ul>
+      <h3 id="mgl-landmarks">4.2 Mucogingival landmarks: <a href="../ALI/ALI.html#ali-ios">ALI_IOS</a> <span class="badge predit">predicted</span></h3>
 
-      <pre><code>conda run -n shapeaxi python -m CrownSegmentationcli \
-  &lt;surf&gt; None &lt;out&gt; 1 latest 0 Universal_ID 0 None &lt;vtk_folder&gt; &lt;dentalmodelseg_path&gt;</code></pre>
-
-      <p>Arguments in order: surface, input csv, output folder,
-      <code>overwrite=1</code>, <code>latest</code> model,
-      <code>crownsegmentation=0</code>, array name <code>Universal_ID</code>,
-      <code>fdi=0</code>, suffix, vtk folder, path to the
-      <code>dentalmodelseg</code> executable (located via a <code>which</code> inside the env).</p>
-
-      <p>What can be <strong>verified from this repository</strong> stops at the
-      command line above and its effect: the output is a point array
-      <code>Universal_ID</code> in universal 1–32 numbering, written
-      <strong>into the input file</strong> (<code>overwrite=1</code>).</p>
-
-      <p>The architecture and the <code>latest</code> weights live in the pip
-      package <code>shapeaxi</code>, outside the repository: <strong>not determinable here</strong>. By
-      lineage (DentalModelSeg descends from Fly-by-CNN) one would expect a
-      multi-view render followed by a per-view 2D segmentation and a voted
-      reprojection onto the vertices, but neither the number of cameras, their
-      placement, nor the render resolution can be verified from this repository,
-      and the neighboring example is a caution: in <code>PredPatch.py</code>, the buffer
-      named <code>ico_verts</code> does not hold an icosphere but
-      <strong>7 cameras clustered at z=0.9</strong>.</p>
-
-      <div class="callout warn">
-        <div class="callout-title">Pitfall: do not assume (legacy only)</div>
-        <p>Do not assume a sphere of cameras without having read it.</p>
-        <p><strong>Legacy (3c67957); not present in VISOR:</strong> FlexReg no longer calls any segmentation network; the arch must already carry
-        per-point tooth labels (<code>SADT-VISOR sadt_flexreg/__init__.py:82-83</code>).</p>
-      </div>
-
-      <p><code>downloadModel()</code> (<code>FlexReg.py:3374</code>) downloads a
-      Fly-by-CNN <code>.pth</code> (<code>07-21-22_val-loss0.169.pth</code>, release
-      3.0): <strong>never called</strong>, dead code. The model actually used
-      is the <code>latest</code> one bundled inside <code>dentalmodelseg</code>.</p>
-
-      <h3>4.2 Mucogingival landmarks: <a href="../ALI/ALI.html#ali-ios">ALI_IOS</a> <span class="badge predit">predicted</span></h3>
-
-      <p><code>computeMGLLandmarks()</code> (<code>FlexReg.py:2304</code>):</p>
-
-      <pre><code>conda run -n shapeaxi python -m ALI_IOS \
-  &lt;scan&gt; &lt;models&gt; None None "LL6MG LL5MG … L0MG … LR6MG" &lt;out&gt; 224 0 1 &lt;log&gt;</code></pre>
-
-      <p>Positional arguments: <code>input</code>, <code>dir_models</code>,
-      <code>lm_type=None</code>, <code>teeth=None</code>, <code>teeth_mg=&lt;13
-      names&gt;</code>, <code>output_dir</code>, <code>image_size=224</code>,
-      <code>blur_radius=0</code>, <code>faces_per_pixel=1</code>,
-      <code>log_path</code>.</p>
-
-      <p>ALI_IOS is likewise multi-view (PyTorch3D rendering): it places one
-      camera per tooth based on the segmentation, renders the view at 224×224,
-      and the network outputs a heatmap whose peak gives the point's position.
-      <strong>A landmark is placed only if its tooth carries a label</strong> in
-      <code>Universal_ID</code> / <code>PredictedID</code>, hence FlexReg's error
-      message pointing back to the segmentation when <a href="../ALI/ALI.html">ALI</a> has placed only
-      <em>k</em> of the 13 points.</p>
-
-      <p>The weights are looked for in
-      <code>&lt;Documents&gt;/SlicerDownloads/ALI/ALI_IOS/Models/Prediction</code>,
-      named <code>Lower_MG_*.pth</code> (<code>hasMGLModel</code>,
-      <code>FlexReg.py:2374</code>); otherwise a folder picker opens.</p>
+      <p>For the lower arch, ALI_IOS places 13 <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> along the <a class="gterm" data-term="flexreg-mucogingival-legacy" href="FlexReg.code.html#path-c" title="See the code">mucogingival line</a>, one camera per tooth. A landmark is placed only if its tooth carries a label, hence the message that points back to the segmentation when only some of the 13 points were placed.</p>
+      <a class="deep-link" href="FlexReg.code.html#mgl-landmarks"><b>In the code</b><span>The command, the positional arguments and where the weights are looked for</span></a>
 
       <h2 id="coeur">5. The algorithmic core</h2>
 
-      <h3>5.1 Path A: the Butterfly patch (upper arch) <span class="badge calcule">computed</span></h3>
+      <h3 id="path-a">5.1 Path A: the Butterfly patch (upper arch) <span class="badge calcule">computed</span></h3>
 
-      <p><code>make_butterfly.py</code>. No network, purely geometric.</p>
-
-      <p><strong>a) Four centroids.</strong> The operator picks 4 teeth
-      (anterior L/R, posterior L/R); <code>vtkMeanTeeth</code> averages the
-      vertices carrying that <code>Universal_ID</code>.</p>
-
-      <p><strong>b) Three families of parameters</strong> applied to these
-      centroids:</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Parameter</th><th>Effect</th><th>Detail</th></tr></thead>
-          <tbody>
-            <tr><td><code>shift_lr</code>, <code>shift_ap</code></td><td>translates the whole patch</td><td>the same vector is added to all 4 centroids; since the landmarks are affine combinations with weights summing to 1, the shift carries through the interpolation and the <strong>shape is unchanged</strong></td></tr>
-            <tr><td><code>adjust</code> (mm)</td><td>lengthens / shortens</td><td>offset in ±y, <strong>sign flipped on the posterior teeth</strong>: a positive adjust pushes both ends outward</td></tr>
-            <tr><td><code>ratio</code></td><td>width is preserved</td><td>reparameterized as <code>r = (1-ratio)/2</code>, then <code>landmark = (1-r)·own_centroid + r·opposite_centroid</code>. <code>ratio=1</code> → landmark on its own centroid (maximal patch); <code>ratio=0</code> → landmark halfway (degenerate patch)</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>Watch the vocabulary: the UI says <code>top</code>/<code>bot</code>, the
-      CLI says <code>anterior</code>/<code>posterior</code>.
-      <code>lineedit_teeth_left_top</code> → <code>tooth_anterior_left</code>.</p>
-
-      <p><strong>c) The outline</strong>, four pieces:</p>
-
-      <ul>
-        <li>anterior segment and posterior segment (<code>Segment2D</code>, step of <code>0.01</code>);</li>
-        <li>two <strong>quadratic Béziers</strong>, right and left, control points <code>(posterior_landmark, posterior_midpoint, anterior_landmark)</code>, then <strong>reflected across the chord</strong> (<code>sym = 2·proj − bezier</code>) so they bulge toward the outside of the arch instead of the center. This is what gives the butterfly its shape.</li>
-      </ul>
-
-      <p><strong>d) Marking.</strong> <code>torch.cdist</code> between the outline
-      points and the vertices <strong>projected onto XY</strong>; every vertex
-      within <code>radius = 0.7 mm</code> is set to 1.</p>
-
-      <p><strong>e) Filling.</strong> <code>Dilation()</code>
-      (<code>propagation.py:56</code>): a <strong>geodesic flood fill over the
-      mesh</strong>, not a morphological dilation. It starts at the vertex
-      closest to the barycenter of the 4 landmarks, propagates neighbor by
-      neighbor (<code>GetPointCells</code> / <code>GetCellPoints</code>), and
-      <strong>stops at the outline</strong>, already set to 1. Batched by
-      <code>nmb_treatment = 1000</code> on GPU.</p>
-
-      <p><strong>f) Writing.</strong> The array is named <code>Butterfly{index}</code>:
-      each patch has its own index, which allows them to be
-      <strong>accumulated</strong>. At the end of the CLI, all the
-      <code>Butterfly1..N</code> arrays are merged by
-      <code>torch.logical_or</code> into a single array <code>Butterfly</code>
-      (<code>FlexReg_CLI.py:277</code>): that is the one the ICP and <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> read.
-      The result is written back <strong>into the input file</strong>.</p>
-
-      <p>The <code>delete</code> mode renumbers the arrays above the deleted
-      index and then drops the last one, rather than leaving a gap.</p>
+      <p>No network, purely geometric. The operator picks four teeth (anterior left and right, posterior left and right); the tool averages their vertices into four centroids, derives four corners, outlines the patch, marks it and fills it.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 940 120" role="img" aria-label="Geometric construction of the Butterfly patch: centroids, reflected Bézier outline, marking, geodesic dilation, and merging">
+          <a class="d-link" href="#coeur">
           <rect class="d-box" x="10" y="30" width="160" height="48" rx="6"/>
           <text class="d-label" x="90" y="50" text-anchor="middle">4 centroids</text>
           <text class="d-label-s" x="90" y="64" text-anchor="middle">chosen teeth</text>
+          </a>
 
           <path class="d-arrow" d="M170 54 H193"/>
           <path class="d-arrow-head" d="M195 54 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box" x="195" y="30" width="175" height="48" rx="6"/>
           <text class="d-label" x="282" y="50" text-anchor="middle">Bézier outline</text>
           <text class="d-label-s" x="282" y="64" text-anchor="middle">reflected across the chord</text>
+          </a>
 
           <path class="d-arrow" d="M370 54 H393"/>
           <path class="d-arrow-head" d="M395 54 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box" x="395" y="30" width="175" height="48" rx="6"/>
           <text class="d-label" x="482" y="50" text-anchor="middle">Marking</text>
           <text class="d-label-s" x="482" y="64" text-anchor="middle">torch.cdist ≤ 0.7 mm</text>
+          </a>
 
           <path class="d-arrow" d="M570 54 H593"/>
           <path class="d-arrow-head" d="M595 54 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box-a" x="595" y="30" width="165" height="48" rx="6"/>
           <text class="d-label" x="677" y="50" text-anchor="middle">Geodesic dilation</text>
           <text class="d-label-s" x="677" y="64" text-anchor="middle">flood fill, GPU</text>
+          </a>
 
           <path class="d-arrow" d="M760 54 H778"/>
           <path class="d-arrow-head" d="M780 54 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box-a" x="780" y="30" width="150" height="48" rx="6"/>
           <text class="d-label" x="855" y="50" text-anchor="middle">Merge</text>
           <text class="d-label-s" x="855" y="64" text-anchor="middle">Butterfly1..N → Butterfly</text>
+          </a>
         </svg>
-        <figcaption>Path A: no network, pure geometry, from 4 centroids to
-        the merged patch array.</figcaption>
+        <figcaption>Path A: no network, pure geometry, from four centroids to the merged patch array.</figcaption>
+      </figure>
+      <figure class="algo" data-scene="flexreg_corners" data-ms="7000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: four tooth centroids on an arch seen from above; as the ratio grows from 0 to 1, the four corners of the patch slide from the middle of the arch to their own teeth, then the front corners move forward and the back corners backward"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The patch has four corners. Each starts from the average position of a chosen tooth, its <em>centroid</em>, and slides toward the opposite tooth of the same pair: ratio 1 puts the corner on its own tooth, ratio 0 puts it half-way across the arch, where the patch collapses. A positive <em>adjustment</em> then lengthens the patch at both ends, and the <em>shift</em> moves it as a whole without changing its shape.</p><p class="algo-tag">Illustration: the arch is a drawn parabola and the sizes are not to scale; the formulas are those of the code.</p><div class="formula"><math display="block"><mrow><mi class="k2">r</mi><mo>=</mo><mfrac><mrow><mn>1</mn><mo>&#x2212;</mo><mi class="k1">&#x3c1;</mi></mrow><mn>2</mn></mfrac></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mi class="k5">&#x2113;</mi><mtext>ar</mtext></msub><mo>=</mo><mrow><mo stretchy="true" fence="true">(</mo><mn>1</mn><mo>&#x2212;</mo><mi class="k2">r</mi><mo stretchy="true" fence="true">)</mo></mrow><msub><mi class="k3">c</mi><mtext>ar</mtext></msub><mo>+</mo><mi class="k2">r</mi><msub><mi class="k4">c</mi><mtext>al</mtext></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>&rho;</b>the ratio of the joystick, between 0 and 1</li><li class="k2"><b>r</b>the weight given to the opposite tooth</li><li class="k3"><b>c<sub>ar</sub></b>centroid of the tooth the corner belongs to (anterior right here), with shift and adjustment added</li><li class="k4"><b>c<sub>al</sub></b>centroid of the opposite tooth (anterior left)</li><li class="k5"><b>&#8467;<sub>ar</sub></b>the corner of the patch</li></ul></div>
+      </figure>
+      <figure class="algo" data-scene="flexreg_outline" data-ms="7000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: two straight segments close the front and the back of the patch; on each side a dashed curve from the back corner through a middle point to the front corner is reflected across its chord and becomes the outward-bulging wing"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Between the corners the outline is two straight segments (front and back) and two curves. Each curve is a quadratic <a class="gterm" data-term="flexreg-bezier-legacy" href="FlexReg.code.html#path-a" title="See the code">B&eacute;zier</a> from the posterior corner, through the posterior midpoint, to the anterior corner; it is then <strong>reflected across its chord</strong> so that it bulges outward, away from the middle of the arch. That is what gives the <a class="gterm" data-term="flexreg-butterfly-legacy" href="FlexReg.code.html#path-a" title="See the code">butterfly</a> its wings.</p><p class="algo-tag">Illustration: the arch and the wings are drawn by hand; the construction (posterior midpoint, quadratic B&eacute;zier, reflection across the chord) is the one of the code.</p><div class="formula"><math display="block"><mrow><mi class="k1">B</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k5">s</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><msup><mrow><mo stretchy="true" fence="true">(</mo><mn>1</mn><mo>&#x2212;</mo><mi class="k5">s</mi><mo stretchy="true" fence="true">)</mo></mrow><mn>2</mn></msup><msub><mi class="k2">P</mi><mn>0</mn></msub><mo>+</mo><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mn>1</mn><mo>&#x2212;</mo><mi class="k5">s</mi><mo stretchy="true" fence="true">)</mo></mrow><mi class="k5">s</mi><mi class="k3">M</mi><mo>+</mo><msup><mi class="k5">s</mi><mn>2</mn></msup><msub><mi class="k4">P</mi><mn>1</mn></msub></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mi class="k1">B</mi><mo>&#x2032;</mo></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k5">s</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mn>2</mn><mi>proj</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">B</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k5">s</mi><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2212;</mo><mi class="k1">B</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k5">s</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>B, B&prime;</b>the curve, and the curve after reflection; proj is the projection on the chord, the straight line from P<sub>0</sub> to P<sub>1</sub></li><li class="k2"><b>P<sub>0</sub></b>posterior corner</li><li class="k3"><b>M</b>posterior midpoint, half-way between the two posterior corners</li><li class="k4"><b>P<sub>1</sub></b>anterior corner</li><li class="k5"><b>s</b>position along the curve, from 0 to 1</li></ul></div>
+      </figure>
+      <figure class="algo" data-scene="flexreg_fill" data-ms="7600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a grid of mesh vertices, those close to an elliptical outline are marked, then a flood starts at the middle and spreads from neighbour to neighbour until the marked outline stops it"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Every vertex that lies less than 0.7&nbsp;mm from the outline, seen from above, is marked. The inside is then filled by a flood that starts at the vertex nearest the middle of the four corners and spreads <strong>from neighbour to neighbour along the mesh</strong>, stopping at the marked outline. It follows the surface and not the plane, which is why it is a <a class="gterm" data-term="flexreg-flood-legacy" href="FlexReg.code.html#path-a" title="See the code">geodesic fill</a> and not a morphological dilation.</p><p class="algo-tag">Illustration: a flat grid with four-neighbour steps stands in for the mesh, and the outline is an ellipse; a real mesh has thousands of irregular vertices.</p><div class="formula"><math display="block"><mrow><mi class="k1">m</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mn>1</mn><mtext>&#xa0;if&#xa0;</mtext><munder><mo>min</mo><mi class="k3">s</mi></munder><mrow><mo>&#x2225;</mo><mrow><msub><mi class="k2">v</mi><mtext>xy</mtext></msub><mo>&#x2212;</mo><mi class="k3">o</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">s</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow><mo>&#x2225;</mo></mrow><mo>&lt;</mo><mi class="k4">&#x3b4;</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>m(v)</b>the mark of the vertex v: 1 on the outline</li><li class="k2"><b>v<sub>xy</sub></b>the position of v projected on the <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane</li><li class="k3"><b>o(s)</b>a point of the outline</li><li class="k4"><b>&delta;</b>the marking radius, 0.7 mm</li></ul></div>
       </figure>
 
-      <p><strong>Real-time preview.</strong> <code>butterfly_preview.py</code> replays
-      the <em>exact same</em> outline in pure numpy (CPU) and replaces the flood
-      fill with a point-in-polygon test (<code>matplotlib.path.Path</code>, with a
-      numpy crossing-number fallback). Orientation and centroids are cached per
-      scan (<code>prepare</code>), so only the outline is recomputed on each
-      joystick move. Constants: <code>CELL = 1.0</code> mm for the height map,
-      <code>LIFT = 0.4</code> mm above the teeth, <code>NB_POINTS = 120</code>
-      samples per edge.</p>
+      <p>The patch is written under the name <code>Butterfly</code> followed by an index, so patches can accumulate; at the end of the run all of them are merged by a logical OR into the single <code>Butterfly</code> array that the <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> and AREG_IOS read, and the result is written back <strong>into the input file</strong>. The widget&rsquo;s preview replays the same outline on the CPU and replaces the flood fill by a point-in-polygon test.</p>
+      <a class="deep-link" href="FlexReg.code.html#path-a"><b>In the code</b><span>The three families of parameters, the code of each step and the preview constants</span></a>
 
-      <h3>5.2 Path B: the drawn patch <span class="badge calcule">computed</span></h3>
+      <h3 id="path-b">5.2 Path B: the drawn patch <span class="badge calcule">computed</span></h3>
 
-      <p><code>draw()</code> (<code>FlexReg.py:3972</code>), <code>type="curve"</code>.
-      A Slicer curve constrained to the surface
-      (<code>SetAndObserveSurfaceConstraintNode</code>) plus a midpoint,
-      serialized into strings and passed to the CLI. <code>draw.py</code> interpolates
-      linearly between consecutive points (step <code>0.2</code>, closed loop),
-      marks vertices within <code>1.1 mm</code>, then runs
-      <strong>exactly the same <code>Dilation()</code></strong> from the
-      midpoint. The only difference from the butterfly is how the outline is obtained.</p>
+      <p>The operator draws a closed curve on the surface plus a midpoint. The tool interpolates it linearly, marks the vertices within 1.1&nbsp;mm (measured in 3D, with no projection onto the flat view) and runs <strong>exactly the same geodesic fill</strong> from the midpoint. Only the way the outline is obtained differs from the butterfly.</p>
+      <a class="deep-link" href="FlexReg.code.html#path-b"><b>In the code</b><span>The drawing, the serialisation and the undo of the recentering</span></a>
 
-      <p>The curve is drawn on the model recentered facing the camera; before
-      sending it to the CLI, <code>moveCurve()</code> applies the inverse of the
-      recentering matrix to bring it back into the file's coordinates.</p>
+      <h3 id="path-c">5.3 Path C: the MGL patch (lower arch) <span class="badge calcule">computed</span></h3>
 
-      <h3>5.3 Path C: the MGL patch (lower arch) <span class="badge calcule">computed</span></h3>
-
-      <p>The palate provides a stable plateau on the upper arch; the mandible has
-      none. The substitute chosen is the <strong>mucogingival line</strong>. This
-      whole block is computed <strong>inside the widget</strong>, in numpy/scipy:
-      no GPU, no CLI (<code>mgl_patch.py</code>).</p>
-
-      <p><strong>a) Cleaning up ALI's predictions.</strong>
-      <code>DoubtfulLandmarks()</code> reads the <code>description</code> that <a href="../ALI/ALI.html">ALI</a> writes
-      into the json when it forced a point (top-k pixels, fallback to the tooth,
-      missing tooth). Per the code's comment, measured on 364 predictions:
-      <strong>a 4.2 mm median deviation from the neighbors' curve, against 1.2 mm</strong>
-      for the rest. These points are discarded by default, and the spline bridges
-      the gap: unless fewer than 3 points would remain. Then <code>CanonicalLandmarks</code>
-      (old annotation naming → canonical, detected by the presence of an
-      <code>LL7MG</code> or <code>LR7MG</code>) and <code>RecentreNames</code> (the
-      count stays anchored on the midline when a point is missing partway along
-      the arch).</p>
-
-      <p><strong>b) Local frame.</strong> <code>LocalFrames()</code>: the
-      <strong>apical</strong> axis is the third component of the <strong><a class="gterm" href="../glossary.html#g-svd" title="See glossary">SVD</a></strong>
-      of the centered landmarks (the normal of the point ribbon, independent of
-      the scan's orientation in world space); the <strong>tangent</strong> is
-      <code>np.gradient</code> along the arch; <strong>buccal</strong> is
-      their cross product, flipped wherever it points inward.
-      <code>OrientApical</code> fixes the sign based on the crowns.</p>
-
-      <p><strong>c) Building the band</strong>, on every <code>compute()</code>:</p>
-
-      <ol>
-        <li>operator offsets (buccal / apical / tangential) applied to the landmarks;</li>
-        <li><code>vtkParametricSpline</code> running through them, <code>SAMPLES_PER_SEGMENT = 25</code>;</li>
-        <li><strong>each sample is snapped onto the mesh</strong> (<code>vtkPointLocator</code>): an interpolated spline drifts off the surface in interdental concavities;</li>
-        <li><strong>Dijkstra</strong> (<code>scipy.sparse.csgraph</code>) on the edge graph weighted by real length, multi-source from these vertices, <code>limit</code> = max height, <code>min_only=True</code>, <code>return_predecessors=True</code> → the band <strong>grows along the surface</strong>, never through it (a vestibular patch cannot come out on the lingual side, where the ridge is thin);</li>
-        <li>height <strong>interpolated linearly between landmarks</strong> (<code>np.interp</code>) and <strong>asymmetric</strong>: <code>heights</code> on the crown side, <code>heights_down</code> on the vestibular side, with the side decided by the sign of the apical component. The height used is that of the <em>seed</em> from which the vertex was reached, so two segments of different heights coexist without a step;</li>
-        <li>the crowns (<code>Universal_ID</code> 18–31, <code>LOWER_TOOTH_LABELS</code>) are <strong>removed</strong>: they move between T1 and T2;</li>
-        <li>the landmarks themselves always stay in the patch.</li>
-      </ol>
-
-      <p>Bounds: <code>MIN_HEIGHT = 0.0</code>, <code>MAX_HEIGHT = 5.0</code>,
-      <code>DEFAULT_HEIGHT = 2.5</code> mm. Zero height everywhere ⇒ only the
-      13 points remain: this is the deliberate <strong>control case</strong>, to
-      measure what the band adds over the points alone.</p>
-
-      <p>The edge graph is built with <code>np.unique(np.sort(edges))</code>
-      before the <code>coo_matrix</code>: without this deduplication, interior
-      edges shared by two triangles would be <strong>summed</strong>
-      by the sparse matrix, doubling their length and halving the patch's reach.</p>
-
-      <p>Output array: <code>Bottom_MGL</code> (<code>MGL_ARRAY_NAME</code>),
-      previewed in <code>Bottom_MGLPreview</code>.</p>
-
-      <p><code>WriteLandmarks()</code> writes the edited landmarks in
-      <strong>LPS</strong>, like the training annotations: the resulting
-      file can be fed straight back into the corpus.</p>
+      <p>The palate gives a stable plateau on the upper arch; the lower arch has none, so the stand-in is the <strong><a class="gterm" data-term="flexreg-mucogingival-legacy" href="FlexReg.code.html#path-c" title="See the code">mucogingival line</a></strong>. The whole block is computed inside the widget, with no GPU and no command-line step. First the predicted <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> that ALI_IOS marked as doubtful (forced out of the top pixels, fall-back to the tooth, arch fit, off the aim, extrapolated) or gave with a confidence under 0.785 are discarded, unless fewer than 3 points would remain: the code&rsquo;s comment measures the doubtful ones on 364 predictions at a median 4.2&nbsp;mm from the curve of their neighbours against 1.2&nbsp;mm for the rest. A local frame is built from the landmarks (apical, tangent and buccal axes), then the band is grown.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 900 215" role="img" aria-label="Construction of the mucogingival band: landmarks predicted by ALI_IOS, cleanup, local frame, snapped spline, multi-source Dijkstra, and the final band">
+          <a class="d-link" href="#modeles">
           <rect class="d-box-n" x="10" y="20" width="230" height="50" rx="6"/>
           <text class="d-label" x="125" y="42" text-anchor="middle">ALI_IOS</text>
           <text class="d-label-s" x="125" y="57" text-anchor="middle">13 predicted MG landmarks</text>
+          </a>
 
           <path class="d-arrow" d="M240 45 H268"/>
           <path class="d-arrow-head" d="M270 45 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box" x="270" y="20" width="230" height="50" rx="6"/>
           <text class="d-label" x="385" y="42" text-anchor="middle">Cleanup</text>
           <text class="d-label-s" x="385" y="57" text-anchor="middle">DoubtfulLandmarks</text>
+          </a>
 
           <path class="d-arrow" d="M500 45 H528"/>
           <path class="d-arrow-head" d="M530 45 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box" x="530" y="20" width="230" height="50" rx="6"/>
           <text class="d-label" x="645" y="42" text-anchor="middle">Local frame</text>
           <text class="d-label-s" x="645" y="57" text-anchor="middle">apical SVD / tangent / buccal</text>
+          </a>
 
           <path class="d-arrow" d="M645 70 V110 H125 V148"/>
           <path class="d-arrow-head" d="M125 150 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box" x="10" y="150" width="230" height="50" rx="6"/>
           <text class="d-label" x="125" y="172" text-anchor="middle">Spline + snap</text>
           <text class="d-label-s" x="125" y="187" text-anchor="middle">vtkPointLocator on the mesh</text>
+          </a>
 
           <path class="d-arrow" d="M240 175 H268"/>
           <path class="d-arrow-head" d="M270 175 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box-a" x="270" y="150" width="270" height="50" rx="6"/>
           <text class="d-label" x="405" y="172" text-anchor="middle">Multi-source Dijkstra</text>
           <text class="d-label-s" x="405" y="187" text-anchor="middle">bounded, asymmetric height</text>
+          </a>
 
           <path class="d-arrow" d="M540 175 H548"/>
           <path class="d-arrow-head" d="M550 175 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur">
           <rect class="d-box-a" x="550" y="150" width="250" height="50" rx="6"/>
           <text class="d-label" x="675" y="172" text-anchor="middle">Bottom_MGL</text>
           <text class="d-label-s" x="675" y="187" text-anchor="middle">crowns removed</text>
+          </a>
         </svg>
-        <figcaption>Path C: the only predicted elements are the 13
-        ALI_IOS landmarks (purple box); everything else, cleanup, frame, spline, Dijkstra,
-        is computed in numpy/scipy on the widget side, with no GPU.</figcaption>
+        <figcaption>Path C: the only predicted element is the set of 13 ALI_IOS landmarks (purple box); everything else, cleanup, frame, spline, shortest paths, is computed on the widget side, with no GPU.</figcaption>
+      </figure>
+      <figure class="algo" data-scene="flexreg_band" data-ms="6000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a curved line of landmarks with a band that grows on both sides of it, wider where the interpolated height is larger"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Under the lower arch there is no stable palate, so the patch is a <strong>band along the mucogingival line</strong>, built from 13 landmarks. A spline through the landmarks is snapped onto the mesh; a shortest-path search then spreads from it <em>along the surface</em>, never through it, up to a height that is interpolated linearly between landmarks. There are two heights per landmark, one on the crown side of the line and one on the vestibule side (both 2.5&nbsp;mm by default, so the band is symmetric until the operator changes one). The crowns are removed afterwards, since they move between T1 and T2, and the 13 landmarks themselves always stay in the patch.</p><p class="algo-tag">Illustration: the 13 landmarks and the two-sided band are as in the code; the arch shape, the crowns and the heights are made up for the picture.</p><div class="formula"><math display="block"><mrow><mi class="k1">v</mi><mo>&#x2208;</mo><mtext>&#xa0;band&#xa0;</mtext><mo>&#x21d4;</mo><mi class="k2">d</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2264;</mo><msub><mi class="k3">h</mi><mtext>side</mtext></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k4">s</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>v</b>a vertex of the mesh</li><li class="k2"><b>d(v)</b>its distance along the surface to the nearest point of the line</li><li class="k4"><b>s(v)</b>that nearest point, the seed the vertex was reached from</li><li class="k3"><b>h<sub>side</sub></b>the height interpolated at that seed, between 0 and 5 mm (2.5 mm by default): the crown-side height if the vertex lies on the crown side of the line, the vestibule-side height if it lies on the other side (the side is read from the direction pointing away from the crowns); a height of 0 keeps nothing</li></ul></div>
       </figure>
 
-      <h3>5.4 The registration <span class="badge calcule">computed</span></h3>
+      <p>Each of the two heights is bounded between 0 and 5&nbsp;mm (2.5 by default); with both at zero everywhere only the 13 points remain, the deliberate control case. The result is stored in the array <code>Bottom_MGL</code>.</p>
+      <a class="deep-link" href="FlexReg.code.html#path-c"><b>In the code</b><span>The cleanup, the frame, the seven-step band construction and the constants</span></a>
 
-      <p><code>Reg.run()</code> (<code>FlexReg.py:1060</code>) relaunches the same CLI
-      with <code>type = "icp"</code> (upper) or <code>"icp_mgl"</code> (lower).
-      <strong>T2 is the moving scan</strong> (<code>lineedit</code>), <strong>T1 the
-      fixed one</strong> (<code>path_reg</code>).</p>
+      <h3 id="registration">5.4 The registration <span class="badge calcule">computed</span></h3>
 
-      <pre><code>patch_array = "Bottom_MGL" if args.type == "icp_mgl" else "Butterfly"
-option = vtkMeshTeeth(list_teeth=[1], property=patch_array)
-icp = ICP([vtkICP()], option=option)
-output_icp = icp.run(modelNode, modelNodeT1)</code></pre>
+      <p>The same command-line tool is run again in registration mode. <strong>T2 is the moving scan</strong>, T1 the fixed one. The ICP extracts from both meshes only the points where the patch array equals 1, so it runs <strong>on the patch only</strong>, never on the teeth. Its matrix is then applied to the entire T2 mesh, and to the opposite arch if one is supplied so that it follows the same movement.</p>
 
-      <p><code>vtkMeshTeeth</code> does not build a mesh despite its name: it
-      extracts a <strong>point cloud</strong> containing only the vertices whose
-      patch array equals 1. The ICP therefore runs <strong>only on the patch</strong>,
-      never on the teeth.</p>
-
-      <pre><code>icp.GetLandmarkTransform().SetModeToRigidBody()   # 6 dof, no scaling
-icp.SetMaximumNumberOfIterations(1000)
-icp.StartByMatchingCentroidsOn()                  # initialization</code></pre>
-
-      <p>Standard <code>vtkIterativeClosestPointTransform</code>: nearest-neighbor
-      matching, rigid least-squares estimation, iteration. No learning at this
-      stage.</p>
-
-      <p>The 4×4 matrix is then applied <strong>to the entire T2 mesh</strong>,
-      and to the opposite arch if one is supplied (<code>lower_arch</code>), so
-      it follows the same movement.</p>
+      <figure class="algo" data-scene="flexreg_icp" data-ms="8200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: two copies of the same bean-shaped patch, one moved and rotated; the ICP first matches their centroids, then repeatedly links each moving point to its nearest neighbour and applies the rigid motion that shortens those links, until the two overlap"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Only the points of the patch are used, in both arches: they stand in for the stable structure. The ICP first <strong>matches the two centroids</strong>, then repeats: link the moving points to their nearest points on the reference, find the rigid motion (rotation and translation, no scaling) that makes the links shortest, apply it. The code sets a limit of 1000 rounds; the other stopping settings of the VTK routine were not read for this page, so it may stop sooner.</p><p class="algo-tag">Illustration: a two-dimensional toy with a fixed number of rounds; the real ICP is three-dimensional and the code only limits it to 1000 rounds.</p><div class="formula"><math display="block"><mrow><munder><mo>min</mo><mrow><mi class="k1">R</mi><mo>,</mo><mi class="k1">t</mi></mrow></munder><munder><mo>&#x2211;</mo><mi class="k2">i</mi></munder><msup><mrow><mo>&#x2225;</mo><mrow><mi class="k1">R</mi><msub><mi class="k2">p</mi><mi class="k2">i</mi></msub><mo>+</mo><mi class="k1">t</mi><mo>&#x2212;</mo><msub><mi class="k3">q</mi><mrow><mi class="k4">c</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">i</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></msub></mrow><mo>&#x2225;</mo></mrow><mn>2</mn></msup></mrow></math></div><ul class="algo-legend"><li class="k1"><b>R, t</b>a rotation and a translation: 6 degrees of freedom</li><li class="k2"><b>p<sub>i</sub></b>a point of the moving patch</li><li class="k3"><b>q</b>a point of the reference patch</li><li class="k4"><b>c(i)</b>the index of the reference point nearest to p<sub>i</sub></li></ul></div>
+      </figure>
+      <a class="deep-link" href="FlexReg.code.html#registration"><b>In the code</b><span>The call, the VTK settings and the option object</span></a>
 
       <h2 id="sorties">6. Post-processing and outputs</h2>
 
-      <p><strong>The mesh.</strong> Patch <code>type</code> → rewritten
-      <strong>into the input file</strong>. ICP <code>type</code> → written
-      into <code>path_output</code> as
-      <code>&lt;T2 name without extension&gt;&lt;suffix&gt;.vtk</code>, after
-      flipping back to LPS.</p>
+      <p>A patch mode rewrites the mesh <strong>into the input file</strong>. A registration writes <code>&lt;T2 name&gt;&lt;suffix&gt;.vtk</code> into the output folder, after flipping back to <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>, and a <code>.tfm</code> reusable by the other modules.</p>
 
-      <p><strong>The transform</strong>, the delicate step
-      (<code>FlexReg_CLI.py:100-106</code>):</p>
+      <figure class="algo" data-scene="flexreg_flip" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: an asymmetric shape in the upper-right quadrant of a pair of axes turns by half a turn about the origin into the lower-left quadrant, the change from LPS to RAS"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The registration runs in <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="See glossary">RAS</a> (x toward the patient&rsquo;s right, y toward the front), the files and Slicer&rsquo;s transforms are in LPS. The two frames differ by the sign of x and y, which is a half-turn about the vertical axis. The matrix found in RAS is therefore conjugated by that half-turn, then inverted: the file follows the ITK convention, which goes from the fixed scan to the moving one, the opposite of the direction of the matrix the <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> found (a comment in the code says so).</p><p class="algo-tag">Illustration: the drawn shape is made up; the half-turn about the vertical axis is what the code does.</p><div class="formula"><math display="block"><mrow><msub><mi class="k3">M</mi><mtext>LPS</mtext></msub><mo>=</mo><msup><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">F</mi><mi class="k2">M</mi><mi class="k1">F</mi><mo stretchy="true" fence="true">)</mo></mrow><mrow><mo>&#x2212;</mo><mn>1</mn></mrow></msup></mrow></math></div><ul class="algo-legend"><li class="k1"><b>F</b>the flip diag(-1, -1, 1, 1): it changes the sign of x and y</li><li class="k2"><b>M</b>the 4&times;4 matrix found by the ICP, in RAS</li><li class="k3"><b>M<sub>LPS</sub></b>the matrix written to the <code>.tfm</code> file</li></ul></div>
+      </figure>
 
-      <pre><code>flip = np.diag([-1, -1, 1, 1])
-composed = flip @ matrix_array @ flip     # RAS -> LPS by conjugation
-composed_inv = np.linalg.inv(composed)    # ITK convention: fixed -> moving
-sitk_tfm = sitk.AffineTransform(3)
-sitk_tfm.SetMatrix(composed_inv[:3, :3].flatten())
-sitk_tfm.SetTranslation(composed_inv[:3, 3])</code></pre>
-
-      <p>File <code>&lt;T2 name&gt;&lt;suffix&gt;.tfm</code>, reusable by the
-      other modules in the repository.</p>
-
-      <p><strong>The See button.</strong> Runs the <em>exact same</em> registration
-      into a <code>tempfile.mkdtemp(prefix="FlexReg_see_")</code> that is deleted as
-      soon as it's displayed (<code>discardTempFolder</code>). The resulting node
-      is marked <code>SetSaveWithScene(False)</code> and renamed
-      <code>... (preview, not saved)</code>: the file behind it is about to
-      disappear.</p>
-
-      <p><strong>The display.</strong> Custom layout <code>501</code>, T1 in
-      <code>[255,51,200]/256</code> and T2 in <code>[102,102,255]/256</code> in
-      the third 3D view.</p>
+      <p>The preview button runs the same registration into a temporary folder that is deleted as soon as the result is displayed, and marks the node &ldquo;preview, not saved&rdquo;.</p>
+      <a class="deep-link" href="FlexReg.code.html#sorties"><b>In the code</b><span>The matrix code, the temporary folder and the display layout</span></a>
 
       <h2 id="predit-calcule">7. What is predicted vs what is computed</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Block</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>Crown segmentation</td><td><span class="badge predit">predicted</span> multi-view network (<a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a>)</td><td><code>conda run -n shapeaxi</code></td></tr>
-            <tr><td>Canonical orientation</td><td><span class="badge calcule">computed</span> geometric, 4 centroids</td><td>CLI</td></tr>
-            <tr><td>Butterfly / curve</td><td><span class="badge calcule">computed</span> geometric, Bézier + geodesic flood fill</td><td>CLI, <strong>GPU required</strong></td></tr>
-            <tr><td>Butterfly preview</td><td><span class="badge calcule">computed</span> geometric, point-in-polygon</td><td>widget, CPU</td></tr>
-            <tr><td>MG landmarks</td><td><span class="badge predit">predicted</span> multi-view network (<a href="../ALI/ALI.html#ali-ios">ALI_IOS</a>, <code>Lower_MG_*.pth</code>)</td><td><code>conda run -n shapeaxi</code></td></tr>
-            <tr><td>MGL band</td><td><span class="badge calcule">computed</span> geometric, spline + Dijkstra</td><td>widget, CPU</td></tr>
-            <tr><td>Registration</td><td><span class="badge calcule">computed</span> classic rigid ICP (VTK)</td><td>CLI</td></tr>
+            <tr><td>Crown segmentation</td><td><span class="badge predit">predicted</span> multi-view network (<a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a>)</td></tr>
+            <tr><td>Canonical orientation</td><td><span class="badge calcule">computed</span> geometric, 4 centroids</td></tr>
+            <tr><td><a class="gterm" data-term="flexreg-butterfly-legacy" href="FlexReg.code.html#path-a" title="See the code">Butterfly</a> / curve</td><td><span class="badge calcule">computed</span> geometric, <a class="gterm" data-term="flexreg-bezier-legacy" href="FlexReg.code.html#path-a" title="See the code">B&eacute;zier</a> + geodesic <a class="gterm" data-term="flexreg-flood-legacy" href="FlexReg.code.html#path-a" title="See the code">flood fill</a>, <strong>GPU required</strong></td></tr>
+            <tr><td>Butterfly preview</td><td><span class="badge calcule">computed</span> geometric, point-in-polygon, on the CPU</td></tr>
+            <tr><td>MG <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a></td><td><span class="badge predit">predicted</span> multi-view network (<a href="../ALI/ALI.html#ali-ios">ALI_IOS</a>)</td></tr>
+            <tr><td>MGL band</td><td><span class="badge calcule">computed</span> geometric, spline + shortest paths, on the CPU</td></tr>
+            <tr><td>Registration</td><td><span class="badge calcule">computed</span> classic rigid <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> (VTK)</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>No part of FlexReg learns anything: the two networks it calls are
-      pretrained and act purely as <strong>landmark providers</strong>.</p>
+      <p>No part of FlexReg learns anything: the two networks it calls are pretrained and act only as <strong>landmark providers</strong>.</p>
+      <a class="deep-link" href="FlexReg.code.html#predit-calcule"><b>In the code</b><span>Where each block runs</span></a>
 
       <h2 id="environnement">8. Environment</h2>
 
-      <p><code>ensureBooted()</code> (<code>FlexReg.py:192</code>) centralizes the
-      check, run <strong>once</strong>, at the moment an action needs it, not
-      when a scan is displayed. The probes cost a measured 7.6 s:
-      2.2 s for <code>conda --version</code>, 0.6 s for the environment test,
-      4.8 s for importing the install module inside it.</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Value</th><th>Source</th></tr></thead>
-          <tbody>
-            <tr><td>conda env</td><td><code>shapeaxi</code>, shared with <a href="../ALI/ALI.html">ALI</a>, AREG, <a href="../ASO/ASO.html">ASO</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td><code>FlexReg.py:705</code></td></tr>
-            <tr><td>Python</td><td><strong>3.12</strong> (forced: prebuilt pytorch3d wheels only exist for cp310–cp313; shapeaxi ≥ 2.0.2 lifted the <code>grpcio</code> pin that used to force 3.9)</td><td>same</td></tr>
-            <tr><td>Packages at creation</td><td><code>torch&gt;=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td><code>install_shapeaxi</code></td></tr>
-            <tr><td>pytorch3d + shapeaxi</td><td>installed <strong>after</strong> torch, by <code>FlexReg_utils.install_pytorch</code>, which reads the torch version to pick the wheel</td><td><code>install_pytorch.py</code></td></tr>
-            <tr><td>Inside Slicer</td><td>only <code>torch</code> is added: vtk, numpy, scipy, SimpleITK are already there</td><td><code>ensureBooted</code></td></tr>
-            <tr><td>Windows</td><td>conda via WSL (<code>CondaSetUpCallWsl</code>), plus a check for <code>libxrender1</code>, <code>libgl1</code>/<code>libgl1-mesa-glx</code>, <code>libglx-mesa0</code></td><td><code>check_lib_wsl</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Pitfall: numpy (legacy only)</div>
-        <p><strong>numpy must not be touched</strong>: Slicer's scipy is
-        compiled against its own numpy, and swapping numpy out under a live
-        session leaves the next scipy import reading a mix of the two
-        (<code>No module named 'numpy.strings'</code>), which used to kill
-        the MGL preview (comment in <code>FlexReg.py:220-224</code>).</p>
-        <p><strong>Legacy (3c67957); not present in VISOR:</strong> numpy is pinned to 1.26.4 in the tool's own environment
-        (<code>SADT-VISOR tools/FlexReg/pyproject.toml:14</code>), and the client installs nothing
-        (<code>AutomatedDentalToolsRemote FlexRegRemote/FlexRegRemote.py:8-12</code>).</p>
-      </div>
+      <p>The command-line tool runs in Slicer&rsquo;s own Python, where the widget adds only <code>torch</code>; the two networks run in a shared conda environment (Python 3.12, with prebuilt pytorch3d wheels). The checks run once, at the moment an action needs them, and cost about 7.6&nbsp;s. On Windows, conda goes through WSL.</p>
+      <a class="deep-link" href="FlexReg.code.html#environnement"><b>In the code</b><span>The packages, the probes and their measured cost</span></a>
 
       <h2 id="pieges">9. Pitfalls and fragile points</h2>
 
-      <div class="callout warn">
-        <div class="callout-title">The CLI requires CUDA (also true in VISOR, for the patch step only)</div>
-        <p><code>Dilation</code>, <code>drawPatch</code>, and the final merge of the
-        arrays all call <code>.cuda()</code> with no CPU fallback. The MGL patch,
-        on the other hand, is computed on the widget side and does without it,
-        hence the <code>while args.type != "icp_mgl"</code> that skips the merge
-        for the lower arch (<code>FlexReg_CLI.py:267-292</code>, <code>.cuda()</code> at 272 and 286).</p>
-        <p><strong>Also true in VISOR for the patch:</strong> <code>Dilation</code> calls <code>.cuda()</code> with no fallback
-        (<code>SADT-VISOR sadt_flexreg/propagation.py:31, 60, 66-68</code>), called from <code>make_butterfly.py:161</code>.
-        <strong>No longer true</strong> for the rest: the merge of the <code>Butterfly</code> arrays is numpy
-        (<code>pipeline.py:165-188</code>), <code>drawPatch</code> is not called, the <code>icp_mgl</code> loop skip is gone, and the
-        registration path imports no torch (<code>pipeline.py:191-224</code>).</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">The input file gets overwritten (legacy only)</div>
-        <p>In patch mode, and the automatic segmentation overwrites it too
-        (<code>overwrite=1</code>). A <code>.stl</code> handed to
-        <code>dentalmodelseg</code> is simply deleted outright: that's the
-        whole reason <code>ensureVtkInput()</code> exists.</p>
-        <p>Legacy references: <code>FlexReg_CLI.py:314-315</code> (patch modes write to <code>args.lineedit</code>),
-        <code>FlexReg.py:3481</code> (<code>overwrite</code> flag of the segmentation).</p>
-        <p><strong>Legacy (3c67957); not present in VISOR:</strong> the input is never modified; outputs go under
-        <code>output_dir</code> with a suffix (<code>SADT-VISOR sadt_flexreg/__init__.py:160-163</code>), and no segmentation is run.</p>
-      </div>
-
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug: vtkICP.__call__ (also true in VISOR)</div>
-        <p><code>vtkICP.__call__</code> returns <code>source</code> unchanged instead
-        of the transformed mesh. Harmless here because <code>list_icp</code>
-        only contains one method, but a multi-step chain would not work as
-        written.</p>
-        <p><strong>Also true in VISOR:</strong> <code>return source, VTKMatrixToNumpy(...)</code>
-        (<code>SADT-VISOR sadt_flexreg/ICP.py:113</code>; legacy <code>FlexReg_CLI/FlexReg_Method/ICP.py:104</code>). Still harmless, because
-        <code>register</code> applies the returned matrix itself (<code>pipeline.py:218-224</code>).</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Segmentation detection works through an exception (legacy only)</div>
-        <p>A mesh segmented under an array name other than
-        <code>Universal_ID</code> will trigger a full re-segmentation.</p>
-        <p><strong>Legacy (3c67957); not present in VISOR:</strong> there is no re-segmentation. What VISOR does instead is different
-        and quieter: see "Without <code>Universal_ID</code>, the last array is used" in <a href="../visor/FlexReg/FlexReg.html#visor-findings">Findings in VISOR</a>.</p>
-      </div>
-
-      <p><strong>Dead code</strong>: <code>downloadModel()</code>,
-      <code>setup_cli_command()</code> / <code>find_cli_parameters()</code>.</p>
-
-      <div class="callout warn">
-        <div class="callout-title">Patch decided in projected 2D (also true in VISOR)</div>
-        <p>The butterfly patch is decided <strong>in projected 2D</strong>: on an
-        arch strongly tilted after orientation, the outline can catch vertices
-        that are far apart in z.</p>
-        <p><strong>Also true in VISOR:</strong> the distances use <code>V[:,:2]</code>
-        (<code>SADT-VISOR sadt_flexreg/make_butterfly.py:127, 133, 147, 159</code>; legacy <code>make_butterfly.py:114, 120, 134, 146</code>),
-        and the Slicer preview does the same on the client (<code>FlexRegLib/butterfly_preview.py</code>).</p>
-      </div>
+      <ul>
+        <li>The command-line tool requires CUDA, with no CPU fallback; the same is true in VISOR for the patch fill (<a href="FlexReg.code.html#f-the-cli-requires-cuda-also-true-in-visor-for-the">details</a>).</li>
+        <li>In patch mode the input file is overwritten, and a <code>.stl</code> handed to the segmentation is deleted (<a href="FlexReg.code.html#f-the-input-file-gets-overwritten-legacy-only">details</a>).</li>
+        <li>The <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> wrapper returns the source unchanged instead of the moved mesh: harmless with a single method (<a href="FlexReg.code.html#f-confirmed-bug-vtkicp-call-also-true-in-visor">details</a>).</li>
+        <li>Segmentation is detected through an exception: a mesh labelled under another array name is re-segmented (<a href="FlexReg.code.html#f-segmentation-detection-works-through-an-exceptio">details</a>).</li>
+        <li>The patch is decided in a 2D projection, so on a strongly tilted arch the outline can catch vertices far apart in height (<a href="FlexReg.code.html#f-patch-decided-in-projected-2d-also-true-in-visor">details</a>).</li>
+        <li>numpy must not be touched in Slicer&rsquo;s Python, and some download code is never called (<a href="FlexReg.code.html#pieges">details</a>).</li>
+      </ul>
 
       <h2 id="litterature">10. Literature</h2>
 
-      <p>The published foundation is <strong>AReg IOS: Automatic Registration on
+
+      <p>The published foundation is <strong>AReg <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>: Automatic Registration on
       IntraOral Scans</strong> (Hutin, Anchling, Cevidanes et al., Lecture Notes in
       Computer Science, 2023): crown segmentation by <a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a>,
       initial alignment by shared centroids, palatal ROI segmented by multi-view
-      3D shape analysis, then ICP. FlexReg is its "the operator draws the ROI
+      3D shape analysis, then <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a>. FlexReg is its "the operator draws the ROI
       instead of having it predicted" counterpart.</p>
 
       <p>No paper deals specifically with FlexReg or with the MGL variant:
@@ -795,8 +488,10 @@ sitk_tfm.SetTranslation(composed_inv[:3, 3])</code></pre>
       <p>Detailed bibliography, files retrieved, and links worth visiting:
       <a href="SOURCES.html">SOURCES.html</a>.</p>
 
+      
       <footer class="footer">
         <a href="../index.html">← All pages</a> ·
+        <a href="FlexReg.code.html">Code page</a> ·
         <a href="SOURCES.html">Bibliography for this tool</a> ·
         Source: <code>FlexReg.md</code>
       </footer>
@@ -805,5 +500,7 @@ sitk_tfm.SetTranslation(composed_inv[:3, 3])</code></pre>
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/algo.js"></script>
+<script src="../../assets/algo-FlexReg.js"></script>
 </body>
 </html>
