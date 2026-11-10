@@ -23,6 +23,7 @@
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/CNE.html">Guide</a>
       <a href="../../visor/CNE/CNE.html" aria-current="true">Atlas</a>
+      <a href="../../visor/CNE/CNE.code.html">Code</a>
     </div>
     <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="visor">
@@ -122,139 +123,121 @@
         <img class="tool-icon" src="../../../assets/screens/CNE/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../../index.html">SADT Atlas</a> › <a href="../index.html">VISOR</a> › Text &amp; language</div>
         <h1>CNE on VISOR</h1>
-        <p class="lede">In VISOR, CNE runs on the server: the Slicer panel uploads the clinical notes, the server reads them and runs the language model, and the extractions come back as files. The clinical text therefore leaves the workstation, which the legacy module never did. The prompts and context windows are the legacy ones; reading the notes, parsing the answer and naming the outputs have changed. The legacy Slicer module is described on <a href="../../CNE/CNE.html">its own page</a>.</p>
+        <p class="lede">CNE reads free-text clinical notes and writes down the facts it finds in them (symptoms, diagnoses, scores) as a list of <em>field : value</em> lines. A language model does the reading; everything around it decides what the model is shown and which of its answers are kept. In VISOR the model runs on a server, so the notes are <a class="gterm" data-term="cne-upload" href="CNE.code.html#f-text-leaves" title="See the code">uploaded</a>, which the legacy module never did. This page explains the steps and the few calculations in them; the details a developer needs are on <a href="CNE.code.html">the code page</a>, and the legacy module has <a href="../../CNE/CNE.html">its own page</a>.</p>
         <div class="meta-row">
           <span class="badge neutral">VISOR</span>
           <span class="badge predit">1 language model</span>
+          <a class="badge neutral" href="CNE.code.html">Code (developers)</a>
           <a class="badge neutral" href="../../CNE/CNE.html">Legacy page</a>
           <a class="badge neutral" href="../guide/CNE.html">Guide (VISOR)</a>
         </div>
       </header>
 
-      <p>References on this page name a repository, then a path inside it, then a line:
-      <em>SADT-VISOR</em> is the tool catalogue (commit 6ba2a78), <em>VISOR-serve</em> the
-      server (e9a7e5d), <em>Remote</em> the Slicer client (AutomatedDentalToolsRemote 19b95e8),
-      <em>legacy</em> SlicerAutomatedDentalTools at 3c67957. A bare path such as <code>readers.py:41</code> is in
-      SADT-VISOR <code>tools/CNE/src/sadt_cne/</code>. Everything was read in the code; nothing on this page was run,
-      except the HTTP status checks dated below. Overview of the stack: <a href="../index.html">VISOR</a>.</p>
+      <h2 id="visor-overview">Overview: what goes in, what comes out</h2>
 
-      <h2 id="visor-status">1. Position in the chain</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>CNE</th></tr></thead>
+          <tbody>
+            <tr><td>Input</td><td>one note, or a folder of notes (<code>.txt</code>, <code>.pdf</code>, <code>.docx</code>), sub-folders included</td></tr>
+            <tr><td>What you choose</td><td>the type of note (<a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> or Ortho), the model file, and how long an answer may be</td></tr>
+            <tr><td>The model</td><td>a quantised language model run on the server&rsquo;s processor; the one hosted is a Qwen 2.5 7B fine-tuned on TMJ notes</td></tr>
+            <tr><td>Output</td><td>for each note, a JSON file and a text file of <em>field : value</em> lines, plus one run report</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-      <ul>
-        <li><strong>State: ported, implemented in code, with tests in the tool</strong> (SADT-VISOR
-        <code>tools/CNE/tests/test_run.py</code>, 130 test functions, not run for this page). The Dashboard is not ported. Only the <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> model is
-        staged on the server's data manifest.</li>
-        <li><strong>API name</strong> <code>CNE</code> (SADT-VISOR <code>tools/CNE/pyproject.toml:35-37</code>), code in
-        <code>__init__.py</code>, <code>extraction.py</code>, <code>readers.py</code>, <code>dependencies.py</code>, <code>layout.py</code>.</li>
-        <li><strong>Client panel</strong> <code>CNERemote</code>, a thin panel (Remote
-        <code>CNERemote/CNERemote.py:57,61-62</code>; built, <code>CMakeLists.txt:36</code>). It reads
-        <code>CNE_report.json</code> after a run and shows a one-line summary in the status bar (<code>:75-103</code>).</li>
-        <li><strong>Calls / called by</strong>: nothing. No <code>sup</code> argument, no <code>sup.run</code>
-        (<code>__init__.py:46-56</code>), and no other tool names <code>CNE</code>.</li>
-        <li><strong>Hosted data</strong>: one bundle, <code>DATA/CNE/models/TMJ/qwen-ft-q4_k_m.gguf</code> (4,683,073,408
-        bytes) and one synthetic TMJ test note (VISOR-serve <code>scripts/data-manifest.yml:687-701</code>).</li>
-      </ul>
+      <p>The model alone decides which fields exist and what their values are. Nothing checks an extraction against the note it came from; the tool only controls what the model is shown and which answers are written down.</p>
+
+      <h2 id="visor-status">1. Where it runs</h2>
+
+      <p>Slicer keeps only a small panel (<code>CNERemote</code>). It uploads the notes to a server, waits, then downloads one archive and unpacks it into the chosen folder. The model is loaded and run on the server, in an environment of its own, and nothing is loaded into the Slicer scene: the results are text. CNE calls no other tool and no tool calls CNE.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 960 210" role="img" aria-label="The Slicer panel uploads the notes to VISOR-serve, which runs the CNE tool in its own virtual environment with llama.cpp in process, and sends back one archive. CNE calls no other tool.">
+<a class="d-link" href="#visor-where">
 <rect class="d-box-a" x="20" y="60" width="230" height="80" rx="6"/>
 <text class="d-label" x="135" y="89" text-anchor="middle">Slicer: CNERemote</text>
 <text class="d-label-s" x="135" y="104" text-anchor="middle">panel generated from GET /tools</text>
 <text class="d-label-s" x="135" y="119" text-anchor="middle">summary in the status bar</text>
+</a>
 <path class="d-arrow" d="M250 85 H338"/>
 <path class="d-arrow-head" d="M338 85 l-7 -4 v8 z"/>
 <text class="d-label-s" x="294" y="77" text-anchor="middle">notes (upload)</text>
 <path class="d-arrow" d="M340 118 H252"/>
 <path class="d-arrow-head" d="M252 118 l7 -4 v8 z"/>
 <text class="d-label-s" x="296" y="134" text-anchor="middle">one archive</text>
+<a class="d-link" href="#visor-where">
 <rect class="d-box" x="340" y="40" width="260" height="120" rx="6"/>
 <text class="d-label" x="470" y="81.5" text-anchor="middle">VISOR-serve</text>
 <text class="d-label-s" x="470" y="96.5" text-anchor="middle">registry, conventions, queue</text>
 <text class="d-label-s" x="470" y="111.5" text-anchor="middle">batch = false: one call</text>
 <text class="d-label-s" x="470" y="126.5" text-anchor="middle">runner: one process per run</text>
+</a>
 <path class="d-arrow" d="M600 100 H688"/>
 <path class="d-arrow-head" d="M688 100 l-7 -4 v8 z"/>
 <text class="d-label-s" x="644" y="92" text-anchor="middle">run()</text>
+<a class="d-link" href="#visor-pipeline">
 <rect class="d-box" x="690" y="40" width="250" height="120" rx="6"/>
 <text class="d-label" x="815" y="81.5" text-anchor="middle">CNE venv</text>
 <text class="d-label-s" x="815" y="96.5" text-anchor="middle">sadt_cne.run(notes, ...)</text>
 <text class="d-label-s" x="815" y="111.5" text-anchor="middle">llama.cpp in process (CPU build)</text>
 <text class="d-label-s" x="815" y="126.5" text-anchor="middle">writes Extraction_* + report</text>
 <text class="d-label-s" x="480" y="195" text-anchor="middle">no sup argument: CNE calls no tool, and no tool calls CNE</text>
+</a>
 </svg>
         <figcaption>CNE stays a standalone tool. The change is where the language model runs: legacy loaded it inside Slicer's interpreter on the workstation; VISOR loads it on the server, once per call, and the notes travel there.</figcaption>
       </figure>
 
+      <p>Because the model runs on the server, <strong>the text of the notes leaves the workstation</strong>. The legacy module kept it on the machine. Nothing de-identifies the notes before they are sent (<a href="#visor-findings">known problems</a>).</p>
+
       <h3 id="visor-where">1.1 What runs where</h3>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Step</th><th>Server</th><th>Client (Slicer)</th></tr></thead>
-          <tbody>
-            <tr><td>Choosing notes, note type, model, output folder</td><td>publishes the form (<code>GET /tools</code>)</td><td>generated panel; the notes are uploaded</td></tr>
-            <tr><td>Reading <code>.txt</code>, <code>.pdf</code>, <code>.docx</code></td><td>all of it (<code>readers.py</code>)</td><td>nothing</td></tr>
-            <tr><td>The model</td><td><a class="gterm" data-term="llamacpp" href="../../glossary.html#g-llamacpp" title="See glossary">llama.cpp</a> loaded once per call, in-process, on the CPU build (<code>extraction.py:193-203</code>); no network call in the tool's sources</td><td>nothing is installed or downloaded</td></tr>
-            <tr><td>Results</td><td><code>Extraction_*.json</code>, <code>.txt</code> and <code>CNE_report.json</code>, as one archive</td><td>unpacks into the chosen folder; nothing is loaded into the scene (text only, <code>CNERemote.py:68-73</code>)</td></tr>
-            <tr><td>Status line</td><td>–</td><td>"CNE: n/m note(s) extracted with the TMJ model", plus the number of warnings (<code>CNERemote.py:93-103</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <ul>
+        <li><strong>Server:</strong> publishes the form the panel shows, reads the three note formats, runs the model, writes the results. The model is loaded once per call, which is why a whole folder of notes is sent in a single call.</li>
+        <li><strong>Slicer:</strong> shows the generated form, uploads the notes, unpacks the archive, and prints a one-line summary in the status bar (how many notes were extracted, with which model type, and how many warnings). Nothing is installed or downloaded on the workstation.</li>
+      </ul>
 
-      <p>Run mechanics: <a href="../run-lifecycle.html">Anatomy of a run</a>. What protects the upload:
-      <a href="../security.html">Security and privacy</a>.</p>
+      <a class="deep-link" href="CNE.code.html#visor-status"><b>In the code</b><span>The panel, the server tool, what is hosted, with files and lines</span></a>
 
       <h2 id="visor-files">2. Files involved</h2>
 
-      <p>Line counts at 6ba2a78. The legacy module was <code>CNE/CNE.py</code> (678 lines, the panel, the pip installs and the
-      model download) and <code>CNE_CLI/CNE_CLI.py</code> (279 lines, the inference), plus the Dashboard; only the inference
-      was ported.</p>
+      <p>The tool is five small source files: the entry point that runs the loop over the notes, the model code (prompts, loading, parsing), the readers for the three formats, a loader for optional packages, and the layout of the panel. Of the legacy module, only the inference was ported; the panel, the model download and the Dashboard were not.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Lines</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>src/sadt_cne/__init__.py</code></td><td>324</td><td><code>run()</code>: folder checks, output planning, warnings, the per-note loop, the report</td></tr>
-            <tr><td><code>src/sadt_cne/extraction.py</code></td><td>349</td><td>the model: prompts and windows (<code>:38-51</code>), <code>resolve_model_file</code>, <code>load_model</code>, <code>complete</code>, <code>parse_extraction</code>, <code>render_extraction</code></td></tr>
-            <tr><td><code>src/sadt_cne/readers.py</code></td><td>264</td><td>note discovery and the three readers, character normalisation, <code>looks_empty</code></td></tr>
-            <tr><td><code>src/sadt_cne/dependencies.py</code></td><td>114</td><td><code>require</code> (late import, <code>ToolUnavailableError</code> when a package is missing) and <code>preload_cuda_runtime</code></td></tr>
-            <tr><td><code>src/sadt_cne/layout.py</code></td><td>24</td><td>two panel sections, "Notes" and "Generation", with labels</td></tr>
-            <tr><td><code>pyproject.toml</code>, <code>uv.lock</code></td><td>78, 276</td><td>the venv (<a href="#visor-env">section 6</a>)</td></tr>
-            <tr><td><code>tests/test_run.py</code></td><td>1623</td><td>the tool's tests; <code>models</code> and <code>gpu</code> marks deselected by default (<code>pyproject.toml:74</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Elsewhere</th><th>What concerns CNE</th></tr></thead>
-          <tbody>
-            <tr><td>VISOR-serve <code>server/deployment.toml:239-246</code></td><td><code>[tools.CNE] batch = false</code>: a cohort of notes is sent in one call, because each call loads the 4.4 GB model</td></tr>
-            <tr><td>VISOR-serve <code>scripts/data-manifest.yml:674-701</code></td><td>the <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> bundle and the test note; the header still says "NOT PORTED YET" (<code>:676</code>), which is out of date</td></tr>
-            <tr><td>Remote <code>CNERemote/CNERemote.py</code></td><td>the panel: tool name, <code>RUN_REPORT</code>, the status-bar summary</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <a class="deep-link" href="CNE.code.html#visor-files"><b>In the code</b><span>File list with line counts, and the server and client files that concern CNE</span></a>
 
       <h2 id="visor-pipeline">3. The pipeline</h2>
+
+      <p>Once per run the tool checks the folders, lists the notes, chooses the model file and loads it. Then, note by note, it reads the text, asks the model, and decides whether the answer can be kept. Each box is a link to its step.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 1440 400" role="img" aria-label="CNE pipeline on VISOR: per run, validate folders, discover notes, plan output names, resolve the GGUF model and load llama.cpp once; per note, read, refuse empty text, build the chat, run the language model, refuse a truncated answer; then parse JSON or key-value lines, write two files and a report entry.">
 <text class="d-label" x="14" y="75" text-anchor="start">per run</text>
+<a class="d-link" href="#visor-discovery">
 <rect class="d-box" x="110" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="225" y="73.5" text-anchor="middle">Validate folders</text>
 <text class="d-label-s" x="225" y="88.5" text-anchor="middle">notes exist, output is not notes</text>
+</a>
+<a class="d-link" href="#visor-discovery">
 <rect class="d-box" x="374" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="489" y="73.5" text-anchor="middle">Discover notes</text>
 <text class="d-label-s" x="489" y="88.5" text-anchor="middle">.txt .pdf .docx, recursive</text>
+</a>
+<a class="d-link" href="#visor-parsing">
 <rect class="d-box" x="638" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="753" y="73.5" text-anchor="middle">Plan outputs</text>
 <text class="d-label-s" x="753" y="88.5" text-anchor="middle">Extraction_&lt;name&gt;.json/.txt</text>
+</a>
+<a class="d-link" href="#visor-model">
 <rect class="d-box" x="902" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="1017" y="73.5" text-anchor="middle">Resolve model</text>
 <text class="d-label-s" x="1017" y="88.5" text-anchor="middle">one .gguf; type hint warns</text>
+</a>
+<a class="d-link" href="#visor-model">
 <rect class="d-box" x="1166" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="1281" y="73.5" text-anchor="middle">Load llama.cpp</text>
 <text class="d-label-s" x="1281" y="88.5" text-anchor="middle">n_ctx 6144 TMJ / 2048 Ortho</text>
+</a>
 <path class="d-arrow" d="M340 77 H372"/>
 <path class="d-arrow-head" d="M372 77 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M604 77 H636"/>
@@ -264,21 +247,31 @@
 <path class="d-arrow" d="M1132 77 H1164"/>
 <path class="d-arrow-head" d="M1164 77 l-7 -4 v8 z"/>
 <text class="d-label" x="14" y="175" text-anchor="start">per note</text>
+<a class="d-link" href="#visor-reading">
 <rect class="d-box" x="110" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="225" y="173.5" text-anchor="middle">Read note</text>
 <text class="d-label-s" x="225" y="188.5" text-anchor="middle">txt encodings, pdf, docx</text>
+</a>
+<a class="d-link" href="#visor-reading">
 <rect class="d-box" x="374" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="489" y="173.5" text-anchor="middle">Empty text?</text>
 <text class="d-label-s" x="489" y="188.5" text-anchor="middle">refused: no OCR</text>
+</a>
+<a class="d-link" href="#visor-generation">
 <rect class="d-box" x="638" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="753" y="173.5" text-anchor="middle">Build messages</text>
 <text class="d-label-s" x="753" y="188.5" text-anchor="middle">TMJ: system prompt; Ortho: none</text>
+</a>
+<a class="d-link" href="#visor-generation">
 <rect class="d-box-n" x="902" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="1017" y="173.5" text-anchor="middle">LLM chat completion</text>
 <text class="d-label-s" x="1017" y="188.5" text-anchor="middle">max_tokens 2048, temperature 0</text>
+</a>
+<a class="d-link" href="#visor-generation">
 <rect class="d-box" x="1166" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="1281" y="173.5" text-anchor="middle">finish_reason</text>
 <text class="d-label-s" x="1281" y="188.5" text-anchor="middle">&quot;length&quot; fails the note</text>
+</a>
 <path class="d-arrow" d="M340 177 H372"/>
 <path class="d-arrow-head" d="M372 177 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M604 177 H636"/>
@@ -288,21 +281,31 @@
 <path class="d-arrow" d="M1132 177 H1164"/>
 <path class="d-arrow-head" d="M1164 177 l-7 -4 v8 z"/>
 <text class="d-label" x="14" y="275" text-anchor="start">answer</text>
+<a class="d-link" href="#visor-parsing">
 <rect class="d-box" x="110" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="225" y="273.5" text-anchor="middle">Parse JSON</text>
 <text class="d-label-s" x="225" y="288.5" text-anchor="middle">first { to last }</text>
+</a>
+<a class="d-link" href="#visor-parsing">
 <rect class="d-box" x="374" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="489" y="273.5" text-anchor="middle">Parse key: value</text>
 <text class="d-label-s" x="489" y="288.5" text-anchor="middle">at least 60 % of lines</text>
+</a>
+<a class="d-link" href="#visor-parsing">
 <rect class="d-box" x="638" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="753" y="273.5" text-anchor="middle">Write</text>
 <text class="d-label-s" x="753" y="288.5" text-anchor="middle">.json canonical, .txt readable</text>
+</a>
+<a class="d-link" href="#visor-parsing">
 <rect class="d-box" x="902" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="1017" y="273.5" text-anchor="middle">Report entry</text>
 <text class="d-label-s" x="1017" y="288.5" text-anchor="middle">status, fields, output</text>
+</a>
+<a class="d-link" href="#visor-parsing">
 <rect class="d-box" x="1166" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="1281" y="273.5" text-anchor="middle">CNE_report.json</text>
 <text class="d-label-s" x="1281" y="288.5" text-anchor="middle">if one note was written</text>
+</a>
 <path class="d-arrow" d="M340 277 H372"/>
 <path class="d-arrow-head" d="M372 277 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M604 277 H636"/>
@@ -327,302 +330,153 @@
 
       <h3 id="visor-discovery">3.1 Checking the folders and finding the notes</h3>
 
-      <p>A missing <code>notes</code> path is a <code>FileNotFoundError</code> (<code>__init__.py:97-100</code>). If <code>notes</code> is a folder
-      and <code>output_dir</code> is the same folder (symlinks resolved), the run is refused, because the extractions would be read back
-      as notes by the next run (<code>:106-110,320-324</code>). The tool then creates <code>output_dir</code> itself (<code>:116</code>); legacy relied on
-      the panel to create it.</p>
+      <p>The tool first checks that the notes exist and that the results will not be written into the notes folder, otherwise the next run would read its own results as notes. It then lists the <code>.txt</code>, <code>.pdf</code> and <code>.docx</code> files in the folder and its sub-folders, whatever the case of the extension, skipping Word lock files and hidden files. If it finds none, the run stops with an error that names the three extensions; the legacy module just ended quietly.</p>
 
-      <p>Discovery is recursive and returns files sorted by relative path (<code>readers.py:92-123</code>). It keeps <code>.txt</code>,
-      <code>.pdf</code> and <code>.docx</code> without regard to case (<code>:33,78-81</code>), skips names starting with <code>~$</code>
-      (Word lock files) or a dot, and folders named <code>__MACOSX</code> (<code>:60-61,84-90,117-118</code>). The output folder is excluded
-      when it sits inside the input (<code>__init__.py:118</code>). Nothing found is a 422 naming the three extensions (<code>:119-126</code>);
-      legacy exited with status 0 in that case (legacy <code>CNE_CLI/CNE_CLI.py:137-141</code>).</p>
+      <a class="deep-link" href="CNE.code.html#visor-discovery"><b>In the code</b><span>Folder checks, recursive discovery, skipped names, error codes</span></a>
 
       <h3 id="visor-model">3.2 Choosing and loading the model</h3>
 
-      <p><code>model</code> is required. A <code>.gguf</code> file is used as is; a folder must hold exactly one <code>.gguf</code>, searched
-      recursively, or the run is refused with the candidates named (<code>extraction.py:89-128</code>). If the model's path names one note
-      type and <code>notes_type</code> is the other, a warning goes into the report; it is not a refusal
-      (<code>model_type_hint</code>, <code>extraction.py:131-143</code>; <code>__init__.py:132-142</code>).</p>
+      <p>The model is one quantised file in the <a class="gterm" data-term="gguf" href="../../glossary.html#g-gguf" title="See glossary">GGUF</a> format, run by <a class="gterm" data-term="llamacpp" href="../../glossary.html#g-llamacpp" title="See glossary">llama.cpp</a>. A file is used as it is; a folder must contain exactly one. Each type of note has its own <strong><a class="gterm" data-term="cne-window" href="CNE.code.html#visor-model" title="See the code">context window</a></strong>, the amount of text (note and answer together, counted in tokens) that the model can hold at once: 6144 for <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a>, 2048 for Ortho. If the path of the model names the other type of note, a warning goes into the report but the run continues. The model is loaded once for the whole batch, since loading 4.4 GB is the slow part, and if a GPU is requested from a <a class="gterm" data-term="cne-cpu-build" href="CNE.code.html#f-cpu" title="See the code">processor-only build</a> the run goes on without it and says so in the report.</p>
 
-      <pre><code>CONTEXT_TOKENS = {"TMJ": 6144, "Ortho": 2048}                # extraction.py:49
-SYSTEM_PROMPTS = {"TMJ": INSTRUCTION_TMJ, "Ortho": None}      # extraction.py:51
-
-window = context_for(notes_type, context_tokens)              # 0 means the type's default
-offloading = wants_gpu and supports_gpu_offload()             # asked before the 4.4 GB load
-engine = load_model(model_file, window, seed, -1 if wants_gpu else 0)   # __init__.py:144-165</code></pre>
-
-      <p><code>load_model</code> builds one <code>llama_cpp.Llama(model_path, n_ctx, n_gpu_layers, seed, verbose=False)</code> for the whole
-      batch (<code>extraction.py:193-203</code>). Its loader chatter is captured with <code>contextlib.redirect_stderr</code> and logged at
-      debug level (<code>:63-86</code>), where legacy redirected the process's file descriptor 2 with <code>os.dup2</code> and no
-      <code>finally</code> (legacy <code>CNE_CLI.py:157-171</code>). Every import of <code>llama_cpp</code> goes through
-      <code>engine_module()</code>, which first tries to open the CUDA runtime from the venv (<code>extraction.py:167-177</code>,
-      <code>dependencies.py:65</code>); on the CPU build that is a no-op. A <code>device = "cuda"</code> request on a build without GPU support
-      adds a warning and <code>gpu_offload: false</code> to the report (<code>__init__.py:145-165,184</code>).</p>
+      <a class="deep-link" href="CNE.code.html#visor-model"><b>In the code</b><span>Model resolution, the window table, loading and the CPU build</span></a>
 
       <h3 id="visor-reading">3.3 Reading a note</h3>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Format</th><th>VISOR</th><th>Legacy</th></tr></thead>
-          <tbody>
-            <tr><td><code>.txt</code></td><td>decoded with <code>utf-8-sig</code>, then <code>cp1252</code>, then <code>latin-1</code>; the encoding that worked is recorded (<code>readers.py:41,159-174</code>)</td><td>UTF-8 only (<code>CNE_CLI.py:82</code>)</td></tr>
-            <tr><td><code>.pdf</code></td><td>PyMuPDF text layer, page by page (<code>readers.py:177-186</code>)</td><td>same reader</td></tr>
-            <tr><td><code>.docx</code></td><td>headers and footers, then the body with paragraphs and tables in reading order, one table row per line, cells separated by tabs (<code>readers.py:188-245</code>)</td><td><code>doc.paragraphs</code> only (<code>CNE_CLI.py:72</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>A text file is decoded as UTF-8, then Windows-1252, then Latin-1, whichever works first. A PDF gives its text layer page by page. A Word file gives its headers and footers, then its body in reading order with tables, one table row per line. Then every note goes through the same cleaning step.</p>
 
-      <p>All three go through the same normalisation of quotes, dashes and non-breaking spaces, ported from the legacy table
-      (<code>readers.py:47-55,64</code>). PyMuPDF and python-docx are imported only when a note of that format is read
-      (<code>dependencies.py:39</code>); a missing package fails those notes with <code>ToolUnavailableError</code>, not the run. Then
-      <code>looks_empty</code> refuses a text with no letter or digit, which is what an image-only PDF gives; there is no OCR
-      (<code>readers.py:254-264</code>, <code>__init__.py:276-285</code>).</p>
+      <figure class="algo" data-scene="cne_clean" data-ms="6000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: seven typographic characters are replaced by plain ones, then runs of blank lines shrink to one"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Notes exported from PDF or Word carry typographic characters that never appeared in the plain-text notes the models were trained on. Seven of them are rewritten as plain ones, and runs of blank lines are collapsed, so the model sees the same text whatever the file format.</p><ul class="algo-legend"><li class="k1"><b>highlight</b>the character being rewritten: curly quotes, en dash, em dash and non-breaking space become a plain quote, a hyphen or a space</li><li><b>bars</b>lines of text; dashed marks are blank lines, and a second blank line in a row is dropped</li></ul></div>
+      </figure>
+
+      <p>A text with no letter and no digit, which is what a <a class="gterm" data-term="cne-scanned-pdf" href="CNE.code.html#visor-reading" title="See the code">scanned PDF</a> gives, is refused by name: there is no OCR.</p>
+
+      <a class="deep-link" href="CNE.code.html#visor-reading"><b>In the code</b><span>The three readers, the replacement table, the empty-text check</span></a>
 
       <h3 id="visor-generation">3.4 Asking the model</h3>
 
-      <pre><code>messages = []
-if SYSTEM_PROMPTS[notes_type]:                       # TMJ only
-    messages.append({"role": "system", "content": INSTRUCTION_TMJ})
-messages.append({"role": "user", "content": text})   # extraction.py:156-164
+      <p>The note is sent as a chat. For TMJ notes a <strong><a class="gterm" data-term="cne-system-prompt" href="CNE.code.html#visor-generation" title="See the code">system prompt</a></strong> comes first: &ldquo;Using the following note, extract structured key-value pairs about the patient&rsquo;s symptoms and diagnoses&rdquo;. Ortho notes get none, because their model was fine-tuned to answer from the note alone. The answer is limited to 2048 tokens by default, the sampling temperature is 0 and a fixed seed is used, so the same note should give the same answer. If the model stops because it reached the limit, the answer is incomplete and the note fails.</p>
 
-output = model.create_chat_completion(messages=messages,
-                                      max_tokens=max_tokens, temperature=temperature)
-content, finish_reason = choice["message"]["content"], choice.get("finish_reason")   # :206-223
-if finish_reason == "length":   # cut off at max_tokens
-    raise ValueError("the model's answer was cut off ...")                          # __init__.py:293-297</code></pre>
+      <figure class="algo" data-scene="cne_budget" data-ms="6400" data-reserve="0.33">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a bar for the context window holds the note and a reserved zone for the answer; a short note leaves room, a long note eats into the reserved zone"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The context window is shared: the note and the answer must fit in it together. The room the answer may use is set aside first, so the note has about the window minus that room. The tool does not check this.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">n</mi><mtext>note</mtext></msub><mo>+</mo><msub><mi class="k2">n</mi><mtext>max</mtext></msub><mo>&#x2264;</mo><msub><mi class="k3">n</mi><mtext>ctx</mtext></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>n<sub>note</sub></b>tokens in the note, the part of the window the note fills</li><li class="k2"><b>n<sub>max</sub></b>the longest answer allowed (<code>max_tokens</code>), the dashed zone</li><li class="k3"><b>n<sub>ctx</sub></b>the context window: 6144 tokens for TMJ, 2048 for Ortho</li></ul></div>
+      </figure>
 
-      <p>The <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> instruction is the legacy string verbatim: "Using the following note, extract structured key-value pairs about the
-      patient's symptoms and diagnoses:" (<code>extraction.py:41-44</code>). Ortho gets no system message, as in legacy. The tool does
-      not compare the note's length with the window: <code>context_for</code> only rejects a negative value
-      (<code>extraction.py:146-153</code>), and any error raised by <a class="gterm" data-term="llamacpp" href="../../glossary.html#g-llamacpp" title="See glossary">llama.cpp</a> is caught for that note (<code>__init__.py:200-212</code>).</p>
+      <p>With the Ortho defaults the answer limit alone equals the whole window (2048 and 2048). The tool never compares a note with the window: if the model engine refuses a note that is too long, only that note fails.</p>
+
+      <a class="deep-link" href="CNE.code.html#visor-generation"><b>In the code</b><span>The messages, the call, the cut-off check, and the missing length guard</span></a>
 
       <h3 id="visor-parsing">3.5 Reading the answer and writing it</h3>
 
-      <ol>
-        <li><strong>JSON first</strong>: the slice from the first <code>{</code> to the last <code>}</code> is parsed; a dict under
-        <code>"extraction"</code> is unwrapped (<code>extraction.py:261-275</code>). The slicing is the legacy one.</li>
-        <li><strong>Then <code>key: value</code> lines</strong>: keys are lowercase words and underscores, at least 60 % of the non-empty lines
-        must match, and a repeated key keeps its first value (<code>extraction.py:230-235,278-301</code>). The source says the published TMJ
-        fine-tune answers in this form, 46 fields and no JSON (<code>:244-245</code>).</li>
-        <li><strong>Otherwise nothing is written</strong> and the note fails (<code>__init__.py:299-305</code>). Legacy wrote the raw answer.</li>
-      </ol>
+      <p>The model is expected to answer in JSON, but nothing forces it to. The tool tries two readings, in this order, and writes nothing if both fail.</p>
 
-      <p>Two files are written per note under the mirrored tree (<code>__init__.py:240-266,307-317</code>): the JSON, canonical, and a
-      <code>key : value</code> text where a list is joined with commas and a nested dict stays JSON (<code>extraction.py:304-328</code>).</p>
+      <figure class="algo" data-scene="cne_slice" data-ms="6800">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the first opening brace and the last closing brace of an answer are found and everything between them is cut out; with one object the cut reads as JSON, with two objects it does not"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">JSON is tried first. The tool takes everything from the first opening brace to the last closing brace of the answer and tries to read it as one JSON object. That works when the model wraps a single object in a sentence, and fails when the answer holds two.</p><ul class="algo-legend"><li class="k1"><b>brackets</b>the first opening brace and the last closing brace; the slice is what lies between them</li><li><b>tick or cross</b>whether the slice reads as one JSON object</li></ul></div>
+      </figure>
 
-      <pre><code>input   notes/P01/B_001.txt
-output  output_dir/P01/Extraction_B_001.txt.json
-        output_dir/P01/Extraction_B_001.txt.txt</code></pre>
 
-      <p><code>plan_outputs</code> checks that no two notes map to the same pair before anything runs (<code>__init__.py:240-266</code>).
-      <code>CNE_report.json</code> carries <code>tool</code>, <code>notes_type</code>, <code>model</code>, <code>system_prompt</code> (a flag),
-      <code>context_tokens</code>, <code>max_tokens</code>, <code>temperature</code>, <code>seed</code>, <code>device</code>, <code>gpu_offload</code>,
-      <code>warnings</code>, and per note <code>input</code>, the reader and encoding, <code>characters</code>, <code>finish_reason</code>,
-      <code>answer_characters</code>, <code>status</code>, <code>fields</code>, the two output paths or a <code>reason</code>; then <code>summary</code>
-      and <code>duration_seconds</code> (<code>__init__.py:171-187,213-216,272-317</code>). The answer text itself is not put in the report or the logs.</p>
+      <figure class="algo" data-scene="cne_lines" data-ms="6400">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the lines of two answers are checked one by one; the left answer has 8 field lines out of 10 and is accepted, the right one has 4 out of 10 and is refused"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Otherwise the answer is read as lines of <em><a class="gterm" data-term="cne-kv-lines" href="CNE.code.html#visor-parsing" title="See the code">key: value</a></em>. A line counts when it starts with a field name (lowercase letters, digits, spaces, underscores) followed by a colon. At least 60 % of the non-empty lines must count, or the answer is taken for prose and nothing is written.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">n</mi><mtext>field</mtext></msub><mo>&#x2265;</mo><mn>0.6</mn><mo>&#xd7;</mo><msub><mi class="k2">n</mi><mtext>lines</mtext></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>n<sub>field</sub></b>lines that look like <em>key: value</em></li><li class="k2"><b>n<sub>lines</sub></b>non-empty lines in the answer</li><li><b>bar</b>fills with every field line found; the dashed mark is the 60 % line</li></ul></div>
+      </figure>
+
+      <p>A field that appears twice keeps its first value. For each note two files are written in a folder tree that mirrors the notes: a JSON file, which is the canonical result, and a text file of <em>field : value</em> lines for reading, where a list is joined by commas. For <code>B_001.txt</code> they are <code>Extraction_B_001.txt.json</code> and <code>Extraction_B_001.txt.txt</code>. The run report lists, for each note, how it was read, how long the note and the answer were, whether it succeeded, how many fields it gave, and why it failed if it did. The text of the answer itself is not put in the report or in the logs.</p>
+
+      <a class="deep-link" href="CNE.code.html#visor-parsing"><b>In the code</b><span>The parsing code, the output planner, the report fields</span></a>
 
       <h3 id="visor-failures">3.6 Failures</h3>
 
-      <p>Each note is in its own <code>try</code>: a failure is logged with the note's relative path and recorded in the report, and the loop
-      continues (<code>__init__.py:191-213</code>). If no note was written the run raises: a 503 (<code>ToolUnavailableError</code>) when every failure
-      was a missing reader, otherwise a 422 (<code>ValueError</code>) listing each note's reason (<code>:218-232</code>); the report is then not written.
-      Note that this per-note log line names the file, unlike CLIC's progress messages.</p>
+      <p>Each note is handled on its own. A failure (empty text, an answer cut off, an answer that is neither JSON nor fields, an error in the model engine) is logged with the note&rsquo;s path, recorded with its reason, and the loop goes on. The whole run fails only if no note at all was written; it then ends with an error listing the reason for each note, and no report is written.</p>
 
-      <h2 id="visor-args">4. Arguments and schema</h2>
+      <a class="deep-link" href="CNE.code.html#visor-failures"><b>In the code</b><span>Which error becomes which status code</span></a>
 
-      <p>Signature: SADT-VISOR <code>tools/CNE/src/sadt_cne/__init__.py:46-56</code>; published form checked by running
-      <code>scripts/describe.py</code> on the tool. Sections and labels come from <code>layout.py:12-24</code>.</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Argument</th><th>Published type</th><th>Default</th><th>Shown to the user</th><th>Meaning</th></tr></thead>
-          <tbody>
-            <tr><td><code>notes</code></td><td>path, required</td><td>–</td><td>yes, "Clinical notes"</td><td>one note or a folder, searched recursively, extension matched without case (<code>readers.py:92-123</code>)</td></tr>
-            <tr><td><code>notes_type</code></td><td>"<a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a>" or "Ortho", required</td><td>–</td><td>yes, "Note type"</td><td>chooses the system prompt and the context window together (<code>extraction.py:49-51</code>)</td></tr>
-            <tr><td><code>model</code></td><td>path, <strong>required</strong></td><td>–</td><td>yes, "Model" (a list of hosted names, no "automatic" entry)</td><td>a <code>.gguf</code> file, or a folder holding exactly one, searched recursively (<code>extraction.py:89-128</code>)</td></tr>
-            <tr><td><code>output_dir</code></td><td>path</td><td>filled by the server</td><td>no</td><td>refused if it is the notes folder (<code>__init__.py:106-110</code>)</td></tr>
-            <tr><td><code>max_tokens</code></td><td>int</td><td>2048</td><td>yes</td><td>longest answer per note; a cut-off answer fails that note (<code>__init__.py:293-297</code>)</td></tr>
-            <tr><td><code>temperature</code></td><td>float</td><td>0.0</td><td>yes</td><td>sampling</td></tr>
-            <tr><td><code>context_tokens</code></td><td>int</td><td>0</td><td>yes</td><td>0 means TMJ 6144, Ortho 2048 (<code>extraction.py:49,146-153</code>)</td></tr>
-            <tr><td><code>seed</code></td><td>int</td><td>0</td><td>no (technical, VISOR-serve <code>server/registry/conventions.py:41-58</code>)</td><td>sampler seed</td></tr>
-            <tr><td><code>device</code></td><td>"cpu" or "cuda"</td><td>"cpu"</td><td>no (technical)</td><td>when the client sends none, the server fills in its own <code>DEVICE</code> setting (VISOR-serve <code>server/execution/dispatch.py:431-432</code>); "cuda" on the CPU build is run on the CPU and reported (<code>__init__.py:145-165</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <h2 id="visor-args">4. What you can choose</h2>
 
       <ul>
-        <li><strong>Output</strong>: per note an <code>Extraction_&lt;note file name&gt;.json</code> and
-        <code>.txt</code> (the source extension is kept: <code>B_001.txt</code> gives <code>Extraction_B_001.txt.txt</code>),
-        the input tree reproduced, and <code>CNE_report.json</code> (<a href="#visor-parsing">section 3.5</a>). The
-        report is written only when at least one note succeeded (<code>:218-236</code>).</li>
-        <li><strong>Resources and time</strong>: VISOR-serve <code>server/deployment.toml:239-246</code> sets
-        <code>[tools.CNE] batch = false</code> (the 4.4 GB model is loaded at each call, so a cohort of notes is sent in one
-        piece). No <code>timeout_seconds</code>, so no time limit (<code>server/config.py:77</code>); the upload cap of 500 MB
-        stays the ceiling of a cohort (<code>server/config.py:240</code>).</li>
-        <li><strong>What the client does</strong>: it declares <code>RUN_REPORT = "CNE_report.json"</code> and, after unpacking, shows
-        <code>summary</code>, <code>notes_type</code> and the warning count (Remote <code>CNERemote.py:62,75-103</code>). No result is loaded into the scene.</li>
+        <li><strong>Notes:</strong> a note or a folder of notes. Required.</li>
+        <li><strong>Note type:</strong> <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> or Ortho. It selects the <a class="gterm" data-term="cne-system-prompt" href="CNE.code.html#visor-generation" title="See the code">system prompt</a> and the <a class="gterm" data-term="cne-window" href="CNE.code.html#visor-model" title="See the code">context window</a> together.</li>
+        <li><strong>Model:</strong> a model file, or a folder holding exactly one. The list shows the hosted models; there is no &ldquo;automatic&rdquo; choice, so the model is not derived from the note type.</li>
+        <li><strong>Answer limit:</strong> the longest answer per note, 2048 tokens by default.</li>
+        <li><strong>Temperature:</strong> 0 by default, which means no randomness.</li>
+        <li><strong>Context window:</strong> 0 means the default of the note type.</li>
+        <li><strong>Hidden settings:</strong> a random seed and the device (processor by default); the server fills in its own device.</li>
+        <li><strong>Output folder:</strong> filled in by the server, and refused if it is the notes folder.</li>
       </ul>
 
-      <h2 id="visor-predicted">5. What is predicted vs computed</h2>
+      <p>There is no time limit, and a call is limited by the 500 MB upload cap of the server.</p>
+
+      <a class="deep-link" href="CNE.code.html#visor-args"><b>In the code</b><span>Argument table with types, defaults and the lines that enforce them</span></a>
+
+      <h2 id="visor-predicted">5. Predicted or calculated</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Step</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>Discovery, reading, character normalisation, empty-text refusal</td><td><span class="badge calcule">computed</span> deterministic</td><td>server, CNE venv</td></tr>
-            <tr><td>Prompt and window from <code>notes_type</code></td><td><span class="badge calcule">computed</span> fixed table</td><td>server</td></tr>
-            <tr><td>The extraction itself (which fields, which values)</td><td><span class="badge predit">predicted</span> <strong>language model</strong>: Qwen 2.5 7B <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> fine-tune, q4_k_m <a class="gterm" data-term="gguf" href="../../glossary.html#g-gguf" title="See glossary">GGUF</a> (the hosted one)</td><td>server, CPU build of <a class="gterm" data-term="llamacpp" href="../../glossary.html#g-llamacpp" title="See glossary">llama.cpp</a></td></tr>
-            <tr><td>Truncation check, JSON or key-value parsing, file writing</td><td><span class="badge calcule">computed</span> deterministic</td><td>server</td></tr>
+            <tr><td>Finding notes, reading them, cleaning characters, refusing empty text</td><td><span class="badge calcule">computed</span> deterministic</td></tr>
+            <tr><td>Prompt and window chosen from the note type</td><td><span class="badge calcule">computed</span> a fixed table</td></tr>
+            <tr><td>The extraction itself: which fields, which values</td><td><span class="badge predit">predicted</span> the language model, a Qwen 2.5 7B <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> fine-tune in q4_k_m <a class="gterm" data-term="gguf" href="../../glossary.html#g-gguf" title="See glossary">GGUF</a> form (the hosted one), run by <a class="gterm" data-term="llamacpp" href="../../glossary.html#g-llamacpp" title="See glossary">llama.cpp</a> on the processor</td></tr>
+            <tr><td>Cut-off check, JSON or field-line parsing, writing files</td><td><span class="badge calcule">computed</span> deterministic</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>At temperature 0 with a fixed seed the same note should give the same answer; nothing checks the answer against the note.</p>
+      <p>At temperature 0 with a fixed seed the same note should give the same answer. Nothing checks the answer against the note.</p>
+
+      <a class="deep-link" href="CNE.code.html#visor-predicted"><b>In the code</b><span>The same table with the places in the code</span></a>
 
       <h2 id="visor-env">6. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Value</th><th>Where</th></tr></thead>
-          <tbody>
-            <tr><td>Python</td><td><code>&gt;=3.11,&lt;3.12</code></td><td><code>pyproject.toml:5-6</code></td></tr>
-            <tr><td>llama-cpp-python</td><td><code>0.3.35</code> from the explicit <strong>CPU</strong> wheel index <code>abetlen.github.io/llama-cpp-python/whl/cpu</code></td><td><code>pyproject.toml:13,60-67</code></td></tr>
-            <tr><td>CUDA runtime wheels</td><td><code>nvidia-cuda-runtime-cu12==12.8.90</code>, <code>nvidia-cublas-cu12==12.8.4.1</code>, preloaded for a CUDA build that is not the one pinned</td><td><code>pyproject.toml:24-25</code></td></tr>
-            <tr><td>Readers</td><td><code>pymupdf==1.28.2</code>, <code>python-docx==1.2.0</code></td><td><code>pyproject.toml:29-30</code></td></tr>
-            <tr><td>Model expected</td><td><code>DATA/CNE/models/&lt;bundle&gt;/</code>, one <code>.gguf</code> per folder; the manifest stages <code>TMJ/qwen-ft-q4_k_m.gguf</code></td><td>VISOR-serve <code>scripts/data-manifest.yml:687-692</code></td></tr>
-            <tr><td>Resources and timeout</td><td><code>batch = false</code>; no timeout</td><td>VISOR-serve <code>server/deployment.toml:246</code>, <code>server/config.py:77</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>Everything runs in the tool&rsquo;s own environment on the server: Python 3.11, the <a class="gterm" data-term="cne-cpu-build" href="CNE.code.html#f-cpu" title="See the code">processor build</a> of llama-cpp-python, and one reader each for PDF and Word. Nothing is installed in Slicer. The legacy module installed the packages into Slicer&rsquo;s own Python and downloaded a 4.4 or 4.9 GB model into the user&rsquo;s Documents folder.</p>
 
-      <p>Legacy pip-installed llama-cpp-python, PyMuPDF and python-docx into Slicer's own interpreter and downloaded a 4.4 or 4.9 GB
-      model into the user's Documents folder (legacy page, <a href="../../CNE/CNE.html#modeles">§4</a>; Remote <code>CNERemote.py:3-6</code>).
-      In VISOR nothing is installed in Slicer; the engine is in the tool's venv on the server
-      (<a href="../deployment.html">Packaging and deployment</a>).</p>
+      <a class="deep-link" href="CNE.code.html#visor-env"><b>In the code</b><span>Pinned versions, wheel index, hosted data, resources</span></a>
 
       <h2 id="visor-changes">7. What changed from the legacy logic</h2>
 
-      <p>The system prompt of <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> mode, the absence of one in Ortho mode, and the two default windows are unchanged.
-      Legacy lines are <code>CNE_CLI/CNE_CLI.py</code> at 3c67957.</p>
+      <p>The <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> prompt, the absence of a prompt for Ortho and the two default windows are unchanged. Around them:</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Point</th><th>Legacy</th><th>VISOR</th></tr></thead>
-          <tbody>
-            <tr><td>Where it runs</td><td>Slicer CLI module on the workstation, engine in Slicer's Python</td><td>the server, tool venv (<a href="#visor-where">section 1.1</a>)</td></tr>
-            <tr><td>Finding the notes</td><td><code>glob(folder/*ext)</code>, flat, case-sensitive (<code>:134-135</code>)</td><td>recursive, case-insensitive, skips <code>~$</code>, dotfiles and <code>__MACOSX</code> (<code>readers.py:92-123</code>)</td></tr>
-            <tr><td>Nothing found</td><td>warning, exit status 0 (<code>:137-141</code>)</td><td>422 with the supported extensions (<code>__init__.py:119-126</code>)</td></tr>
-            <tr><td>Output folder</td><td>must exist, created by the panel</td><td>created by the tool, refused if equal to the notes folder (<code>__init__.py:106-116</code>)</td></tr>
-            <tr><td><code>.txt</code> encoding</td><td>UTF-8 only (<code>:82</code>)</td><td><code>utf-8-sig</code>, <code>cp1252</code>, <code>latin-1</code>, encoding recorded (<code>readers.py:41,159-174</code>)</td></tr>
-            <tr><td><code>.docx</code></td><td><code>doc.paragraphs</code> only (<code>:72</code>)</td><td>body in order, tables, headers and footers (<code>readers.py:188-229</code>)</td></tr>
-            <tr><td>Scanned PDF</td><td>empty text sent to the model (legacy page, <a href="../../CNE/CNE.html#entrees">§5</a>)</td><td>the note is refused by name, no OCR (<code>__init__.py:276-285</code>)</td></tr>
-            <tr><td>Missing reader package</td><td><code>sys.exit(1)</code> if PyMuPDF or python-docx is absent (<code>:107-117</code>)</td><td>only the notes of that format fail (<code>dependencies.py:39</code>)</td></tr>
-            <tr><td>Context window and prompt</td><td>window tested on <code>== "TMJ"</code> (<code>:152</code>), prompt on <code>.upper()</code> (<code>:195</code>)</td><td>one validated choice drives both (<code>extraction.py:49-51</code>)</td></tr>
-            <tr><td>GPU request</td><td><code>n_gpu_layers=-1</code> always, silently without effect on the CPU build (<code>:164</code>)</td><td>only when <code>device</code> is <code>cuda</code>; whether layers were really offloaded is in the report (<code>__init__.py:145-165,184</code>)</td></tr>
-            <tr><td>Generation</td><td><code>max_tokens=500</code>, <code>temperature=0.1</code>, no seed (<code>:199-203</code>)</td><td><code>2048</code>, <code>0.0</code>, a seed argument (<code>__init__.py:51-54</code>)</td></tr>
-            <tr><td>Truncated answer</td><td>not detected</td><td><code>finish_reason == "length"</code> fails the note (<code>__init__.py:293-297</code>)</td></tr>
-            <tr><td>Reading the answer</td><td>first <code>{</code> to last <code>}</code>, otherwise the raw text is written (<code>:209-226</code>)</td><td>JSON first, then <code>key: value</code> lines (at least 60 % of lines), otherwise nothing is written and the note fails (<code>extraction.py:261-301</code>, <code>__init__.py:299-305</code>)</td></tr>
-            <tr><td>Output files</td><td><code>Extraction_&lt;stem&gt;.txt</code> only, nested values written as Python <code>repr</code>, so <code>.txt</code>, <code>.pdf</code> and <code>.docx</code> of the same name overwrite each other (<code>:219-232</code>)</td><td><code>.json</code> and <code>.txt</code>, full name kept, uniqueness checked (<code>__init__.py:240-266</code>)</td></tr>
-            <tr><td>One note fails</td><td>a failed note is logged and counted, then the CLI still ends with the filter comment "All files processed successfully!" (<code>:238-246,267</code>); any error outside the loop exits with status 1 (<code>:248-261</code>)</td><td>failure recorded per note; run fails only if no note was written, with a 503 when every failure is a missing reader (<code>__init__.py:200-232</code>)</td></tr>
-            <tr><td>Model files</td><td>downloaded by the widget into <code>Documents</code> (legacy page, <a href="../../CNE/CNE.html#modeles">§4</a>)</td><td>hosted on the server, picked by name (<code>extraction.py:89-128</code>)</td></tr>
-            <tr><td>Dashboard</td><td><code>CNE_Dashboard</code> reads <code>Extraction_*.txt</code> (legacy page, <a href="../../CNE/CNE.html#tableau-de-bord">§8.1</a>)</td><td>not ported; and the file names it reads have changed</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <ul>
+        <li><strong>Where:</strong> on the server instead of inside Slicer on the workstation.</li>
+        <li><strong>Finding notes:</strong> recursive and not case-sensitive; finding nothing is an error instead of a quiet success.</li>
+        <li><strong>Reading:</strong> three text encodings instead of one; Word tables, headers and footers are read; a <a class="gterm" data-term="cne-scanned-pdf" href="CNE.code.html#visor-reading" title="See the code">scanned PDF</a> is refused instead of sending an empty text to the model; a missing reader package fails only the notes of that format.</li>
+        <li><strong>Generation:</strong> answer limit 2048 instead of 500, temperature 0 instead of 0.1, a seed, and a cut-off answer fails the note instead of being written.</li>
+        <li><strong>Reading the answer:</strong> JSON, then field lines, otherwise nothing is written, where the legacy module saved the raw answer.</li>
+        <li><strong>Outputs:</strong> a JSON file and a text file per note, with the full note name so that a <code>.txt</code>, a <code>.pdf</code> and a <code>.docx</code> of the same name no longer overwrite each other, and a run report.</li>
+        <li><strong>GPU:</strong> asked for only on request, and the report says whether layers were really offloaded.</li>
+        <li><strong>Not ported:</strong> the Dashboard, and the download of models by the client.</li>
+      </ul>
 
-      <h2 id="visor-findings">8. Findings in VISOR</h2>
+      <a class="deep-link" href="CNE.code.html#visor-changes"><b>In the code</b><span>Legacy against VISOR, point by point, with lines on both sides</span></a>
 
-      <div class="callout warn">
-        <div class="callout-title">The text of the notes is sent to the server</div>
-        <p>The legacy statement that CNE keeps clinical text on the machine ("no network exfiltration", legacy page
-        <a href="../../CNE/CNE.html#pieges">§11</a>, and the legacy Guide's
-        <a href="../../guide/CNE.html#quand">"Nothing leaves your machine"</a>) <strong>does not hold for VISOR</strong>. The VISOR panel uploads the notes
-        you select to a tool server where the model runs (Remote <code>README.md:24-35</code>; <code>CNERemote/CNERemote.py:57</code>
-        and the server-side <code>notes</code> argument, <a href="#visor-args">Arguments and schema</a>). The Remote README says in so many words that there is no
-        de-identification in the current client (<code>README.md:32</code>), and the VISOR security page lists the
-        de-identification of uploaded files as specified only
-        (<a href="../security.html#deidentification">De-identification</a>, <a href="../security.html#transport">Transport</a>).
-        What the tool itself does with the text: it runs <a class="gterm" data-term="llamacpp" href="../../glossary.html#g-llamacpp" title="See glossary">llama.cpp</a> in-process and contains no network call
-        (<code>grep</code> for <code>urllib</code>, <code>requests</code>, <code>http</code> and <code>socket</code> in
-        <code>tools/CNE/src/sadt_cne/</code> finds none), and the server writes the answer to the job folder. The legacy
-        finding stays true of the legacy module only.</p>
-      </div>
+      <h2 id="visor-findings">8. Known problems</h2>
 
-      <div class="callout warn">
-        <div class="callout-title">The client says "automatic", but nothing matches the model to the note type</div>
-        <p>The Remote README ("leave <strong>Model</strong> on automatic and the server uses the model fine-tuned for that
-        note type", <code>README.md:611-613</code>) and the docstring of <code>CNERemote/CNERemote.py:15-18</code> ("the
-        <code>model</code> field defaults to (automatic)") are out of date. <code>model</code> is a required
-        argument of the tool (<code>__init__.py:49</code>), and the client adds its "(automatic)" entry only to
-        <em>optional</em> arguments (Remote <code>ServerToolsCore/ServerToolsCoreLib/base_widget.py:1074-1076</code>,
-        rationale at <code>formgen.py:107-109</code>): the Model field lists the hosted bundles and sends the one selected.
-        Nothing derives the model from <code>notes_type</code> (<code>resolve_model_file</code> takes a path,
-        <code>extraction.py:89-128</code>); a mismatch between the two is only a warning (next callout). Read in the code,
-        not run in Slicer.</p>
-      </div>
+      <ul>
+        <li>The notes are <a class="gterm" data-term="cne-upload" href="CNE.code.html#f-text-leaves" title="See the code">uploaded</a> to the server as they are, with no de-identification, so the legacy statement that clinical text stays on the machine does not hold for VISOR (<a href="CNE.code.html#f-text-leaves">details</a>).</li>
+        <li>The panel and the README speak of an &ldquo;automatic&rdquo; model, but nothing derives the model from the note type (<a href="CNE.code.html#f-automatic">details</a>).</li>
+        <li>Only the <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> model is hosted, and a model of the wrong type is only a warning (<a href="CNE.code.html#f-only-tmj">details</a>).</li>
+        <li>The engine is the <a class="gterm" data-term="cne-cpu-build" href="CNE.code.html#f-cpu" title="See the code">processor build</a>, whatever some comments say; a GPU request is reported as ignored (<a href="CNE.code.html#f-cpu">details</a>).</li>
+        <li>Nothing compares a note with the <a class="gterm" data-term="cne-window" href="CNE.code.html#visor-model" title="See the code">context window</a>, and the Ortho defaults leave no room (<a href="CNE.code.html#f-no-length-guard">details</a>).</li>
+        <li>Output files are named differently from the legacy ones, so tools that read the old names would not find them (<a href="CNE.code.html#f-output-names">details</a>).</li>
+        <li>Fixed: <a class="gterm" data-term="cne-scanned-pdf" href="CNE.code.html#visor-reading" title="See the code">scanned PDFs</a>, cut-off answers, unreadable answers, same-named notes and silent GPU requests no longer produce a plausible file (<a href="CNE.code.html#f-verified-closed">details</a>).</li>
+      </ul>
 
-      <div class="callout warn">
-        <div class="callout-title">Only the <a class="gterm" data-term="tmj" href="../../glossary.html#g-tmj" title="See glossary">TMJ</a> model is hosted</div>
-        <p>The data manifest stages one bundle, <code>TMJ/qwen-ft-q4_k_m.gguf</code> (VISOR-serve
-        <code>scripts/data-manifest.yml:687-692</code>). <code>notes_type = "Ortho"</code> is accepted by the tool but no Ortho
-        model is hosted, and a model whose path names the other type is only a warning in the report, not a refusal
-        (<code>__init__.py:133-139</code>, <code>extraction.py:131-144</code>). The manifest comment that the Ortho repository "answers 404 today"
-        (<code>data-manifest.yml:682-686</code>, repeated in SADT-VISOR <code>tools/CNE/README.md:205-208</code>) is out of
-        date: on 2026-11-09 an HTTP HEAD request on the old <code>dcbia/</code> Ortho URL answered 307 (a redirect to the
-        <code>DCBIA-OrthoLab/</code> organisation), and one on
-        <code>DCBIA-OrthoLab/Llama-3.1-8B-Instruct-Ortho/.../model-q4_k_m.gguf</code> answered 302 to a download (status codes
-        only, nothing downloaded). The TMJ URL in the manifest also still uses the old <code>dcbia/</code> name and answers
-        307.</p>
-      </div>
+      <a class="deep-link" href="CNE.code.html#visor-findings"><b>In the code</b><span>The seven findings with their evidence</span></a>
 
-      <div class="callout note">
-        <div class="callout-title">CPU, whatever some comments say</div>
-        <p>The pinned wheel index for llama-cpp-python is the CPU one (SADT-VISOR <code>tools/CNE/pyproject.toml:60-67</code>). Three comments
-        disagree with it: the same file's header speaks of a "CUDA 12.4 wheel index below" (<code>:8-23</code>); the published
-        description of <code>device</code> says "it needs the CUDA build of llama.cpp, which this tool pins"
-        (<code>__init__.py:82-84</code>); and VISOR-serve's compose file says CNE cannot run in the CPU service because it ships
-        the CUDA build (<code>docker-compose.yml:105-110</code>). The code is the CPU build, so a <code>cuda</code> request is
-        reported as ignored. The tool's README agrees with the code (SADT-VISOR <code>tools/CNE/README.md:154-165</code>).
-        Do not read "CNE needs a GPU" anywhere.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">No guard on the length of a note</div>
-        <p>The legacy concern about long notes (legacy page, <a href="../../CNE/CNE.html#pieges">§11</a>) is only half closed. A cut-off
-        <em>answer</em> is now refused (<code>__init__.py:293-297</code>) and <code>max_tokens</code> defaults to 2048 instead of 500. But nothing
-        compares the note with the context window or checks that <code>max_tokens</code> leaves room in it: <code>context_for</code> only
-        rejects a negative value (<code>extraction.py:146-153</code>). With the Ortho default the answer budget alone equals the window
-        (2048 and 2048, <code>:49</code>, <code>__init__.py:51</code>). What llama.cpp does then was not checked; whatever it raises fails that one
-        note (<code>__init__.py:200-212</code>). Read in the code.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">Output names changed</div>
-        <p>Files are <code>Extraction_&lt;note file name&gt;.json</code> and <code>.txt</code>, not
-        <code>Extraction_&lt;stem&gt;.txt</code> (<code>__init__.py:240-266</code>). Anything that reads the legacy names,
-        such as the legacy Dashboard (<code>Extraction_*.txt</code>), would not find the same files.</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">Verified: the silent legacy failures are closed</div>
-        <p>An image-only PDF, a truncated answer and an answer that is neither JSON nor fields now fail the note instead of writing a
-        plausible file (<code>__init__.py:276-305</code>); homonymous notes of different formats no longer overwrite each other
-        (<code>:240-266</code>); the TMJ/tmj spelling split is gone (<code>extraction.py:49-51</code>); a GPU request that cannot be honoured
-        is reported (<code>__init__.py:145-165</code>). Read in the code.</p>
-      </div>
 
       <h2 id="visor-literature">9. Literature</h2>
 
       <p>The fine-tuned models and their publications are the tool's: see the <a href="../../CNE/SOURCES.html">CNE sources page</a>.
       VISOR adds no new model.</p>
 
-      <footer class="footer">
-        <a href="../../index.html">← All pages</a> · <a href="../../CNE/CNE.html">Legacy page for this tool</a> · <a href="../guide/CNE.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a>
+            <footer class="footer">
+        <a href="../../index.html">← All pages</a> · <a href="CNE.code.html">Code page</a> · <a href="../../CNE/CNE.html">Legacy page for this tool</a> · <a href="../guide/CNE.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a>
       </footer>
     </article>
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../../assets/algo.js"></script>
+<script src="../../../assets/algo-CNE.js"></script>
 </body>
 </html>

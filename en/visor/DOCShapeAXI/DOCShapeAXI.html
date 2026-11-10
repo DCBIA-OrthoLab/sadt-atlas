@@ -23,6 +23,7 @@
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/DOCShapeAXI.html">Guide</a>
       <a href="../../visor/DOCShapeAXI/DOCShapeAXI.html" aria-current="true">Atlas</a>
+      <a href="../../visor/DOCShapeAXI/DOCShapeAXI.code.html">Code</a>
     </div>
     <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="visor">
@@ -122,71 +123,74 @@
         <img class="tool-icon" src="../../../assets/screens/DOCShapeAXI/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../../index.html">SADT Atlas</a> › <a href="../index.html">VISOR</a> › Analysis</div>
         <h1>DOCShapeAXI on VISOR</h1>
-        <p class="lede">In VISOR, DOCShapeAXI runs on the server: the Slicer panel uploads <code>.vtk</code> surfaces and a <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> name, and gets back a JSON report of the predictions and, optionally, the surfaces carrying the <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> maps. The networks and the Grad-CAM method are the legacy ones; the checkpoint now decides anatomy, task and class count by itself, there is no CSV any more, and explainability can be turned off. The legacy Slicer module is described on <a href="../../DOCShapeAXI/DOCShapeAXI.html">its own page</a>.</p>
+        <p class="lede">DOCShapeAXI looks at a 3D surface, such as an airway or a jaw joint, and answers a clinical question about its shape: which severity class it belongs to, or how obstructed it is. It then shows <em>where on the surface</em> the network looked. This page explains how, step by step, with the maths. Where the code does something worth checking, a link leads to <a href="DOCShapeAXI.code.html">the code page</a>. The legacy module is on <a href="../../DOCShapeAXI/DOCShapeAXI.html">its own page</a>.</p>
         <div class="meta-row">
           <span class="badge neutral">VISOR</span>
-          <span class="badge predit">5 checkpoints, 2 network classes</span>
+          <a class="badge neutral" href="DOCShapeAXI.code.html">Code (developers)</a>
+          <span class="badge predit">5 <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoints</a>, 2 network classes</span>
           <a class="badge neutral" href="../../DOCShapeAXI/DOCShapeAXI.html">Legacy page</a>
           <a class="badge neutral" href="../guide/DOCShapeAXI.html">Guide (VISOR)</a>
         </div>
       </header>
 
-      <p>References on this page name a repository, then a path inside it, then a line:
-      <em>SADT-VISOR</em> is the tool catalogue (commit 6ba2a78), <em>VISOR-serve</em> the
-      server (e9a7e5d), <em>Remote</em> the Slicer client (AutomatedDentalToolsRemote 19b95e8),
-      <em>legacy</em> SlicerAutomatedDentalTools at 3c67957. A bare path such as <code>catalog.py:50</code> is in
-      SADT-VISOR <code>tools/DOCShapeAXI/src/sadt_docshapeaxi/</code>. Everything was read in the code; nothing on this
-      page was run. Overview of the stack: <a href="../index.html">VISOR</a>.</p>
+      <h2 id="visor-overview">Overview: what goes in, what comes out</h2>
 
-      <h2 id="visor-status">1. Position in the chain</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>DOCShapeAXI</th></tr></thead>
+          <tbody>
+            <tr><td>Input</td><td>one or several 3D surfaces (<code>.vtk</code>) that are already segmented elsewhere, for example an airway or a <a class="gterm" data-term="condyle" href="../../glossary.html#g-condyle" title="See glossary">condyle</a>, and the name of a trained network file (a <em><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a></em>)</td></tr>
+            <tr><td>Idea</td><td>the network sees each surface in two ways at once, as a cloud of points and as many pictures taken from around it; the two views of the shape are merged into a class or a score; then a second pass shows which parts of the surface weighed most</td></tr>
+            <tr><td>Output</td><td>for each surface, a class (or a number for the regression checkpoint) in a <a class="gterm" data-term="dsx-report" href="DOCShapeAXI.code.html#visor-io" title="See the code">JSON report</a>, and optionally a copy of the surface carrying one &ldquo;where it looked&rdquo; map per class</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-      <ul>
-        <li><strong>State: ported, implemented in code, with tests in the tool</strong> (SADT-VISOR
-        <code>tools/DOCShapeAXI/tests/test_run.py</code>, 91 test functions, not run for this page). <strong>A server set up only with
-        the VISOR-serve staging scripts cannot run it</strong>: the <a class="gterm" data-term="efficientnet" href="../../glossary.html#g-efficientnet" title="See glossary">EfficientNet</a> backbone it requires is not staged by
-        any of them (see <a href="#visor-findings">Findings in VISOR</a>).</li>
-        <li><strong>API name</strong> <code>DOCShapeAXI</code> (SADT-VISOR <code>tools/DOCShapeAXI/pyproject.toml:57-59</code>);
-        modules <code>__init__.py</code>, <code>catalog.py</code>, <code>engine.py</code>, <code>pipeline.py</code>.</li>
-        <li><strong>Client panel</strong> <code>DOCShapeAXIRemote</code>, a thin panel (Remote
-        <code>DOCShapeAXIRemote/DOCShapeAXIRemote.py:63,67,69</code>; built, <code>CMakeLists.txt:34</code>). It loads the
-        <code>.vtk</code> and <code>.vtp</code> results as models, at most 12 (<code>:82,88-92</code>).</li>
-        <li><strong>Calls / called by</strong>: nothing; no <code>sup</code> argument (<code>__init__.py:18-25</code>), and no other tool
-        names <code>DOCShapeAXI</code>.</li>
-        <li><strong>Hosted data</strong>: the five <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoints</a> are in the data manifest (VISOR-serve
-        <code>scripts/data-manifest.yml:597-614</code>). There is no test surface, deliberately: nothing public is an airway,
-        a <a class="gterm" data-term="condyle" href="../../glossary.html#g-condyle" title="See glossary">condyle</a> or a cleft (<code>:616-622</code>). The manifest header still says "NOT PORTED YET" (<code>:595</code>), which
-        is wrong: the tool and its client exist.</li>
-      </ul>
+      <p>The networks and the <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> method are the legacy ones: nothing is trained in VISOR. What changed is everything around them: the checkpoint name now tells the tool which analysis to run, there is no CSV any more, and the <a class="gterm" data-term="dsx-explain-pass" href="DOCShapeAXI.code.html#visor-explain" title="See the code">explanation pass</a> can be switched off (<a href="#visor-changes">What changed</a>).</p>
 
-      <figure class="diagram">
+      <h2 id="visor-status">1. Where it runs</h2>
+
+      <p>In VISOR, Slicer keeps only a panel. It sends the surfaces and the <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> name to a server, which does all the work and sends one archive back. DOCShapeAXI calls no other tool, and no other tool calls it. The tool is implemented and tested, but a server prepared only with the standard staging scripts cannot run it yet: one <a class="gterm" data-term="dsx-backbone" href="DOCShapeAXI.code.html#f-backbone" title="See the code">image backbone</a> that the network needs is not put in place by any of them (<a href="#visor-findings">Known issues</a>).</p>
+
+            <figure class="diagram">
         <svg viewBox="0 0 980 210" role="img" aria-label="The Slicer panel uploads the surfaces to VISOR-serve, which runs DOCShapeAXI in its own virtual environment and sends back one archive. It calls no other tool.">
+<a class="d-link" href="#visor-where">
 <rect class="d-box-a" x="20" y="60" width="240" height="80" rx="6"/>
-<text class="d-label" x="140" y="89" text-anchor="middle">Slicer: DOCShapeAXIRemote</text>
-<text class="d-label-s" x="140" y="104" text-anchor="middle">panel generated from GET /tools</text>
-<text class="d-label-s" x="140" y="119" text-anchor="middle">loads .vtk/.vtp as models</text>
+<text class="d-label" x="140" y="89" text-anchor="middle">Slicer: the panel</text>
+<text class="d-label-s" x="140" y="104" text-anchor="middle">generated from the server&rsquo;s form</text>
+<text class="d-label-s" x="140" y="119" text-anchor="middle">loads the surfaces as models</text>
+</a>
 <path class="d-arrow" d="M260 85 H348"/>
 <path class="d-arrow-head" d="M348 85 l-7 -4 v8 z"/>
 <text class="d-label-s" x="304" y="77" text-anchor="middle">surfaces</text>
 <path class="d-arrow" d="M350 118 H262"/>
 <path class="d-arrow-head" d="M262 118 l7 -4 v8 z"/>
 <text class="d-label-s" x="306" y="134" text-anchor="middle">one archive</text>
+<a class="d-link" href="#visor-where">
 <rect class="d-box" x="350" y="40" width="260" height="120" rx="6"/>
 <text class="d-label" x="480" y="81.5" text-anchor="middle">VISOR-serve</text>
-<text class="d-label-s" x="480" y="96.5" text-anchor="middle">registry, conventions, queue</text>
-<text class="d-label-s" x="480" y="111.5" text-anchor="middle">model = hosted checkpoint name</text>
-<text class="d-label-s" x="480" y="126.5" text-anchor="middle">runner: one process per run</text>
+<text class="d-label-s" x="480" y="96.5" text-anchor="middle">queue, one process per run</text>
+<text class="d-label-s" x="480" y="111.5" text-anchor="middle">checkpoint = a hosted file name</text>
+<text class="d-label-s" x="480" y="126.5" text-anchor="middle">starts the tool</text>
+</a>
 <path class="d-arrow" d="M610 100 H698"/>
 <path class="d-arrow-head" d="M698 100 l-7 -4 v8 z"/>
 <text class="d-label-s" x="654" y="92" text-anchor="middle">run()</text>
+<a class="d-link" href="#visor-pipeline">
 <rect class="d-box" x="700" y="40" width="260" height="120" rx="6"/>
-<text class="d-label" x="830" y="81.5" text-anchor="middle">DOCShapeAXI venv</text>
-<text class="d-label-s" x="830" y="96.5" text-anchor="middle">shapeaxi 1.1.1, pytorch3d, captum</text>
+<text class="d-label" x="830" y="81.5" text-anchor="middle">DOCShapeAXI environment</text>
+<text class="d-label-s" x="830" y="96.5" text-anchor="middle">its own pinned environment</text>
 <text class="d-label-s" x="830" y="111.5" text-anchor="middle">predict, then Grad-CAM</text>
-<text class="d-label-s" x="830" y="126.5" text-anchor="middle">writes surfaces + JSON report</text>
-<text class="d-label-s" x="490" y="195" text-anchor="middle">no sup argument: DOCShapeAXI calls no tool, and no tool calls it</text>
+<text class="d-label-s" x="830" y="126.5" text-anchor="middle">writes surfaces + a report</text>
+<text class="d-label-s" x="490" y="195" text-anchor="middle">DOCShapeAXI calls no other tool, and no tool calls it</text>
+</a>
 </svg>
-        <figcaption>DOCShapeAXI is standalone in VISOR as in legacy. What moved is the shapeaxi environment: legacy built a conda <code>shapeaxi</code> environment on the workstation (with a WSL path on Windows); VISOR keeps a pinned venv on the server.</figcaption>
+        <figcaption>DOCShapeAXI is standalone in VISOR as in legacy. What moved is its Python environment: legacy built a conda environment on the workstation; VISOR keeps a pinned one on the server.</figcaption>
       </figure>
+
+
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-status"><b>In the code</b><span>The panel, the API name, hosted data and the position in the chain, with files and lines</span></a>
+
 
       <h3 id="visor-where">1.1 What runs where</h3>
 
@@ -194,67 +198,53 @@
         <table>
           <thead><tr><th>Step</th><th>Server</th><th>Client (Slicer)</th></tr></thead>
           <tbody>
-            <tr><td>Choosing surfaces, checkpoint, output folder</td><td>publishes the form (<code>GET /tools</code>)</td><td>generated panel; the surfaces are uploaded</td></tr>
-            <tr><td>Network, prediction, <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a>, writing the surfaces</td><td>everything (<code>engine.py</code>, <code>pipeline.py</code>)</td><td>nothing</td></tr>
-            <tr><td>Results</td><td>surfaces carrying the Grad-CAM arrays, and <code>DOCShapeAXI_report.json</code>, as one archive</td><td>unpacks it; optionally loads up to 12 surfaces as models (<code>DOCShapeAXIRemote.py:82-92,118</code>)</td></tr>
-            <tr><td>Status line</td><td>–</td><td>one sentence built from the report (<code>:114-116,120-130</code>); see the findings</td></tr>
+            <tr><td>Choosing surfaces, checkpoint, output folder</td><td>publishes the form</td><td>generated panel; the surfaces are uploaded</td></tr>
+            <tr><td>Network, prediction, <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a>, writing the surfaces</td><td>everything</td><td>nothing</td></tr>
+            <tr><td>Results</td><td>the surfaces carrying the Grad-CAM maps, and a <a class="gterm" data-term="dsx-report" href="DOCShapeAXI.code.html#visor-io" title="See the code">JSON report</a>, as one archive</td><td>unpacks it; optionally loads up to 12 surfaces as models</td></tr>
+            <tr><td>Status line</td><td>–</td><td>one sentence built from the report (it shows question marks today)</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>Run mechanics: <a href="../run-lifecycle.html">Anatomy of a run</a>. What protects the upload:
-      <a href="../security.html">Security and privacy</a>.</p>
+      <p>Run mechanics: <a href="../run-lifecycle.html">Anatomy of a run</a>. What protects the upload: <a href="../security.html">Security and privacy</a>.</p>
 
       <h2 id="visor-files">2. Files involved</h2>
 
-      <p>Line counts at 6ba2a78. Legacy was <code>DOCShapeAXI/DOCShapeAXI.py</code> (830 lines, panel, conda and WSL handling) and
-      <code>DOCShapeAXI_CLI/DOCShapeAXI_CLI.py</code> (310 lines, the computation); only the computation was ported.</p>
+      <p>The tool is four short Python modules (the catalogue of <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoints</a>, the network and the two passes, the discovery and loading helpers, and the entry point that ties them together), a pinned environment, and tests. Legacy had a 830-line panel plus a 310-line command; only the computation was ported. The full table, with line counts and the files on the server and client sides, is on the code page.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Lines</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>src/sadt_docshapeaxi/__init__.py</code></td><td>133</td><td><code>run()</code>: catalogue lookup, discovery, the two passes, renaming, the report</td></tr>
-            <tr><td><code>src/sadt_docshapeaxi/catalog.py</code></td><td>88</td><td>the five <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoints</a> and what each implies (<code>Analysis</code>, <code>ANALYSES</code>, <code>analysis_for</code>)</td></tr>
-            <tr><td><code>src/sadt_docshapeaxi/engine.py</code></td><td>129</td><td>the dataset, <code>predict</code> and <code>explain</code></td></tr>
-            <tr><td><code>src/sadt_docshapeaxi/pipeline.py</code></td><td>199</td><td>discovery, device, backbone check, pickle allowlist, <code>load_network</code>, <code>scale_attribution</code></td></tr>
-            <tr><td><code>pyproject.toml</code>, <code>uv.lock</code></td><td>106, 2849</td><td>the venv (<a href="#visor-env">section 6</a>)</td></tr>
-            <tr><td><code>tests/test_run.py</code></td><td>1005</td><td>the tool's tests, including the resize pinned against <code>cv2.resize</code> (<code>pyproject.toml:45-51</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-files"><b>In the code</b><span>Every file with its line count, and what concerns DOCShapeAXI on the server and the client</span></a>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Elsewhere</th><th>What concerns DOCShapeAXI</th></tr></thead>
-          <tbody>
-            <tr><td>VISOR-serve <code>server/deployment.toml</code></td><td>no section: default resources, no timeout</td></tr>
-            <tr><td>VISOR-serve <code>scripts/data-manifest.yml:595-622</code></td><td>the five checkpoints from the <code>shapeaxi-ckpt-v1</code> release, about 72 MB each; no test file; no <a class="gterm" data-term="efficientnet" href="../../glossary.html#g-efficientnet" title="See glossary">EfficientNet</a> backbone</td></tr>
-            <tr><td>Remote <code>DOCShapeAXIRemote/DOCShapeAXIRemote.py</code></td><td>the panel: tool name, <code>RUN_REPORT</code>, status summary, model loading</td></tr>
-          </tbody>
-        </table>
-      </div>
 
       <h2 id="visor-pipeline">3. The pipeline</h2>
 
-      <figure class="diagram">
+            <figure class="diagram">
         <svg viewBox="0 0 1440 490" role="img" aria-label="DOCShapeAXI pipeline on VISOR: per run, the checkpoint file name selects the analysis, surfaces are discovered and the network is loaded; a prediction pass renders each surface and runs the network; an optional explanation pass runs Grad-CAM per class and paints it on the mesh; then surfaces and a JSON report are written.">
 <text class="d-label" x="14" y="75" text-anchor="start">per run</text>
+<a class="d-link" href="#visor-catalogue">
 <rect class="d-box" x="120" y="45" width="220" height="64" rx="6"/>
-<text class="d-label" x="230" y="73.5" text-anchor="middle">Catalogue lookup</text>
-<text class="d-label-s" x="230" y="88.5" text-anchor="middle">file name gives task, classes</text>
+<text class="d-label" x="230" y="73.5" text-anchor="middle">Look up the checkpoint</text>
+<text class="d-label-s" x="230" y="88.5" text-anchor="middle">its name gives the task</text>
+</a>
+<a class="d-link" href="#visor-discovery">
 <rect class="d-box" x="374" y="45" width="220" height="64" rx="6"/>
-<text class="d-label" x="484" y="73.5" text-anchor="middle">Checkpoint exists?</text>
-<text class="d-label-s" x="484" y="88.5" text-anchor="middle">else FileNotFoundError</text>
+<text class="d-label" x="484" y="73.5" text-anchor="middle">Is the file there?</text>
+<text class="d-label-s" x="484" y="88.5" text-anchor="middle">otherwise stop</text>
+</a>
+<a class="d-link" href="#visor-discovery">
 <rect class="d-box" x="628" y="45" width="220" height="64" rx="6"/>
-<text class="d-label" x="738" y="73.5" text-anchor="middle">Discover surfaces</text>
-<text class="d-label-s" x="738" y="88.5" text-anchor="middle">.vtk, recursive, sorted</text>
+<text class="d-label" x="738" y="73.5" text-anchor="middle">Find the surfaces</text>
+<text class="d-label-s" x="738" y="88.5" text-anchor="middle">sub-folders included</text>
+</a>
+<a class="d-link" href="#visor-discovery">
 <rect class="d-box" x="882" y="45" width="220" height="64" rx="6"/>
-<text class="d-label" x="992" y="73.5" text-anchor="middle">Resolve device</text>
-<text class="d-label-s" x="992" y="88.5" text-anchor="middle">cuda, else cpu + warning</text>
+<text class="d-label" x="992" y="73.5" text-anchor="middle">Choose the device</text>
+<text class="d-label-s" x="992" y="88.5" text-anchor="middle">GPU, else CPU with a warning</text>
+</a>
+<a class="d-link" href="#visor-discovery">
 <rect class="d-box" x="1136" y="45" width="220" height="64" rx="6"/>
-<text class="d-label" x="1246" y="73.5" text-anchor="middle">Load network</text>
-<text class="d-label-s" x="1246" y="88.5" text-anchor="middle">backbone staged, allowlist</text>
+<text class="d-label" x="1246" y="73.5" text-anchor="middle">Load the network</text>
+<text class="d-label-s" x="1246" y="88.5" text-anchor="middle">image backbone must be present</text>
+</a>
 <path class="d-arrow" d="M340 77 H372"/>
 <path class="d-arrow-head" d="M372 77 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M594 77 H626"/>
@@ -265,21 +255,31 @@
 <path class="d-arrow-head" d="M1134 77 l-7 -4 v8 z"/>
 <text class="d-label" x="14" y="175" text-anchor="start">predict</text>
 <text class="d-label-s" x="14" y="191" text-anchor="start">each surface</text>
+<a class="d-link" href="#visor-predict">
 <rect class="d-box" x="120" y="145" width="220" height="64" rx="6"/>
-<text class="d-label" x="230" y="173.5" text-anchor="middle">SaxiDataset</text>
-<text class="d-label-s" x="230" y="188.5" text-anchor="middle">EvalTransform(scale_factor)</text>
+<text class="d-label" x="230" y="173.5" text-anchor="middle">Prepare the data</text>
+<text class="d-label-s" x="230" y="188.5" text-anchor="middle">standard size</text>
+</a>
+<a class="d-link" href="#visor-predict">
 <rect class="d-box" x="374" y="145" width="220" height="64" rx="6"/>
-<text class="d-label" x="484" y="173.5" text-anchor="middle">create_mesh</text>
-<text class="d-label-s" x="484" y="188.5" text-anchor="middle">vertices, faces, normals</text>
+<text class="d-label" x="484" y="173.5" text-anchor="middle">Build the mesh</text>
+<text class="d-label-s" x="484" y="188.5" text-anchor="middle">points, triangles, normals</text>
+</a>
+<a class="d-link" href="#visor-predict">
 <rect class="d-box" x="628" y="145" width="220" height="64" rx="6"/>
 <text class="d-label" x="738" y="173.5" text-anchor="middle">Points and views</text>
-<text class="d-label-s" x="738" y="188.5" text-anchor="middle">sample points, render views</text>
+<text class="d-label-s" x="738" y="188.5" text-anchor="middle">a cloud, many pictures</text>
+</a>
+<a class="d-link" href="#visor-predict">
 <rect class="d-box-n" x="882" y="145" width="220" height="64" rx="6"/>
-<text class="d-label" x="992" y="173.5" text-anchor="middle">SaxiMHAFB network</text>
-<text class="d-label-s" x="992" y="188.5" text-anchor="middle">points + views</text>
+<text class="d-label" x="992" y="173.5" text-anchor="middle">Two-branch network</text>
+<text class="d-label-s" x="992" y="188.5" text-anchor="middle">one score per class</text>
+</a>
+<a class="d-link" href="#visor-predict">
 <rect class="d-box" x="1136" y="145" width="220" height="64" rx="6"/>
-<text class="d-label" x="1246" y="173.5" text-anchor="middle">argmax</text>
-<text class="d-label-s" x="1246" y="188.5" text-anchor="middle">skipped for regression</text>
+<text class="d-label" x="1246" y="173.5" text-anchor="middle">Pick the class</text>
+<text class="d-label-s" x="1246" y="188.5" text-anchor="middle">regression keeps the score</text>
+</a>
 <path class="d-arrow" d="M340 177 H372"/>
 <path class="d-arrow-head" d="M372 177 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M594 177 H626"/>
@@ -290,21 +290,31 @@
 <path class="d-arrow-head" d="M1134 177 l-7 -4 v8 z"/>
 <text class="d-label" x="14" y="275" text-anchor="start">explain</text>
 <text class="d-label-s" x="14" y="291" text-anchor="start">each class</text>
+<a class="d-link" href="#visor-explain">
 <rect class="d-box" x="120" y="245" width="220" height="64" rx="6"/>
-<text class="d-label" x="230" y="273.5" text-anchor="middle">LayerGradCam</text>
-<text class="d-label-s" x="230" y="288.5" text-anchor="middle">convnet._blocks[-1]</text>
+<text class="d-label" x="230" y="273.5" text-anchor="middle">Grad-CAM</text>
+<text class="d-label-s" x="230" y="288.5" text-anchor="middle">last block of the image branch</text>
+</a>
+<a class="d-link" href="#visor-explain">
 <rect class="d-box" x="374" y="245" width="220" height="64" rx="6"/>
-<text class="d-label" x="484" y="273.5" text-anchor="middle">Resize</text>
-<text class="d-label-s" x="484" y="288.5" text-anchor="middle">bilinear, 224 x 224</text>
+<text class="d-label" x="484" y="273.5" text-anchor="middle">Enlarge</text>
+<text class="d-label-s" x="484" y="288.5" text-anchor="middle">to 224 x 224</text>
+</a>
+<a class="d-link" href="#visor-explain">
 <rect class="d-box" x="628" y="245" width="220" height="64" rx="6"/>
 <text class="d-label" x="738" y="273.5" text-anchor="middle">Clip and rescale</text>
-<text class="d-label-s" x="738" y="288.5" text-anchor="middle">percentiles 1, 99 to [-1, 1]</text>
+<text class="d-label-s" x="738" y="288.5" text-anchor="middle">percentiles 1 and 99 to [-1, 1]</text>
+</a>
+<a class="d-link" href="#visor-explain">
 <rect class="d-box" x="882" y="245" width="220" height="64" rx="6"/>
-<text class="d-label" x="992" y="273.5" text-anchor="middle">Project on mesh</text>
-<text class="d-label-s" x="992" y="288.5" text-anchor="middle">gradcam_process</text>
+<text class="d-label" x="992" y="273.5" text-anchor="middle">Paint the mesh</text>
+<text class="d-label-s" x="992" y="288.5" text-anchor="middle">pixel to triangle to vertex</text>
+</a>
+<a class="d-link" href="#visor-explain">
 <rect class="d-box" x="1136" y="245" width="220" height="64" rx="6"/>
-<text class="d-label" x="1246" y="273.5" text-anchor="middle">Add point array</text>
-<text class="d-label-s" x="1246" y="288.5" text-anchor="middle">+ median filter</text>
+<text class="d-label" x="1246" y="273.5" text-anchor="middle">Smooth and attach</text>
+<text class="d-label-s" x="1246" y="288.5" text-anchor="middle">median filter, one array per class</text>
+</a>
 <path class="d-arrow" d="M340 277 H372"/>
 <path class="d-arrow-head" d="M372 277 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M594 277 H626"/>
@@ -314,15 +324,21 @@
 <path class="d-arrow" d="M1102 277 H1134"/>
 <path class="d-arrow-head" d="M1134 277 l-7 -4 v8 z"/>
 <text class="d-label" x="14" y="375" text-anchor="start">outputs</text>
+<a class="d-link" href="#visor-io">
 <rect class="d-box" x="120" y="345" width="300" height="64" rx="6"/>
-<text class="d-label" x="270" y="373.5" text-anchor="middle">WriteSurf, once</text>
-<text class="d-label-s" x="270" y="388.5" text-anchor="middle">output_dir/&lt;name&gt;.vtk, flat</text>
+<text class="d-label" x="270" y="373.5" text-anchor="middle">Write the surfaces</text>
+<text class="d-label-s" x="270" y="388.5" text-anchor="middle">one file per input, in one folder</text>
+</a>
+<a class="d-link" href="#visor-io">
 <rect class="d-box" x="476" y="345" width="300" height="64" rx="6"/>
 <text class="d-label" x="626" y="373.5" text-anchor="middle">Rename</text>
-<text class="d-label-s" x="626" y="388.5" text-anchor="middle">&lt;stem&gt;&lt;suffix&gt;.vtk</text>
+<text class="d-label-s" x="626" y="388.5" text-anchor="middle">the suffix is added</text>
+</a>
+<a class="d-link" href="#visor-io">
 <rect class="d-box" x="832" y="345" width="300" height="64" rx="6"/>
-<text class="d-label" x="982" y="373.5" text-anchor="middle">DOCShapeAXI_report.json</text>
-<text class="d-label-s" x="982" y="388.5" text-anchor="middle">predictions, always</text>
+<text class="d-label" x="982" y="373.5" text-anchor="middle">The report</text>
+<text class="d-label-s" x="982" y="388.5" text-anchor="middle">predictions, always written</text>
+</a>
 <path class="d-arrow" d="M420 377 H474"/>
 <path class="d-arrow-head" d="M474 377 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M776 377 H830"/>
@@ -334,307 +350,199 @@
 <text class="d-label-s" x="240" y="240" text-anchor="start">if explain</text>
 <path class="d-arrow" d="M1246 309 V327 H270 V343"/>
 <path class="d-arrow-head" d="M270 343 l-4 -7 h8 z"/>
-<text class="d-label-s" x="120" y="440" text-anchor="start">Without explain, the run skips the explain row and the surfaces: only the report is written.</text>
+<text class="d-label-s" x="120" y="440" text-anchor="start">Without the explanation pass, only the report is written.</text>
 <rect class="d-box" x="120" y="460" width="26" height="16" rx="4"/>
 <text class="d-label-s" x="154" y="472" text-anchor="start">computed step</text>
 <rect class="d-box-n" x="301" y="460" width="26" height="16" rx="4"/>
 <text class="d-label-s" x="335" y="472" text-anchor="start">network: predicts</text>
 </svg>
-        <figcaption>DOCShapeAXI on the server. The network (violet outline) runs in both passes: once without gradients to predict, then once per class through <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> to explain. Everything else is deterministic code in SADT-VISOR <code>tools/DOCShapeAXI/src/sadt_docshapeaxi/</code> or in shapeaxi.</figcaption>
+        <figcaption>DOCShapeAXI on the server. The network (violet outline) runs in both passes: once to predict, then once per class through <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> to explain. Every other box is ordinary deterministic code. Click a box to jump to its section.</figcaption>
       </figure>
+
 
       <h3 id="visor-catalogue">3.1 One checkpoint name decides the analysis</h3>
 
-      <p>Legacy asked the caller for <code>data_type</code>, <code>task</code>, <code>model</code>, <code>nn</code> and <code>num_classes</code> as separate
-      positional arguments (legacy <code>DOCShapeAXI_CLI/DOCShapeAXI_CLI.py:299-307</code>), so a two-class <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> could be run with a
-      four-class scale. VISOR takes one argument, <code>model</code>, and looks its base name up in a table
-      (<code>catalog.py:50-71</code>, <code>__init__.py:54</code>). An unknown name is a <code>ValueError</code> listing the five known ones
-      (<code>catalog.py:74-88</code>); the lookup happens before the file's existence is checked (<code>__init__.py:54-57</code>).</p>
+      <p>Legacy asked the caller for five separate settings, so a two-class <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> could be run with a four-class scale. VISOR takes one thing, the checkpoint name, and looks it up in a fixed table of five. An unknown name is refused with the list of the known ones.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>File name</th><th>Anatomy</th><th>Task</th><th>Classes</th><th>Network</th></tr></thead>
+          <thead><tr><th>File name</th><th>Anatomy</th><th>Task</th><th>Classes</th></tr></thead>
           <tbody>
-            <tr><td><code>airways_2_class.ckpt</code></td><td>Nasopharynx airway obstruction</td><td>binary</td><td>2</td><td><code>SaxiMHAFBClassification</code></td></tr>
-            <tr><td><code>airways_4_class.ckpt</code></td><td>Nasopharynx airway obstruction</td><td>severity</td><td>4</td><td><code>SaxiMHAFBClassification</code></td></tr>
-            <tr><td><code>airways_4_regress.ckpt</code></td><td>Nasopharynx airway obstruction</td><td>regression</td><td>1</td><td><code>SaxiMHAFBRegression</code></td></tr>
-            <tr><td><code>condyles_4_class.ckpt</code></td><td>Mandibular <a class="gterm" data-term="condyle" href="../../glossary.html#g-condyle" title="See glossary">condyle</a></td><td>severity</td><td>4</td><td><code>SaxiMHAFBClassification</code></td></tr>
-            <tr><td><code>cleft_4_class.ckpt</code></td><td>Alveolar bone defect in cleft</td><td>severity</td><td>4</td><td><code>SaxiMHAFBClassification</code></td></tr>
+            <tr><td><code>airways_2_class.ckpt</code></td><td>Nasopharynx airway obstruction</td><td>binary</td><td>2</td></tr>
+            <tr><td><code>airways_4_class.ckpt</code></td><td>Nasopharynx airway obstruction</td><td>severity</td><td>4</td></tr>
+            <tr><td><code>airways_4_regress.ckpt</code></td><td>Nasopharynx airway obstruction</td><td>regression (a score)</td><td>1</td></tr>
+            <tr><td><code>condyles_4_class.ckpt</code></td><td>Mandibular <a class="gterm" data-term="condyle" href="../../glossary.html#g-condyle" title="See glossary">condyle</a></td><td>severity</td><td>4</td></tr>
+            <tr><td><code>cleft_4_class.ckpt</code></td><td>Alveolar bone defect in cleft</td><td>severity</td><td>4</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>The table is keyed by the file name as staged: <code>cleft_4_class.ckpt</code>, where the legacy panel's lookup returned
-      <code>clefts_4_class</code> (comment at <code>catalog.py:44-49</code>; legacy page, <a href="../../DOCShapeAXI/DOCShapeAXI.html#modeles">models</a>).</p>
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-catalogue"><b>In the code</b><span>The table in the code, the network class of each checkpoint and the order of the checks</span></a>
+
 
       <h3 id="visor-discovery">3.2 Surfaces, device and network</h3>
 
       <ul>
-        <li><strong>Discovery</strong>: a single <code>.vtk</code>, or a folder walked recursively, hidden files skipped, sorted
-        (<code>pipeline.py:22,40-64</code>). Nothing found is a <code>ValueError</code>, "DOCShapeAXI reads surfaces, not volumes"
-        (<code>__init__.py:59-64</code>). The mount point given to shapeaxi is the input folder, or the file's folder for a single file
-        (<code>:71</code>).</li>
-        <li><strong>Device</strong>: <code>cuda</code> falls back to <code>cpu</code> with a warning when no card is visible
-        (<code>pipeline.py:67-72</code>).</li>
-        <li><strong>Network</strong>: <code>load_network</code> checks that the class named by the catalogue exists in
-        <code>shapeaxi.saxi_nets_lightning</code>, then that the <a class="gterm" data-term="efficientnet" href="../../glossary.html#g-efficientnet" title="See glossary">EfficientNet</a> backbone is staged, then allowlists the classes the
-        checkpoint pickles, and loads it (<code>pipeline.py:130-151</code>):</li>
+        <li><strong>Surfaces</strong>: a single file, or a folder searched through all its sub-folders, in a fixed order. Finding nothing is an error (&ldquo;DOCShapeAXI reads surfaces, not volumes&rdquo;).</li>
+        <li><strong>Device</strong>: the graphics card if there is one, otherwise the processor, with a warning.</li>
+        <li><strong>Network</strong>: the tool loads the network named by the table, checks that the <a class="gterm" data-term="dsx-backbone" href="DOCShapeAXI.code.html#f-backbone" title="See the code">image backbone</a> it needs is already on the server (it refuses to download it in the middle of a request), then loads the checkpoint.</li>
       </ul>
 
-      <pre><code>network_class = getattr(saxi_nets_lightning, network_name, None)   # else ValueError
-check_backbone_is_staged()      # &lt;torch hub dir&gt;/checkpoints/efficientnet-b0-355c32eb.pth, else FileNotFoundError
-allow_checkpoint_globals()      # shapeaxi transform classes + torchvision Compose
-model = network_class.load_from_checkpoint(checkpoint, strict=False)
-model.eval(); model.to(device)</code></pre>
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-discovery"><b>In the code</b><span>The loading sequence, the allowlist of classes the checkpoint may rebuild, and strict=False</span></a>
 
-      <p>The allowlist exists because torch 2.6 made <code>weights_only=True</code> the default and these checkpoints carry their training
-      transforms in <code>hyper_parameters</code> (<code>pipeline.py:108-127</code>). <code>strict=False</code> is kept from legacy
-      (legacy <code>DOCShapeAXI_CLI.py:135,201</code>).</p>
 
       <h3 id="visor-predict">3.3 Prediction pass</h3>
 
-      <p>The file list is a pandas DataFrame built in memory (legacy wrote a CSV into the output folder with mode <code>'a'</code>,
-      <code>DOCShapeAXI_CLI.py:111-118</code>), fed to shapeaxi's <code>SaxiDataset</code> with <code>EvalTransform(scale_factor)</code>, the
-      scale factor being read from the checkpoint's hyperparameters (<code>engine.py:11-34</code>). Then, one surface at a time
-      (<code>engine.py:37-64</code>):</p>
+      <p>Each surface goes through the network one at a time. The file list is built in memory, and shapeaxi puts every surface at a standard size and position before it is looked at; whether the checkpoint&rsquo;s own scale factor is honoured by the pinned shapeaxi was not checked. Then the network receives <strong>two inputs made from the same surface</strong>, and each is turned into one 256-number vector.</p>
 
-      <pre><code>mesh = model.create_mesh(vertices, faces, normals)
-points = model.sample_points_from_meshes(mesh, model.hparams.sample_levels[0])
-views, _ = model.render(mesh)
-output = model(points, views)
-if not analysis.is_regression:
-    output = torch.argmax(softmax(output).detach(), dim=1, keepdim=True)
-predictions.append(float(output.reshape(-1)[0].cpu()))</code></pre>
+            <figure class="algo" data-scene="dsx_views" data-ms="6400">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a camera moves around a mesh on a sphere of viewpoints, and each position gives one small picture of the mesh"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The mesh is photographed from many virtual cameras placed around it, one picture per camera (42 in the checkpoints read). Each picture is 224 by 224 pixels and holds four numbers per pixel: the colour of the surface normal, and the depth.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">e</mi><mi class="k1">k</mi></msub><mo>=</mo><mi class="">r</mi><mo>&#xd7;</mo><msub><mi class="">u</mi><mi class="k1">k</mi></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>e<sub>k</sub></b>where camera k stands</li><li class=""><b>r</b>distance of the cameras from the centre, 1.35 (the mesh fits in a sphere of radius 1)</li><li class=""><b>u<sub>k</sub></b>direction of the k-th vertex of a subdivided icosahedron; the camera looks at the centre</li></ul></div>
+      </figure>
 
-      <p>Each prediction is recorded with the surface's path relative to the mount point and either <code>class</code> (an integer) or
-      <code>score</code> (a float, regression) (<code>__init__.py:81-90</code>). The sampling of points and the rendering are shapeaxi's; neither the
-      tool nor legacy fixes a random seed (no <code>seed</code> or <code>manual_seed</code> in the tool's sources).</p>
+
+      <p>Besides the pictures, the network samples <strong>4096 points</strong> at random on the surface. A first branch processes this cloud with attention restricted to the nearest neighbours of every point; a second branch runs an image network (EfficientNet-B0) on each picture, then attention across the pictures.</p>
+
+            <figure class="algo" data-scene="dsx_pool" data-ms="6000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: eight tokens each get a weight shown as a bar, then they merge into a single vector in which heavy tokens count more"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Both branches end with the same trick, an <em><a class="gterm" data-term="dsx-pool" href="DOCShapeAXI.code.html#visor-predict" title="See the code">attention pooling</a></em>: every token gets a weight between 0 and 1 from a tiny network, the weights are normalised, and the tokens are averaged with those weights into one vector of 256 numbers.</p><div class="formula"><math display="block"><mrow><msub><mi class="k4">a</mi><mi class="k4">i</mi></msub><mo>=</mo><mi>&#x3c3;</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="">w</mi><mo>&#x22c5;</mo><mi>tanh</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="">W</mi><msub><mi class="k2">x</mi><mi class="k2">i</mi></msub><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi class="k3">z</mi><mo>=</mo><mfrac><mrow><munder><mo>&#x2211;</mo><mi>i</mi></munder><msub><mi class="k4">a</mi><mi class="k4">i</mi></msub><msub><mi class="k2">x</mi><mi class="k2">i</mi></msub></mrow><mrow><munder><mo>&#x2211;</mo><mi>j</mi></munder><msub><mi class="k4">a</mi><mi class="k4">j</mi></msub></mrow></mfrac></mrow></math></div><ul class="algo-legend"><li class="k2"><b>x<sub>i</sub></b>token i: a vector of 256 numbers (a point, or a view)</li><li class="k4"><b>a<sub>i</sub></b>its weight, between 0 and 1</li><li class=""><b>W, w</b>two learned layers: 256 to 64 numbers, then 64 to 1</li><li class="k3"><b>z</b>the pooled vector, 256 numbers</li></ul></div>
+      </figure>
+
+
+            <figure class="algo" data-scene="dsx_fuse" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: two short vectors are placed end to end, a layer turns them into one score per class, and the highest score is picked"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The point-cloud vector and the views vector are joined end to end (256 + 256 = 512 numbers). One linear layer turns them into a score per class, and the class with the highest score is the answer. For a regression checkpoint there is one score and it is the answer as it is.</p><div class="formula"><math display="block"><mrow><mi class="k4">s</mi><mo>=</mo><mi class="k4">W</mi><mo stretchy="true" fence="true">[</mo><msub><mi class="k2">z</mi><mi>pts</mi></msub><mo>;</mo><msub><mi class="k3">z</mi><mi>views</mi></msub><mo stretchy="true" fence="true">]</mo><mo>+</mo><mi class="k4">b</mi></mrow></math></div><div class="formula"><math display="block"><mrow><mi class="k1">&#x177;</mi><mo>=</mo><munder><mo>argmax</mo><mi>k</mi></munder><msub><mi class="k4">s</mi><mi class="k1">k</mi></msub></mrow></math></div><ul class="algo-legend"><li class="k2"><b>z<sub>pts</sub></b>vector from the point-cloud branch</li><li class="k3"><b>z<sub>views</sub></b>vector from the multi-view branch</li><li class="k4"><b>s</b>one score per class (the network&rsquo;s raw output)</li><li class="k1"><b>&#x177;</b>the class given back: the index of the highest score</li></ul></div>
+      </figure>
+
+
+      <p>The class is the highest score; the other scores are not returned, so the report carries no measure of confidence. The point sampling is random and no seed is set, so two runs on the same surface can differ slightly.</p>
+
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-predict"><b>In the code</b><span>The calls of the prediction loop, how a class or a score is recorded, and the missing seed</span></a>
+
 
       <h3 id="visor-explain">3.4 Explanation pass (Grad-CAM)</h3>
 
-      <p>Only when <code>explain</code> is true (<code>__init__.py:92-95</code>). The dataset is rebuilt and each surface is rendered again; then
-      for each class <code>k</code> in <code>range(analysis.classes)</code> (<code>engine.py:67-114</code>):</p>
+      <p>Only when <em>explain</em> is on. The surface is rendered again and, for <strong>each class</strong> in turn, the network is asked which parts of the pictures pushed that class&rsquo;s score. This is done on the image branch only: the map says nothing about the point-cloud branch.</p>
 
-      <pre><code>cam = LayerGradCam(model, model.convnet.module._blocks[-1], device_ids=[0])
-attribution = cam.attribute(inputs=(points, views), target=k, attr_dim_summation=False)
-attribution = attribution.sum(dim=1).cpu().detach()
-scaled = scale_attribution(attribution.numpy(), (224, 224))   # resize, clip 1/99 percentiles, rescale to [-1, 1]
-projected = gradcam_process(_Namespace(device, target_class=k), scaled, faces, per_face, vertices)
-surface.GetPointData().AddArray(projected)                    # array grad_cam_target_class_&lt;k&gt;
-post_process.MedianFilter(surface, projected)</code></pre>
+            <figure class="algo" data-scene="dsx_cam" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a small 7 by 7 grid of numbers is enlarged smoothly into a map the size of a picture"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">To see where the network looked, Grad-CAM takes the last block of the image branch. For a chosen class it asks how much each channel of that block pushes the class score up, and weights the channels by that. The result is a coarse 7 by 7 map for each of the 42 views.</p><div class="formula"><math display="block"><mrow><mi class="k4">M</mi><mi>(x,y)</mi><mo>=</mo><munder><mo>&#x2211;</mo><mi class="k2">c</mi></munder><msub><mi class="k3">&#x3b1;</mi><mi class="k2">c</mi></msub><msub><mi class="k2">A</mi><mi class="k2">c</mi></msub><mi>(x,y)</mi></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mi class="k3">&#x3b1;</mi><mi class="k2">c</mi></msub><mo>=</mo><munder><mi>mean</mi><mrow><mi>x</mi><mo>,</mo><mi>y</mi></mrow></munder><mfrac><mrow>&#x2202;<msub><mi class="k1">s</mi><mi class="k1">k</mi></msub></mrow><mrow>&#x2202;<msub><mi class="k2">A</mi><mi class="k2">c</mi></msub><mi>(x,y)</mi></mrow></mfrac></mrow></math></div><ul class="algo-legend"><li class="k2"><b>A<sub>c</sub></b>channel c of the last block of the image branch, a 7 by 7 grid</li><li class="k1"><b>s<sub>k</sub></b>the network&rsquo;s score for class k</li><li class="k3"><b>&#x3b1;<sub>c</sub></b>how strongly channel c drives that score: the gradient averaged over the grid</li><li class="k4"><b>M</b>the coarse map, enlarged to 224 by 224 next</li></ul></div>
+      </figure>
 
-      <ul>
-        <li><strong>Resize</strong>: <code>torch.nn.functional.interpolate</code>, bilinear, <code>align_corners=False</code>, instead of legacy's
-        <code>cv2.resize</code>; the comment says a test pins the two to 1e-5 (<code>pipeline.py:163-184</code>, <code>pyproject.toml:45-51</code>).</li>
-        <li><strong>Normalisation</strong>: clip to the 1st and 99th percentiles, then map to [-1, 1]; a flat map becomes zeros rather than NaN
-        (<code>pipeline.py:186-199</code>).</li>
-        <li><strong>Which layer</strong>: the last block of the 2D EfficientNet branch, as in legacy (<code>DOCShapeAXI_CLI.py:150-151</code>): the map
-        explains the multi-view branch, not the point-cloud branch.</li>
-        <li><strong>Array names</strong>: the class index is always passed as <code>target_class</code>, which names the array
-        (<code>engine.py:104-106,117-129</code>). Legacy set it only when <code>num_classes &gt; 1</code> (<code>DOCShapeAXI_CLI.py:171-174</code>), so the
-        regression checkpoint now also gets a per-class name, <code>grad_cam_target_class_0</code>. Read in the code.</li>
-        <li><strong>Writing</strong>: once per surface after all classes, flat in <code>output_dir</code> under the input's base name
-        (<code>engine.py:111-113</code>); legacy wrote inside the class loop, into <code>&lt;out&gt;/explainability/&lt;task&gt;/</code>
-        (<code>DOCShapeAXI_CLI.py:153,185-186</code>).</li>
-      </ul>
+
+            <figure class="algo" data-scene="dsx_rescale" data-ms="5400">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: dots on a number line are first clamped between two markers, then spread over the range from minus 1 to 1"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The enlarged map is then rescaled: values beyond the 1st and 99th <a class="gterm" data-term="dsx-percentiles" href="DOCShapeAXI.code.html#visor-explain" title="See the code">percentiles</a> are cut to those two values, and the rest is stretched linearly onto [-1, 1]. A map with no variation becomes all zeros.</p><div class="formula"><math display="block"><mrow><mi class="k4">s</mi><mo>=</mo><mn>2</mn><mo>&#xd7;</mo><mfrac><mrow><mi>clip</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">a</mi><mo>,</mo><msub><mi>p</mi><mn>1</mn></msub><mo>,</mo><msub><mi>p</mi><mn>99</mn></msub><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2212;</mo><msub><mi>p</mi><mn>1</mn></msub></mrow><mrow><msub><mi>p</mi><mn>99</mn></msub><mo>&#x2212;</mo><msub><mi>p</mi><mn>1</mn></msub></mrow></mfrac><mo>&#x2212;</mo><mn>1</mn></mrow></math></div><ul class="algo-legend"><li class="k3"><b>a</b>a value of the enlarged map</li><li class=""><b>p<sub>1</sub>, p<sub>99</sub></b>the values below which 1 % and 99 % of the map fall</li><li class="k4"><b>s</b>the rescaled value, between -1 and 1</li></ul></div>
+      </figure>
+
+
+            <figure class="algo" data-scene="dsx_project" data-ms="7000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: pixels of two views point to mesh faces, each face keeps the highest value, the value moves to a vertex, and gaps are filled from neighbours"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Each pixel knows which triangle of the mesh it shows. A triangle seen in several views keeps the <strong>highest</strong> value it received. The value is written on one vertex of the triangle, and vertices left empty are filled from their neighbours by a <a class="gterm" data-term="dsx-median" href="DOCShapeAXI.code.html#visor-explain" title="See the code">median filter</a>.</p><div class="formula"><math display="block"><mrow><msub><mi class="k4">g</mi><mi class="k4">f</mi></msub><mo>=</mo><munder><mo>max</mo><mrow><mi class="k2">p</mi><mo>&#x2208;</mo><msub><mi class="k3">P</mi><mi>f</mi></msub></mrow></munder><msub><mi class="k2">s</mi><mi class="k2">p</mi></msub></mrow></math></div><ul class="algo-legend"><li class="k4"><b>g<sub>f</sub></b>the value kept for triangle f</li><li class="k3"><b>P<sub>f</sub></b>all pixels, in all views, that show triangle f</li><li class="k2"><b>s<sub>p</sub></b>the rescaled value of pixel p</li><li class="k1"><b>vertex</b>where g<sub>f</sub> is finally written, then smoothed by the median of its neighbours</li></ul></div>
+      </figure>
+
+
+      <p>The result is stored on the surface as one named array of numbers per class. The regression checkpoint has one class, so one array. In Slicer these arrays can be shown as colours on the surface.</p>
+
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-explain"><b>In the code</b><span>The Grad-CAM calls, the resize, the percentile clipping, the array names and where the surfaces are written</span></a>
+
 
       <h3 id="visor-io">3.5 Outputs and the report</h3>
 
-      <p>The written surfaces are renamed with <code>output_suffix</code> before the extension (<code>__init__.py:118-133</code>), so
-      <code>P01.vtk</code> becomes <code>P01_pred.vtk</code>. <code>DOCShapeAXI_report.json</code> is always written (<code>:97-110</code>):</p>
+      <p>The written surfaces get the chosen suffix (by default <code>_pred</code>) added to their name, so that <code>P01.vtk</code> becomes <code>P01_pred.vtk</code>. A <a class="gterm" data-term="dsx-report" href="DOCShapeAXI.code.html#visor-io" title="See the code">JSON report</a> is always written. It names the checkpoint, the anatomy, the task, the number of classes, the device, whether the explanation was done, and, for each surface, its path and its class or score. There is no CSV any more.</p>
 
-      <pre><code>{
-  "model": "condyles_4_class.ckpt", "anatomy": "Mandibular condyle", "task": "severity",
-  "classes": 4, "network": "SaxiMHAFBClassification", "device": "cuda",
-  "explained": true, "surfaces": 2,
-  "predictions": [ {"surface": "left/P01.vtk", "class": 2},
-                   {"surface": "right/P01.vtk", "class": 0} ]
-}</code></pre>
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-io"><b>In the code</b><span>The report keys, the example report and the return value of the tool</span></a>
 
-      <p>The values are illustrative, the keys are the code's. This example is also the collision of the findings: both surfaces would
-      be written to the same <code>output_dir/P01.vtk</code>. <code>run()</code> returns
-      <code>{"outputs": {...}, "predictions": [...], "report": path}</code> although it is annotated <code>-&gt; Path</code> (<code>__init__.py:25,112-115</code>).
-      There is no CSV.</p>
 
-      <h2 id="visor-args">4. Arguments and schema</h2>
-
-      <p>Signature: SADT-VISOR <code>tools/DOCShapeAXI/src/sadt_docshapeaxi/__init__.py:18-25</code>; published form checked
-      by running <code>scripts/describe.py</code> on the tool: six arguments. The tool has no <code>layout.py</code>.</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Argument</th><th>Published type</th><th>Default</th><th>Shown to the user</th><th>Meaning</th></tr></thead>
-          <tbody>
-            <tr><td><code>surfaces</code></td><td>path, required</td><td>–</td><td>yes</td><td>one <code>.vtk</code>, or a folder searched recursively (<code>pipeline.py:22,40-60</code>)</td></tr>
-            <tr><td><code>model</code></td><td>path, required</td><td>–</td><td>yes (hosted names)</td><td>the <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a>; <strong>its file name decides anatomy, task, class count and network</strong> (<code>catalog.py:50-71</code>); an unknown name is a <code>ValueError</code> listing the known ones (<code>:74-88</code>)</td></tr>
-            <tr><td><code>output_dir</code></td><td>path</td><td>filled by the server</td><td>no</td><td>surfaces and report are written there</td></tr>
-            <tr><td><code>explain</code></td><td>bool</td><td>true</td><td>yes</td><td>compute <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> and write the surfaces; off, only the report is written, "several times faster" (<code>__init__.py:22,92-95</code>)</td></tr>
-            <tr><td><code>output_suffix</code></td><td>str</td><td><code>"_pred"</code></td><td>yes</td><td>added to each written surface's stem (<code>__init__.py:118-133</code>)</td></tr>
-            <tr><td><code>device</code></td><td>"cuda" or "cpu"</td><td>"cuda"</td><td>no (technical, VISOR-serve <code>server/registry/conventions.py:41-58</code>)</td><td>when the client sends none, the server fills in its own <code>DEVICE</code> setting (VISOR-serve <code>server/execution/dispatch.py:431-432</code>); the tool falls back to CPU with a warning if no card is visible (<code>pipeline.py:67-72</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <h2 id="visor-args">4. What you can choose</h2>
 
       <ul>
-        <li><strong>Output</strong>: see <a href="#visor-io">section 3.5</a>. One entry per surface in <code>predictions</code>, with its path relative
-        to the input and either <code>class</code> or <code>score</code>; with <code>explain</code>, one surface per input written flat in
-        <code>output_dir</code>, carrying one <code>grad_cam_target_class_&lt;k&gt;</code> point array per class (<code>engine.py:98-113</code>,
-        <code>__init__.py:118-133</code>).</li>
-        <li><strong>Resources and time</strong>: <code>server/deployment.toml</code> has no section for this tool, so the
-        conventions apply: no time limit (<code>server/config.py:77</code>), and a cohort cut along <code>surfaces</code> by the
-        generic rule, 400 MB or 25 files per batch (<code>server/config.py:192,196</code>; axis derived by reading
-        <code>server/registry/conventions.py:158-190</code>, not executed).</li>
-        <li><strong>What the client does</strong>: declares <code>RUN_REPORT</code>, prints a one-line summary, loads up to 12
-        <code>.vtk</code>/<code>.vtp</code> results as models (Remote <code>DOCShapeAXIRemote.py:67-92,101-130</code>).</li>
+        <li><strong>Surfaces</strong>: one <code>.vtk</code> file, or a folder.</li>
+        <li><strong><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">Checkpoint</a></strong>: one of the five hosted files. Its name alone fixes the anatomy, the task, the number of classes and the network.</li>
+        <li><strong>Explain</strong>: on by default. Turned off, the run is several times faster and only the report is written.</li>
+        <li><strong>Suffix</strong>: added to the name of each written surface.</li>
+        <li><strong>Device</strong>: filled in by the server, not shown in the panel.</li>
       </ul>
 
-      <h2 id="visor-predicted">5. What is predicted vs computed</h2>
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-args"><b>In the code</b><span>The six arguments with type, default and what the panel shows, the output and the resource limits</span></a>
+
+
+      <h2 id="visor-predicted">5. What is predicted and what is computed</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Block</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">Checkpoint</a> to anatomy, task, classes, network</td><td><span class="badge calcule">computed</span> fixed table</td><td>server, DOCShapeAXI venv</td></tr>
-            <tr><td>Mesh creation, point sampling, multi-view rendering</td><td><span class="badge calcule">computed</span> shapeaxi and pytorch3d; point sampling is random, unseeded</td><td>server, GPU in practice</td></tr>
-            <tr><td>Class or severity score</td><td><span class="badge predit">predicted</span> <strong>network</strong>: <code>SaxiMHAFBClassification</code> or <code>SaxiMHAFBRegression</code>, EfficientNet-B0 views branch plus point branch</td><td>server</td></tr>
-            <tr><td>Argmax</td><td><span class="badge calcule">computed</span></td><td>server</td></tr>
-            <tr><td><a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> maps</td><td><span class="badge calcule">computed</span> from the network's gradients; describes the network, does not predict anything new</td><td>server</td></tr>
-            <tr><td>Resize, clipping, projection, median filter</td><td><span class="badge calcule">computed</span></td><td>server</td></tr>
+            <tr><td><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">Checkpoint</a> name to anatomy, task, classes, network</td><td><span class="badge calcule">computed</span> a fixed table</td></tr>
+            <tr><td>Mesh, point sampling, rendering of the pictures</td><td><span class="badge calcule">computed</span> geometry; the point sampling is random and unseeded</td></tr>
+            <tr><td>Class or severity score</td><td><span class="badge predit">predicted</span> a two-branch network (point cloud plus pictures)</td></tr>
+            <tr><td>Picking the highest score</td><td><span class="badge calcule">computed</span></td></tr>
+            <tr><td><a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> maps</td><td><span class="badge calcule">computed</span> from the network&rsquo;s gradients; they describe the network, they predict nothing new</td></tr>
+            <tr><td>Enlarging, clipping, painting the mesh, <a class="gterm" data-term="dsx-median" href="DOCShapeAXI.code.html#visor-explain" title="See the code">median filter</a></td><td><span class="badge calcule">computed</span></td></tr>
           </tbody>
         </table>
       </div>
 
       <h2 id="visor-env">6. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Value</th><th>Where</th></tr></thead>
-          <tbody>
-            <tr><td>Python</td><td><code>&gt;=3.11,&lt;3.12</code>, "the only one the pytorch3d wheel is built for there"</td><td><code>pyproject.toml:5-7</code></td></tr>
-            <tr><td>torch, torchvision, pytorch3d</td><td><code>2.11.0</code>, <code>0.26.0</code> (cu128 index), <code>0.7.9+pt2110cu128</code> (prebuilt wheels index)</td><td><code>pyproject.toml:15-17,76-99</code></td></tr>
-            <tr><td>shapeaxi</td><td><code>1.1.1</code>, pinned because all five <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoints</a> carry 1.x hyperparameters that 2.x's <code>MHAEncoder</code> rejects</td><td><code>pyproject.toml:18-30</code></td></tr>
-            <tr><td>numpy, captum, others</td><td><code>numpy==1.26.4</code>, <code>captum==0.8.0</code>, <code>ocnn==2.2.6</code>, <code>vtk==9.6.2</code>, <code>pandas==2.3.3</code>, <code>tqdm==4.67.1</code>; no OpenCV</td><td><code>pyproject.toml:31-52</code></td></tr>
-            <tr><td>Weights expected</td><td><code>DATA/DOCShapeAXI/models/&lt;name&gt;.ckpt</code>, five files</td><td>VISOR-serve <code>scripts/data-manifest.yml:597-614</code></td></tr>
-            <tr><td>Backbone expected</td><td><code>&lt;torch hub dir&gt;/checkpoints/efficientnet-b0-355c32eb.pth</code>, 20.4 MB, not staged by any script</td><td><code>pipeline.py:80-105</code>, <code>README.md:112-121</code></td></tr>
-            <tr><td>Resources and timeout</td><td>none declared; no timeout</td><td>VISOR-serve <code>server/config.py:77</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The tool runs in a Python environment of its own on the server, with pinned versions: Python 3.11, shapeaxi 1.1.1 (all five <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoints</a> carry settings that shapeaxi 2.x rejects), PyTorch3D for the pictures, and Captum for <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a>. Having one environment per tool is what lets DOCShapeAXI sit on older libraries next to Crown_Seg on newer ones. The <a class="gterm" data-term="dsx-backbone" href="DOCShapeAXI.code.html#f-backbone" title="See the code">image backbone</a> (a 20 MB file) must be placed in the server&rsquo;s PyTorch cache beforehand. Legacy installed a shared conda environment from the panel instead.</p>
 
-      <p>Legacy installed a conda <code>shapeaxi</code> environment from the panel, with a WSL path on Windows, and its installer asks for
-      <code>shapeaxi&gt;=2.0.2</code> (legacy <code>ADT/ADTLib/env/install_pytorch.py:385</code>; legacy page,
-      <a href="../../DOCShapeAXI/DOCShapeAXI.html#environnement">environment</a>). In VISOR the venv is built in the image from the lock file
-      (<a href="../deployment.html">Packaging and deployment</a>), and a venv per tool is what lets DOCShapeAXI sit on numpy 1.26 next to
-      Crown_Seg on shapeaxi 2.x and numpy 2 (<code>README.md:107-110</code>).</p>
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-env"><b>In the code</b><span>Pinned versions with their line numbers, the weights and backbone expected, and the limits</span></a>
+
 
       <h2 id="visor-changes">7. What changed from the legacy logic</h2>
 
-      <p>The network architecture, the point-cloud and multi-view inputs, the <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> layer and its percentile clipping
-      are the same. Legacy lines are <code>DOCShapeAXI_CLI/DOCShapeAXI_CLI.py</code> at 3c67957.</p>
+      <p>The network architecture, the point-cloud and multi-view inputs, the <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> layer and its <a class="gterm" data-term="dsx-percentiles" href="DOCShapeAXI.code.html#visor-explain" title="See the code">percentile</a> clipping are the same.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Point</th><th>Legacy</th><th>VISOR</th></tr></thead>
+          <thead><tr><th>Subject</th><th>Legacy</th><th>VISOR</th></tr></thead>
           <tbody>
-            <tr><td>What the caller says</td><td>eight positional arguments, <code>data_type</code>, <code>task</code>, <code>model</code>, <code>nn</code>, <code>num_classes</code>... (<code>:299-307</code>)</td><td>one <code>model</code>; the catalogue gives the rest (<code>catalog.py:50-71</code>)</td></tr>
-            <tr><td>List of surfaces</td><td><code>os.listdir</code>, CSV opened with mode <code>'a'</code> in the output folder (<code>:111-118</code>)</td><td>recursive walk, in-memory table (<code>pipeline.py:40-60</code>, <code>engine.py:11-34</code>)</td></tr>
-            <tr><td><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">Checkpoint</a></td><td>downloaded into the output folder (<code>:120-126,278-283</code>)</td><td>hosted, never downloaded</td></tr>
-            <tr><td><a class="gterm" data-term="efficientnet" href="../../glossary.html#g-efficientnet" title="See glossary">EfficientNet</a> backbone</td><td>fetched by <code>from_pretrained</code> on first use</td><td>must be staged in the torch hub cache, otherwise <code>FileNotFoundError</code> (<code>pipeline.py:80-105,146</code>)</td></tr>
-            <tr><td>Device</td><td><code>cuda</code> if available (<code>:267</code>)</td><td>argument with CPU fallback (<code>pipeline.py:67-72</code>)</td></tr>
-            <tr><td>Checkpoint loading</td><td><code>load_from_checkpoint(path, strict=False)</code> (<code>:135,201</code>)</td><td>still <code>strict=False</code> (<code>pipeline.py:148</code>), with an allowlist of the classes the checkpoint may unpickle (<code>:108-127</code>)</td></tr>
-            <tr><td>Scale factor</td><td><code>EvalTransform(scale_factor)</code> for prediction (<code>:209</code>), <code>EvalTransform()</code> for Grad-CAM (<code>:144</code>)</td><td>both passes go through one dataset built with <code>EvalTransform(scale_factor)</code> (<code>engine.py:25-28</code>)</td></tr>
-            <tr><td>Classification output</td><td>softmax then argmax, not applied to regression (<code>:232-235</code>)</td><td>argmax unless regression (<code>engine.py:57-62</code>); written as <code>class</code> or <code>score</code></td></tr>
-            <tr><td>Regression result</td><td>a <code>{task}_prediction</code> column in a CSV (<code>:243-248</code>)</td><td>a <code>score</code> key in the JSON report</td></tr>
-            <tr><td>Grad-CAM writes</td><td>the surface is written inside the per-class loop (<code>:172-186</code>)</td><td>written once after all classes (<code>engine.py:98-113</code>)</td></tr>
-            <tr><td>Grad-CAM resize</td><td><code>cv2.resize</code> to 224 by 224 (<code>:52,179</code>)</td><td>bilinear <code>torch.nn.functional.interpolate</code>, flat maps become zeros instead of NaN (<code>pipeline.py:163-199</code>)</td></tr>
-            <tr><td>Explainability</td><td>always (<code>:289-292</code>; legacy page, <a href="../../DOCShapeAXI/DOCShapeAXI.html#explicabilite">§5</a>)</td><td>optional, <code>explain=True</code> by default (<code>__init__.py:22,93-95</code>)</td></tr>
-            <tr><td>Where surfaces land</td><td><code>&lt;out&gt;/explainability/&lt;task&gt;/</code> (<code>:153</code>)</td><td>flat in <code>output_dir</code> (<code>engine.py:111-112</code>)</td></tr>
-            <tr><td>shapeaxi version</td><td>installer: <code>shapeaxi&gt;=2.0.2</code> (<code>ADT/ADTLib/env/install_pytorch.py:385</code>)</td><td><code>shapeaxi==1.1.1</code> (<code>pyproject.toml:30</code>)</td></tr>
-            <tr><td>Regression "bug"</td><td>already excluded from argmax at 3c67957 (<code>:232-235</code>)</td><td>the tool's README lists "a regression checkpoint no longer reports class 0" as a fix over upstream (<code>README.md:48-51</code>, repeated in comments at <code>__init__.py:85-87</code> and <code>engine.py:59-61</code>); the legacy code at 3c67957 already skipped argmax for regression</td></tr>
+            <tr><td>What the caller says</td><td>eight positional arguments (data type, task, model, network, number of classes...)</td><td>one: the <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a>; a table gives the rest</td></tr>
+            <tr><td>List of surfaces</td><td>a CSV opened for appending in the output folder</td><td>a search through sub-folders, kept in memory</td></tr>
+            <tr><td>Checkpoint</td><td>downloaded into the output folder</td><td>hosted on the server, never downloaded</td></tr>
+            <tr><td><a class="gterm" data-term="dsx-backbone" href="DOCShapeAXI.code.html#f-backbone" title="See the code">Image backbone</a></td><td>fetched on first use</td><td>must already be in the server&rsquo;s cache, otherwise an error</td></tr>
+            <tr><td>Device</td><td>GPU if available</td><td>an argument, with a processor fallback</td></tr>
+            <tr><td>Checkpoint loading</td><td>lenient: missing or extra weights pass silently</td><td>still lenient, plus a list of the classes the file may rebuild</td></tr>
+            <tr><td>Prediction and explanation datasets</td><td>one with the scale factor, one without</td><td>both built the same way, with the scale factor</td></tr>
+            <tr><td>Regression result</td><td>a column in a CSV</td><td>a <code>score</code> entry in the <a class="gterm" data-term="dsx-report" href="DOCShapeAXI.code.html#visor-io" title="See the code">JSON report</a></td></tr>
+            <tr><td>Grad-CAM resize</td><td>OpenCV</td><td>PyTorch bilinear; a flat map becomes zeros instead of NaN</td></tr>
+            <tr><td>Explainability</td><td>always</td><td>optional, on by default</td></tr>
+            <tr><td>Where surfaces land</td><td>in an <code>explainability/&lt;task&gt;</code> sub-folder</td><td>flat in the output folder</td></tr>
+            <tr><td>shapeaxi version</td><td>the installer asks for 2.0.2 or later, while the code is written for 1.x</td><td>pinned to 1.1.1</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h2 id="visor-findings">8. Findings in VISOR</h2>
+            <a class="deep-link" href="DOCShapeAXI.code.html#visor-changes"><b>In the code</b><span>The same table with legacy and VISOR file:line references</span></a>
 
-      <div class="callout warn">
-        <div class="callout-title">The <a class="gterm" data-term="efficientnet" href="../../glossary.html#g-efficientnet" title="See glossary">EfficientNet</a> backbone is a prerequisite nobody stages</div>
-        <p>shapeaxi builds an EfficientNet-B0 around every <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a>. The tool refuses to let it be downloaded in the
-        middle of a request, and instead raises <code>FileNotFoundError</code> unless
-        <code>efficientnet-b0-355c32eb.pth</code> is already under <code>&lt;torch hub dir&gt;/checkpoints/</code>
-        (SADT-VISOR <code>tools/DOCShapeAXI/src/sadt_docshapeaxi/pipeline.py:80-105</code>, called from
-        <code>load_network</code> at <code>:146</code>; <code>README.md:112-121</code>). Neither the data manifest nor any
-        script of VISOR-serve mentions this file (searched for "efficientnet" in the three repositories: only the tool's own
-        <code>README.md</code>, <code>pipeline.py</code> and <code>tests/test_run.py</code> do). A deployment that follows the
-        usual staging steps therefore fails at its first call, after the surfaces have been uploaded. Read in the code;
-        whether a given server has the file in its cache was not checked.</p>
-      </div>
 
-      <div class="callout warn">
-        <div class="callout-title">The status line shows question marks</div>
-        <p>The client builds its summary from <code>report.get("data_type")</code> and <code>report.get("checkpoint")</code>
-        (Remote <code>DOCShapeAXIRemote/DOCShapeAXIRemote.py:122-130</code>). The report written by the tool has neither key: it
-        has <code>model</code>, <code>anatomy</code>, <code>task</code>, <code>classes</code> and <code>network</code>
-        (SADT-VISOR <code>__init__.py:97-110</code>). The panel's summary will read "?" in place of the anatomy and of the
-        checkpoint, while <code>task</code> and the surface count are filled. Read in the code, not run in Slicer.</p>
-      </div>
+      <h2 id="visor-findings">8. Known issues in VISOR</h2>
 
-      <div class="callout warn">
-        <div class="callout-title">The client describes a prediction table and a task selector that do not exist</div>
-        <p>The client's comments say the result is a "prediction table" in CSV form (<code>DOCShapeAXIRemote.py:76-86</code>)
-        and that a <code>task</code> argument narrows itself to the anatomy through an <code>options_when</code> rule
-        (<code>:12-17</code>). The tool writes no CSV (<code>__init__.py:97-110</code>), and its schema has six arguments,
-        none called <code>task</code>, with no <code>options_when</code> (output of <code>scripts/describe.py</code>). The task is
-        chosen by picking the checkpoint file, so a user must know what <code>airways_2_class.ckpt</code> and
-        <code>airways_4_regress.ckpt</code> mean.</p>
-      </div>
+      <p>Each point below is read in the code and described, with its evidence, on the code page; the list also appears in the <a href="../../findings.html">findings</a>.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Two inputs with the same file name collide on output</div>
-        <p>Surfaces are found recursively but written flat: <code>a/s.vtk</code> and <code>b/s.vtk</code> both go to
-        <code>output_dir/s.vtk</code> (<code>engine.py:111-112</code>), so the second replaces the first, while the report
-        keeps them apart by relative path (<code>__init__.py:84</code>). The renaming step then moves
-        <code>s.vtk</code> to <code>s_pred.vtk</code> once per entry (<code>__init__.py:128-132</code>): the second move finds
-        no file, which would end the run in a <code>FileNotFoundError</code> after all the computation; with an empty
-        <code>output_suffix</code> the overwrite is silent. CLIC and CNE reproduce the input tree to avoid exactly this.
-        Read in the code, not run.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Still true from legacy: unseeded sampling, saliency of one branch only</div>
-        <p>No seed is set anywhere in the tool's sources and there is no <code>seed</code> argument, so the random point sampling
-        inside shapeaxi (<code>engine.py:54,92</code>) is not fixed from one run to the next, as in legacy (legacy page,
-        <a href="../../DOCShapeAXI/DOCShapeAXI.html#pieges">pitfalls</a>). The <a class="gterm" data-term="gradcam" href="../../glossary.html#g-gradcam" title="See glossary">Grad-CAM</a> layer is the last block of the 2D views branch
-        (<code>engine.py:82-83</code>), so the map says nothing about the point-cloud branch. Read in the code.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">Comments that disagree with the pins</div>
-        <p>The comment above the captum pin speaks of 0.9.0 while the pin is <code>captum==0.8.0</code>
-        (<code>pyproject.toml:39-44</code>). The data manifest still labels the tool "NOT PORTED YET"
-        (<code>data-manifest.yml:595</code>). Neither changes what runs.</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">Verified: the legacy shapeaxi mismatch is fixed here</div>
-        <p>Legacy code is written for the shapeaxi 1.x API while its installer asks for 2.0.2 or later (legacy
-        <code>ADT/ADTLib/env/install_pytorch.py:385</code>). VISOR pins <code>shapeaxi==1.1.1</code>, with the reason in the comment
-        (<code>pyproject.toml:18-30</code>), and resolves the network classes from <code>saxi_nets_lightning</code>, where they live
-        (<code>pipeline.py:135-145</code>). The checkpoint is no longer copied into the output folder. Whether shapeaxi 1.1.1's
-        <code>EvalTransform</code> honours <code>scale_factor</code> (the legacy page found shapeaxi ignoring it) was not checked.</p>
-      </div>
+      <ul>
+        <li><strong>A prerequisite nobody stages.</strong> The <a class="gterm" data-term="dsx-backbone" href="DOCShapeAXI.code.html#f-backbone" title="See the code">image backbone</a> file is not put in place by any staging script, so a standard server fails at its first call. <a href="DOCShapeAXI.code.html#f-backbone">Evidence</a>.</li>
+        <li><strong>The status line shows question marks.</strong> The panel reads two keys that the report does not have. <a href="DOCShapeAXI.code.html#f-status-line">Evidence</a>.</li>
+        <li><strong>The client describes things that do not exist.</strong> A prediction table and a task selector are mentioned in its comments; the tool has neither. <a href="DOCShapeAXI.code.html#f-client-comments">Evidence</a>.</li>
+        <li><strong>Two inputs with the same file name collide.</strong> They are written to the same output file. <a href="DOCShapeAXI.code.html#f-collision">Evidence</a>.</li>
+        <li><strong>Still true from legacy.</strong> Unseeded point sampling, and a saliency map for one branch only. <a href="DOCShapeAXI.code.html#f-unseeded">Evidence</a>.</li>
+        <li><strong>Comments that disagree with the pins.</strong> Harmless, but they mislead. <a href="DOCShapeAXI.code.html#f-pin-comments">Evidence</a>.</li>
+      </ul>
 
       <h2 id="visor-literature">9. Literature</h2>
 
-      <p>The networks and their publications are the tool's: see the <a href="../../DOCShapeAXI/SOURCES.html">DOCShapeAXI sources page</a>.
-      VISOR adds no new model.</p>
+      <p>The networks and their publications are the tool&rsquo;s: see the <a href="../../DOCShapeAXI/SOURCES.html">DOCShapeAXI sources page</a>. VISOR adds no new model.</p>
 
       <footer class="footer">
-        <a href="../../index.html">← All pages</a> · <a href="../../DOCShapeAXI/DOCShapeAXI.html">Legacy page for this tool</a> · <a href="../guide/DOCShapeAXI.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a>
+        <a href="../../index.html">← All pages</a> · <a href="DOCShapeAXI.code.html">Code page for this tool</a> · <a href="../../DOCShapeAXI/DOCShapeAXI.html">Legacy page for this tool</a> · <a href="../guide/DOCShapeAXI.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a>
       </footer>
+
     </article>
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../../assets/algo.js"></script>
+<script src="../../../assets/algo-DOCShapeAXI.js"></script>
 </body>
 </html>

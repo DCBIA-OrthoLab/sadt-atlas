@@ -23,6 +23,7 @@
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/AREG_IOSCBCT.html">Guide</a>
       <a href="../../visor/AREG_IOSCBCT/AREG_IOSCBCT.html" aria-current="true">Atlas</a>
+      <a href="../../visor/AREG_IOSCBCT/AREG_IOSCBCT.code.html">Code</a>
     </div>
     <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="visor">
@@ -122,11 +123,12 @@
         <img class="tool-icon" src="../../../assets/screens/AREG_IOSCBCT/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../../index.html">SADT Atlas</a> › <a href="../index.html">VISOR</a> › Registration</div>
         <h1>AREG_IOSCBCT on VISOR</h1>
-        <p class="lede">How AREG_IOSCBCT runs in VISOR (client and server), what changed from the legacy Slicer module, and what the code of the port does, step by step. The legacy module is described on <a href="../../AREG_IOSCBCT/AREG_IOSCBCT.html">its own page</a>.</p>
+        <p class="lede">AREG_IOSCBCT places an intraoral scan of the teeth into the frame of the same patient&rsquo;s <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a>. The two scans come from different machines and share nothing but the teeth, so the tool matches <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> first, then refines on the surface. This page explains how, step by step, with the maths. Where the code does something worth checking, a link leads to <a href="AREG_IOSCBCT.code.html">the code page</a>. The legacy module is described on <a href="../../AREG_IOSCBCT/AREG_IOSCBCT.html">its own page</a>.</p>
         <div class="meta-row">
           <span class="badge neutral">VISOR</span>
+          <a class="badge neutral" href="AREG_IOSCBCT.code.html">Code (developers)</a>
           <span class="badge cli">AREG_IOSCBCT</span>
-          <span class="badge neutral">reached as AREG, mode <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a> to <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a></span>
+          <span class="badge neutral">reached as AREG, mode <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a> to CBCT</span>
           <span class="badge neutral">no torch, pure geometry</span>
           <a class="badge neutral" href="../../AREG_IOSCBCT/AREG_IOSCBCT.html">Legacy page</a>
           <a class="badge neutral" href="../guide/AREG_IOSCBCT.html">Guide (VISOR)</a>
@@ -134,27 +136,26 @@
         </div>
       </header>
 
-<p>AREG_IOSCBCT places an intraoral scan in the frame of a CBCT of the same patient, taken at the same visit: a rigid fit on <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> both sides share, then an <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> of the mesh against a surface contoured from the CBCT. In VISOR the whole computation runs on a server, and the landmarks, when you do not send them, come from other tools the server calls; Slicer only shows the form, sends the folders and opens what comes back. This page describes that port, read at SADT-VISOR 6ba2a78 (branch <code>tool/vface</code>), VISOR-serve e9a7e5d and AutomatedDentalToolsRemote 19b95e8. The legacy module it is compared with is SlicerAutomatedDentalTools 3c67957, described on <a href="../../AREG_IOSCBCT/AREG_IOSCBCT.html">its own page</a>; legacy paths below are at that commit, and <code>AREG_IOSCBCT.py</code> is <code>AREG_IOSCBCT/AREG_IOSCBCT.py</code> there.</p>
-<p>Abbreviations used on this page: <code>ioscbct/</code> is <code>SADT-VISOR tools/AREG/AREG_IOSCBCT/src/sadt_areg_ioscbct/</code>, <code>common/</code> is <code>SADT-VISOR tools/AREG/common/src/sadt_areg_common/</code>, and <code>server/</code> paths are in VISOR-serve. &ldquo;Observed&rdquo; marks what was executed (tests, <code>scripts/describe.py</code>, short Python probes run with the tool's own environment on the published test files); everything else was read in the code.</p>
+      <h2 id="visor-overview">Overview: what goes in, what comes out</h2>
 
-      <h2 id="visor-status">1. Position in the chain</h2>
-
-      <p>A client sends <code>AREG</code> with <code>mode = "IOS to CBCT"</code>, and the server swaps the facade for this engine. The engine has no network of its own and imports neither torch nor pytorch3d (<code>ioscbct/__init__.py:9-14</code>): tooth labels, <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> and orientation are all asked of other tools, and what is left in the engine is geometry.</p>
+      <p>A <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> is a 3D volume of grey values; an intraoral scan is a surface of triangles with colour or tooth numbers. Nothing in them looks alike, so AREG_IOSCBCT works in two stages: a quick <strong>rough placement</strong> from 12 matching <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>, then a <strong>fine slide</strong> of the mesh onto the surface of the teeth extracted from the CBCT. The tool itself contains no network: the landmarks are given or asked from other tools.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Item</th><th>State</th></tr></thead>
+          <thead><tr><th></th><th>What it is</th></tr></thead>
           <tbody>
-            <tr><td>API name</td><td><code>AREG_IOSCBCT</code>. A client sends <code>AREG</code> with <code>mode = "IOS to CBCT"</code> (<code>VISOR-serve server/deployment.toml:186-193</code>); the name of the mode is the one the Slicer module offered, and it travels on the wire (<code>server/deployment.toml:187-192</code>). The facade is composed in <code>server/registry/facade.py:98</code> and swapped for its target in <code>server/main.py:1888-1918</code>.</td></tr>
-            <tr><td>Source and environment</td><td><code>SADT-VISOR tools/AREG/AREG_IOSCBCT</code>, Python 3.11, own environment (see <a href="#environment">Environment</a>). No torch and no pytorch3d: the engine is pure geometry (<code>ioscbct/__init__.py:9-14</code>), as the legacy command-line module already was.</td></tr>
-            <tr><td>Client</td><td>Module <code>AREG Remote</code>, the same panel as for the two other engines, with the fields of mode &ldquo;<a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a> to <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a>&rdquo; (<code>AutomatedDentalToolsRemote AREGRemote/AREGRemote.py:47-48,99,109</code>); it loads at most 12 files of the result (<code>AREGRemote.py:114-130</code>).</td></tr>
-            <tr><td>Calls (<code>sup.run</code>)</td><td>The published schema declares <code>supervisor: true</code> and <code>calls = [ALI_CBCT, ALI_IOS, ASO, Crown_Seg]</code> (observed with <code>scripts/describe.py</code>). Deepest chain: AREG_IOSCBCT, ASO, ALI_CBCT (<code>VISOR-serve docs/TOOL_GRAPH.md:11-14</code>, <code>server/execution/runner.py:185-190</code>).</td></tr>
-            <tr><td>Called by</td><td>No other tool.</td></tr>
-            <tr><td>Declared resources</td><td>None. <code>[tools.AREG_IOSCBCT]</code> sets <code>data_dir</code> and <code>server_selectable</code> only; a comment prices the chain at about 157 s (+20% = 190 s) and says the timeout is left unset (<code>server/deployment.toml:70-85</code>). The global <code>TOOL_TIMEOUT_SECONDS = 0</code> means no limit (<code>server/config.py:77</code>).</td></tr>
-            <tr><td>State</td><td>Implemented and tested: the largest test set of the three engines, 193 passed and 1 skipped (observed, run with the repository's own <code>sadt_areg_common</code> on the path, because the copy installed in that environment differs from <code>common/catalogs.py</code>). The AREG README says no supervised chain has been run end to end with the real tools (<code>SADT-VISOR tools/AREG/README.md:132-136</code>). The comment in the data manifest saying the IOSCBCT test files are for a mode that is not ported is out of date (<code>VISOR-serve scripts/data-manifest.yml:287</code>).</td></tr>
+            <tr><td>Input</td><td>intraoral meshes (<code>.vtk</code> or <code>.stl</code>, one file per arch) and CBCT volumes, paired by a patient number in their names; in Registration mode, a landmark file for each mesh and each CBCT</td></tr>
+            <tr><td>Idea</td><td>12 <a class="gterm" data-term="occlusal" href="../../glossary.html#g-occlusal" title="See glossary">occlusal</a> points exist on both scans; a rigid fit on those pairs brings the mesh near, then an <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> slides its crowns onto the CBCT surface</td></tr>
+            <tr><td>Output</td><td>each mesh moved into the CBCT frame, its 4&times;4 matrix, and <code>AREG_report.json</code> saying what each mesh went through</td></tr>
           </tbody>
         </table>
       </div>
+
+      <p>Three modes decide how much the tool does for you: <strong>Registration</strong> (the default) takes your landmark files and calls nothing; <strong>Semi-Automated</strong> labels the crowns and predicts the landmarks; <strong>Fully-Automated</strong> also orients the CBCT first.</p>
+
+      <h2 id="visor-status">1. Position in the chain</h2>
+
+      <p>A client sends <code>AREG</code> with the mode &ldquo;<a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a> to <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a>&rdquo; and the server swaps the general AREG form for this engine. The engine has no network of its own: tooth labels, <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> and orientation are asked of other tools, and what is left is geometry.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 960 300" role="img" aria-label="Who calls whom. The AREG Remote module in Slicer sends one request to the facade AREG with mode IOS to CBCT. The server runs the AREG_IOSCBCT engine, which holds no network. In Fully-Automated mode it calls ASO on the CBCT, which itself calls ALI_CBCT. In Semi-Automated and Fully-Automated modes it calls Crown_Seg on the meshes, then ALI_IOS and ALI_CBCT for the landmarks it was not sent.">
@@ -163,26 +164,32 @@
           <text class="d-label-s" x="12" y="28">clinician's machine</text>
           <text class="d-label-s" x="202" y="28">server: one environment per tool, chained by the supervisor</text>
 
+          <a class="d-link" href="#visor-where">
           <rect class="d-box" x="12" y="60" width="156" height="78" rx="6"/>
           <text class="d-label" x="90" y="84" text-anchor="middle">AREG Remote</text>
           <text class="d-label-s" x="90" y="104" text-anchor="middle">panel from schema</text>
-          <text class="d-label-xs" x="90" y="122" text-anchor="middle">AREGRemote.py, 156 lines</text>
+          <text class="d-label-xs" x="90" y="122" text-anchor="middle">a form, no computation</text>
+          </a>
 
           <path class="d-arrow" d="M168 99 H213"/>
           <path class="d-arrow-head" d="M220 99 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-status">
           <rect class="d-box" x="222" y="60" width="190" height="78" rx="6"/>
           <text class="d-label" x="317" y="84" text-anchor="middle">Facade AREG</text>
           <text class="d-label-s" x="317" y="104" text-anchor="middle">mode = "IOS to CBCT"</text>
-          <text class="d-label-xs" x="317" y="122" text-anchor="middle">deployment.toml:186-193</text>
+          <text class="d-label-xs" x="317" y="122" text-anchor="middle">the mode travels with the request</text>
+          </a>
 
           <path class="d-arrow" d="M412 99 H457"/>
           <path class="d-arrow-head" d="M464 99 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-where">
           <rect class="d-box-a" x="466" y="60" width="210" height="78" rx="6"/>
           <text class="d-label" x="571" y="84" text-anchor="middle">AREG_IOSCBCT</text>
           <text class="d-label-s" x="571" y="104" text-anchor="middle">fit on landmarks, ICP</text>
           <text class="d-label-xs" x="571" y="122" text-anchor="middle">no torch, no network</text>
+          </a>
 
           <path class="d-arrow" d="M571 138 V158 H290 V183"/>
           <path class="d-arrow-head" d="M290 190 l-4 -7 h8 z"/>
@@ -191,168 +198,148 @@
           <path class="d-arrow" d="M571 158 V183"/>
           <path class="d-arrow-head" d="M571 190 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#upstream">
           <rect class="d-box" x="206" y="192" width="168" height="70" rx="6"/>
           <text class="d-label" x="290" y="216" text-anchor="middle">ASO, CBCT</text>
           <text class="d-label-s" x="290" y="234" text-anchor="middle">calls ALI_CBCT</text>
           <text class="d-label-xs" x="290" y="250" text-anchor="middle">Fully-Automated only</text>
+          </a>
 
+          <a class="d-link" href="#upstream">
           <rect class="d-box-n" x="390" y="192" width="362" height="70" rx="6"/>
           <text class="d-label" x="571" y="216" text-anchor="middle">Crown_Seg, then ALI_IOS (Occlusal)</text>
           <text class="d-label-s" x="571" y="234" text-anchor="middle">labels the meshes, predicts the occlusal points</text>
           <text class="d-label-xs" x="571" y="250" text-anchor="middle">Semi and Fully-Automated</text>
+          </a>
 
+          <a class="d-link" href="#upstream">
           <rect class="d-box-n" x="768" y="192" width="176" height="70" rx="6"/>
           <text class="d-label" x="856" y="216" text-anchor="middle">ALI_CBCT</text>
           <text class="d-label-s" x="856" y="234" text-anchor="middle">12 named points</text>
           <text class="d-label-xs" x="856" y="250" text-anchor="middle">Semi and Fully</text>
+          </a>
 
           <path class="d-arrow" d="M676 99 H760" stroke-dasharray="4 4"/>
           <path class="d-arrow-head" d="M767 99 l-7 -4 v8 z"/>
+          <a class="d-link" href="#visor-io">
           <rect class="d-box" x="769" y="60" width="175" height="78" rx="6"/>
           <text class="d-label" x="856" y="84" text-anchor="middle">Output archive</text>
           <text class="d-label-s" x="856" y="104" text-anchor="middle">meshes, matrices</text>
           <text class="d-label-xs" x="856" y="122" text-anchor="middle">AREG_report.json</text>
+          </a>
         </svg>
-        <figcaption>One request from Slicer; in the default Registration mode, no other tool at all. Purple boxes hold a network; the accent box is the engine, which holds none. The calls are those of <code>ioscbct/tools.py:102-177</code>, triggered from <code>ioscbct/dispatch.py:311-339</code>.</figcaption>
+        <figcaption>One request from Slicer; in the default Registration mode, no other tool at all. Purple boxes hold a network; the accent box is the engine, which holds none. In the two other modes it asks other tools for what it was not given.</figcaption>
       </figure>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#visor-status"><b>In the code</b><span>The facade, the declared calls, the resources and the state of the tests</span></a>
 
       <h2 id="files">2. Files involved</h2>
 
-      <p>Line counts at SADT-VISOR 6ba2a78.</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Lines</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>ioscbct/__init__.py</code></td><td>100</td><td><code>run()</code>, the published signature, and <code>ACCEPTS</code>, the extensions of each path argument, derived from the pipeline's own tables (<code>ioscbct/__init__.py:34-60</code>)</td></tr>
-            <tr><td><code>ioscbct/layout.py</code></td><td>86</td><td>sections Inputs, <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">Landmarks</a>, Models, Outputs; <code>visible_when</code> per mode (<code>ioscbct/layout.py:5-15</code>)</td></tr>
-            <tr><td><code>ioscbct/dispatch.py</code></td><td>365</td><td><code>main</code>: mode check, supervised calls, <code>try/finally</code> around the run (<code>:277-365</code>); <code>register</code>, the per-patient, per-mesh loop (<code>:202-274</code>); landmark-file matching (<code>:87-175</code>); the <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> surface once per patient (<code>:57-84</code>)</td></tr>
-            <tr><td><code>ioscbct/tools.py</code></td><td>177</td><td><code>label_crowns</code>, <code>predict_cbct_landmarks</code>, <code>predict_ios_landmarks</code>, <code>orient_cbct</code>; the 12 CBCT landmark names (<code>:55-60</code>)</td></tr>
-            <tr><td><code>ioscbct/pipeline.py</code></td><td>244</td><td><code>patient_key</code>, <code>discover</code>, landmark reading, <code>shared_landmarks</code>, <code>register_one</code>, landmark drift</td></tr>
-            <tr><td><code>ioscbct/volume.py</code></td><td>175</td><td>the CBCT as a surface: the level read off the scan, the verdict on each landmark, the contour</td></tr>
-            <tr><td><code>ioscbct/geometry.py</code></td><td>670</td><td>the landmark fit and its outlier trimming, the pre-alignment verdict, the point-to-plane <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a></td></tr>
-            <tr><td><code>ioscbct/progress.py</code></td><td>103</td><td>progress lines the server relays</td></tr>
-            <tr><td><code>common/pairing.py</code>, <code>common/catalogs.py</code></td><td>404, 197</td><td>tokens and scan extensions only: the longitudinal pairing of the two sibling engines is not used here (<code>ioscbct/pipeline.py:8-10</code>)</td></tr>
-            <tr><td><code>tests/</code> (9 files)</td><td>2638</td><td>geometry, landmarks, pairing, registration, run, schema seam, tools, volume</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>Outside the tool: <code>VISOR-serve server/deployment.toml</code> (facade at lines 186-193, <code>[tools.AREG_IOSCBCT]</code> at lines 70-85), <code>scripts/data-manifest.yml</code> (the two published test sets, <code>IOSCBCT_RegTestFiles</code> for the Registration mode and <code>IOSCBCT_TestFile</code> for the two others, lines 356-365), and on the client <code>AutomatedDentalToolsRemote AREGRemote/AREGRemote.py</code>.</p>
+      <p>The engine is a small Python package: one file reads and writes meshes and runs the per-patient loop, one pairs the files, one turns the <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> into a surface, one holds the geometry (<a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> fit and <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a>), and one asks the other tools. Nothing needs a GPU.</p>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#files"><b>In the code</b><span>The files, their size and their role</span></a>
 
       <h2 id="visor-where">3. What runs where, and the pipeline</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Step</th><th>Server</th><th>Client (Slicer)</th></tr></thead>
-          <tbody>
-            <tr><td>Form</td><td>publishes the schema; the <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> pickers only appear in Registration mode, the model fields only in the two other modes (<code>ioscbct/layout.py:13-15</code>)</td><td>builds the panel; hosted cohorts for the four inputs are offered (<code>VISOR-serve server/deployment.toml:85</code>)</td></tr>
-            <tr><td><a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> orientation</td><td>Fully-Automated: <code>sup.run("ASO", ...)</code>, reference Frankfurt resolved by the tool (<code>ioscbct/dispatch.py:317-332</code>, <code>ioscbct/tools.py:159-177</code>)</td><td>nothing</td></tr>
-            <tr><td>Labels and landmarks</td><td>Semi and Fully: <code>Crown_Seg</code> on the meshes, then <code>ALI_IOS</code> (network <a class="gterm" data-term="occlusal" href="../../glossary.html#g-occlusal" title="See glossary">Occlusal</a> alone) unless <code>ios_landmarks</code> is sent, then <code>ALI_CBCT</code> for twelve named occlusal landmarks unless <code>cbct_landmarks</code> is sent (<code>ioscbct/dispatch.py:334-339</code>, <code>ioscbct/tools.py:55-60,102-156</code>). Semi-Automated runs ALI_CBCT on the CBCT as sent, without orienting it</td><td>nothing</td></tr>
-            <tr><td>Registration</td><td>contouring of the CBCT, pre-alignment, point-to-plane <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a>, writing (<code>ioscbct/volume.py</code>, <code>ioscbct/geometry.py</code>, <code>ioscbct/pipeline.py</code>)</td><td>nothing</td></tr>
-            <tr><td>Results</td><td>output folder returned as an archive</td><td>unpacks it; optional loading of the meshes (<code>.vtk</code>) in the scene, up to 12 files</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>Slicer only builds the form and unpacks the result. Everything else runs on the server: the calls to the other tools, the surface, the fits, the files.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 960 372" role="img" aria-label="The pipeline. Optional orientation of the CBCT by ASO, crown labels by Crown_Seg, landmarks by ALI_IOS and ALI_CBCT. Then intraoral meshes and CBCTs are paired on patient digits. For each patient the CBCT is contoured once at a level read off the scan, and each landmark is judged on or off enamel. For each mesh the shared landmarks are fitted rigidly, off-enamel landmarks first set aside and outliers trimmed, then a point-to-plane ICP on the crowns against the CBCT surface cropped around the landmarks, and the mesh and its matrix are written.">
+          <a class="d-link" href="#upstream">
           <rect class="d-box" x="10" y="20" width="200" height="74" rx="6"/>
           <text class="d-label" x="110" y="44" text-anchor="middle">① ASO on the CBCT</text>
           <text class="d-label-s" x="110" y="62" text-anchor="middle">Frankfurt reference</text>
           <text class="d-label-xs" x="110" y="80" text-anchor="middle">Fully-Automated only</text>
+          </a>
           <path class="d-arrow" d="M210 57 H233"/><path class="d-arrow-head" d="M240 57 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#upstream">
           <rect class="d-box-n" x="242" y="20" width="230" height="74" rx="6"/>
           <text class="d-label" x="357" y="44" text-anchor="middle">② Crown_Seg, ALI_IOS, ALI_CBCT</text>
           <text class="d-label-s" x="357" y="62" text-anchor="middle">only what was not sent</text>
           <text class="d-label-xs" x="357" y="80" text-anchor="middle">Semi and Fully-Automated</text>
+          </a>
           <path class="d-arrow" d="M472 57 H495"/><path class="d-arrow-head" d="M502 57 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#pairing">
           <rect class="d-box" x="504" y="20" width="200" height="74" rx="6"/>
           <text class="d-label" x="604" y="44" text-anchor="middle">③ Pair on digits</text>
           <text class="d-label-s" x="604" y="62" text-anchor="middle">meshes with one CBCT</text>
-          <text class="d-label-xs" x="604" y="80" text-anchor="middle">pipeline.py:30-106</text>
+          <text class="d-label-xs" x="604" y="80" text-anchor="middle">one number per patient</text>
+          </a>
           <path class="d-arrow" d="M704 57 H727"/><path class="d-arrow-head" d="M734 57 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#surface-cbct">
           <rect class="d-box" x="736" y="20" width="214" height="74" rx="6"/>
           <text class="d-label" x="843" y="44" text-anchor="middle">④ Contour the CBCT</text>
           <text class="d-label-s" x="843" y="62" text-anchor="middle">level read off the scan</text>
-          <text class="d-label-xs" x="843" y="80" text-anchor="middle">once per patient, volume.py</text>
+          <text class="d-label-xs" x="843" y="80" text-anchor="middle">once per patient</text>
+          </a>
 
           <path class="d-arrow" d="M843 94 V116 H20 V146"/><path class="d-arrow-head" d="M20 153 l-4 -7 h8 z"/>
-          <text class="d-label-s" x="30" y="138">for each mesh of the patient (dispatch.py:237-264)</text>
+          <text class="d-label-s" x="30" y="138">for each mesh of the patient</text>
 
+          <a class="d-link" href="#correspondance">
           <rect class="d-box" x="10" y="156" width="200" height="80" rx="6"/>
           <text class="d-label" x="110" y="180" text-anchor="middle">⑤ Shared landmarks</text>
           <text class="d-label-s" x="110" y="198" text-anchor="middle">by label, at least 3</text>
-          <text class="d-label-xs" x="110" y="216" text-anchor="middle">pipeline.py:136-155</text>
+          <text class="d-label-xs" x="110" y="216" text-anchor="middle">labels present on both sides</text>
+          </a>
           <path class="d-arrow" d="M210 196 H233"/><path class="d-arrow-head" d="M240 196 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#correspondance">
           <rect class="d-box-a" x="242" y="156" width="230" height="80" rx="6"/>
           <text class="d-label" x="357" y="180" text-anchor="middle">⑥ Rigid fit</text>
           <text class="d-label-s" x="357" y="198" text-anchor="middle">off-enamel set aside, trim</text>
-          <text class="d-label-xs" x="357" y="216" text-anchor="middle">geometry.py:212-321</text>
+          <text class="d-label-xs" x="357" y="216" text-anchor="middle">refused above 10 mm</text>
+          </a>
           <path class="d-arrow" d="M472 196 H495"/><path class="d-arrow-head" d="M502 196 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#icp">
           <rect class="d-box-a" x="504" y="156" width="200" height="80" rx="6"/>
           <text class="d-label" x="604" y="180" text-anchor="middle">⑦ ICP point-to-plane</text>
           <text class="d-label-s" x="604" y="198" text-anchor="middle">crowns, 1 mm, normals</text>
-          <text class="d-label-xs" x="604" y="216" text-anchor="middle">geometry.py:524-670</text>
+          <text class="d-label-xs" x="604" y="216" text-anchor="middle">stops when settled</text>
+          </a>
           <path class="d-arrow" d="M704 196 H727"/><path class="d-arrow-head" d="M734 196 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#visor-io">
           <rect class="d-box" x="736" y="156" width="214" height="80" rx="6"/>
           <text class="d-label" x="843" y="180" text-anchor="middle">⑧ Write</text>
           <text class="d-label-s" x="843" y="198" text-anchor="middle">mesh, 4x4 matrix .npy</text>
-          <text class="d-label-xs" x="843" y="216" text-anchor="middle">dispatch.py:251-261</text>
+          <text class="d-label-xs" x="843" y="216" text-anchor="middle">one folder per patient</text>
+          </a>
 
           <rect class="d-box" x="242" y="262" width="462" height="50" rx="6"/>
           <text class="d-label" x="473" y="282" text-anchor="middle">No surface: placed on the landmarks only</text>
-          <text class="d-label-xs" x="473" y="300" text-anchor="middle">the report says the ICP did not run (dispatch.py:57-84, pipeline.py:184-185)</text>
+          <text class="d-label-xs" x="473" y="300" text-anchor="middle">the report says the ICP did not run</text>
           <path class="d-arrow" d="M357 236 V255"/><path class="d-arrow-head" d="M357 262 l-4 -7 h8 z"/>
 
-          <text class="d-label-s" x="10" y="350">then: AREG_report.json; .areg_work removed in a finally (dispatch.py:357-362)</text>
+          <text class="d-label-s" x="10" y="350">then: AREG_report.json; the scratch folder is always removed</text>
         </svg>
-        <figcaption>The pipeline of <code>main</code> and <code>register</code> in the order the code runs it. Registration mode, the default, starts at ③ with your own landmark files. A mesh fails alone (no landmark file for its jaw, an ICP that matches under 5% of the arch); a run in which no mesh of any patient registers raises (<code>ioscbct/dispatch.py:262-274</code>).</figcaption>
+        <figcaption>The pipeline in the order it runs. Registration mode, the default, starts at ③ with your own <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> files. A mesh fails alone (no landmark file for its jaw, an <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> that matches under 5% of the arch); a run in which no mesh of any patient registers fails as a whole.</figcaption>
       </figure>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#visor-where"><b>In the code</b><span>What the server and the client each do, step by step</span></a>
 
       <h3 id="upstream">3.1 The supervised calls</h3>
 
-      <p>The mode is checked first; Registration is the default, and the one that needs no other tool (<code>ioscbct/__init__.py:46-48</code>, <code>ioscbct/dispatch.py:283-288</code>). In the two other modes <code>main</code> refuses at once when Crown_Seg, ALI_IOS and ALI_CBCT, plus ASO for Fully-Automated, cannot be reached, and resolves the orientation reference to <code>DATA/AREG/models/CBCT_Gold_Frankfurt_Horizontal_Midsagittal_Plane</code> when none is named (<code>ioscbct/dispatch.py:190-199,311-331</code>). Then, in this order (<code>ioscbct/dispatch.py:332-339</code>, <code>ioscbct/tools.py:102-177</code>):</p>
-      <pre><code>cbct = sup.run("ASO", input=cbct, reference=&lt;Frankfurt&gt;,          # Fully only
-               modality="CBCT", automation="Fully-Automated" [, landmark_model])
-ios  = sup.run("Crown_Seg", meshes=ios, suffix="Seg" [, model=crown_model])
-ios_lm  = sup.run("ALI_IOS", input=ios, networks=["Occlusal"])          # unless sent
-cbct_lm = sup.run("ALI_CBCT", input=cbct,
-                  landmarks=["UR1O","UR3O","UR6O","UL1O","UL3O","UL6O",
-                             "LR1O","LR3O","LR6O","LL1O","LL3O","LL6O"])   # unless sent</code></pre>
-      <p>ALI_CBCT is asked for those twelve points by name, not by region, because asking by region would run every agent of every region containing one of them (<code>ioscbct/tools.py:122-137</code>); ALI_IOS is asked for its occlusal network alone (<code>ioscbct/tools.py:140-156</code>). The intraoral meshes are labelled but <strong>not oriented</strong>: ASO is called only on the CBCT. Progress waypoints are 0.1, 0.3 and 0.5, and the registration starts at 0.6 (<code>ioscbct/tools.py:129-130,148-149,167-168</code>, <code>ioscbct/dispatch.py:355</code>).</p>
+      <p>In the two automatic modes, the tool first asks for what you did not give. <strong>ASO</strong> orients the <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> onto a Frankfurt reference (Fully-Automated only). <strong>Crown_Seg</strong> labels the teeth of the meshes. <strong>ALI_IOS</strong> places the <a class="gterm" data-term="occlusal" href="../../glossary.html#g-occlusal" title="See glossary">occlusal</a> landmarks on the meshes, and <strong>ALI_CBCT</strong> places twelve named occlusal landmarks on the CBCT. ALI_CBCT is asked for those twelve points by name, because asking by region would run every agent of every region that contains one of them. The meshes are labelled but <strong>not oriented</strong>: the landmark fit alone brings them near.</p>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#upstream"><b>In the code</b><span>The four calls, in order, with their arguments and progress marks</span></a>
 
       <h3 id="pairing">3.2 Pairing the two modalities</h3>
 
-      <p>The two modalities are named by different conventions, so <code>patient_key</code> keeps only what they share, the digits: the time-point tokens <code>t0 t1 t2</code> are removed, then every non-digit, then the leading zeros, so <code>P001_T2_U.vtk</code> and <code>P_0001_T2.nii.gz</code> both key to <code>1</code> (<code>ioscbct/pipeline.py:30-52</code>). <code>discover</code> walks both folders in sorted order, keeps every mesh (<code>.vtk</code>, <code>.stl</code>) of a key and the <em>first</em> CBCT of a key, and reports a key present on one side only (<code>ioscbct/pipeline.py:55-106</code>). The crudeness of that key is the first <a href="#visor-findings">finding</a>.</p>
-
-      <p>Landmark files are read as Slicer markups, or as a plain <code>{label: [x, y, z]}</code> object (<code>ioscbct/pipeline.py:109-133</code>), indexed by their path relative to the folder (<code>ioscbct/dispatch.py:87-108</code>), narrowed to the patient's key (<code>:111-135</code>), and matched to a mesh by its jaw token (<code>u upper l lower</code>); a single file without a jaw token, which is what ALI_CBCT writes for a whole CBCT, serves both arches, the labels themselves (<code>UR1O</code> against <code>LR1O</code>) separating them (<code>ioscbct/dispatch.py:138-175</code>).</p>
+      <p>The mesh and the CBCT of a patient are named by different conventions, so the tool keeps only what they share: <strong>the digits</strong>. The time-point tokens <code>t0</code>, <code>t1</code>, <code>t2</code> are removed, then every non-digit, then the leading zeros: <code>P001_T2_U.vtk</code> and <code>P_0001_T2.nii.gz</code> both become patient <code>1</code>. A landmark file is attached to a mesh by the jaw in its name (<code>u</code> upper, <code>l</code> lower); one file without a jaw, which is what ALI_CBCT writes for a whole CBCT, serves both arches because the labels themselves tell them apart (<code>UR1O</code> against <code>LR1O</code>). The crudeness of that key is the first <a href="#visor-findings">known issue</a>.</p>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#pairing"><b>In the code</b><span>The key function, the folder walk and the landmark-file matching</span></a>
 
       <h3 id="surface-cbct">3.3 The CBCT surface, and the level it is contoured at</h3>
 
-      <p>Once per patient, all the patient's CBCT landmarks merged, <code>volume.read</code> reads the volume and returns the contoured surface and a verdict on each landmark (<code>ioscbct/dispatch.py:57-84</code>, <code>ioscbct/volume.py:148-175</code>):</p>
-      <pre><code>array = sitk.GetArrayFromImage(image)
-ijk_to_lps[:3, :3] = direction @ diag(spacing);  ijk_to_lps[:3, 3] = origin
-level = surface_threshold(array, ijk_to_lps, landmark_positions)
-on_enamel = landmarks_on_enamel(array, ijk_to_lps, landmarks, level)
-surface = pv.wrap(array.transpose(2, 1, 0)).contour(isosurfaces=[level])
-return surface.transform(ijk_to_lps, inplace=False), on_enamel</code></pre>
+      <p>Once per patient, the volume becomes a surface: all <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxels</a> brighter than a level <em>L</em> are separated from the others by a closed skin of triangles (the marching-cubes contour). That skin takes bone and enamel alike, with no distinction. The level is read off each scan, because a CBCT is not calibrated and a fixed number can be meaningless.</p>
 
-      <p><strong>The level is read off the scan</strong>, with the same rule as the legacy at 3c67957 (<code>ioscbct/volume.py:96-117</code>):</p>
-      <ul>
-        <li>the <em>enamel plateau</em> is the median, over the CBCT landmarks, of the brightest <a class="gterm" data-term="voxel" href="../../glossary.html#g-voxel" title="See glossary">voxel</a> within 2 voxels of each (<code>PROBE_RADIUS_VOXELS = 2</code>, <code>ioscbct/volume.py:27,46-60,77-79,91</code>);</li>
-        <li>the <em>surround</em> is the median of the voxels between -300 and 300 HU in the box the landmarks span (<code>SOFT_TISSUE_BAND</code>, <code>ioscbct/volume.py:32,85-92</code>);</li>
-        <li>the level is half-way between the two; <strong>400 is only the fallback</strong>, used when no landmark falls inside the scan or when the crowns are no brighter than their surround (<code>FALLBACK_LEVEL = 400.0</code>, <code>ioscbct/volume.py:36,105-112</code>);</li>
-        <li>an explicit <code>level</code> argument would win, but no caller passes one (<code>ioscbct/volume.py:101-103</code>, <code>ioscbct/dispatch.py:77</code>).</li>
-      </ul>
-      <p><strong>Observed on the published test scan</strong> (<code>P_0001_T2_Or.nii.gz</code> and its 12 CBCT landmarks, the files the viewer below is built from, run through <code>volume.surface_threshold</code> and <code>volume.landmarks_on_enamel</code> in the tool's environment): enamel 2783, surround 146, <strong>level 1464</strong>, far above the 400 fallback; and <code>UL3O</code> reads 274 at its brightest, under the level, so it is judged not to lie on a tooth.</p>
-      <p>The same level then judges each landmark: one whose neighbourhood never reaches it is not on enamel, which in a closed bite usually means the network put it on the opposing arch (<code>ioscbct/volume.py:120-145</code>). The contour takes bone and enamel alike above that level; the transpose puts SimpleITK's <code>(k, j, i)</code> array back in pyvista's <code>(i, j, k)</code> order, and <code>ijk_to_lps</code> takes the surface back to <a class="gterm" data-term="lps" href="../../glossary.html#g-lps" title="See glossary">LPS</a>, the frame both ALI tools write (<code>ioscbct/volume.py:161-175</code>).</p>
+      <figure class="algo" data-scene="ioscbct_level" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a grey-level profile across a crown, a low plateau for soft tissue and a high one for enamel, a line half-way between them, and the two points where the profile crosses it"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">A CBCT has no sharp edge: the grey level climbs from the soft tissue around an arch to the enamel of a crown over a few voxels. The surface is drawn where the scan crosses a level <em>L</em> set half-way between the two plateaus, which is where an edge is located best. 400 is only a <a class="gterm" data-term="areg-ioscbct-fallback-visor" href="AREG_IOSCBCT.code.html#surface-cbct" title="See the code">fallback</a>.</p><div class="formula"><math display="block"><mrow><mi class="k1">L</mi><mo>=</mo><mfrac><mrow><mi class="k2">E</mi><mo>+</mo><mi class="k3">S</mi></mrow><mn>2</mn></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>L</b>the grey level at which the surface is drawn</li><li class="k2"><b>E</b><a class="gterm" data-term="areg-ioscbct-enamel-visor" href="AREG_IOSCBCT.code.html#correspondance" title="See the code">enamel plateau</a>: the median, over the CBCT landmarks, of the brightest voxel within 2 voxels of each landmark</li><li class="k3"><b>S</b>surround: the median of the voxels between -300 and 300 in the box the landmarks span</li></ul></div>
+      </figure>
+
+      <p>On the published test scan the engine reads an enamel plateau of 2783, a surround of 146 and a level of <strong>1464</strong>, far above the fallback of 400; one landmark, <code>UL3O</code>, reads at most 274 around it, under the level, so it is judged not to lie on a tooth. The same level judges each landmark: a point whose neighbourhood never reaches it is not on enamel, which in a closed bite usually means the network put it on the opposing arch.</p>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#surface-cbct"><b>In the code</b><span>The probe radius, the soft-tissue band, the fallback and the contour call</span></a>
 
       <h3 id="correspondance">3.4 The landmark fit</h3>
 
@@ -382,118 +369,91 @@ return surface.transform(ijk_to_lps, inplace=False), on_enamel</code></pre>
           <i data-k="align">rigid fit on the pairs VISOR keeps:</i>
           <i data-k="icp">then a point-to-plane ICP, inside a 1&nbsp;mm window, not replayed here</i>
         </span>
-        <figcaption>Two modalities with nothing in common: a volume and a surface. The geometry comes from the published AREG_IOSCBCT test set (no patient data): the oriented CBCT, the two arches, and the six occlusal points ALI wrote on each side. <strong>The surface shown is the published one, contoured at 400</strong>, the fallback level; VISOR reads 1464 off this scan (observed, section 3.3), so the surface the VISOR ICP sees holds less bone than the one drawn here. The pairing by label is the VISOR rule (<code>ioscbct/pipeline.py:136-155</code>). <strong>The pre-alignment is VISOR's, recomputed</strong> with <code>geometry.prealign</code> in the tool's environment on these same points and the on-enamel verdict at level 1464 (observed), and not the legacy matrix: on the lower arch the trimming sets <code>LL1O</code> and <code>LR6O</code> aside and fits on four pairs, 24.63&nbsp;&rarr;&nbsp;0.62&nbsp;mm; on the upper arch <code>UL3O</code> is set aside as off enamel and the trimming then drops <code>UR3O</code>, four pairs, 26.21&nbsp;&rarr;&nbsp;1.47&nbsp;mm. The legacy scene, which fitted all six pairs of each arch, ended 3.7&nbsp;mm away on the upper arch. The ICP that follows is not replayed: it needs the full surfaces and the VISOR level.</figcaption>
+        <figcaption>Two modalities with nothing in common: a volume and a surface. The geometry comes from the published AREG_IOSCBCT test set (no patient data): the oriented CBCT, the two arches, and the six occlusal points ALI wrote on each side. <strong>The surface shown is the published one, contoured at 400</strong>, the fallback level; VISOR reads 1464 off this scan, so the surface its ICP sees holds less bone than the one drawn here. Points are paired by label, never by position. <strong>The pre-alignment is VISOR&rsquo;s, recomputed</strong> on these same points with the on-enamel verdict at level 1464, and not the legacy matrix: on the lower arch the <a class="gterm" data-term="areg-ioscbct-trimming-visor" href="AREG_IOSCBCT.code.html#correspondance" title="See the code">trimming</a> sets <code>LL1O</code> and <code>LR6O</code> aside and fits on four pairs, 24.63&nbsp;&rarr;&nbsp;0.62&nbsp;mm; on the upper arch <code>UL3O</code> is set aside as off enamel and the trimming then drops <code>UR3O</code>, four pairs, 26.21&nbsp;&rarr;&nbsp;1.47&nbsp;mm. The legacy scene, which fitted all six pairs of each arch, ended 3.7&nbsp;mm away on the upper arch. The ICP that follows is not replayed: it needs the full surfaces and the VISOR level.</figcaption>
       </figure>
 
-      <p><code>shared_landmarks</code> intersects the two label sets, refuses fewer than 3 common labels, and reports the labels dropped (<code>ioscbct/pipeline.py:136-155</code>). <code>align_by_landmarks</code> is the closed-form rigid fit of <code>vtkLandmarkTransform</code> in RigidBody mode, <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a> as source and CBCT as target, and it raises on sets of different sizes instead of returning the identity (<code>ioscbct/geometry.py:34-74</code>). Around it, <code>fit_rigid_without_outliers</code> and <code>prealign</code> decide which pairs count and whether the result is accepted (<code>ioscbct/geometry.py:168-321</code>):</p>
+      <figure class="algo" data-scene="ioscbct_fit" data-ms="7200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: six labelled points of the mesh are linked to their partners in the CBCT; the rigid fit brings them together, one pair stays far off, is set aside, and the fit is redone on the other five"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The same occlusal points exist on both scans and are paired <strong>by label</strong>. A rigid fit (a rotation and a translation, no scaling) brings the mesh points onto their CBCT partners. One pair that stays far off, and whose removal improves the fit a lot, is set aside and the fit is redone.</p><div class="formula"><math display="block"><mrow><mi class="k1">RMS</mi><mo>=</mo><msqrt><mrow><mfrac><mn>1</mn><mi class="k2">n</mi></mfrac><munderover><mo>&#x2211;</mo><mrow><mi class="k4">i</mi><mo>=</mo><mn>1</mn></mrow><mi class="k2">n</mi></munderover><msup><msub><mi class="k3">r</mi><mi class="k4">i</mi></msub><mn>2</mn></msup></mrow></msqrt></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mi class="k3">r</mi><mi class="k4">j</mi></msub><mo>&gt;</mo><mn>3</mn><mtext>&#xa0;mm</mtext><mtext>&#xa0;and&#xa0;</mtext><msub><mi class="k5">RMS</mi><mrow><mo>&#x2212;</mo><mi class="k4">j</mi></mrow></msub><mo>&#x2264;</mo><mn>0.75</mn><mo>&#xd7;</mo><mi class="k1">RMS</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>RMS</b>how far the moved points still are from their partners, on average</li><li class="k2"><b>n</b>pairs in the fit</li><li class="k3"><b>r</b>distance between a moved point and its partner</li><li class="k5"><b>RMS<sub>-j</sub></b>the same residual with pair j left out</li></ul></div>
+      </figure>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Rule</th><th>Constant</th><th>Effect</th></tr></thead>
-          <tbody>
-            <tr><td>Fewer than 3 pairs</td><td><code>MIN_LANDMARK_PAIRS = 3</code></td><td>identity, <code>accepted: false</code>, reason &ldquo;too few pairs&rdquo; (<code>:289-294</code>)</td></tr>
-            <tr><td>Landmark not on enamel</td><td>verdict of <a href="#surface-cbct">3.3</a></td><td>set aside before any fit, provided 3 pairs remain (<code>:229-242</code>)</td></tr>
-            <tr><td>Outlier trimming</td><td><code>LANDMARK_OUTLIER_FLOOR_MM = 3.0</code>, <code>LANDMARK_OUTLIER_IMPROVEMENT = 0.75</code>, <code>MIN_LANDMARK_PAIRS_AFTER_TRIM = 4</code></td><td>one pair per round: the pair whose removal gives the best fit is dropped if it sits more than 3 mm off and the fit without it is at most 75% of the residual; never below 4 pairs (<code>:244-275</code>)</td></tr>
-            <tr><td>Residual too large</td><td><code>MAX_LANDMARK_RESIDUAL_MM = 10.0</code></td><td>identity, <code>accepted: false</code>, reason &ldquo;residual too large&rdquo; (<code>:301-307</code>)</td></tr>
-            <tr><td>Landmarks nearly in a line</td><td><code>MIN_LANDMARK_SPREAD_RATIO = 0.10</code></td><td>warning only; the spread goes to the report (<code>:199-209,309-321</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>A refused pre-alignment is not an error: the ICP then starts from the pose the orientation left, the identity (<code>ioscbct/geometry.py:278-285</code>).</p>
+      <p>At least 3 common labels are needed. A landmark judged off enamel is set aside before any fit, as long as 3 pairs remain. Trimming then removes one pair per round and never goes below 4 pairs. If the final residual is above 10&nbsp;mm the pre-alignment is refused (the mesh then starts from where it was); if the landmarks are nearly in a line, the tool only warns. A refused pre-alignment is not an error: the ICP goes on from the pose the orientation left.</p>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#correspondance"><b>In the code</b><span>The fit, its constants, the table of rules and the line numbers</span></a>
 
       <h3 id="icp">3.5 The ICP</h3>
 
-      <p><code>register_one</code> crops the CBCT surface to the box of the arch's CBCT landmarks plus 25 mm, moves the mesh by the pre-alignment, then runs <code>icp_point_to_plane</code> (<code>ioscbct/pipeline.py:158-212</code>, <code>ioscbct/geometry.py:395-450</code>):</p>
-      <ul>
-        <li><strong>moving points</strong>: the crowns only, when the mesh carries <code>Universal_ID</code> and at least 10% of it is crown; labels 0 and 33 are gingiva, which has no counterpart in a CBCT (<code>GINGIVA_LABELS</code>, <code>MIN_CROWN_SHARE</code>, <code>ioscbct/geometry.py:368-372,453-476</code>);</li>
-        <li><strong>correspondences</strong>: nearest CBCT point within <code>ICP_MAX_DIST_MM = 1.0</code>, whose normal agrees with the mesh's by more than 0.5, which keeps the opposing arch out in a closed bite (<code>:338,343,543-555</code>);</li>
-        <li><strong>step</strong>: point-to-plane, linearised in the rotation, solved by least squares; a rank-deficient system or a rotation over 0.5 rad falls back to a point-to-point <a class="gterm" data-term="procrustes" href="../../glossary.html#g-procrustes" title="See glossary">Procrustes</a> step (<code>:479-521,571-577</code>);</li>
-        <li><strong>stop</strong>: after 300 iterations, or once the largest shift stays under 0.001 mm for 3 iterations (<code>:346-348,585-586</code>);</li>
-        <li><strong>normal sign</strong>: the run is done with the CBCT normals read both ways, and the reading with the better fitness, then the lower RMSE, is kept (<code>:600-651</code>);</li>
-        <li><strong>floor</strong>: an ICP that matched under 5% of the arch is an error for that mesh, so an unregistered mesh is never written under a registered name (<code>MIN_ICP_FITNESS = 0.05</code>, <code>ioscbct/pipeline.py:192-202</code>);</li>
-        <li><strong>drift</strong>: the RMS of the fitted landmarks before and after the ICP goes to the report, with a warning above 1 mm (<code>ioscbct/pipeline.py:215-244</code>).</li>
-      </ul>
-      <p>The final matrix is <code>refinement @ matrix</code>, the ICP composed after the landmark fit (<code>ioscbct/pipeline.py:212</code>). Without a surface (the volume could not be contoured) the mesh is placed on its landmarks only and <code>icp</code> stays <code>null</code> in the report (<code>ioscbct/pipeline.py:184-185</code>).</p>
+      <p>The ICP refines what the landmarks started. The part of the CBCT surface kept as a target is a box around the arch&rsquo;s landmarks plus 25&nbsp;mm; the points of the mesh that move are the <strong>crowns</strong> only (the <a class="gterm" data-term="areg-ioscbct-gingiva-visor" href="AREG_IOSCBCT.code.html#icp" title="See the code">gingiva</a> has no counterpart in a CBCT), when the mesh carries tooth labels and at least 10% of it is crown.</p>
+
+      <figure class="algo" data-scene="ioscbct_icp" data-ms="8200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a line of mesh points close to a wavy CBCT surface; each looks up its nearest surface point within a small ring and the points slide along the surface until they settle"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Each point of the tooth crowns looks for its nearest point on the CBCT surface, within 1&nbsp;mm. Only the distance <em>along the <a class="gterm" data-term="areg-ioscbct-normals-visor" href="AREG_IOSCBCT.code.html#icp" title="See the code">surface normal</a></em> counts: the mesh can slide along a smooth surface and is held only where the two really differ. Rounds repeat until the points stop moving.</p><div class="formula"><math display="block"><mrow><munder><mo>min</mo><mrow><mi class="k4">&#x3c9;</mi><mo>,</mo><mi class="k4">t</mi></mrow></munder><munder><mo>&#x2211;</mo><mi class="k1">i</mi></munder><msup><mrow><mo stretchy="true" fence="true">(</mo><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k1">p</mi><mi class="k1">i</mi></msub><mo>&#x2212;</mo><msub><mi class="k2">q</mi><mi class="k1">i</mi></msub><mo stretchy="true" fence="true">)</mo></mrow><mo>&#xb7;</mo><msub><mi class="k3">n</mi><mi class="k1">i</mi></msub><mo>+</mo><mi class="k4">&#x3c9;</mi><mo>&#xb7;</mo><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k1">p</mi><mi class="k1">i</mi></msub><mo>&#xd7;</mo><msub><mi class="k3">n</mi><mi class="k1">i</mi></msub><mo stretchy="true" fence="true">)</mo></mrow><mo>+</mo><mi class="k4">t</mi><mo>&#xb7;</mo><msub><mi class="k3">n</mi><mi class="k1">i</mi></msub><mo stretchy="true" fence="true">)</mo></mrow><mn>2</mn></msup></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p<sub>i</sub></b>a point of the mesh crowns</li><li class="k2"><b>q<sub>i</sub></b>its nearest point on the CBCT surface</li><li class="k3"><b>n<sub>i</sub></b>the CBCT surface normal at q<sub>i</sub></li><li class="k4"><b>&omega;, t</b>a small rotation and a translation, the six unknowns of the step</li></ul></div>
+      </figure>
+      <figure class="algo" data-scene="ioscbct_normals" data-ms="6400">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a mesh point sits between an upper and a lower arch; its nearest neighbour on the lower arch is refused because the two normals point in opposite directions, the one on its own arch is kept"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">In a closed bite the two arches face each other, 1 to 3&nbsp;mm apart, inside the 1&nbsp;mm window of a displaced mesh. The upper surface points down and the lower one points up, so a neighbour is kept only if the two normals agree by more than 0.5. The ICP is run with the CBCT normals read both ways, and the reading that matches more of the arch wins.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">n</mi><mi class="k1">p</mi></msub><mo>&#xb7;</mo><msub><mi class="k2">n</mi><mi class="k2">q</mi></msub><mo>&gt;</mo><mn>0.5</mn></mrow></math></div><ul class="algo-legend"><li class="k1"><b>n<sub>p</sub></b>normal at a point of the mesh</li><li class="k2"><b>n<sub>q</sub></b>normal at the CBCT point found for it (+1: same direction, -1: opposite)</li></ul></div>
+      </figure>
+
+      <p>The ICP stops when the largest shift stays under a thousandth of a millimetre for 3 rounds, or after 300. An ICP that matched under 5% of the arch is an error for that mesh, so an unregistered mesh is never written under a registered name. After the ICP, the tool compares the landmarks before and after: more than 1&nbsp;mm of drift is reported as a warning. The final matrix is the ICP composed after the landmark fit.</p>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#icp"><b>In the code</b><span>The seven rules of the ICP, the fallback step and the report fields</span></a>
 
       <h3 id="visor-io">3.6 Outputs and the report</h3>
 
-      <p>The tool returns one path, so there are no named outputs: the output folder is archived. Per patient key and per mesh (<code>ioscbct/dispatch.py:251-261</code>):</p>
-      <pre><code>&lt;output_dir&gt;/&lt;patient key&gt;/
-    &lt;mesh stem&gt;_&lt;suffix&gt;.vtk            # mesh moved into the CBCT frame, arrays kept, binary
-    &lt;mesh stem&gt;_&lt;suffix&gt;_matrix.npy     # the composed 4x4, numpy
-AREG_report.json</code></pre>
-      <p>No <code>.tfm</code> and no re-saved landmarks. The mesh is read and written with pyvista so the <code>Universal_ID</code> labels travel with it (<code>ioscbct/dispatch.py:35-54</code>). The patient folder is named by the digit key, so <code>P001</code> results land in <code>1/</code>.</p>
-      <pre><code>{"modality": "IOSCBCT", "automation": "Registration", "output_suffix": "Reg",
- "unpaired": {"&lt;key&gt;": "no CBCT" | "no intraoral scan"},
- "patients": {"&lt;key&gt;": {"cbct": "&lt;file&gt;", "status": "ok",
-     "cbct_surface_error": "...",                       # only if contouring failed
-     "meshes": {"&lt;mesh&gt;": {"status": "ok", "output": "...",
-         "landmarks_used": [...], "landmarks_dropped": [...],
-         "prealignment": {"accepted": true, "reason": null,
-                          "landmarks_fitted": [...], "residual_mm": 0.62, "spread": 0.42},
-         "icp": {"fitness": ..., "inlier_rmse": ..., "iterations": ..., "settled": ...,
-                 "rejected_by_normal": ..., "sign": ...,
-                 "landmark_rms_before_mm": ..., "landmark_rms_after_mm": ...}}}}},
- "duration_seconds": ...}</code></pre>
-      <p>Keys from <code>ioscbct/dispatch.py:214,230-267,360</code>, <code>ioscbct/pipeline.py:178-212</code> and <code>ioscbct/geometry.py:588-597</code>. The values shown for <code>prealignment</code> are those of the lower arch of the test set (observed); the others are left out.</p>
+      <p>For each patient, a folder named by the digit key holds the registered meshes (<code>.vtk</code>, with their tooth labels kept) and, for each, its composed 4&times;4 matrix as a numpy file. There is no <code>.tfm</code> and no re-saved landmark file. <code>AREG_report.json</code> lists, per mesh, the landmarks used and dropped, whether the pre-alignment was accepted and its residual, and the ICP statistics. A volume that cannot be contoured does not stop the run: the meshes are then placed on their landmarks only and the report says the ICP did not run.</p>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#visor-io"><b>In the code</b><span>The output tree, the report keys and the file writers</span></a>
 
-      <h2 id="visor-args">4. Arguments and schema</h2>
+      <h2 id="visor-args">4. What you can choose</h2>
 
-      <p>Types and defaults are those of the published schema (observed: <code>scripts/describe.py</code>); layout comes from <code>ioscbct/layout.py</code>. The four model arguments opt out of the hosted-model convention, which would hand them the whole <code>models/</code> folder; each callee resolves its own weights (<code>VISOR-serve server/deployment.toml:74-85</code>). <code>keep_intermediate</code> and <code>stop_after</code> are injected by the server and hidden (<code>ioscbct/layout.py:25,32</code>).</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Argument</th><th>Published type</th><th>Default</th><th>Widget and rule</th></tr></thead>
-          <tbody>
-            <tr><td><code>ios</code></td><td>path, required, <code>.stl .vtk</code></td><td>–</td><td>&ldquo;Intraoral scans&rdquo;, one folder searched recursively (<code>ioscbct/layout.py:34</code>)</td></tr>
-            <tr><td><code>cbct</code></td><td>path, required, volume extensions</td><td>–</td><td>&ldquo;<a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> volumes&rdquo; (<code>ioscbct/layout.py:35</code>)</td></tr>
-            <tr><td><code>output_dir</code></td><td>path, required</td><td>–</td><td>not shown; filled by the server</td></tr>
-            <tr><td><code>automation</code></td><td>str, 3 choices</td><td><code>Registration</code></td><td>drop-down (<code>ioscbct/layout.py:44</code>); the default is the mode that needs no other tool (<code>ioscbct/__init__.py:72-73</code>)</td></tr>
-            <tr><td><code>ios_landmarks</code>, <code>cbct_landmarks</code></td><td>path, <code>.json .mrk.json</code></td><td>empty</td><td>pickers, Registration mode only (<code>ioscbct/layout.py:46-50</code>); both required there (<code>ioscbct/dispatch.py:341-346</code>)</td></tr>
-            <tr><td><code>cbct_reference</code></td><td>path</td><td>empty</td><td>hidden; Fully-Automated; empty means <code>DATA/AREG/models/CBCT_Gold_Frankfurt_Horizontal_Midsagittal_Plane</code> (<code>ioscbct/dispatch.py:190-199,317-331</code>)</td></tr>
-            <tr><td><code>landmark_model</code>, <code>ios_landmark_model</code>, <code>crown_model</code></td><td>path</td><td>empty</td><td>hidden; shown only in Semi and Fully (<code>ioscbct/layout.py:56-69</code>)</td></tr>
-            <tr><td><code>max_dist</code></td><td>float</td><td><code>0.0</code></td><td>hidden (<code>ioscbct/layout.py:84</code>); 0 means 1.0 mm (<code>ioscbct/dispatch.py:352</code>, <code>ioscbct/geometry.py:338</code>); its docstring says otherwise, see <a href="#visor-findings">Findings</a></td></tr>
-            <tr><td><code>output_suffix</code></td><td>str</td><td><code>Reg</code></td><td>text field (<code>ioscbct/layout.py:85</code>); a path separator is refused (<code>ioscbct/dispatch.py:290-292</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>No argument sets the <a class="gterm" data-term="isosurface" href="../../glossary.html#g-isosurface" title="See glossary">isosurface</a> level (see <a href="#visor-findings">Findings</a>). The client adds nothing specific to these fields: the panel is generated from the schema.</p>
+      <ul>
+        <li><strong>The folders</strong>: one of intraoral scans, one of <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> volumes; every scan format is read, recursively.</li>
+        <li><strong>The mode</strong>: Registration (you supply two <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> files), Semi-Automated or Fully-Automated.</li>
+        <li><strong>The landmark files</strong>, in Registration mode only, one set for the meshes and one for the CBCTs.</li>
+        <li><strong>The models</strong>, only in the two other modes; each tool called finds its own weights when none is named.</li>
+        <li><strong>The suffix</strong> of the output names (<code>Reg</code> by default).</li>
+      </ul>
+      <p>Nothing sets the <a class="gterm" data-term="areg-ioscbct-level-visor" href="AREG_IOSCBCT.code.html#surface-cbct" title="See the code">contour level</a> or the <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> distance in the panel: they are read off the scan and fixed at 1&nbsp;mm.</p>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#visor-args"><b>In the code</b><span>Every argument with its type, default and rule, and the schema</span></a>
 
       <h2 id="predicted">5. What is predicted vs computed</h2>
 
+      <p>Everything inside the engine is computed. The <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> and the labels are predicted by other tools, or supplied by you.</p>
+
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where it runs</th></tr></thead>
+          <thead><tr><th>Block</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td><a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> orientation (ASO, through ALI_CBCT)</td><td><span class="badge predit">predicted</span> <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>, <span class="badge calcule">computed</span> fit onto the reference, see <a href="../ASO/ASO.html">ASO on VISOR</a></td><td>separate tools, Fully-Automated</td></tr>
-            <tr><td>Crown labels (Crown_Seg)</td><td><span class="badge predit">predicted</span> network, see <a href="../Crown_Seg/Crown_Seg.html">Crown_Seg on VISOR</a></td><td>separate tool</td></tr>
-            <tr><td>Intraoral landmarks (ALI_IOS)</td><td><span class="badge predit">predicted</span> network, see <a href="../ALI/ALI.html">ALI on VISOR</a></td><td>separate tool, unless sent</td></tr>
-            <tr><td>CBCT landmarks (ALI_CBCT)</td><td><span class="badge predit">predicted</span> network</td><td>separate tool, unless sent</td></tr>
-            <tr><td>Surface level and contour</td><td><span class="badge calcule">computed</span> medians of the scan, <a class="gterm" data-term="marching-cubes" href="../../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a></td><td>engine</td></tr>
-            <tr><td>Landmark fit</td><td><span class="badge calcule">computed</span> closed-form rigid fit, trimming</td><td>engine</td></tr>
-            <tr><td><a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a></td><td><span class="badge calcule">computed</span> point-to-plane, KD-tree</td><td>engine, CPU</td></tr>
+            <tr><td><a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> orientation, crown labels, landmarks</td><td><span class="badge predit">predicted</span> by other tools (<a href="../ASO/ASO.html">ASO</a>, <a href="../Crown_Seg/Crown_Seg.html">Crown_Seg</a>, <a href="../ALI/ALI.html">ALI</a>), unless you send the landmarks</td></tr>
+            <tr><td><a class="gterm" data-term="areg-ioscbct-level-visor" href="AREG_IOSCBCT.code.html#surface-cbct" title="See the code">Surface level</a> and contour</td><td><span class="badge calcule">computed</span> medians of the scan, <a class="gterm" data-term="marching-cubes" href="../../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a></td></tr>
+            <tr><td>Landmark fit</td><td><span class="badge calcule">computed</span> closed-form rigid fit, <a class="gterm" data-term="areg-ioscbct-trimming-visor" href="AREG_IOSCBCT.code.html#correspondance" title="See the code">trimming</a></td></tr>
+            <tr><td><a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a></td><td><span class="badge calcule">computed</span> point-to-plane, KD-tree, on the CPU</td></tr>
           </tbody>
         </table>
       </div>
 
       <figure class="diagram">
         <svg viewBox="0 0 960 150" role="img" aria-label="The Fully-Automated chain coloured by nature: landmarks and labels predicted by other tools, everything inside the engine computed.">
+          <a class="d-link" href="#upstream">
           <rect class="d-box-n" x="10" y="20" width="200" height="56" rx="6"/>
           <text class="d-label" x="110" y="43" text-anchor="middle">Labels, landmarks</text>
           <text class="d-label-s" x="110" y="60" text-anchor="middle">Crown_Seg, ALI ×2</text>
+          </a>
           <path class="d-arrow" d="M210 48 H230"/><path class="d-arrow-head" d="M237 48 l-7 -4 v8 z"/>
+          <a class="d-link" href="#surface-cbct">
           <rect class="d-box" x="239" y="20" width="200" height="56" rx="6"/>
           <text class="d-label" x="339" y="43" text-anchor="middle">Surface level</text>
           <text class="d-label-s" x="339" y="60" text-anchor="middle">read off the scan</text>
+          </a>
           <path class="d-arrow" d="M439 48 H459"/><path class="d-arrow-head" d="M466 48 l-7 -4 v8 z"/>
+          <a class="d-link" href="#correspondance">
           <rect class="d-box-a" x="468" y="20" width="220" height="56" rx="6"/>
           <text class="d-label" x="578" y="43" text-anchor="middle">Landmark fit</text>
           <text class="d-label-s" x="578" y="60" text-anchor="middle">rigid, trimmed</text>
+          </a>
           <path class="d-arrow" d="M688 48 H708"/><path class="d-arrow-head" d="M715 48 l-7 -4 v8 z"/>
+          <a class="d-link" href="#icp">
           <rect class="d-box-a" x="717" y="20" width="233" height="56" rx="6"/>
           <text class="d-label" x="833" y="43" text-anchor="middle">ICP</text>
           <text class="d-label-s" x="833" y="60" text-anchor="middle">point-to-plane, crowns</text>
+          </a>
 
           <rect class="d-box" x="10" y="108" width="26" height="18" rx="3"/>
           <text class="d-label-s" x="44" y="122">computed</text>
@@ -507,86 +467,40 @@ AREG_report.json</code></pre>
 
       <h2 id="environment">6. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Value</th></tr></thead>
-          <tbody>
-            <tr><td>Python</td><td><code>requires-python = "&gt;=3.11,&lt;3.12"</code> (<code>SADT-VISOR tools/AREG/AREG_IOSCBCT/pyproject.toml:5</code>)</td></tr>
-            <tr><td>Dependencies</td><td><code>sadt-areg-common</code>, <code>pyvista&gt;=0.45</code>, <code>SimpleITK==2.5.6</code>, <code>numpy==2.3.2</code>, <code>scipy==1.16.2</code>, <code>vtk==9.6.2</code> (<code>pyproject.toml:16-26</code>), locked in <code>uv.lock</code>. pyvista is raised from the 0.44.2 the legacy carried, because 0.44 pins an older vtk (<code>pyproject.toml:18-21</code>). No torch: the comment in <code>ioscbct/__init__.py:12-14</code> explains that holding both callee stacks would need torch 2.8 and 2.11 in one environment</td></tr>
-            <tr><td>Data the deployment holds</td><td>the Frankfurt orientation reference under <code>DATA/AREG/models/</code> (<code>ioscbct/dispatch.py:190-199</code>); the two published test sets (<code>VISOR-serve scripts/data-manifest.yml:356-365</code>), offered through four <code>testfile:IOSCBCT_*</code> entries (<code>server/deployment.toml:85</code>)</td></tr>
-            <tr><td>Resources and timeouts</td><td>none declared; the deployment comment measures the chain at about 52 + 45 + 45 + 15 s and leaves the timeout unset (<code>server/deployment.toml:70-73</code>); global timeout 0, no limit (<code>server/config.py:77</code>)</td></tr>
-            <tr><td>GPU</td><td>none in the engine. The KD-tree queries use every core (<code>workers=-1</code>, <code>ioscbct/geometry.py:543</code>). The callees use their own</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The engine runs on the CPU in its own Python environment, with <code>pyvista</code>, <code>SimpleITK</code>, <code>numpy</code>, <code>scipy</code> and <code>vtk</code>; it imports no <code>torch</code> and no GPU library. Its nearest-neighbour queries use every core. It declares no time limit.</p>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#environment"><b>In the code</b><span>The pinned versions, the data the server holds and the timeouts</span></a>
 
       <h2 id="visor-changes">7. What changed from the legacy logic</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Subject</th><th>Legacy (3c67957)</th><th>VISOR (6ba2a78)</th></tr></thead>
-          <tbody>
-            <tr><td>Where it runs</td><td>Slicer CLI <code>areg_ioscbct</code>, chained by the <code>AREG</code> widget</td><td>server engine reached through the facade <code>AREG</code></td></tr>
-            <tr><td>Inputs</td><td>four flat folders (<code>os.listdir</code>), <code>.vtk</code> and <code>.nii.gz</code> only, one <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> file per jaw (<code>AREG_IOSCBCT.py:1051-1171</code>)</td><td>recursive and sorted, <code>.vtk .stl</code>, every scan format (<code>ioscbct/pipeline.py:55-87</code>)</td></tr>
-            <tr><td>Patient key</td><td>letters and digits normalised, plus a timepoint <code>[Tt][0-2]</code>; a <code>T3</code> file is skipped (<code>AREG_IOSCBCT.py:1061-1113</code>)</td><td>the digits of all tokens except <code>t0 t1 t2</code>, leading zeros removed; the timepoint no longer enters the key (<code>ioscbct/pipeline.py:30-52</code>)</td></tr>
-            <tr><td>Shared landmarks</td><td><code>_pair_landmarks</code>, common labels (<code>AREG_IOSCBCT.py:203-213</code>)</td><td><code>shared_landmarks</code>, common labels, at least 3 (<code>ioscbct/pipeline.py:136-155</code>); sets of different size are refused (<code>ioscbct/geometry.py:47-51</code>)</td></tr>
-            <tr><td>Pre-alignment</td><td><code>_fit_rigid_without_outliers</code>, skipped with a log line when the residual is too high (<code>AREG_IOSCBCT.py:309-460</code>)</td><td>landmarks judged not to lie on a tooth are set aside first, outliers removed one by one (a pair more than 3 mm off whose removal cuts the residual by at least 25%), never below 4 pairs, refused above 10 mm of residual, a warning when the landmarks are nearly in a line; the verdict goes to the report (<code>ioscbct/geometry.py:168-190,212-322</code>)</td></tr>
-            <tr><td><a class="gterm" data-term="isosurface" href="../../glossary.html#g-isosurface" title="See glossary">Isosurface</a> level</td><td>read off the scan, 400 as fallback, environment override (<code>AREG_IOSCBCT.py:92,847-966</code>)</td><td>same rule and fallback (<code>ioscbct/volume.py:36,96-117,148-175</code>); the override is gone</td></tr>
-            <tr><td><a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a></td><td>point-to-plane, <code>max_dist=1.0</code> at the call sites (the signature says 1.5), 25 mm crop of the <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> around the landmarks (<code>AREG_IOSCBCT.py:71,719,1240-1253</code>)</td><td>the same: 1.0 mm, 25 mm, a floor of 5% matched, rejection by normals, both readings of the normal sign, crowns only when <code>Universal_ID</code> is present with labels 0 and 33 as gingiva (<code>ioscbct/geometry.py:338-372,453,600</code>, <code>ioscbct/pipeline.py:192-202</code>)</td></tr>
-            <tr><td>Arches</td><td>upper and lower always registered together; both landmark files required (<code>AREG_IOSCBCT.py:1203-1214</code>)</td><td>each mesh registered alone; a mesh without landmarks fails alone; relative occlusion still unconstrained (<code>ioscbct/dispatch.py:238-264</code>)</td></tr>
-            <tr><td>Outputs</td><td><code>&lt;id&gt;_Reg_U.vtk</code>, <code>_Reg_L.vtk</code> and re-saved landmarks <code>_lm_Reg_*.mrk.json</code> (<code>AREG_IOSCBCT.py:804-833</code>)</td><td><code>&lt;patient&gt;/&lt;stem&gt;_&lt;suffix&gt;.vtk</code> and <code>_matrix.npy</code>; no re-saved landmarks, no <code>.tfm</code></td></tr>
-            <tr><td>CBCT orientation</td><td>resampling, PRE_ASO_CBCT, ALI_CBCT and SEMI_ASO_CBCT as separate Slicer modules (<code>AREG/AREG_Method/IOSCBCT.py:580-700</code>)</td><td>one call to ASO, Fully-Automated, Frankfurt reference resolved by the tool (<code>ioscbct/tools.py:159-177</code>)</td></tr>
-            <tr><td>Intraoral orientation</td><td>PRE_ASO_IOS onto a gold file in Fully-Automated mode (<code>AREG/AREG_Method/IOSCBCT.py:580</code>)</td><td>none: the meshes are labelled, never oriented; the landmark fit alone brings them near (<code>ioscbct/dispatch.py:332-339</code>)</td></tr>
-            <tr><td>Crown segmentation</td><td><code>CrownSegmentationcli</code> through conda (<code>AREG/AREG.py:2865</code>)</td><td>the Crown_Seg tool (<code>ioscbct/tools.py:102-119</code>)</td></tr>
-            <tr><td>Review page</td><td>a view-only review pause after the registration</td><td>none: <code>stop_after</code> hidden (<code>ioscbct/layout.py:32</code>)</td></tr>
-            <tr><td>Scratch folder</td><td>output sub-folders of each step, next to the results</td><td><code>.areg_work/</code>, removed in a <code>finally</code> (<code>ioscbct/dispatch.py:306-358</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The rules are the same: same level, same fit, same <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a>. What changed is the wrapping.</p>
+      <ul>
+        <li><strong>Where it runs</strong>: a server engine behind the AREG form, not a Slicer command-line module.</li>
+        <li><strong>Pairing</strong>: by the digits of the names, recursively, and with every scan format; the legacy matched letters plus digits and a time point, in flat folders, and skipped a <code>T3</code>.</li>
+        <li><strong>Arches</strong>: each mesh is registered alone; the legacy demanded both arches of a patient.</li>
+        <li><strong>Pre-alignment</strong>: the verdict of the fit goes to the report, instead of a log line.</li>
+        <li><strong>Outputs</strong>: the mesh and a matrix per mesh; no re-saved <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> files.</li>
+        <li><strong>The <a class="gterm" data-term="areg-ioscbct-level-visor" href="AREG_IOSCBCT.code.html#surface-cbct" title="See the code">contour level</a></strong> can no longer be overridden.</li>
+        <li><strong>The orientation of the <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a></strong> is one call to ASO; the intraoral meshes are not oriented at all.</li>
+      </ul>
+      <a class="deep-link" href="AREG_IOSCBCT.code.html#visor-changes"><b>In the code</b><span>The same table with legacy and VISOR file:line references</span></a>
 
-      <h2 id="visor-findings">8. Findings in VISOR</h2>
+      <h2 id="visor-findings">8. Known issues in VISOR</h2>
 
-      <div class="callout warn">
-        <div class="callout-title">Patients and time points that differ only by letters are merged</div>
-        <p><code>patient_key</code> keeps the digits and nothing else (<code>ioscbct/pipeline.py:30-52</code>). Observed on 6ba2a78: <code>A12_T1_Upper.vtk</code>, <code>B12_T1_Upper.vtk</code> and <code>P1_visit2_U.vtk</code> all give <code>'12'</code>, while <code>P001_T2_U.vtk</code> and <code>P_0001_T2.nii.gz</code> both give <code>'1'</code>, which is intended. With four meshes <code>P001_T1_{U,L}.vtk</code> and <code>P001_T2_{U,L}.vtk</code> beside three CBCTs <code>P_0001_T1.nii.gz</code>, <code>P_0001_T2.nii.gz</code> and <code>Q001_T1.nii.gz</code>, <code>discover</code> returned a single patient <code>'1'</code> holding the four meshes and the first <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> in sort order, and an empty <code>unpaired</code>: the other two CBCTs disappeared unreported (<code>setdefault</code>, <code>ioscbct/pipeline.py:74,81</code>). <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">Landmark</a> files are narrowed to the patient key, then matched to a mesh by the jaw token alone, the first in sort order winning: observed, the landmark set picked for <code>P001_T2_L.vtk</code> among <code>P001_T1_L</code> and <code>P001_T2_L</code> was the T1 one (<code>_for_patient</code> and <code>_match_landmarks</code>, <code>ioscbct/dispatch.py:111-175</code>). The tool is documented as not longitudinal (<code>ioscbct/__init__.py:3-7</code>) but nothing enforces it or reports it.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">The <a class="gterm" data-term="isosurface" href="../../glossary.html#g-isosurface" title="See glossary">isosurface</a> level can no longer be set</div>
-        <p>The legacy accepted <code>AREG_CBCT_SURFACE_THRESHOLD</code> (<code>AREG_IOSCBCT.py:92,943-950@3c67957</code>). VISOR keeps the rule and the fallback of 400, and the warning it logs on falling back advises to &ldquo;pass a level explicitly&rdquo; (<code>ioscbct/volume.py:96-112</code>), but the only caller never does: <code>volume.read(scan_path, merged)</code> (<code>ioscbct/dispatch.py:77</code>) and <code>run()</code> has no such argument. Read in code.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">On the published test scan the level is 1464, not 400</div>
-        <p>Observed with the tool's own functions on <code>P_0001_T2_Or.nii.gz</code> and its 12 CBCT landmarks: enamel 2783, soft tissue 146, level 1464 (<code>ioscbct/volume.py:96-117</code>). At that level <code>UL3O</code> (brightest 274) is judged off enamel, and the landmark fit of the upper arch is made without it (<code>ioscbct/geometry.py:229-236</code>). So &ldquo;400&rdquo; is only what VISOR uses when it cannot read a scan, and the surface any figure draws at 400 is not the one the VISOR <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> registers on. The viewer in <a href="#correspondance">3.4</a> says so.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">The documentation of <code>max_dist</code> is wrong</div>
-        <p>The docstring says that 0 uses 1.5, &ldquo;which is upstream's&rdquo; (<code>ioscbct/__init__.py:83-85</code>). The code uses <code>ICP_MAX_DIST_MM = 1.0</code> (<code>ioscbct/dispatch.py:352</code>, <code>ioscbct/geometry.py:338</code>), with a comment saying that upstream's signature says 1.5 and every call site passes 1.0 (<code>ioscbct/geometry.py:335-338</code>). <code>DEFAULT_MAX_DIST = 1.5</code> is the default of <code>icp_point_to_point</code> alone (<code>ioscbct/geometry.py:25,77-78</code>), a function no module of the engine calls (grep: only <code>tests/test_geometry.py</code> does); the fallback the ICP actually uses is <code>_point_to_point_step</code>, which takes no distance (<code>ioscbct/geometry.py:509-521,576-577</code>). The field is hidden in the panel (<code>ioscbct/layout.py:84</code>), so the wrong sentence reaches API users only.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">A kept estimator describes an upstream that no longer exists</div>
-        <p>The docstring of <code>icp_point_to_point</code> says it was renamed from upstream's <code>run_icp_point_to_plane</code> because that function computes point-to-point (<code>ioscbct/geometry.py:81-86</code>), and the comment above the ICP constants says it is kept as the fallback for a degenerate system (<code>ioscbct/geometry.py:331-334</code>). At 3c67957 upstream's <code>run_icp_point_to_plane</code> has a real point-to-plane step (<code>AREG_IOSCBCT.py:579-608,719</code>), and in VISOR the degenerate case falls back to <code>_point_to_point_step</code>, not to this function. Harmless, but misleading for whoever compares the two code bases. Read in code.</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">The pre-alignment verdict is data, not a log line</div>
-        <p>Each mesh carries <code>prealignment</code> (accepted or not, why, landmarks fitted, residual, spread) and the ICP statistics, including the drift of the landmarks before and after (<code>ioscbct/pipeline.py:158-212</code>). A volume that cannot be contoured does not stop the run: the meshes are placed on their landmarks and the report says that the ICP did not run (<code>ioscbct/dispatch.py:57-84</code>). Read in code.</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">The scratch folder is always removed</div>
-        <p>Unlike AREG_CBCT and AREG_IOS, the engine wraps its work in a <code>try/finally</code> that deletes <code>.areg_work/</code> (<code>ioscbct/dispatch.py:306-358</code>). Read in code.</p>
-      </div>
+      <ul>
+        <li>Patients whose names differ only by letters are merged into one, and a second <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> of the same number can disappear without a word (<a href="AREG_IOSCBCT.code.html#f-patients-and-time-points-that-differ-only-by-let">details</a>).</li>
+        <li>The <a class="gterm" data-term="areg-ioscbct-level-visor" href="AREG_IOSCBCT.code.html#surface-cbct" title="See the code">contour level</a> can no longer be set by hand, although a warning still advises it (<a href="AREG_IOSCBCT.code.html#f-the-isosurface-level-can-no-longer-be-set">details</a>).</li>
+        <li>On the published test scan the level is 1464, not 400, so any figure drawn at 400 shows more bone than the <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> sees (<a href="AREG_IOSCBCT.code.html#f-on-the-published-test-scan-the-level-is-1464-not">details</a>).</li>
+        <li>The documentation of <code>max_dist</code> says 1.5 and the code uses 1.0 (<a href="AREG_IOSCBCT.code.html#f-the-documentation-of-max-dist-is-wrong">details</a>).</li>
+        <li>A comment in the code describes an upstream function that no longer matches the legacy (<a href="AREG_IOSCBCT.code.html#f-a-kept-estimator-describes-an-upstream-that-no-l">details</a>).</li>
+      </ul>
+      <p>Two things work well: the verdict on each pre-alignment is data in the report, and the scratch folder is always removed.</p>
 
       <h2 id="literature">9. Literature</h2>
 
-      <p>No paper covers AREG_IOSCBCT as implemented in either code base; the methodological neighbourhood and the group's related publications are listed on <a href="../../AREG_IOSCBCT/SOURCES.html">its sources page</a> and in <a href="../../AREG_IOSCBCT/AREG_IOSCBCT.html#litterature">section 8 of the legacy page</a>.</p>
+      <p>No paper covers AREG_IOSCBCT as implemented in either code base; the methodological neighbourhood and the group&rsquo;s related publications are listed on <a href="../../AREG_IOSCBCT/SOURCES.html">its sources page</a> and in <a href="../../AREG_IOSCBCT/AREG_IOSCBCT.html#litterature">section 8 of the legacy page</a>.</p>
 
       <footer class="footer">
-        <a href="../../index.html">← All pages</a> · <a href="../../AREG_IOSCBCT/AREG_IOSCBCT.html">Legacy page for this tool</a> · <a href="../guide/AREG_IOSCBCT.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a> · <a href="../architecture.html">Architecture</a>
+        <a href="../../index.html">← All pages</a> · <a href="AREG_IOSCBCT.code.html">Code page</a> · <a href="../../AREG_IOSCBCT/AREG_IOSCBCT.html">Legacy page for this tool</a> · <a href="../guide/AREG_IOSCBCT.html">Guide with VISOR</a> · <a href="../index.html">VISOR overview</a> · <a href="../architecture.html">Architecture</a>
       </footer>
 
     </article>
@@ -596,5 +510,7 @@ AREG_report.json</code></pre>
 <script src="../../../assets/scene3d.js"></script>
 <script src="../../../assets/aregios-mesh.js"></script>
 <script src="../../../assets/aregios-3d-visor.js"></script>
+<script src="../../../assets/algo.js"></script>
+<script src="../../../assets/algo-AREG_IOSCBCT.js"></script>
 </body>
 </html>

@@ -23,6 +23,7 @@
     <div class="sec-switch" role="group">
       <a href="../guide/CNE.html">Guide</a>
       <a href="../CNE/CNE.html" aria-current="true">Atlas</a>
+      <a href="../CNE/CNE.code.html">Code</a>
     </div>
     <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="legacy">
@@ -122,555 +123,272 @@
         <img class="tool-icon" src="../../assets/screens/CNE/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Text &amp; language</div>
         <h1>CNE</h1>
-        <p class="lede">A language-model (LLM) inference module that reads free-text clinical notes and extracts key–value pairs from them: it is neither a geometric tool nor an image-processing one, despite its place in a suite of dental tools.</p>
+        <p class="lede">CNE reads free-text clinical notes and writes the facts it finds in them (symptoms, diagnoses, scores) as a list of <em>field : value</em> lines. It is a language-model module: it touches no image and no mesh. This page explains the pipeline of the legacy Slicer module step by step; the code details are on <a href="CNE.code.html">the code page</a>.</p>
         <div class="meta-row">
           <a class="badge nopaper" href="SOURCES.html" title="Unpublished: no paper and no evaluation; the Hugging Face repositories have a model card but report no results.">unpublished</a>
           <a class="badge neutral" href="../visor/CNE/CNE.html">VISOR</a>
           <span class="badge cli">CNE_CLI</span>
           <span class="badge neutral">no conda: Slicer's Python</span>
           <a class="badge neutral" href="SOURCES.html">Bibliography</a>
+          <a class="badge neutral" href="CNE.code.html">Code (developers)</a>
+          <a class="badge neutral" href="../guide/CNE.html">Guide</a>
         </div>
       </header>
 
-      <p><strong>Scope warning.</strong> Unlike <a href="../AutoCrop3D/AutoCrop3D.html">AutoCrop3D</a> and <a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a>, CNE
-      is not a geometric utility: it touches no volume, no mesh, no
-      coordinate. It is an <strong>LLM inference module</strong> that reads free-text clinical
-      notes and writes key–value pairs. At the core of the module sits a quantized
-      <a class="gterm" href="../glossary.html#g-gguf" title="See in the glossary">GGUF</a> model loaded by <code>llama-cpp-python</code> inside Slicer's Python.</p>
+      <p>CNE is not a geometric tool: it reads text and writes text. A quantised language model (<a class="gterm" data-term="gguf" href="../glossary.html#g-gguf" title="See glossary">GGUF</a> format) is loaded by llama-cpp-python inside Slicer&rsquo;s own Python. This page describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port runs the same tool on a server and has <a href="../visor/CNE/CNE.html">its own page</a>. One consequence matters before you read on: where this page says the model runs locally, that is true of the legacy module only. With VISOR the note text is sent to the server (<a href="../visor/CNE/CNE.html#visor-findings">known problems in VISOR</a>).</p>
 
-      <div class="callout note">
-        <div class="callout-title">Two code bases</div>
-        <p>Everything numbered below describes the legacy Slicer module
-        (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port, which runs the
-        same tool on a server, is described on its own page, <a href="../visor/CNE/CNE.html">CNE on VISOR</a>.
-        One consequence matters before you read on: where this page says the model runs
-        locally, that is true of the legacy module only. With VISOR the note text is sent to
-        the server (see <a href="../visor/CNE/CNE.html#visor-findings">Findings in VISOR</a>).</p>
+      <h2 id="apercu">Overview: what goes in, what comes out</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>CNE, legacy</th></tr></thead>
+          <tbody>
+            <tr><td>Input</td><td>a folder of notes (<code>.txt</code>, <code>.pdf</code>, <code>.docx</code>), not searched recursively, and a choice between <a class="gterm" data-term="tmj" href="../glossary.html#g-tmj" title="See glossary">TMJ</a> and Ortho</td></tr>
+            <tr><td>The model</td><td>a quantised Qwen 2.5 7B (TMJ) or Llama 3.1 8B (Ortho), downloaded on first use and run on the processor</td></tr>
+            <tr><td>Output</td><td>one text file per note, <em>field : value</em> lines, in the output folder</td></tr>
+            <tr><td>Optional</td><td>a <a class="gterm" data-term="cne-leg-dashboard" href="CNE.code.html#tableau-de-bord" title="See the code">Dashboard</a> button that reads those files and draws a figure and two CSV tables</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <h2 id="acronyme">0. The acronym</h2>
 
-      <p>The repository never spells out the acronym in any documentation: the README
-      contains no CNE section, and no longer documents the <a href="../MedX/MedX.html">MedX</a> it replaced either, neither name appears in it. The module's help text
-      (<code>CNE.py:157</code>) says only "This tool helps to create
-      summaries of clinical notes".</p>
+      <p>CNE stands for Clinical Notes Extraction. The repository never says so in its documentation: only two log lines and the name the tool announces to Slicer give the expansion.</p>
 
-      <p>Two log lines, and only those, give the expansion:
-      <code>logger.info("CNE (Clinical Notes Extraction)")</code>
-      (<code>CNE.py:342</code> and <code>CNE.py:663</code>), and the CLI
-      publishes the same name to the Slicer supervisor:
-      <code>&lt;filter-name&gt;Clinical Notes Extraction&lt;/filter-name&gt;</code>
-      (<code>CNE_CLI.py:93</code>). <strong>CNE = Clinical Notes Extraction</strong>,
-      attested by the code and by nothing else.</p>
+      <a class="deep-link" href="CNE.code.html#acronyme"><b>In the code</b><span>The log lines and filter name that attest the expansion</span></a>
 
       <h2 id="situation">1. Place in the pipeline</h2>
 
-      <p>Terminal module. Nothing calls it, and it calls no other module in the repository.
-      Declared in <code>CMakeLists.txt:50-52</code> (<code>CNE</code>, <code>CNE_CLI</code>, <code>CNE_Dashboard</code>).</p>
-
-      <p>It <strong>replaces the "Summarization" half of <a href="../MedX/MedX.html">MedX</a></strong>, which was
-      disabled from the build in March 2026 with the comment "Replaced by CNE".</p>
-
-      <div class="callout ok">
-        <div class="callout-title">Corrected since this page was written (legacy; Dashboard not in VISOR)</div>
-        <p><em>Legacy (3c67957). The MedX removal also holds for VISOR; the Dashboard does not
-        exist there: the string "dashboard" occurs neither in SADT-VISOR
-        <code>tools/CNE</code> nor in Remote <code>CNERemote/</code> (searched, not run; see
-        <a href="../visor/CNE/CNE.html#visor-status">CNE on VISOR</a>).</em>
-        This survey, dated September 2026, recorded two things here that have since
-        changed. <strong>MedX/ and MedX_CLI/ are no longer in the tree at all</strong>:
-        they were removed on 2026-09-17, the same day this page was written,
-        and kept on the <code>archive/medx</code> branch. And the "Dashboard" half
-        (<code>dashboard.png</code> + <code>patient_data.csv</code>), which this page said
-        had no equivalent and disappeared from the compiled extension, <strong>was ported
-        into CNE on 2026-10-12</strong>: <code>CNE_Dashboard</code> and
-        <code>CNE_CLI_utils</code> draw it from the <code>Extraction_*.txt</code> files CNE
-        writes, reached by a button beside Run (<code>CNE.py:234</code>,
-        <code>CNE.py:365</code>; §8.1). On 2026-10-16 the two model repositories moved from
-        <code>dcbia/...</code> to <code>DCBIA-OrthoLab/...</code> and the Ortho download was
-        repaired (§4).</p>
-      </div>
+      <p>CNE is a terminal module: nothing calls it and it calls nothing. It replaces the summarisation half of MedX, which was disabled from the build in March 2026 with the comment &ldquo;Replaced by CNE&rdquo;. MedX itself left the tree on 2026-09-17 and lives on the <code>archive/medx</code> branch. The <a class="gterm" data-term="cne-leg-dashboard" href="CNE.code.html#tableau-de-bord" title="See the code">Dashboard</a> half was ported into CNE on 2026-10-12 (<a href="#tableau-de-bord">section 8.1</a>); VISOR has no Dashboard.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 900 130" role="img" aria-label="Full chain: raw clinical note, text extraction and cleaning, GGUF model served by llama.cpp that predicts, extraction file as output">
+<a class="d-link" href="#entrees">
           <rect class="d-box" x="10" y="35" width="170" height="60" rx="6"/>
           <text class="d-label" x="95" y="60" text-anchor="middle">Clinical note</text>
           <text class="d-label-s" x="95" y="78" text-anchor="middle">.txt · .pdf · .docx</text>
+</a>
 
           <path class="d-arrow" d="M180 65 H213"/>
           <path class="d-arrow-head" d="M213 65 l-7 -4 v8 z"/>
 
+<a class="d-link" href="#entrees">
           <rect class="d-box" x="220" y="35" width="190" height="60" rx="6"/>
           <text class="d-label" x="315" y="60" text-anchor="middle">Text extraction</text>
           <text class="d-label-s" x="315" y="78" text-anchor="middle">+ clean_text()</text>
+</a>
 
           <path class="d-arrow" d="M410 65 H448"/>
           <path class="d-arrow-head" d="M448 65 l-7 -4 v8 z"/>
 
+<a class="d-link" href="#inference">
           <rect class="d-box-n" x="450" y="25" width="220" height="80" rx="6"/>
           <text class="d-label" x="560" y="55" text-anchor="middle">GGUF model</text>
           <text class="d-label-s" x="560" y="72" text-anchor="middle">llama.cpp · Q4_K_M</text>
           <text class="d-label-s" x="560" y="88" text-anchor="middle">, predicts</text>
+</a>
 
           <path class="d-arrow" d="M670 65 H708"/>
           <path class="d-arrow-head" d="M708 65 l-7 -4 v8 z"/>
 
+<a class="d-link" href="#sorties">
           <rect class="d-box" x="710" y="35" width="180" height="60" rx="6"/>
           <text class="d-label" x="800" y="60" text-anchor="middle">Extraction_&lt;note&gt;.txt</text>
           <text class="d-label-s" x="800" y="78" text-anchor="middle">key : value</text>
+</a>
         </svg>
-        <figcaption>From the raw clinical note to the extraction file: a single pass, with no chunking, through a GGUF model served locally by <a class="gterm" href="../glossary.html#g-llamacpp" title="See in the glossary">llama.cpp</a>.</figcaption>
+        <figcaption>From the raw clinical note to the extraction file: a single pass, with no chunking, through a <a class="gterm" data-term="gguf" href="../glossary.html#g-gguf" title="See glossary">GGUF</a> model served locally by <a class="gterm" href="../glossary.html#g-llamacpp" title="See in the glossary">llama.cpp</a>.</figcaption>
       </figure>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Difference from MedX Summarize</th><th>MedX</th><th>CNE</th></tr></thead>
-          <tbody>
-            <tr><td>Engine</td><td><code>transformers</code> + <code>torch</code></td><td><code>llama_cpp</code> (llama.cpp)</td></tr>
-            <tr><td>Model</td><td><a class="gterm" href="../glossary.html#g-bart" title="See in the glossary">BART</a> seq2seq, <code>.safetensors</code>, GitHub release <code>MedX/BART.zip</code></td><td>Quantized GGUF Llama-3.1-8B or Qwen-2.5-7B, Hugging Face</td></tr>
-            <tr><td>Note chunking</td><td><code>create_chunks_from_paragraphs(max_chunk_size=3500)</code> then concatenation of the summaries</td><td><strong>none</strong>: the whole note in a single message</td></tr>
-            <tr><td>Decoding</td><td>beam search 4, <code>no_repeat_ngram_size=3</code>, <code>repetition_penalty=2.0</code>, <code>temperature=0.6</code>, <code>top_p=0.95</code></td><td><code>temperature=0.1</code>, <code>max_tokens=500</code></td></tr>
-            <tr><td>Per-patient aggregation</td><td>yes, <code>patient_id = file_name.split("_")[0]</code></td><td>no, one file gives one output</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>Compared with the MedX summariser it replaces:</p>
 
-      <p>The system instruction is copied verbatim from MedX:
-      <code>"Using the following note, extract structured key-value pairs about the patient's symptoms and diagnoses:"</code>
-      (<code>CNE_CLI.py:24</code> against
-      <code>MedX_Summarize.py:55</code>, on the <code>archive/medx</code> branch where MedX
-      now lives).</p>
+      <ul>
+        <li><strong>Engine and model:</strong> llama.cpp and a quantised Llama or Qwen instead of PyTorch and a <a class="gterm" data-term="bart" href="../glossary.html#g-bart" title="See glossary">BART</a> model.</li>
+        <li><strong>No chunking:</strong> the whole note goes to the model in one message, where MedX cut it into pieces.</li>
+        <li><strong>Decoding:</strong> temperature 0.1 and at most 500 tokens, instead of beam search with sampling.</li>
+        <li><strong>No per-patient aggregation:</strong> one file gives one output.</li>
+      </ul>
+
+      <p>The one <a class="gterm" data-term="cne-leg-instruction" href="CNE.code.html#f-ortho-no-instruction" title="See the code">instruction sentence</a> of <a class="gterm" data-term="tmj" href="../glossary.html#g-tmj" title="See glossary">TMJ</a> mode is copied word for word from MedX.</p>
+
+      <a class="deep-link" href="CNE.code.html#situation"><b>In the code</b><span>Which build files declare it, the corrected survey, the full MedX comparison table</span></a>
 
       <h2 id="fichiers">2. Files involved</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
-          <tbody>
-            <tr><td><code>CNE.py</code></td><td>widget: dependencies, model download, launching the CLI, and the Dashboard button</td><td>Slicer's Python</td></tr>
-            <tr><td><code>CNE_CLI.py</code></td><td>text extraction + llama.cpp inference</td><td>Slicer's Python (<code>SlicerMacroBuildScriptedCLI</code>)</td></tr>
-            <tr><td><code>CNE_Dashboard/CNE_Dashboard.py</code></td><td>scripted CLI that draws the dashboard from the extractions (§8.1)</td><td>Slicer's Python</td></tr>
-            <tr><td><code>CNE_CLI/CNE_CLI_utils/</code></td><td><code>dashboard_utils.py</code> (400 lines: one aggregation function per panel) and <code>display_figure.py</code> (725 lines: reading, parsing, matplotlib figure)</td><td>Slicer's Python</td></tr>
-            <tr><td><code>CNE.ui</code></td><td>two <code>ctkPathLineEdit</code> widgets in <code>Dirs</code> mode, a Dashboard button, two <a class="gterm" href="../glossary.html#g-tmj" title="See in the glossary">TMJ</a>/Ortho radio buttons</td><td>–</td></tr>
-            <tr><td><code>Resources/testfiles/</code></td><td>4 sample notes (2 TMJ, 2 Ortho), stored in the clear in the repository</td><td>–</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>Four parts: the widget (dependencies, model download, launching the job, the <a class="gterm" data-term="cne-leg-dashboard" href="CNE.code.html#tableau-de-bord" title="See the code">Dashboard</a> button), the command-line job that reads notes and calls the model, the Dashboard job with its two helper files, and the interface file. Four sample notes ship in the repository. There is no conda environment: everything runs in Slicer&rsquo;s Python.</p>
 
-      <p>No conda. The CLI is a <em>scripted CLI</em>, so it is launched by <code>slicer.cli.run</code> in
-      Slicer's Python: it is in that same interpreter that <code>llama-cpp-python</code> is
-      installed and the model is loaded into memory.</p>
+      <a class="deep-link" href="CNE.code.html#fichiers"><b>In the code</b><span>File table with the roles and where each runs</span></a>
 
       <h2 id="dependances">3. Dependencies, installed on demand</h2>
 
-      <p><code>check_dependencies()</code> (<code>CNE.py:83</code>) is called <strong>on clicking
-      Apply</strong>, not on module load. It tests five imports (<code>CNE.py:93-110</code>) and, if any are missing,
-      asks for confirmation before <code>slicer.util.pip_install</code>:</p>
+      <p>When Apply is clicked, the module checks five packages (the llama.cpp binding, a PDF reader, a Word reader, a plotting library and a table library) and, after confirmation, installs the missing ones into Slicer&rsquo;s Python. The wheel index it points to is the <a class="gterm" data-term="cne-leg-cpu" href="CNE.code.html#f-cpu-index" title="See the code">processor-only build</a>. The job asks for GPU layers anyway, which has no effect on that build: in practice inference runs on the processor, and a 7 to 8 billion parameter model takes several tens of seconds per note there.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Import tested</th><th>Package installed</th><th>Use</th></tr></thead>
-          <tbody>
-            <tr><td><code>llama_cpp</code></td><td><code>llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu</code></td><td>inference</td></tr>
-            <tr><td><code>fitz</code></td><td><code>pymupdf</code></td><td>PDF text extraction</td></tr>
-            <tr><td><code>docx</code></td><td><code>python-docx</code></td><td>Word text extraction</td></tr>
-            <tr><td><code>matplotlib</code></td><td><code>matplotlib</code></td><td>Dashboard figure (<code>CNE.py:102-107</code>)</td></tr>
-            <tr><td><code>pandas</code></td><td><code>pandas</code></td><td>Dashboard table (<code>CNE.py:109-110</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>Two points worth knowing:</p>
-
-      <div class="callout warn">
-        <div class="callout-title">Gotcha (legacy only)</div>
-        <p><em>Legacy (3c67957); not present in VISOR: nothing is compiled or installed on the
-        workstation, the server environment pins <code>llama-cpp-python==0.3.35</code> from a
-        prebuilt wheel index (SADT-VISOR <code>tools/CNE/pyproject.toml:60-67</code>; see
-        <a href="../visor/CNE/CNE.html#visor-findings">CNE on VISOR</a>).</em>
-        <code>install_function</code> (<code>CNE.py:44</code>) forces <code>CC=gcc</code> and <code>CXX=g++</code>
-        during installation and then restores the original values: this is for the case
-        where pip has to compile <code>llama-cpp-python</code> from source. On Windows these
-        values are unusable.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Gotcha (also true in VISOR, now reported)</div>
-        <p><em>Also true in VISOR: the pinned index is still the CPU one (SADT-VISOR
-        <code>tools/CNE/pyproject.toml:60-67</code>). What changed is that the request is no longer
-        silent: <code>device</code> is an explicit argument defaulting to <code>cpu</code>, and a
-        <code>cuda</code> request met by a CPU build is written to the report as
-        <code>gpu_offload</code> and <code>warnings</code> (<code>src/sadt_cne/__init__.py:145-165,184-185</code>; see
-        <a href="../visor/CNE/CNE.html#visor-changes">CNE on VISOR</a>).</em>
-        The extra index explicitly points to the <strong>CPU wheels</strong>. Yet the CLI
-        requests <code>n_gpu_layers=-1</code> with the comment "Use GPU if available"
-        (<code>CNE_CLI.py:164</code>): with a CPU-only build this
-        parameter has no effect. In practice inference runs on CPU, and a
-        7–8 B Q4-quantized model costs several tens of seconds per note there.</p>
-      </div>
-
-      <p>The CLI re-tests its three imports (llama_cpp, fitz, docx) at startup and calls <code>sys.exit(1)</code> if one is
-      missing (<code>CNE_CLI.py:101-117</code>): redundant, but harmless
-      since the CLI shares the widget's interpreter.</p>
+      <a class="deep-link" href="CNE.code.html#dependances"><b>In the code</b><span>The five imports, install flags, the compiler override, the GPU request</span></a>
 
       <h2 id="modeles">4. The models</h2>
 
-      <p>No weights ship in the repository. <code>getModelPath()</code>
-      (<code>CNE.py:513</code>) downloads the GGUF on demand, via
-      <code>urllib.request.urlretrieve</code> with a <code>QProgressDialog</code>, into
-      <code>&lt;Documents&gt;/SlicerDownloads/CNE/model/</code>.</p>
+      <p>No weights ship in the repository. The first run downloads the model for the chosen mode into the Documents folder.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>UI mode</th><th><code>repo_id</code></th><th>File requested</th><th>Local name</th><th><code>n_ctx</code></th></tr></thead>
+          <thead><tr><th>Mode</th><th>Model</th><th>Download</th><th><a class="gterm" data-term="cne-leg-window" href="CNE.code.html#inference" title="See the code">Context window</a></th></tr></thead>
           <tbody>
-            <tr><td>TMJ</td><td><code>DCBIA-OrthoLab/Qwen-2.5-7B-Instruct-TMJ</code></td><td><code>qwen-ft-q4_k_m.gguf</code></td><td><code>Qwen-2.5-7B-TMJ.gguf</code></td><td><strong>6144</strong></td></tr>
-            <tr><td>Ortho</td><td><code>DCBIA-OrthoLab/Llama-3.1-8B-Instruct-Ortho</code></td><td><code>model-q4_k_m.gguf</code></td><td><code>Meta-Llama-3.1-8B-Ortho.gguf</code></td><td><strong>2048</strong></td></tr>
+            <tr><td><a class="gterm" data-term="tmj" href="../glossary.html#g-tmj" title="See glossary">TMJ</a></td><td>Qwen 2.5 7B Instruct, fine-tuned (DCBIA-OrthoLab)</td><td>about 4.4 GB</td><td>6144 tokens</td></tr>
+            <tr><td>Ortho</td><td>Llama 3.1 8B Instruct, fine-tuned (DCBIA-OrthoLab)</td><td>about 4.9 GB</td><td>2048 tokens</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>Constructed URL: <code>https://huggingface.co/{repo_id}/resolve/main/{fileName}</code>.</p>
+      <p>The Ortho download used to fail because it asked for a file that did not exist; this was corrected (<a href="CNE.code.html#f-ortho-url-fixed">details</a>). Both Hugging Face repositories now carry a model card that states the license, the base model and the fine-tuning method, and says the training notes are patient data that are not released. Neither card reports an evaluation.</p>
 
-      <div class="callout ok">
-        <div class="callout-title">Corrected (legacy only)</div>
-        <p><em>Legacy (3c67957) download code. In VISOR nothing is downloaded by the client:
-        the models are hosted on the server, and the data manifest stages only the TMJ bundle
-        (VISOR-serve <code>scripts/data-manifest.yml:687-695</code>); see
-        <a href="../visor/CNE/CNE.html#visor-findings">Findings in VISOR</a>.</em>
-        This page used to record a confirmed bug here: the Ortho mode asked for
-        <code>model-q4_0.gguf</code>, which did not exist in the repository, so the download
-        returned HTTP 404 and failed with "Download failed or was cancelled". The code now asks
-        for <code>model-q4_k_m.gguf</code> in <code>DCBIA-OrthoLab/Llama-3.1-8B-Instruct-Ortho</code>
-        (<code>CNE.py:518-519</code>), and the TMJ file in
-        <code>DCBIA-OrthoLab/Qwen-2.5-7B-Instruct-TMJ</code> (<code>CNE.py:525-526</code>). Checked on
-        2026-11-09 with an HTTP HEAD request on both URLs: each answers 302 to the file, and the Ortho
-        file is 4,920,738,880 bytes, hence the "approx. 4.9 GB" of the download dialog
-        (<code>CNE.py:521</code>; the TMJ dialog says 4.4 GB, <code>CNE.py:528</code>, which was not measured).</p>
-      </div>
-
-      <p>Both Hugging Face repositories now carry a <strong>model card</strong>, which this page
-      used to say they lacked (read through the Hugging Face API on 2026-11-09, not from the
-      ADT repository). Each states its license (Llama 3.1 for Ortho, Apache 2.0 for TMJ), the
-      base model, the method (LoRA, r = 32, alpha = 64, merged then quantized to Q4_K_M), that
-      the training notes are annotated patient data that are not released, and that the sets
-      were split by patient. The Ortho card says the model takes the raw note <strong>with no
-      system prompt</strong>, which matches the code (§6), and lists orthodontic features (wire
-      size and material, ligation, elastics, overjet, overbite, ...) as its schema. Neither card
-      reports an evaluation. The TMJ card gives the file as 4.7 GB, while the download dialog
-      says 4.4 GB (<code>CNE.py:528</code>).</p>
+      <a class="deep-link" href="CNE.code.html#modeles"><b>In the code</b><span>Repository ids, file names, URLs and the checks made on them</span></a>
 
       <h2 id="entrees">5. Inputs and preprocessing</h2>
 
-      <p><code>SUPPORTED_EXTENSIONS = (".txt", ".pdf", ".docx")</code>. The scan is
-      <strong>non-recursive</strong>: <code>glob.glob(os.path.join(notesFolder_input, f"*{ext}"))</code>
-      (<code>CNE_CLI.py:135</code>), unlike every other
-      module in the repository, which uses <code>iglob(**, recursive=True)</code>. A folder made of
-      per-patient subfolders will yield nothing.</p>
+      <p>The module looks for <code>.txt</code>, <code>.pdf</code> and <code>.docx</code> files in the chosen folder only: sub-folders are not searched, unlike every other module, so a folder organised by patient yields nothing. Text comes out of a PDF page by page with no OCR (a <a class="gterm" data-term="cne-leg-scanned" href="CNE.code.html#entrees" title="See the code">scanned PDF</a> is empty), out of a Word file paragraph by paragraph (tables are lost), and out of a text file as UTF-8 (another encoding makes that note fail).</p>
 
-      <p>Text extraction (<code>CNE_CLI.py:75</code>):</p>
+      <figure class="algo" data-scene="cne_clean" data-ms="6000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: seven typographic characters are replaced by plain ones, then runs of blank lines shrink to one"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Notes exported from PDF or Word carry typographic characters that never appeared in the plain-text notes the models were trained on. Seven of them are rewritten as plain ones, and runs of blank lines are collapsed, so the model sees the same text whatever the file format.</p><ul class="algo-legend"><li class="k1"><b>highlight</b>the character being rewritten: curly quotes, en dash, em dash and non-breaking space become a plain quote, a hyphen or a space</li><li><b>bars</b>lines of text; dashed marks are blank lines, and a second blank line in a row is dropped</li></ul></div>
+      </figure>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Format</th><th>Extractor</th><th>Detail</th></tr></thead>
-          <tbody>
-            <tr><td><code>.pdf</code></td><td><code>fitz.open</code> then <code>"\n".join(page.get_text() for page in doc)</code></td><td>no OCR: a scanned PDF comes out empty</td></tr>
-            <tr><td><code>.docx</code></td><td><code>docx.Document</code>, <code>paragraph.text</code></td><td><strong>tables are lost</strong> (<code>doc.paragraphs</code> does not iterate over them)</td></tr>
-            <tr><td><code>.txt</code></td><td><code>open(..., encoding="utf-8")</code></td><td>a file in <code>cp1252</code> raises <code>UnicodeDecodeError</code>, caught by the loop and counted as a failure</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>Nothing anonymises the notes. The test notes in the repository were pseudonymised by hand, and the separate MedicalDataAnonymizer module is not chained to CNE.</p>
 
-      <p><code>clean_text()</code> (<code>CNE_CLI.py:42</code>) is the only
-      preprocessing step, and its motivation is stated in the code: normalize what
-      varies between PDF/Word exports but never appeared in the plain-text
-      training notes, smart apostrophes and quotes to ASCII, en dash and em
-      dash to <code>-</code>, non-breaking space to a regular space, then collapsing of
-      consecutive blank lines. Explicit goal: the model should see the same text
-      regardless of the source format.</p>
-
-      <p>No anonymization, no PHI filtering. The repository's test notes are
-      pseudonymized by hand (<code>B_001</code>, <code>[DOCTOR]</code>, <code>Dr. XXX</code>) but nothing in the code
-      guarantees this for the user's own data. The
-      Medical_Data_Anonymizer_Module module exists
-      separately and is not chained to CNE.</p>
+      <a class="deep-link" href="CNE.code.html#entrees"><b>In the code</b><span>The three extractors, the replacement table and the glob call</span></a>
 
       <h2 id="inference">6. Inference</h2>
 
-      <p>A single pass per file, with no chunking
-      (<code>CNE_CLI.py:194-203</code>):</p>
-
-      <pre><code>messages = []
-if notesType.upper() == "TMJ":
-    messages.append({"role": "system", "content": INSTRUCTION_TMJ})
-messages.append({"role": "user", "content": clinical_text})
-
-output = llm.create_chat_completion(messages=messages, max_tokens=500, temperature=0.1)</code></pre>
+      <p>The model is called once per note, with no chunking. In <a class="gterm" data-term="tmj" href="../glossary.html#g-tmj" title="See glossary">TMJ</a> mode the note is preceded by the <a class="gterm" data-term="cne-leg-instruction" href="CNE.code.html#f-ortho-no-instruction" title="See the code">instruction sentence</a>; in Ortho mode the note goes alone, because the Ortho model is supposed to carry the task in its fine-tuning.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 900 230" role="img" aria-label="TMJ versus Ortho branch: system instruction present or absent, different context size, then a common call to create_chat_completion">
+<a class="d-link" href="#inference">
           <rect class="d-box" x="10" y="20" width="180" height="55" rx="6"/>
           <text class="d-label" x="100" y="43" text-anchor="middle">TMJ mode</text>
           <text class="d-label-s" x="100" y="60" text-anchor="middle">system instruction + note</text>
+</a>
 
           <path class="d-arrow" d="M190 47 H213"/>
           <path class="d-arrow-head" d="M213 47 l-7 -4 v8 z"/>
 
+<a class="d-link" href="#modeles">
           <rect class="d-box-n" x="220" y="12" width="230" height="70" rx="6"/>
           <text class="d-label" x="335" y="40" text-anchor="middle">Qwen-2.5-7B-TMJ.gguf</text>
           <text class="d-label-s" x="335" y="58" text-anchor="middle">n_ctx 6144, predicts</text>
+</a>
 
+<a class="d-link" href="#inference">
           <rect class="d-box" x="10" y="150" width="180" height="55" rx="6"/>
           <text class="d-label" x="100" y="173" text-anchor="middle">Ortho mode</text>
           <text class="d-label-s" x="100" y="190" text-anchor="middle">note alone, no instruction</text>
+</a>
 
           <path class="d-arrow" d="M190 177 H213"/>
           <path class="d-arrow-head" d="M213 177 l-7 -4 v8 z"/>
 
+<a class="d-link" href="#modeles">
           <rect class="d-box-a" x="220" y="142" width="230" height="70" rx="6"/>
           <text class="d-label" x="335" y="167" text-anchor="middle">Llama-3.1-8B-Ortho.gguf</text>
           <text class="d-label-s" x="335" y="184" text-anchor="middle">n_ctx 2048, predicts</text>
-          <text class="d-label-s" x="335" y="200" text-anchor="middle">download: 404</text>
+</a>
 
           <path class="d-arrow" d="M450 47 L500 100"/>
           <path class="d-arrow" d="M450 177 L500 120"/>
           <path class="d-arrow-head" d="M500 110 l-8 -3 l2 8 z"/>
 
+<a class="d-link" href="#inference">
           <rect class="d-box" x="510" y="85" width="210" height="50" rx="6"/>
           <text class="d-label" x="615" y="106" text-anchor="middle">create_chat_completion()</text>
           <text class="d-label-s" x="615" y="123" text-anchor="middle">max_tokens 500 · temperature 0.1</text>
+</a>
 
           <path class="d-arrow" d="M720 110 H758"/>
           <path class="d-arrow-head" d="M758 110 l-7 -4 v8 z"/>
 
+<a class="d-link" href="#post-traitement">
           <rect class="d-box" x="760" y="85" width="130" height="50" rx="6"/>
           <text class="d-label" x="825" y="106" text-anchor="middle">Raw response</text>
           <text class="d-label-s" x="825" y="123" text-anchor="middle">JSON expected</text>
+</a>
         </svg>
         <figcaption>The two modes diverge before the call to the model (system instruction, context size) and then converge in the same llama.cpp call. The Ortho path is highlighted: it is the mode with no system instruction and the tighter context (§6).</figcaption>
       </figure>
 
-      <p>Worth noting:</p>
+      <figure class="algo" data-scene="cne_budget" data-ms="6400" data-reserve="0.24">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a bar for the context window holds the note and a reserved zone for the answer; a short note leaves room, a long note eats into the reserved zone"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The <a class="gterm" data-term="cne-leg-window" href="CNE.code.html#inference" title="See the code">context window</a> is shared: the note and the answer must fit in it together. The answer may use up to 500 tokens, so the note has the window minus 500: about 1,500 tokens in Ortho mode. The module does not check this.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">n</mi><mtext>note</mtext></msub><mo>+</mo><mn>500</mn><mo>&#x2264;</mo><msub><mi class="k3">n</mi><mtext>ctx</mtext></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>n<sub>note</sub></b>tokens in the note</li><li class="k2"><b>500</b>the answer limit, the dashed zone</li><li class="k3"><b>n<sub>ctx</sub></b>the context window: 6144 tokens for TMJ, 2048 for Ortho</li></ul></div>
+      </figure>
 
-      <div class="callout warn">
-        <div class="callout-title">Gotcha (also true in VISOR)</div>
-        <p><em>Also true in VISOR (SADT-VISOR <code>tools/CNE/src/sadt_cne/extraction.py:51</code>:
-        <code>SYSTEM_PROMPTS = {"TMJ": INSTRUCTION_TMJ, "Ortho": None}</code>; see
-        <a href="../visor/CNE/CNE.html#visor-changes">CNE on VISOR</a>).</em>
-        <strong>Ortho mode sends no instruction.</strong> Only the raw note goes out as the
-        user message; it is the fine-tuning of the Llama-Ortho model that is supposed to
-        carry the task. TMJ mode, by contrast, keeps the instruction inherited from MedX.</p>
-      </div>
+      <p>The answer is limited to 500 tokens and the temperature is 0.1 with no seed, so the output is nearly deterministic but not exactly reproducible. A note that exceeds the budget makes the engine raise an error; it is caught for that note, logged, and the file is counted as failed. The model&rsquo;s own chat template is applied, and cannot be seen or changed from the repository.</p>
 
-      <ul>
-        <li><code>create_chat_completion</code> applies the <em>chat template</em> embedded in the GGUF.
-        Both models are tagged <code>conversational</code> on Hugging Face, so the
-        template does exist; it is neither visible nor controllable from the repository.</li>
-        <li><code>temperature=0.1</code> and no <code>seed</code>: the output is nearly deterministic but not
-        exactly reproducible.</li>
-      </ul>
-
-      <div class="callout warn">
-        <div class="callout-title">Gotcha (partly true in VISOR)</div>
-        <p><em>VISOR (SADT-VISOR <code>tools/CNE/src/sadt_cne/</code>): <code>max_tokens</code> defaults to
-        2048 instead of 500 (<code>__init__.py:46-56</code>), and an answer cut off by the limit is a failure of
-        that note instead of being written (<code>__init__.py:293-297</code>). Still true: nothing checks the
-        note's length against the window, and nothing checks <code>max_tokens</code> against it either
-        (<code>extraction.py:146-153</code> only rejects a negative window); an overflow raises inside
-        llama.cpp and is caught per note (<code>__init__.py:200-212</code>; see
-        <a href="../visor/CNE/CNE.html#visor-args">CNE on VISOR</a>).</em>
-        <strong>No guard on length.</strong> <code>n_ctx</code> is 6144 (TMJ) or 2048 (Ortho) and
-        <code>max_tokens=500</code> is taken out of that budget. A note exceeding the budget makes
-        llama.cpp raise; the exception is caught per file, logged, and the file
-        is added to <code>failed_files</code>. The Ortho budget is particularly tight:
-        ~1,500 tokens of usable note. The test note
-        <code>TMJ_note1.txt</code> is roughly
-        4,400 characters long, which passes in TMJ mode.</p>
-      </div>
-
-      <ul>
-        <li>Model loading is wrapped by redirecting <code>stderr</code> to
-        <code>/dev/null</code> via <code>os.dup2</code> (<code>CNE_CLI.py:159</code>), to
-        mask llama.cpp's chatter, which would otherwise pollute the error channel that
-        Slicer interprets as a CLI failure.</li>
-      </ul>
+      <a class="deep-link" href="CNE.code.html#inference"><b>In the code</b><span>The call, the TMJ and Ortho messages, the stderr redirection</span></a>
 
       <h2 id="post-traitement">7. Post-processing the response</h2>
 
-      <p>The model is expected to answer in JSON; the code does not enforce this (no
-      <code>response_format</code>, no GBNF grammar) and simply <strong>fishes out</strong> the JSON
-      from the text (<code>CNE_CLI.py:209-214</code>):</p>
+      <p>Nothing forces the model to produce JSON, so the module fishes it out of the answer.</p>
 
-      <pre><code>start_idx = ai_response.find('{')
-end_idx   = ai_response.rfind('}') + 1
-data = json.loads(ai_response[start_idx:end_idx])
-if "extraction" in data:
-    data = data["extraction"]
-for key, value in data.items():
-    formatted_response += f"{key} : {value}\n"</code></pre>
+      <figure class="algo" data-scene="cne_slice" data-ms="6800">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the first opening brace and the last closing brace of an answer are found and everything between them is cut out; with one object the cut reads as JSON, with two objects it does not"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The model is expected to answer in JSON. The module takes everything from the <a class="gterm" data-term="cne-leg-slice" href="CNE.code.html#f-parse-heuristic" title="See the code">first opening brace</a> to the last closing brace of the answer and tries to read it as one JSON object. That works for a single object, and fails when the answer holds two.</p><ul class="algo-legend"><li class="k1"><b>brackets</b>the first opening brace and the last closing brace; the slice is what lies between them</li><li><b>tick or cross</b>whether the slice reads as one JSON object</li></ul></div>
+      </figure>
 
-      <p>So: first opening brace through last closing brace, unwrapping of a
-      possible <code>extraction</code> level, then flattening into <code>key : value</code> lines. If the
-      parse fails <strong>or</strong> there is no brace at all, the model's raw response is
-      written as is. The output file does not say which of the two cases
-      occurred.</p>
+      <p>If the slice holds a wrapper called <em>extraction</em>, that level is removed; each field is then written as a <em>field : value</em> line, and a nested value appears as its Python representation. If the slice cannot be read, or the answer has no brace at all, the model&rsquo;s raw answer is written as it is, and the file does not say which of the two cases happened.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Gotcha (partly corrected in VISOR)</div>
-        <p><em>VISOR: nested values are no longer written as a Python <code>repr</code>
-        (<code>extraction.py:318-328</code>). The first-brace to last-brace slicing is kept
-        (<code>extraction.py:263-266</code>), but when <code>json.loads</code> fails the answer is read as
-        <code>key: value</code> lines, and if that fails too nothing is written and the note is reported as
-        failed, instead of saving the raw text (<code>extraction.py:278-301</code>,
-        <code>__init__.py:299-305</code>; see <a href="../visor/CNE/CNE.html#visor-changes">CNE on VISOR</a>).</em>
-        Consequences: the naive <code>find('{')</code>…<code>rfind('}')</code> slicing breaks as soon as the
-        response contains more than one JSON object, and a nested value (list, dict) is
-        rendered by its Python <code>repr</code> in the text file.</p>
-      </div>
+      <a class="deep-link" href="CNE.code.html#post-traitement"><b>In the code</b><span>The slicing code and the partly corrected VISOR behaviour</span></a>
 
       <h2 id="sorties">8. Outputs</h2>
 
-      <p>One text file per input note, in the output folder:</p>
+      <p>One text file per note, <code>Extraction_&lt;note name&gt;.txt</code>, holding <em>field : value</em> lines or the raw answer. No CSV, no JSON and no per-patient aggregation come from the extraction itself.</p>
 
-      <pre><code>Extraction_&lt;note name without extension&gt;.txt</code></pre>
-
-      <p>Content: <code>key : value</code> lines, or the model's raw response if the parse
-      failed. No CSV, no json and no per-patient aggregation from the extraction itself: the
-      table and the figure come from the Dashboard button (§8.1), which reads these files
-      afterwards.</p>
-
-      <p>The output folder is created by <code>os.makedirs(..., exist_ok=True)</code> on the widget
-      side (<code>CNE.py:613</code>).</p>
+      <a class="deep-link" href="CNE.code.html#sorties"><b>In the code</b><span>File naming, output folder creation</span></a>
 
       <h3 id="tableau-de-bord">8.1 The Dashboard</h3>
 
-      <p>The "Dashboard" half of <a href="../MedX/MedX.html">MedX</a> was ported on 2026-10-12,
-      so the earlier statement of this page that it "was not carried over" no longer holds. It
-      is read from the code as follows:</p>
+      <p>A button beside Run launches a second job that reads the <code>Extraction_*.txt</code> files of the output folder. It fills a table of 54 expected fields, converts six of them to numbers, and computes one deterministic summary per panel of the figure: age groups, mean and spread of pain scores, maximum mouth opening, where headaches and joint pain are, disc displacement, muscle pain. It writes <code>dashboard.png</code> and two CSV tables, and stops with an error when the files do not carry the expected fields. No model and no download are involved.</p>
 
-      <ul>
-        <li><strong>Trigger.</strong> The Dashboard button (<code>dashboardButton</code> in
-        <code>CNE.ui</code>, connected at <code>CNE.py:234</code>) runs
-        <code>onDashboardButton()</code> (<code>CNE.py:365</code>). It checks the dependencies,
-        refuses to run without an output folder, and launches <code>CNE_Dashboard</code> via
-        <code>CNELogic.dashboard()</code> (<code>CNE.py:629</code>) with the output folder as both
-        input and output. No model and no download are involved.</li>
-        <li><strong>Reading.</strong> <code>read_summaries()</code>
-        (<code>display_figure.py:23</code>) keeps only <code>Extraction_*.txt</code> files in the
-        folder; the patient identifier is the note name minus the prefix.
-        <code>process_summaries()</code> (<code>display_figure.py:135</code>) fills a dictionary of
-        54 keys seeded by <code>initialize_key_value_summary()</code>
-        (<code>dashboard_utils.py:332</code>) and converts six numeric fields.</li>
-        <li><strong>Computed, not predicted.</strong> Each panel is a deterministic
-        aggregation <span class="badge calcule">computed</span> in <code>dashboard_utils.py</code>
-        (age groups, mean and SD of pain scores, maximum mouth opening parsed from
-        strings such as "33 mm", headache and joint-pain locations by synonym lists, disc
-        displacement left and right, muscle pain level). The figure is drawn by
-        <code>generate_dashboard_figure()</code> (<code>display_figure.py:164</code>).</li>
-        <li><strong>Outputs.</strong> <code>dashboard.png</code> and <code>patient_data.csv</code>
-        (<code>display_figure.py:714-716</code>), plus a third file,
-        <code>dashboard_full_dataframe.csv</code> (<code>display_figure.py:183</code>), written before
-        the figure is drawn.</li>
-        <li><strong>Fails loudly when the schema does not match.</strong>
-        <code>report_field_coverage()</code> (<code>display_figure.py:668</code>) logs the expected
-        keys that carry no value, and <code>show_dashboard()</code>
-        (<code>display_figure.py:694</code>) raises if none carries one or if the folder holds no
-        <code>Extraction_*.txt</code>.</li>
-      </ul>
+      <p>It is a <a class="gterm" data-term="tmj" href="../glossary.html#g-tmj" title="See glossary">TMJ</a> dashboard: the expected fields are those the TMJ model is supposed to return. Nothing says the Ortho model writes them, so on Ortho extractions the coverage check would most likely stop the run (an inference from the field list, not run).</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Gotcha (legacy only)</div>
-        <p><em>Legacy (3c67957); there is no Dashboard in VISOR (see the first callout of <a href="#situation">§1</a> and
-        <a href="../visor/CNE/CNE.html#visor-status">CNE on VISOR</a>).</em>
-        <strong>The dashboard is a TMJ dashboard.</strong> The expected keys are headache
-        intensity, jaw clicking, disc displacement, maximum opening, sleep disorder and similar
-        (<code>dashboard_utils.py:339-396</code>). They are the keys the TMJ model is supposed to
-        return; nothing in the repository says the Ortho model writes them, and the Ortho mode
-        has no instruction to impose them. On Ortho extractions the coverage check would
-        most likely stop the run with the "keys do not match" error. This is an inference from
-        the key list, not something run against Ortho output. The keys themselves are chosen by
-        the model, not by the code (docstring of <code>report_field_coverage</code>,
-        <code>display_figure.py:668-679</code>).</p>
-      </div>
+      <a class="deep-link" href="CNE.code.html#tableau-de-bord"><b>In the code</b><span>Trigger, readers, aggregation functions and the coverage check</span></a>
 
-      <h2 id="predit-calcule">9. What is predicted vs. what is computed</h2>
+      <h2 id="predit-calcule">9. Predicted or calculated</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Step</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>PDF/Word text extraction</td><td><span class="badge calcule">computed</span> PyMuPDF / python-docx</td><td>CLI</td></tr>
-            <tr><td>Typographic normalization</td><td><span class="badge calcule">computed</span> fixed replacement table, 7 entries</td><td>CLI</td></tr>
-            <tr><td>Key–value pair extraction</td><td><span class="badge predit">predicted</span> LLM, Qwen-2.5-7B-TMJ or Llama-3.1-8B-Ortho, GGUF Q4</td><td>CLI, in-process <code>llama_cpp</code></td></tr>
-            <tr><td>Formatting</td><td><span class="badge calcule">computed</span> <code>find('{')</code> / <code>json.loads</code> / flattening loop</td><td>CLI</td></tr>
+            <tr><td>PDF and Word text extraction</td><td><span class="badge calcule">computed</span> PyMuPDF and python-docx</td></tr>
+            <tr><td>Typographic cleaning</td><td><span class="badge calcule">computed</span> a fixed table of seven replacements</td></tr>
+            <tr><td>Extraction of the fields</td><td><span class="badge predit">predicted</span> the language model, Qwen 2.5 7B <a class="gterm" data-term="tmj" href="../glossary.html#g-tmj" title="See glossary">TMJ</a> or Llama 3.1 8B Ortho, in quantised <a class="gterm" data-term="gguf" href="../glossary.html#g-gguf" title="See glossary">GGUF</a> form</td></tr>
+            <tr><td>Formatting</td><td><span class="badge calcule">computed</span> slicing, JSON reading, a flattening loop</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>All the clinical content of the output comes from the model. There is no rule,
-      no dictionary of terms, no schema validation: whatever the model
-      writes is what gets saved.</p>
+      <p>All the clinical content of the output comes from the model. There is no rule, no dictionary of terms and no schema check: whatever the model writes is what gets saved.</p>
+
+      <a class="deep-link" href="CNE.code.html#predit-calcule"><b>In the code</b><span>The same table with where each block runs</span></a>
 
       <h2 id="environnement">10. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Element</th><th>Value</th><th>Source</th></tr></thead>
-          <tbody>
-            <tr><td>Interpreter</td><td>Slicer's Python, no conda</td><td><code>SlicerMacroBuildScriptedCLI</code>, <code>CMakeLists.txt</code></td></tr>
-            <tr><td>Packages installed on the fly</td><td><code>llama-cpp-python</code> (CPU index), <code>pymupdf</code>, <code>python-docx</code>, <code>matplotlib</code>, <code>pandas</code></td><td><code>CNE.py:93-110</code></td></tr>
-            <tr><td>GPU</td><td>requested (<code>n_gpu_layers=-1</code>) but the install forces a CPU build</td><td>§3</td></tr>
-            <tr><td>Weights</td><td>~4.4 GB (TMJ) / ~4.9 GB (Ortho), <code>&lt;Documents&gt;/SlicerDownloads/CNE/model/</code></td><td><code>CNE.py:535</code></td></tr>
-            <tr><td>RAM</td><td>not constrained in the code; a 7–8 B Q4_K_M model needs roughly 5–6 GB resident on top of Slicer</td><td>inference</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>Slicer&rsquo;s Python only, with five packages installed on the fly. A 7 to 8 billion parameter quantised model needs roughly 5 to 6 GB of memory on top of Slicer. The weights take about 4.4 GB (<a class="gterm" data-term="tmj" href="../glossary.html#g-tmj" title="See glossary">TMJ</a>) or 4.9 GB (Ortho) on disk.</p>
 
-      <h2 id="pieges">11. Gotchas and fragile points</h2>
+      <a class="deep-link" href="CNE.code.html#environnement"><b>In the code</b><span>Interpreter, packages, GPU and weights locations</span></a>
+
+      <h2 id="pieges">11. Known problems</h2>
 
       <ul>
-        <li><strong>The Dashboard expects the TMJ schema</strong> (§8.1).</li>
-        <li><strong>The test files' output folder.</strong> <code>copyTestFiles()</code>
-        (<code>CNE.py:454</code>) used to put a path that did not exist into the output field. It now
-        creates the output folder (<code>CNE.py:508</code>), copies the notes again on every call
-        without erasing the folder (<code>dirs_exist_ok=True</code>, <code>CNE.py:505</code>), and leaves
-        an output folder already chosen by the user alone (<code>CNE.py:328-330</code>).
-        <code>Resources/testfiles/</code> still holds only the two <code>input_</code> folders.</li>
-        <li><strong>Non-recursive scan</strong> of the input folder (§5).</li>
-        <li><strong>No length limit</strong> before the call: a note that is too long fails
-        instead of being chunked, whereas <a href="../MedX/MedX.html">MedX</a> did chunk (§6). This is a functional
-        regression of the replacement.</li>
-        <li><strong>Ortho mode sends no system instruction</strong> (§6): if the model is not the
-        one expected, there is no reason for the output to be JSON at all.</li>
-        <li><strong>No constraint on output format</strong>: no GBNF grammar and no
-        <code>response_format</code>, even though llama.cpp offers both. Post-processing is therefore
-        a heuristic fishing operation (§7).</li>
-        <li><strong>Radio button set to neither TMJ nor Ortho</strong> → <code>notesType = ""</code>
-        (<code>CNE.py:427</code>) → in <code>getModelPath</code>, <code>repo_id</code> is never
-        assigned and the <code>UnboundLocalError</code> surfaces as "Failed to load model". This case
-        should not occur (<code>setExclusive(True)</code> and a default of TMJ), but nothing
-        blocks it.</li>
-        <li><strong>Inconsistent casing</strong>: <code>notesType == "TMJ"</code> sets <code>n_ctx</code>, while <code>notesType.upper() == "TMJ"</code>
-        sets the instruction. A lowercase <code>notesType</code> would give the TMJ instruction
-        with the 2048 context.</li>
-        <li><strong>No provenance trail</strong>: the <code>Extraction_*.txt</code> file mentions neither
-        the model, its version, nor the date. Two runs with different
-        models produce indistinguishable files.</li>
-        <li><strong>PHI</strong>: nothing anonymizes, nothing warns. Notes are read in the clear,
-        passed through a local model (so no network exfiltration: that is the only
-        safeguard, and it is structural rather than deliberate).
-        <strong>Legacy module only (3c67957).</strong> With VISOR the notes are uploaded to a
-        server as they are, and nothing de-identifies them first: see
-        <a href="../visor/CNE/CNE.html#visor-findings">Findings in VISOR</a>.</li>
-        <li><strong>CLI metadata left at the template default</strong>:
-        <code>CNE_CLI.xml</code> still describes "Apply a Gaussian blur to an
-        image", attributes the module to "Andras Lasso (PerkLab)", and its <code>&lt;index&gt;</code>
-        values are 0, 2, 3, 4, index 1 is missing.</li>
-        <li><strong><code>onCliProgress</code></strong> (<code>CNE.py:651</code>) reads <code>caller.GetProgress()</code>
-        and does nothing with it; it is not even connected to any observer. Dead
-        code. Actual progress goes through the CLI's <code>&lt;filter-progress&gt;</code> tags, read
-        by <code>qSlicerCLIProgressBar</code>.</li>
+        <li>The <a class="gterm" data-term="cne-leg-dashboard" href="CNE.code.html#tableau-de-bord" title="See the code">Dashboard</a> expects the <a class="gterm" data-term="tmj" href="../glossary.html#g-tmj" title="See glossary">TMJ</a> fields and would probably stop on Ortho extractions (<a href="CNE.code.html#f-dashboard-tmj">details</a>).</li>
+        <li>Ortho mode sends no <a class="gterm" data-term="cne-leg-instruction" href="CNE.code.html#f-ortho-no-instruction" title="See the code">instruction</a>, so nothing makes the output JSON if the model is not the expected one (<a href="CNE.code.html#f-ortho-no-instruction">details</a>).</li>
+        <li>No length guard: a note longer than the window fails instead of being cut into chunks, a regression from MedX (<a href="CNE.code.html#f-no-length-guard">details</a>).</li>
+        <li>The answer format is not constrained, and the first-brace to last-brace slice breaks on two objects (<a href="CNE.code.html#f-parse-heuristic">details</a>).</li>
+        <li>The scan of the input folder is not recursive (<a href="CNE.code.html#pieges">all gotchas</a>).</li>
+        <li>Output files record neither the model nor the date, so two runs with different models cannot be told apart (<a href="CNE.code.html#pieges">all gotchas</a>).</li>
+        <li>Nothing anonymises the notes; the only safeguard is that the model runs locally, which is true of this legacy module only (<a href="CNE.code.html#pieges">all gotchas</a>).</li>
+        <li>The <a class="gterm" data-term="cne-leg-cpu" href="CNE.code.html#f-cpu-index" title="See the code">processor-only build</a> makes the GPU request pointless (<a href="CNE.code.html#f-cpu-index">details</a>).</li>
       </ul>
+
+      <a class="deep-link" href="CNE.code.html#pieges"><b>In the code</b><span>The full gotcha list, including the CLI metadata left at the template default</span></a>
+
 
       <h2 id="litterature">12. Literature</h2>
 
@@ -685,8 +403,7 @@ for key, value in data.items():
       <ul>
         <li>The <a href="../MedX/MedX.html">MedX</a> → CNE lineage, documented only by
         the acknowledgement line of <code>CNE_Dashboard.xml</code> ("Ported from MedX_Dashboard, which
-        CNE replaced without taking this half with it") and the comments in
-        <code>display_figure.py:35</code> and <code>:675</code>. The root <code>CMakeLists.txt</code>
+        CNE replaced without taking this half with it") and the comments in the <a class="gterm" data-term="cne-leg-dashboard" href="CNE.code.html#tableau-de-bord" title="See the code">Dashboard</a> code (see the code page). The root <code>CMakeLists.txt</code>
         no longer mentions MedX and the README has no MedX or CNE section.</li>
         <li>The base models:
         <a href="https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct">Meta-Llama-3.1-8B-Instruct</a>,
@@ -695,7 +412,7 @@ for key, value in data.items():
         <a href="https://huggingface.co/DCBIA-OrthoLab/Qwen-2.5-7B-Instruct-TMJ">DCBIA-OrthoLab/Qwen-2.5-7B-Instruct-TMJ</a>,
         <a href="https://huggingface.co/DCBIA-OrthoLab/Llama-3.1-8B-Instruct-Ortho">DCBIA-OrthoLab/Llama-3.1-8B-Instruct-Ortho</a>.</li>
         <li>The engine: <a href="https://github.com/abetlen/llama-cpp-python">llama-cpp-python</a>,
-        <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a> (GGUF format, Q4_K_M
+        <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a> (<a class="gterm" data-term="gguf" href="../glossary.html#g-gguf" title="See glossary">GGUF</a> format, Q4_K_M
         quantization).</li>
         <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
       </ul>
@@ -707,8 +424,8 @@ for key, value in data.items():
       <p>What was searched for to reach this conclusion, and the neighborhood gathered along the way:
       <a href="SOURCES.html">SOURCES.md</a>.</p>
 
-      <footer class="footer">
-        <a href="../index.html">← All tool pages</a> ·
+            <footer class="footer">
+        <a href="../index.html">← All tool pages</a> · <a href="CNE.code.html">Code page</a> ·
         <a href="SOURCES.html">Bibliography for this tool</a> ·
         Source: <code>CNE.md</code>
       </footer>
@@ -717,5 +434,7 @@ for key, value in data.items():
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/algo.js"></script>
+<script src="../../assets/algo-CNE.js"></script>
 </body>
 </html>

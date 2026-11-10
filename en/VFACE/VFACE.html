@@ -27,6 +27,7 @@
     <div class="sec-switch" role="group">
       <a href="../guide/VFACE.html">Guide</a>
       <a href="../VFACE/VFACE.html" aria-current="true">Atlas</a>
+      <a href="../VFACE/VFACE.code.html">Code</a>
     </div>
     <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="legacy">
@@ -126,9 +127,10 @@
         <img class="tool-icon" src="../../assets/screens/VFACE/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Analysis</div>
         <h1>VFACE</h1>
-        <p class="lede">An orchestrator that learns and segments nothing itself: it chains six other modules to register a <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> onto its own mirror image, measures the gap, and classifies skeletal facial asymmetry with three <a class="gterm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> models.</p>
+        <p class="lede">VFACE decides whether a face is skeletally asymmetric from a <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> scan alone. It learns and segments nothing itself: it chains six other modules to register the scan onto its own mirror image, measures the gap, and classifies the asymmetry with three <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> models. This page explains how, step by step, with the maths. Files, lines and pitfalls are on <a href="VFACE.code.html">the code page</a>.</p>
         <div class="meta-row">
           <a class="badge paper" href="https://doi.org/10.1117/12.3087010" target="_blank" rel="noopener" title="The paper describes unsupervised clustering; the code ships 3 supervised LightGBM models.">SPIE Medical Imaging 2026</a>
+          <a class="badge neutral" href="VFACE.code.html">Code (developers)</a>
           <span class="badge cli">vface_cli</span>
           <span class="badge neutral">conda env: none (Slicer's Python)</span>
           <a class="badge neutral" href="SOURCES.html">Bibliography</a>
@@ -136,7 +138,7 @@
         </div>
       </header>
 
-      <figure class="shot">
+            <figure class="shot">
         <img src="../../assets/data/VFACE/vface_workflow.jpg" loading="lazy"
              alt="The VFACE flow: orientation by ASO, landmarks by ALI_CBCT, mirroring by AutoMatrix, segmentation by BatchDentalSeg, registration by AReg, then asymmetry classification.">
         <figcaption>The flow as the lab presents it: ASO orients the scan, ALI_CBCT places
@@ -149,324 +151,278 @@
       </figure>
 
 
-      <p>Automatic classification of skeletal facial asymmetry on CBCT. VFACE
-      learns nothing and segments nothing itself: it is an <strong>orchestrator</strong> that
-      chains six other modules from the repository, extracts linear and
-      angular measurements from them, and finishes with three LightGBM classifiers. It
-      is the highest-level module in the chain: the call tree is the central piece of
-      information here.</p>
+      <p>Automatic classification of skeletal facial asymmetry on CBCT. VFACE learns nothing and segments nothing itself: it is an <strong>orchestrator</strong> that chains six other modules from the repository, extracts linear and angular measurements from them, and finishes with three LightGBM classifiers. It is the highest-level module in the chain: the call tree is the central piece of information here.</p>
 
-      <p>The clinical principle fits in one sentence: <strong>T2 is the patient's own
-      mirror image</strong>. There is no second scan. The scan is oriented, mirrored across
-      the mid-sagittal plane, registered onto the original, and everything that gets
-      measured is a gap between the patient and their own reflection.</p>
+      <p>The clinical principle fits in one sentence: <strong>T2 is the patient&rsquo;s own mirror image</strong>. There is no second scan. The scan is oriented, mirrored across the <a class="gterm" data-term="vface-leg-plane" href="VFACE.code.html#entrees" title="See the code">mid-sagittal plane</a>, registered onto the original, and everything that gets measured is a gap between the patient and their own reflection.</p>
 
-      <div class="callout note">
-        <div class="callout-title">Two code bases</div>
-        <p>Everything numbered below describes the legacy Slicer module
-        (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port, which runs the same
-        tool on a server, is described on <a href="../visor/VFACE/VFACE.html">its VISOR page</a>.
-        That port exists on feature branches only (SADT-VISOR <code>tool/vface</code> and
-        VISOR-serve <code>conf/vface-deployment</code>, neither on <code>main</code>) and has never
-        been run with its six real callees.</p>
-      </div>
+      <p>This page describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port, which runs the same tool on a server, is on <a href="../visor/VFACE/VFACE.html">its VISOR page</a>; it exists on feature branches only and has never been run with its six real callees.</p>
 
-      <h2 id="situation">1. Where it sits in the pipeline</h2>
-
-      <p>Nothing in the repository calls VFACE: <code>CMakeLists.txt:54</code>
-      adds it as a terminal module. It does, however, call eight processes, seven of
-      which are other modules of the extension. Everything is built in a single pass by
-      <code>CreateListProcess()</code>
-      (<code>createlistprocess.py:120</code>), which
-      returns a <strong>list of dictionaries</strong> <code>{Process, Parameter, Module, Display,
-      Review*}</code>; the widget unwinds it one item at a time.</p>
+      <h2 id="overview">Overview: what goes in, what comes out</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Called</th><th>Slicer module</th><th>Role in VFACE</th></tr></thead>
+          <thead><tr><th></th><th>VFACE</th></tr></thead>
           <tbody>
-            <tr><td><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a> resample</td><td><span class="badge cli">mri2cbct_resample_cbct_mri</span></td><td>0.3 mm isotropic resampling + recentering</td></tr>
-            <tr><td><a href="../ASO/ASO.html">ASO</a> PRE</td><td><span class="badge cli">pre_aso_cbct</span></td><td>geometric centering, writes a <code>.tfm</code></td></tr>
-            <tr><td>ALI-CBCT</td><td><span class="badge cli">ali_cbct</span></td><td><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> (orientation, then measurements)</td></tr>
-            <tr><td>ASO SEMI</td><td><span class="badge cli">semi_aso_cbct</span></td><td>orientation onto a gold standard</td></tr>
-            <tr><td><a href="../AMASSS/AMASSS.html#modeles">AMASSS</a></td><td><span class="badge cli">amasss_cli</span></td><td>CB / MAND / MAX bone masks</td></tr>
-            <tr><td><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></td><td><span class="badge cli">automatrix_cli</span></td><td>applies the mirror and the AREG matrices</td></tr>
-            <tr><td>AREG-CBCT</td><td><span class="badge cli">areg_cbct</span></td><td>rigid <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a> <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> registration</td></tr>
-            <tr><td>VFACE_CLI</td><td><span class="badge cli">vface_cli</span></td><td>LightGBM classification</td></tr>
+            <tr><td>Input</td><td>a folder of <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> scans (T1), one per patient; no segmentation and no <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> is needed</td></tr>
+            <tr><td>Idea</td><td>orient each scan, mirror it, register the mirror back region by region, measure the gaps between landmarks and their mirrored counterparts, and let three small models read those measurements</td></tr>
+            <tr><td>Output</td><td>Excel tables of measurements and features, a classification per patient (asymmetric or not, mandible, maxilla), optional <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">heat maps</a> on bone surfaces</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>Three steps are <strong>Python functions</strong> run on Slicer's main thread, not CLIs:
-      <code>run_aq3dc</code>, <code>run_bds</code> (BatchDentalSegmentator /
-      <a class="gterm" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>), <code>batch_process</code> (heatmaps), plus <code>derive_landmarks</code> and
-      <code>postprocess</code>. <code>executeProcess()</code> (<code>VFACE.py:2454</code>) tells the two apart
-      with a battery of nine tests (<code>test1</code>..<code>test9</code>) on the object's type.</p>
+      <h2 id="situation">1. Where it sits in the pipeline</h2>
 
-      <figure class="diagram">
+      <p>Nothing in the repository calls VFACE: it is a terminal module. It does, however, call eight processes, seven of which are other modules of the extension. Everything is planned in one pass, which produces a list of steps; the panel then runs them one at a time.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Called</th><th>Role in VFACE</th></tr></thead>
+          <tbody>
+            <tr><td><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a> resample</td><td>0.3 mm isotropic resampling and recentring</td></tr>
+            <tr><td><a href="../ASO/ASO.html">ASO</a>, centring step</td><td>geometric centring, writes a transform</td></tr>
+            <tr><td>ALI-CBCT</td><td><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> (orientation, then measurements)</td></tr>
+            <tr><td>ASO, orientation step</td><td>orientation onto a gold-standard case</td></tr>
+            <tr><td><a href="../AMASSS/AMASSS.html#modeles">AMASSS</a></td><td>cranial base, mandible and maxilla bone masks</td></tr>
+            <tr><td><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></td><td>applies the mirror and the registration matrices</td></tr>
+            <tr><td>AREG-CBCT</td><td>rigid <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a> <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> registration</td></tr>
+            <tr><td>The VFACE classifier</td><td><a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> classification</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Three steps are plain Python functions run on Slicer&rsquo;s main thread rather than separate commands: the measurements, the bone surfaces (<a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>) and the <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">heat maps</a>, plus the landmark derivation and the post-processing.</p>
+
+            <figure class="diagram">
         <svg viewBox="0 0 860 230" role="img" aria-label="Orchestration: VFACE successively calls AMASSS_CLI, ALI_CBCT, AREG_CBCT, Automatrix_CLI then VFACE_CLI">
-          <rect class="d-box-a" x="350" y="10" width="160" height="46" rx="6"/>
+          <a class="d-link" href="#arbre-appels">
+<rect class="d-box-a" x="350" y="10" width="160" height="46" rx="6"/>
           <text class="d-label" x="430" y="30" text-anchor="middle">VFACE</text>
-          <text class="d-label-s" x="430" y="45" text-anchor="middle">orchestrator widget</text>
+          <text class="d-label-s" x="430" y="45" text-anchor="middle">the orchestrator</text>
+</a>
 
           <path class="d-arrow" d="M430 56 V100 H82 V134"/>
-          <text class="d-label-s" x="250" y="92" text-anchor="middle">orchestrates, one CLI after another</text>
+          <text class="d-label-s" x="250" y="92" text-anchor="middle">calls one tool after another</text>
           <path class="d-arrow-head" d="M82 140 l-5 -9 h10 z"/>
 
-          <rect class="d-box-n" x="15" y="140" width="134" height="50" rx="6"/>
-          <text class="d-label" x="82" y="160" text-anchor="middle">AMASSS_CLI</text>
+          <a class="d-link" href="#amasss-masques">
+<rect class="d-box-n" x="15" y="140" width="134" height="50" rx="6"/>
+          <text class="d-label" x="82" y="160" text-anchor="middle">AMASSS</text>
           <text class="d-label-s" x="82" y="175" text-anchor="middle">bone masks (network)</text>
+</a>
 
           <path class="d-arrow" d="M149 165 H179"/>
           <text class="d-label-s" x="167" y="205" text-anchor="middle">masks</text>
           <path class="d-arrow-head" d="M185 165 l-9 -5 v10 z"/>
 
-          <rect class="d-box-n" x="185" y="140" width="116" height="50" rx="6"/>
+          <a class="d-link" href="#ali-cbct">
+<rect class="d-box-n" x="185" y="140" width="116" height="50" rx="6"/>
           <text class="d-label" x="243" y="160" text-anchor="middle">ALI_CBCT</text>
           <text class="d-label-s" x="243" y="175" text-anchor="middle">landmarks (network)</text>
+</a>
 
           <path class="d-arrow" d="M301 165 H331"/>
           <text class="d-label-s" x="319" y="205" text-anchor="middle">landmarks</text>
           <path class="d-arrow-head" d="M337 165 l-9 -5 v10 z"/>
 
-          <rect class="d-box" x="337" y="140" width="166" height="50" rx="6"/>
+          <a class="d-link" href="#areg-cbct">
+<rect class="d-box" x="337" y="140" width="166" height="50" rx="6"/>
           <text class="d-label" x="420" y="160" text-anchor="middle">AREG_CBCT</text>
           <text class="d-label-s" x="420" y="175" text-anchor="middle">Elastix registration (computed)</text>
+</a>
 
           <path class="d-arrow" d="M503 165 H532"/>
           <text class="d-label-s" x="520" y="205" text-anchor="middle">registered T2</text>
           <path class="d-arrow-head" d="M538 165 l-9 -5 v10 z"/>
 
-          <rect class="d-box" x="538" y="140" width="160" height="50" rx="6"/>
-          <text class="d-label" x="618" y="160" text-anchor="middle">Automatrix_CLI</text>
+          <a class="d-link" href="#entrees">
+<rect class="d-box" x="538" y="140" width="160" height="50" rx="6"/>
+          <text class="d-label" x="618" y="160" text-anchor="middle">AutoMatrix</text>
           <text class="d-label-s" x="618" y="175" text-anchor="middle">mirror + matrices (computed)</text>
+</a>
 
           <path class="d-arrow" d="M698 165 H728"/>
           <text class="d-label-s" x="716" y="205" text-anchor="middle">matrices applied</text>
           <path class="d-arrow-head" d="M734 165 l-9 -5 v10 z"/>
 
-          <rect class="d-box-n" x="734" y="140" width="112" height="50" rx="6"/>
-          <text class="d-label" x="790" y="160" text-anchor="middle">VFACE_CLI</text>
+          <a class="d-link" href="#classifieur">
+<rect class="d-box-n" x="734" y="140" width="112" height="50" rx="6"/>
+          <text class="d-label" x="790" y="160" text-anchor="middle">Classifier</text>
           <text class="d-label-s" x="790" y="175" text-anchor="middle">LightGBM (network)</text>
+</a>
         </svg>
-        <figcaption>The orchestrator's five central calls, in the order VFACE triggers them.
-        The actual pipeline inserts resample/ASO upstream and landmarks/heatmaps
-        downstream (see the call tree below).</figcaption>
+        <figcaption>The orchestrator&rsquo;s five central calls, in the order VFACE triggers them. The actual pipeline inserts resampling and orientation upstream and landmarks and heat maps downstream (see the call tree below). Click a box to see its section.</figcaption>
       </figure>
 
-      <h3 id="arbre-appels">The call tree, in "Full pipeline" + "Asymmetry Assessment" + "Quantitative + Visualization" mode</h3>
 
-      <div class="pipe">
-        <p class="pipe-seed"><code>T1</code>: one raw <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>, nothing else</p>
+            <a class="deep-link" href="VFACE.code.html#situation"><b>In the code</b><span>The call table with module names, the nine-test battery that tells the steps apart, and file:line</span></a>
+
+
+      <h3 id="arbre-appels">The call tree, in &ldquo;Full pipeline&rdquo; + &ldquo;Asymmetry Assessment&rdquo; + &ldquo;Quantitative + Visualization&rdquo; mode</h3>
+
+            <div class="pipe">
+        <p class="pipe-seed">T1: one raw <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>, nothing else</p>
 
         <section class="pipe-phase" data-kind="prep">
           <h4>Preparation</h4>
           <ol>
-            <li><span class="pipe-act">resample to 0.3&nbsp;mm isotropic, centred</span>
-                <span class="pipe-out"><code>T1 Resample/CBCT</code></span></li>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO</a> &times;2, for the maxilla and the cranial base</span>
-                <span class="pipe-out"><code>Centered T1 Scans/{MAX,CB}</code> + <code>.tfm</code></span></li>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> places 6 maxillary landmarks, then <a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> orients on <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> + mid-sagittal</span>
-                <span class="pipe-out"><code>Oriented T1 Scans/MAX</code></span></li>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> places 7 cranial-base landmarks, then <a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> orients on Frankfort + mid-sagittal</span>
-                <span class="pipe-out"><code>Oriented T1 Scans/CB</code></span></li>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> segments <code>CBMASK</code> and <code>MANDMASK</code> on the CB scan, <code>MAXMASK</code> on the MAX scan</span>
-                <span class="pipe-out"><code>T1 Masks</code></span></li>
+            <li><span class="pipe-act">resample to 0.3&nbsp;mm isotropic, centred</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO</a> &times;2, for the maxilla and the cranial base</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> places 6 maxillary landmarks, then <a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> orients on <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> + mid-sagittal</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> places 7 cranial-base landmarks, then <a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> orients on Frankfort + mid-sagittal</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> segments <code>CBMASK</code> and <code>MANDMASK</code> on the CB scan, <code>MAXMASK</code> on the MAX scan</span></li>
           </ol>
         </section>
 
         <section class="pipe-phase" data-kind="mirror">
           <h4>Mirroring</h4>
           <ol>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html#mirror">AutoMatrix</a> applies <code>Matrix_mirror.tfm</code> to the oriented scans: <strong>this is where the &ldquo;T2&rdquo; comes from</strong></span>
-                <span class="pipe-out"><code>T2_Scan/{CB,MAX}</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html#mirror">AutoMatrix</a> applies <code>Matrix_mirror.tfm</code> to the oriented scans: <strong>this is where the &ldquo;T2&rdquo; comes from</strong></span></li>
           </ol>
         </section>
 
         <section class="pipe-phase" data-kind="reg">
           <h4>Registration</h4>
           <ol>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../AREG_CBCT/AREG_CBCT.html#recalage">AREG</a> &times;3, once per region: cranial base, maxilla, mandible</span>
-                <span class="pipe-out"><code>Registered Scan/&lt;region&gt;/&lt;pat&gt;_OutReg/</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AREG_CBCT/AREG_CBCT.html#recalage">AREG</a> &times;3, once per region: cranial base, maxilla, mandible</span></li>
           </ol>
         </section>
 
         <section class="pipe-phase" data-kind="measure">
           <h4>Measurements</h4>
           <ol>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> places every measurement landmark, on the CB scan</span>
-                <span class="pipe-out"><code>T1 Landmarks/CB</code></span></li>
-            <li><span class="pipe-act"><code>derive_landmarks</code> carries them CB&nbsp;&rarr;&nbsp;MAX by a rigid fit</span>
-                <span class="pipe-out"><code>T1 Landmarks/MAX</code></span></li>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html#mirror">AutoMatrix</a> mirrors the landmarks</span>
-                <span class="pipe-out"><code>Mirrored Landmarks/{CB,MAX}</code></span></li>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html#from-areg">AutoMatrix</a> applies the three AREG matrices to them</span>
-                <span class="pipe-out"><code>Mirrored &amp; Registered Landmarks/{CB,MAND,MAX}</code></span></li>
-            <li><span class="pipe-act"><code>AQ3DC</code> &times;3 measures distances and angles</span>
-                <span class="pipe-out"><code>Measurements/Measurements_*.xlsx</code></span></li>
-            <li><span class="pipe-act">post-processing assembles the feature row</span>
-                <span class="pipe-out"><code>Measurements/PostProcess_Measurements.xlsx</code></span></li>
-            <li><span class="pipe-act"><code>VFACE_CLI</code> runs the three <a class="gterm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> models</span>
-                <span class="pipe-out"><code>Classification/Classification.xlsx</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> places every measurement landmark, on the CB scan</span></li>
+            <li><span class="pipe-act"><code>derive_landmarks</code> carries them CB&nbsp;&rarr;&nbsp;MAX by a rigid fit</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html#mirror">AutoMatrix</a> mirrors the landmarks</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../AutoMatrix/AutoMatrix.html#from-areg">AutoMatrix</a> applies the three AREG matrices to them</span></li>
+            <li><span class="pipe-act"><code>AQ3DC</code> &times;3 measures distances and angles</span></li>
+            <li><span class="pipe-act">post-processing assembles the feature row</span></li>
+            <li><span class="pipe-act"><code>VFACE_CLI</code> runs the three LightGBM models</span></li>
           </ol>
         </section>
 
         <section class="pipe-phase" data-kind="viz">
           <h4>Visualization</h4>
           <ol>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../BatchDentalSeg/BatchDentalSeg.html#sorties">BatchDentalSeg</a> &times;5 builds the bone surfaces</span>
-                <span class="pipe-out"><code>VTK Files/{T1 CB,T1 MAX,T2 CB,T2 MAND,T2 MAX}</code></span></li>
-            <li><span class="pipe-act"><code>ModelToModel Distance</code> &times;3 writes the asymmetry maps</span>
-                <span class="pipe-out"><code>Heatmaps/</code></span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../BatchDentalSeg/BatchDentalSeg.html#sorties">BatchDentalSeg</a> &times;5 builds the bone surfaces</span></li>
+            <li><span class="pipe-act"><code>ModelToModel Distance</code> &times;3 writes the asymmetry maps</span></li>
           </ol>
         </section>
-
-        <p class="pipe-note">Phase names are the module&rsquo;s own, from
-        <code>VFACE_utils/review_steps.py</code>; <code>mirror_masks</code> is left out
-        because it only exists in <code>CMFReg</code> mode.</p>
       </div>
 
-      <p>The PDF <code>Janson module.pdf</code> is the diagram
-      of this pipeline (extractable with <code>pdftotext</code>), useful for reading the code.</p>
+
+            <a class="deep-link" href="VFACE.code.html#arbre-appels"><b>In the code</b><span>The same tree with the output folder of every step</span></a>
+
 
       <h3 id="quatre-combos">The four combos that change the plan</h3>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Combo</th><th>Values</th><th>Effect on <code>CreateListProcess</code></th></tr></thead>
+          <thead><tr><th>Combo</th><th>Values</th><th>Effect</th></tr></thead>
           <tbody>
-            <tr><td><code>comboBox3</code> "Where start?"</td><td>Full pipeline / File already Oriented / File already Registered</td><td>skips the resample+ASO block, or the whole upstream block up to registration</td></tr>
-            <tr><td><code>comboBox4</code> "Analysis Type"</td><td>Asymmetry Assesment / Longitudinal studies</td><td>mirror + classification, or a real T2 and <strong>no</strong> classification</td></tr>
-            <tr><td><code>comboBox2</code> "Mode"</td><td>Quantitative / Visualization / both</td><td>enables the measurement block, the heatmap block, or both</td></tr>
-            <tr><td><code>comboBox</code> "Registration Type"</td><td>AREG / CMFReg</td><td><strong>only real effect</strong>: <code>CMFReg</code> adds a mirroring of the masks into <code>T2_Masks</code></td></tr>
+            <tr><td>Where to start</td><td>Full pipeline / File already Oriented / File already Registered</td><td>skips the resample and orientation block, or the whole upstream block up to the registration</td></tr>
+            <tr><td>Analysis type</td><td>Asymmetry assessment / Longitudinal studies</td><td>mirror and classification, or a real T2 and <strong>no</strong> classification</td></tr>
+            <tr><td>Mode</td><td>Quantitative / Visualization / both</td><td>enables the measurement block, the heat-map block, or both</td></tr>
+            <tr><td>Registration type</td><td>AREG / <a class="gterm" data-term="vface-leg-cmfreg" href="VFACE.code.html#f-cmfreg" title="See the code">CMFReg</a></td><td><strong>no real effect</strong>: CMFReg only adds a folder of mirrored masks that nothing reads</td></tr>
           </tbody>
         </table>
       </div>
 
-      <div class="callout warn">
-        <div class="callout-title">Trap (legacy only)</div>
-        <p><strong><code>CMFReg</code> is a dead end</strong>: the <code>T2_Masks</code> folder
-        (<code>createlistprocess.py:518</code>) is
-        read by no downstream step, and registration goes through
-        <code>areg_cbct</code> either way. Choosing CMFReg only changes the computation time.</p>
-        <p>Legacy (3c67957); not present in <a href="../visor/VFACE/VFACE.html#visor-changes">VISOR</a>: the port has no CMFReg option, the second
-        scan being either an AutoMatrix mirror or a real <code>t2</code>
-        (<code>VISOR:SADT-VISOR tools/VFACE/src/sadt_vface/dispatch.py:154-174</code>).</p>
-      </div>
+      <p>The CMFReg option is a dead end; choosing it only changes the computation time (<a href="VFACE.code.html#f-cmfreg">details</a>).</p>
+
+            <a class="deep-link" href="VFACE.code.html#quatre-combos"><b>In the code</b><span>The names of the four combos in the code and what each one does to the plan</span></a>
+
 
       <h2 id="fichiers">2. Files involved</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Lines</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>VFACE/VFACE.py</code></td><td>2977</td><td>widget: UI, review pauses, batch navigation, sequential execution, cleanup</td></tr>
-            <tr><td><code>createlistprocess.py</code></td><td>2636</td><td><strong>the pipeline plan</strong>, plus <code>derive_landmarks</code>, <code>reorganizeStat</code>, <code>postprocess</code>, heatmaps</td></tr>
-            <tr><td><code>functionaq3dc.py</code></td><td>2484</td><td>vendored copy of the AQ3DC module; only <code>AQ3DCLogic</code> is used</td></tr>
-            <tr><td><code>segmentation_logic.py</code></td><td>1051</td><td>drives nnU-Net via <code>SlicerNNUNetLib</code>, VTK exports</td></tr>
-            <tr><td><code>Measure.py</code></td><td>956</td><td><strong>the formulas</strong>: <code>Distance</code>, <code>Angle</code>, <code>Diff2Measure</code></td></tr>
-            <tr><td><code>review_steps.py</code></td><td>249</td><td>catalogue of pauses, and <code>restrictStepToPatients</code></td></tr>
-            <tr><td><code>_batch_worker.py</code></td><td>235</td><td>one subprocess per mesh pair for the <a class="gterm" href="../glossary.html#g-heatmap" title="See glossary">heatmap</a></td></tr>
-            <tr><td><code>VFACE_CLI/VFACE_CLI.py</code></td><td>291</td><td>joblib loading + LightGBM <code>predict</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>The module is a 2,977-line panel (interface, review <a class="gterm" data-term="vface-leg-pauses" href="VFACE.code.html#pauses" title="See the code">pauses</a>, batch navigation, sequential execution, cleanup), a 2,636-line file that is the <strong>pipeline plan</strong> together with the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> derivation, the post-processing and the <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">heat maps</a>, a vendored copy of the AQ3DC measurement module, the segmentation logic, a 956-line file holding <strong>the measurement formulas</strong>, the review catalogue, a worker for the heat maps and the 291-line classifier command. There is no conda environment: everything runs in Slicer&rsquo;s own Python, and only joblib and lightgbm are installed on top. The full table is on the code page.</p>
 
-      <p><strong>Where it runs.</strong> No conda environment: everything is in Slicer's
-      Python. The CLIs go through <code>slicer.cli.run</code>; the Python steps run
-      <em>on</em> the main thread (the window freezes, hence the explicit message posted
-      beforehand, <code>VFACE.py:2945</code>). Only two dependencies are
-      installed by <code>CheckDependency()</code> (<code>VFACE.py:1027</code>):
-      <code>joblib</code> and <code>lightgbm</code>. <code>pytorch</code> and nnU-Net come from
-      <code>SlicerNNUNetLib</code>. CUDA: <code>run_bds</code> hardcodes <code>device="cuda"</code>
-      (<code>createlistprocess.py:1555</code>),
-      with a CPU fallback handled by <code>Parameter.isSelectedDeviceAvailable()</code>.</p>
+            <a class="deep-link" href="VFACE.code.html#fichiers"><b>In the code</b><span>The file table with line counts, the dependency check and the CUDA setting</span></a>
+
 
       <h2 id="entrees">3. Inputs and preprocessing</h2>
 
-      <p><strong>Input</strong>: a folder of T1 CBCTs, one per patient (<code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>,
-      <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>). No segmentation, no <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a>: VFACE
-      starts from the raw volume. <code>checkInputFolder()</code>
-      (<code>VFACE.py:1221</code>) refuses to start on an empty folder.</p>
+      <p><strong>Input</strong>: a folder of T1 CBCTs, one per patient, in a common volume format. No segmentation, no <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a>: VFACE starts from the raw volume. An empty folder is refused. The <strong>patient identity</strong> is read from the file name by cutting it at known decoration words; only the T1 and T2 timepoints are recognised, so a third timepoint would silently break the pairing.</p>
 
-      <p><strong>Patient identity</strong>: <code>patientIdFromFileName</code>
-      (<code>functionaq3dc.py:1370</code>) cuts the name
-      on <code>_Scan</code>, <code>_Or</code>, <code>_MAND</code>, <code>_MD</code>, <code>_MAX</code>, <code>_MX</code>, <code>_CB</code>, <code>_lm</code>, <code>_T2</code>, <code>_T1</code>,
-      <code>_Cl</code>, <code>.</code>. The same chain is duplicated three times in
-      <code>createlistprocess</code> (marked <code>TIMEPOINT-SUFFIX</code>): <strong>only <code>_T1</code>/<code>_T2</code> are
-      recognized</strong>, a <code>_T3</code> silently breaks the pairing.</p>
+      <p><strong>Resampling and centring.</strong></p>
 
-      <p><strong>Resampling</strong>: spacing <code>[0.3, 0.3, 0.3]</code>, <code>resample_size = "None"</code>,
-      <code>center = "True"</code>, the volume's own size is kept, only the spacing
-      changes. Output in <code>&lt;out&gt;/T1 Resample/CBCT</code>.</p>
+            <figure class="algo" data-scene="vface_resample" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a grid keeps the same number of cells but the cells shrink, so the box they cover shrinks around its centre"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The scan is resampled to cubic <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxels</a> of 0.3&nbsp;mm. The number of voxels along each axis is kept and only their size changes, so a finer spacing makes the field of view <em>smaller</em>, shrinking around the centre. Empty space created at the edges is filled with the scan&rsquo;s own darkest value, not with zero.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">o</mi><mi>out</mi></msub><mo>=</mo><msub><mi class="k1">o</mi><mi>in</mi></msub><mo>&#x2212;</mo><mfrac><mrow><mi class="">N</mi><mo>&#xd7;</mo><msub><mi class="">s</mi><mi>out</mi></msub><mo>&#x2212;</mo><mi class="">N</mi><mo>&#xd7;</mo><msub><mi class="">s</mi><mi>in</mi></msub></mrow><mn>2</mn></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>o</b>the corner (origin) of the volume, along one axis</li><li class=""><b>N</b>number of voxels along that axis, unchanged</li><li class=""><b>s</b>voxel size: 0.3&nbsp;mm out, the scan&rsquo;s own spacing in</li></ul></div>
+      </figure>
 
-      <p><strong>Centering</strong> (<code>pre_aso_cbct</code>, <code>model_folder=False</code>): purely geometric,
-      translation of the volume's center to the origin, plus a <code>.tfm</code> written alongside
-      (<code>PRE_ASO_CBCT.py:146</code>). No
-      network is involved here.</p>
 
-      <figure class="diagram">
+      <p>The centring step is purely geometric: the volume&rsquo;s centre is translated to the origin and the translation is saved in a transform file. No network is involved.</p>
+
+            <figure class="diagram">
         <svg viewBox="0 0 760 240" role="img" aria-label="The mirror principle: oriented T1, reflection across the mid-sagittal plane, registration of the reflection onto T1, then measuring the gap">
-          <rect class="d-box" x="20" y="20" width="150" height="54" rx="6"/>
+          <a class="d-link" href="#entrees">
+<rect class="d-box" x="20" y="20" width="150" height="54" rx="6"/>
           <text class="d-label" x="95" y="43" text-anchor="middle">Oriented T1</text>
           <text class="d-label-s" x="95" y="58" text-anchor="middle">the patient's real scan</text>
+</a>
 
           <path class="d-arrow" d="M170 47 H204"/>
           <path class="d-arrow-head" d="M210 47 l-9 -5 v10 z"/>
 
-          <rect class="d-box-a" x="210" y="20" width="150" height="54" rx="6"/>
+          <a class="d-link" href="#entrees">
+<rect class="d-box-a" x="210" y="20" width="150" height="54" rx="6"/>
           <text class="d-label" x="285" y="43" text-anchor="middle">T2 = reflection</text>
           <text class="d-label-s" x="285" y="58" text-anchor="middle">mirror, plane x = 0</text>
+</a>
 
           <path class="d-arrow" d="M360 47 H394"/>
           <path class="d-arrow-head" d="M400 47 l-9 -5 v10 z"/>
 
-          <rect class="d-box" x="400" y="20" width="150" height="54" rx="6"/>
+          <a class="d-link" href="#areg-cbct">
+<rect class="d-box" x="400" y="20" width="150" height="54" rx="6"/>
           <text class="d-label" x="475" y="43" text-anchor="middle">T2 registered onto T1</text>
           <text class="d-label-s" x="475" y="58" text-anchor="middle">AREG, rigid Elastix</text>
+</a>
 
           <path class="d-arrow" d="M95 74 V130 H280 V154"/>
           <path class="d-arrow-head" d="M280 160 l-5 -9 h10 z"/>
           <path class="d-arrow" d="M475 74 V130 H480 V154"/>
           <path class="d-arrow-head" d="M480 160 l-5 -9 h10 z"/>
 
-          <rect class="d-box" x="210" y="160" width="340" height="56" rx="6"/>
+          <a class="d-link" href="#mesures">
+<rect class="d-box" x="210" y="160" width="340" height="56" rx="6"/>
           <text class="d-label" x="380" y="184" text-anchor="middle">Measurements (distances, angles)</text>
           <text class="d-label-s" x="380" y="200" text-anchor="middle">the T1 ↔ T2 gap = the asymmetry</text>
+</a>
         </svg>
-        <figcaption>There is no second scan: the "T2" is the T1's reflection across the
-        mid-sagittal plane, registered onto T1 and then compared to it.</figcaption>
+        <figcaption>There is no second scan: the &ldquo;T2&rdquo; is the T1&rsquo;s reflection across the <a class="gterm" data-term="vface-leg-plane" href="VFACE.code.html#entrees" title="See the code">mid-sagittal plane</a>, registered onto T1 and then compared to it.</figcaption>
       </figure>
 
-      <p><strong>Orientation</strong>: two distinct frames, built on the <em>same</em> centered scan.</p>
+
+      <p><strong>Orientation</strong>: two distinct frames, built on the <em>same</em> centred scan.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Frame</th><th>Landmarks requested from <a href="../ALI/ALI.html#ali-cbct">ALI</a></th><th>Gold standard</th><th>Suffix</th></tr></thead>
+          <thead><tr><th>Frame</th><th>Landmarks requested from ALI</th><th>Gold standard</th></tr></thead>
           <tbody>
-            <tr><td>MAX</td><td><code>ANS, IF, PNS, UL6O, UR1O, UR6O</code></td><td><a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">Occlusal</a> and Midsagittal Plane</td><td><code>_MAX_Or</code></td></tr>
-            <tr><td>CB</td><td><code>Ba, LPo, N, RPo, S, LOr, ROr</code></td><td>Frankfurt Horizontal and Midsagittal Plane</td><td><code>_CB_Or</code></td></tr>
+            <tr><td>Maxilla (MAX)</td><td>ANS, IF, PNS, UL6O, UR1O, UR6O</td><td><a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">Occlusal</a> and mid-sagittal plane</td></tr>
+            <tr><td>Cranial base (CB)</td><td>Ba, LPo, N, RPo, S, LOr, ROr</td><td>Frankfurt horizontal and mid-sagittal plane</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p><code>semi_aso_cbct</code> does a 3-landmark init then a rigid
-      <code>vtkIterativeClosestPointTransform</code> (1000 iterations,
-      <code>StartByMatchingCentroidsOn</code>) of the patient's landmarks onto the gold's
-      (<code>utils.py:623</code>), and writes
-      <code>&lt;pat&gt;_&lt;suffix&gt;_transform.tfm</code> = the inverse of (<a href="../ASO/ASO.html">ASO</a> ∘ centering). After
-      that, the <strong>mid-sagittal plane sits at x = 0</strong>, which is the condition for the
-      mirror to be valid.</p>
+            <figure class="algo" data-scene="vface_orient" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a set of landmarks of the patient is rotated and moved until it sits on the same landmarks of a reference case, and the mid-sagittal plane becomes vertical"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The scan is brought into a standard pose. The landmarks found on the patient are matched, by a rigid motion (a rotation and a shift, no stretching), to the same landmarks on a reference case. When they sit on top of each other, the <strong>mid-sagittal plane lies on x&nbsp;=&nbsp;0</strong>, which is the condition for the mirror of the next step to be valid.</p><div class="formula"><math display="block"><mrow><mi class="k1">p&#x2032;</mi><mo>=</mo><mi class="">R</mi><mi class="k1">p</mi><mo>+</mo><mi class="">t</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p</b>a point of the patient&rsquo;s scan</li><li class=""><b>R</b>the rotation that brings the landmarks onto the reference</li><li class=""><b>t</b>the shift</li></ul></div>
+      </figure>
 
-      <p><strong>The mirror</strong>. <code>Matrix_mirror.tfm</code> (shipped with the <code>AutoMatrixMirror</code>
-      release) is an <code>AffineTransform</code> with parameters <code>-1 0 0 0 1 0 0 0 1</code>, zero
-      translation: a pure reflection along the x axis in <a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a>, i.e. symmetry
-      relative to the mid-sagittal plane. <a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a> applies it to volumes via
-      <code>sitk.ResampleImageFilter</code> and to <code>.mrk.json</code> files via
-      <code>transform.GetInverse().TransformPoint</code>
-      (<code>Automatrix_CLI.py:171</code>).</p>
 
-      <figure class="viewer3d" data-vface="steps">
+      <p>The orientation does a three-landmark initialisation then a rigid <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> of the patient&rsquo;s landmarks onto the gold standard&rsquo;s, and writes the inverse of (orientation after centring) as a transform. After that, the <strong>mid-sagittal plane sits at x&nbsp;=&nbsp;0</strong>.</p>
+
+      <p><strong>The mirror.</strong> The mirror matrix shipped with the AutoMatrix release is a pure reflection along the x axis in <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>, with no translation: symmetry about the mid-sagittal plane. AutoMatrix applies it to volumes by resampling and to landmark files by transforming their points.</p>
+
+            <figure class="algo" data-scene="vface_mirror" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the head outline is flipped about a vertical plane, and a landmark on the right lands near the matching landmark on the left"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The second scan is the patient&rsquo;s own mirror image: every position is reflected across the plane x&nbsp;=&nbsp;0, which only flips the sign of x. A point on the right lands on the left, so each mirrored point is compared with its <strong>counterpart on the other side</strong> (right gonion against left gonion), and a point on the midline with itself.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">p</mi><mi>mir</mi></msub><mo>=</mo><mi class="">M</mi><mi class="k1">p</mi><mo>,</mo><mi class="">M</mi><mo>=</mo><mrow><mo stretchy="true" fence="true">(</mo><mtable><mtr><mtd><mn>&#x2212;1</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd><mtd><mn>0</mn></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd></mtr></mtable><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p</b>a position in the oriented scan (x runs from right to left)</li><li class=""><b>M</b>the reflection: &minus;1 on x, 1 on y and z, no shift</li></ul></div>
+      </figure>
+
+
+            <figure class="viewer3d" data-vface="steps">
         <div class="v3d-modes">
           <button type="button" data-vregion="CB" aria-pressed="true">Cranial base</button>
           <button type="button" data-vregion="MAX" aria-pressed="false">Maxilla</button>
@@ -503,701 +459,284 @@
           <i data-k="median">median</i>
         </span>
         <figcaption>
-        A real VFACE run, not a reconstruction. Everything here comes out of the tool on its
-        own published test set: the three AREG matrices, the mirrored scan, ALI&rsquo;s 26
-        predicted landmarks, and the three <code>ModelDistance</code> maps. <strong>The
-        mirror</strong> is <code>Matrix_mirror.tfm</code> = <code>diag(-1, 1, 1)</code>,
-        zero translation: a pure reflection about <strong>x&nbsp;=&nbsp;0</strong>, a
-        plane of the <em>world</em>. Nothing in it knows anything about the patient, which
-        is exactly why the upstream chain exists: to bring the patient&rsquo;s mid-sagittal
-        plane onto that plane. The reflection is animated through its degenerate state,
-        <code>diag(0, 1, 1)</code>, because a reflection cannot be interpolated by rotations
-: the determinant would have to pass from &minus;1 to +1 without ever being
-        zero. The plane draws itself at mid-flip. <strong>Then the point.</strong>
-        <code>createlistprocess.py</code> calls ModelToModel Distance three times, once per
-        registration, and the three maps do not say the same thing. Superimposed on the
-        <strong>cranial base</strong>, the whole face is laterally displaced: median |d|
-        7.0&nbsp;mm, 46% of vertices past 8&nbsp;mm, range &minus;25 to +32. Superimposed on
-        the <strong>maxilla</strong>, the upper skull meets its own mirror to 1.0&nbsp;mm.
-        On the <strong>mandible</strong>, to 0.45&nbsp;mm. Superimposing <em>on</em> a
-        structure makes that structure symmetric by construction: that is not a flaw
-        in the measurement, that <em>is</em> the measurement. <strong>The direction of those
-        matrices was measured, not assumed.</strong> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">elastix</a> writes the fixed&rarr;moving
-        mapping, so it is the <em>inverse</em> that carries the mirror onto T1: the mean
-        surface gap falls from 2.88&nbsp;mm to 1.73&nbsp;mm with the inverse, and climbs to
-        4.57 with the matrix as written, worse than leaving the mirror alone. The
-        generator now tries both directions against T1 on every run, keeps the better one,
-        and refuses to write the file if neither beats doing nothing. <strong>Three
-        different surfaces, three different scales.</strong> These are the files VFACE
-        writes: the cranial-base map covers the whole skull, the maxilla map the upper skull
-        alone, the mandible map the mandible alone, so when a map covers only one
-        structure the rest of the skull stays neutral grey behind it. Their measured ranges
-        run from &plusmn;2.6&nbsp;mm to &plusmn;32, so each map carries its own scale, shown
-        in the bar and set at its 95th percentile rather than its maximum: cranial
-        base &plusmn;25&nbsp;mm, maxilla &plusmn;5, mandible &plusmn;2.5, saturating under
-        3% of vertices. Set to the maximum, the cranial-base map sat in the pale middle of
-        the ramp almost everywhere; compare them on the numbers in the status line, not on
-        the hue. Blue is negative, red positive, pale grey is zero: the distance is
-        signed, as VFACE writes it. <strong>What is not shown, and why.</strong> The two
-        orientation steps animate no rotation: this scan arrives already oriented, so the
-        pose it came from does not exist anywhere, and what you see is the condition reached
-        rather than a reconstructed path. The frame of the maxilla map was checked rather
-        than assumed: it lives in the maxilla-oriented frame, not the cranial-base
-        one, and of the five candidate compositions <code>inv(CB)&middot;MAX</code> brings
-        it onto the others to 0.23&nbsp;mm against 3.38 for the identity, so guessing would
-        have left it a degree or two out with nothing visibly broken. The surfaces are
-        decimated to about 40&nbsp;000 triangles for the browser: VFACE&rsquo;s own
-        merged surface carries 2.77&nbsp;million, so what you see is a sample of a far
-        richer field. Three choices keep that sample faithful, each of them a correction:
-        the surface is smoothed <em>before</em> decimation rather than after (decimating
-        first then smoothing displaced vertices a median 0.74&nbsp;mm, up to 3.03, off the
-        surface the distance was measured on); its 243 disconnected islands are removed; and
-        every vertex averages the distance over its 12 nearest full-resolution neighbours
-        instead of copying one (a single sample differed from the local average by up to
-        23&nbsp;mm at discontinuities, which speckled the map). Nothing is extrapolated:
-        each vertex shows a mean of values VFACE really measured in its immediate
-        neighbourhood. <strong>Two corrections worth recording.</strong> An earlier version
-        of this figure registered the mirror with an ICP written for the page, because this
-        output had not been found yet. That ICP slid on the maxilla, 10.2&deg; of
-        rotation where AREG&rsquo;s real matrix turns 4.4&deg;, and its unsigned
-        distance on a coarser mesh reported a median of 1.36&nbsp;mm, which made this
-        patient look very nearly symmetric. He is not. The version after that applied
-        AREG&rsquo;s matrices in the wrong direction, so the mirror turned the wrong way on
-        its path to the registered pose: a reader saw it on the page before the
-        generator did, which is why the direction is now measured on every build instead of
-        resting on a convention. <strong>The plane, and how it is computed: it is
-        not.</strong> x&nbsp;=&nbsp;0 is a plane of the world, fixed by
-        <code>Matrix_mirror.tfm</code> being <code>diag(-1, 1, 1)</code> with zero
-        translation and zero fixed parameters. Nothing fits a plane to this patient. What is
-        computed is the <em>orientation</em> that brings the patient onto it: ALI places the
-        landmarks, then <code>semi_aso_cbct</code> does a 3-landmark initialisation followed
-        by a rigid ICP onto a gold standard, and here that comes to a 2.67&deg; rotation.
-        Step&nbsp;0 plays it for real, an earlier version of this caption claimed the
-        pre-orientation pose &ldquo;does not exist anywhere&rdquo;, which was simply wrong:
-        it is in <code>Centered T1 Scans</code>, and the transform VFACE wrote maps between
-        the two. Its direction was measured, not assumed. <strong>At step&nbsp;4 the
-        landmarks stay on screen</strong> so you can watch whether the registration actually
-        pulls them together. Because the mirror swaps left and right, each mirrored point is
-        paired with its <em>contralateral</em> counterpart, RGo against LGo,
-        which the measurement section already explains; pairing each label with itself gives
-        51&nbsp;mm of nonsense, the contralateral pairing gives 4.70&nbsp;mm before
-        registration. Median distance after it: 1.57&nbsp;mm on the cranial base, 2.16 on
-        the mandible, and <strong>12.84 on the maxilla, against 12.79 before, that
-        one does not converge at all</strong>, which is the same weakness its loose surface
-        fit already showed. Both endpoints are measured; only the path between them is
-        interpolated. <strong>One defect found in the published output.</strong> These
-        registered positions are recomputed here from the verified matrix rather than read
-        from <code>Mirrored &amp; Registered Landmarks</code>, because that folder agrees
-        with the matrix to 0.04&nbsp;mm for the maxilla and 0.13 for the mandible but
-        differs by 20.02&nbsp;mm for the cranial base: its points are shifted as a
-        rigid block by about 23&nbsp;mm in x and move <em>away</em> from the target. The
-        agreement on the other two is also the strongest evidence that the inverse is the
-        right direction.
+        <strong>The geometry and every number come from a VFACE run</strong> on the tool&rsquo;s published test set; no patient data is involved. Steps 0 to 5 follow the chain. <strong>The mirror</strong> is a reflection about x&nbsp;=&nbsp;0; a reflection cannot be interpolated by rotations (its determinant would have to pass from &minus;1 to +1 without being zero), so the plane draws itself at mid-flip.
+        <strong>The three <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">heat maps</a> do not say the same thing.</strong> Superimposed on the <strong>cranial base</strong>, the whole face is laterally displaced: median distance 7.0&nbsp;mm, 46&nbsp;% of vertices past 8&nbsp;mm. Superimposed on the <strong>maxilla</strong>, the upper skull meets its own mirror to 1.0&nbsp;mm; on the <strong>mandible</strong>, to 0.45&nbsp;mm. Superimposing <em>on</em> a structure makes that structure symmetric by construction: that is not a flaw in the measurement, that <em>is</em> the measurement.
+        <strong>The direction of the registration matrices was measured, not assumed.</strong> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a> writes the fixed-to-moving mapping, so it is the <em>inverse</em> that carries the mirror onto T1: the mean surface gap falls from 2.88&nbsp;mm to 1.73&nbsp;mm with the inverse, and climbs to 4.57 with the matrix as written. Each map carries its own scale, set at its 95th percentile (cranial base &plusmn;25&nbsp;mm, maxilla &plusmn;5, mandible &plusmn;2.5), so compare them on the numbers, not on the hue. Blue is negative, red positive, pale grey zero.
+        <strong>What is computed, and what is not.</strong> The plane x&nbsp;=&nbsp;0 is not fitted to the patient: what is computed is the orientation that brings the patient onto it (a 2.67&deg; rotation here). The surfaces are decimated to about 40&nbsp;000 triangles for the browser, from a merged surface of 2.77&nbsp;million. At step&nbsp;4 the landmarks stay on screen so you can watch the registration pull them together. Because the mirror swaps left and right, each mirrored point is paired with its counterpart on the other side (right gonion against left gonion): pairing each label with itself gives 51&nbsp;mm of nonsense, the counterpart pairing 4.70&nbsp;mm before registration. After registration the median distance is 1.57&nbsp;mm on the cranial base, 2.16 on the mandible, and <strong>12.84 on the maxilla against 12.79 before: that one does not converge at all</strong>.
+        <strong>One defect found in the published output.</strong> The registered landmark positions are recomputed from the verified matrix rather than read from the output folder, because that folder differs by 20&nbsp;mm for the cranial base: its points are shifted as a rigid block by about 23&nbsp;mm and move away from the target.
         </figcaption>
       </figure>
 
 
-      <p><strong>Coordinate system</strong>: everything is in <strong>LPS</strong>. ALI writes
-      <code>"coordinateSystem": "LPS"</code> (<code>io.py:39</code>),
-      so does <code>derive_landmarks</code>, and <code>createDictPatient</code> reads the raw <code>position</code>
-      field with no conversion. The signs of the measurement components follow directly
-      from this (§5.1). The module's only <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a>↔LPS flips are in
-      <code>saveAdjustedRegistration()</code> (manual review) and in the VTK exports of
-      <code>segmentation_logic</code> (<code>Scale(-1,-1,1)</code> before writing).</p>
+      <p><strong>Coordinate system</strong>: everything is in <strong>LPS</strong>. ALI writes its landmarks in LPS, so does the landmark derivation, and the measurements read positions without conversion; the signs of the measurement components follow from this. The only <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="See glossary">RAS</a> to LPS flips are in the manual review and in the VTK exports of the segmentation.</p>
+
+            <a class="deep-link" href="VFACE.code.html#entrees"><b>In the code</b><span>Input formats, the patient-identity cuts, the resample parameters, the mirror matrix and the coordinate flips</span></a>
+
 
       <h2 id="modeles">4. The models called</h2>
 
-      <p>VFACE contains only one model of its own, the LightGBMs. The others belong to
-      the upstream modules, downloaded by <code>DownloadAllFiles()</code>
-      (<code>VFACE.py:950</code>).</p>
+      <p>VFACE contains only one model of its own, the <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> classifiers. The others belong to the upstream modules, downloaded when the panel opens.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Model</th><th>Origin</th><th>Nature</th></tr></thead>
+          <thead><tr><th>Model</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>ALI-CBCT</td><td>release <code>v0.1-v2.0_models</code> (7 zips: Cranial Base, Lower Bones 1/2, Upper Bones v2, teeth)</td><td>RL agents, <code>DNet</code> = <code>monai DenseNet</code> (<code>brain.py:39</code>)</td></tr>
-            <tr><td><a href="../AMASSS/AMASSS.html#modeles">AMASSS</a></td><td><code>AMASSS_CBCT/AMASSS_Models.zip</code></td><td>3D UNet, label map output</td></tr>
-            <tr><td>DentalSegmentator</td><td><code>Dataset111_453CT_v100.zip</code> (SlicerDentalSegmentator v1.0.0-alpha)</td><td>nnU-Net 3d_fullres, fold 0</td></tr>
-            <tr><td><code>sym_asymm.txt</code>, <code>mand_asym.txt</code>, <code>max_asym.txt</code></td><td>release <code>VFACE/V_FACE_Models.zip</code></td><td><strong>LightGBM</strong>, joblib pickles</td></tr>
+            <tr><td>ALI-CBCT</td><td>reinforcement-learning agents, a DenseNet</td></tr>
+            <tr><td><a href="../AMASSS/AMASSS.html#modeles">AMASSS</a></td><td>3D UNet, label map output</td></tr>
+            <tr><td>DentalSegmentator</td><td><a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> 3d_fullres</td></tr>
+            <tr><td>Symmetry, mandible and maxilla models</td><td><strong>LightGBM</strong>, saved as joblib files</td></tr>
           </tbody>
         </table>
       </div>
 
       <h3 id="ali-cbct">4.1 ALI-CBCT</h3>
 
-      <p><span class="badge predit">network</span> reinforcement learning agents, monai DenseNet.</p>
+      <p><span class="badge predit">network</span> One agent per <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> moves inside a 64-voxel neighbourhood, at two scales (1&nbsp;mm then 0.3&nbsp;mm), with six possible moves. The landmarks requested for the measurements are the <strong><a class="gterm" data-term="vface-leg-dedup" href="VFACE.code.html#ali-cbct" title="See the code">deduplicated union</a></strong> of the points named in the mandible and cranial-base lists, so a landmark shared by both does not trigger two agents. How an agent walks is explained on the <a href="../ALI/ALI.html">ALI page</a>.</p>
 
-      <p>Reinforcement learning agents: one agent per <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a>, moving within a
-      neighborhood of <code>agent_FOV = [64,64,64]</code>, two scales <code>spacing = [1, 0.3]</code> mm,
-      <code>speed_per_scale = [1,1]</code>, <code>spawn_radius = 10</code>. Six possible moves
-      (<code>MOVEMENT_MATRIX_6</code>,
-      <code>constants.py:29</code>). Output: one
-      <code>.mrk.json</code> per anatomical group (<code>CB</code>, <code>U</code>, <code>L</code>, <code>CI</code>), named
-      <code>&lt;scan&gt;_lm_Pred_&lt;group&gt;.mrk.json</code>.</p>
+            <a class="deep-link" href="VFACE.code.html#ali-cbct"><b>In the code</b><span>The agent settings, the output group files and the deduplication line</span></a>
 
-      <p>The landmarks requested for the measurements are the <strong>deduplicated union</strong> of
-      the <code>Point 1</code> / <code>Point 2 / Line</code> columns of the MAND and CB lists
-      (<code>createlistprocess.py:144</code>):
-      <code>dict.fromkeys</code> keeps a landmark shared by both from triggering two agents.</p>
 
       <h3 id="amasss-masques">4.2 AMASSS: the masks</h3>
 
-      <p><span class="badge predit">network</span> 3D UNet.</p>
+      <p><span class="badge predit">network</span> Two calls: the cranial-base and mandible masks on the cranial-base-oriented scan, the maxilla mask on the maxillary one. These masks are only used to <strong>mask the fixed image of the registration</strong>, not to measure anything.</p>
 
-      <p>Two calls: <code>CBMASK,MANDMASK</code> on the CB-oriented scan, <code>MAXMASK</code> on the
-      MAX-oriented scan, <code>merge="SEPARATE"</code>, <code>genVtk=False</code>, <code>prediction_ID="seg"</code>. Names
-      produced: <code>&lt;base&gt;_seg_&lt;STRUCT&gt;MASK.nii.gz</code>
-      (<code>AMASSS_CLI.py:601</code>). These masks are only used to
-      <strong>mask the fixed image of the registration</strong>, not to measure anything.</p>
+            <a class="deep-link" href="VFACE.code.html#amasss-masques"><b>In the code</b><span>The call settings and the names of the mask files</span></a>
+
 
       <h3 id="bds-surfaces">4.3 BDS / DentalSegmentator: the surfaces</h3>
 
-      <p><span class="badge predit">network</span> nnU-Net 3d_fullres.</p>
+      <p><span class="badge predit">network</span> nnU-Net produces a 5-class label map (upper skull, mandible, upper and lower teeth, mandibular canal) that is converted into surfaces by <a class="gterm" data-term="marching-cubes" href="../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a>, smoothing and decimation, then written in <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>. These surfaces serve only the <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">heat maps</a>. The model weights (about 220&nbsp;MB) are downloaded on first use, and three other models offered by the code are never selected by VFACE.</p>
 
-      <p><code>run_bds</code> calls <code>run_dental_segmentation(model="DentalSegmentator",
-      device="cuda", export_formats = VTK | VTK_MERGED)</code>. nnU-Net produces a 5-class
-      label map (<code>Upper Skull</code>, <code>Mandible</code>, <code>Upper Teeth</code>, <code>Lower Teeth</code>,
-      <code>Mandibular canal</code>,
-      <code>segmentation_logic.py:600</code>),
-      converted into surfaces:</p>
+            <a class="deep-link" href="VFACE.code.html#bds-surfaces"><b>In the code</b><span>The marching cubes chain with its parameters, the weight check and the unused models</span></a>
 
-      <ul>
-        <li><code>_exportMergedVTK</code>: <code>vtkDiscreteMarchingCubes</code> (one contour per
-        <strong>present</strong> label value, indexed by position rather than by value, the code's
-        own comment explains the fixed bug), <code>vtkWindowedSincPolyDataFilter</code> 60
-        iterations, passband 0.05, per-cell normals, <code>vtkQuadricDecimation</code> 0.4 per
-        label, then IJK→RAS→LPS before writing;</li>
-        <li><code>_exportVTKPerLabel</code>: the same chain on the "Closed surface"
-        representation of each segment, one file per structure.</li>
-      </ul>
-
-      <p>The weights are not in the repository: only <code>dataset.json</code> and <code>plans.json</code>
-      are versioned, and <code>PythonDependencyChecker</code> tests for the presence of
-      <code>Dataset111_453CT/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_0/checkpoint_final.pth</code>
-      before downloading the URL from
-      <code>download_info.json</code> (~220 MB).
-      The three other models offered (<code>PediatricDentalsegmentator</code>,
-      <code>NasoMaxillaDentSeg</code>, <code>UniversalLabDentalsegmentator</code>) have their download
-      code but are <strong>never selected</strong> by VFACE: dead code here,
-      and their <code>Path(__file__).parent/"Resources"</code> paths are, for that matter, off by
-      one level (<code>VFACE_utils/Resources/...</code>), unlike the corrected path of the
-      default model (<code>segmentation_logic.py:469</code>).</p>
 
       <h3 id="areg-cbct">4.4 The registration: AREG-CBCT</h3>
 
-      <p><span class="badge calcule">computed</span> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a>, no learning.</p>
+      <p><span class="badge calcule">computed</span> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a>, no learning. The original scan is masked with the corresponding AMASSS mask, then a rigid registration is run in three resolutions with a mutual-information metric, one thread for determinism. It is done once per region.</p>
 
-      <p><code>VoxelBasedRegistration</code> masks T1 with the corresponding AMASSS mask then
-      launches <strong>rigid Elastix</strong> (<code>make_rigid_param_map_deterministic</code>,
-      <code>utils.py:530</code>): 3 resolutions,
-      pyramid <code>8,8 4,4 2,2</code>, <code>AdvancedMattesMutualInformation</code> 64 bins,
-      <code>ConjugateGradient</code> 1500 iterations, <code>ImageSampler = Grid</code>,
-      <code>NumberOfThreads = 1</code> (determinism). No learning.</p>
+            <figure class="algo" data-scene="vface_register" data-ms="7200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the mirrored outline is moved rigidly to match the upper part of the skull, then moved again to match the lower jaw; each time the region it matches is aligned and the other is not"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The mirror is then registered back onto the original, <strong>one region at a time</strong> (cranial base, maxilla, mandible), using only the bone of that region. Whatever the region, the registration is a rigid motion; each landmark of the mirrored set is moved by the motion of its own region. Registering <em>on</em> a region makes that region symmetric by construction: the gap that remains on the other regions is the measurement. In the legacy module the motion is found by Elastix: it picks the one that maximises the mutual information between the masked original and the mirrored scan.</p><div class="formula"><math display="block"><mrow><msub><mi class="k2">p</mi><mi>reg</mi></msub><mo>=</mo><msub><mi class="">T</mi><mi class="">r</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k2">p</mi><mi>mir</mi></msub><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mi class="">T&#x302;</mi><mi class="">r</mi></msub><mo>=</mo><munder><mo>argmax</mo><mi>T</mi></munder><mi>MI</mi><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="">F</mi><mi class="">r</mi></msub><mo>,</mo><mi class="">M</mi><mo>&#x2218;</mo><mi class="">T</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k2"><b>p</b>a landmark of the mirrored set</li><li class=""><b>T<sub>r</sub></b>the rigid motion found for region r, one per patient and per region</li><li class=""><b>F<sub>r</sub></b>the original scan, masked to region r</li><li class=""><b>M</b>the mirrored scan</li><li class=""><b>MI</b>mutual information: how well the grey levels of the two scans predict each other</li></ul></div>
+      </figure>
 
-      <p>Outputs: <code>Registered Scan/&lt;Cranial Base|Maxilla|Mandible&gt;/&lt;pat&gt;_OutReg/</code>
-      containing <code>&lt;pat&gt;_&lt;CB|MAX|MAND&gt;Scan_Reg.nii.gz</code> and
-      <code>&lt;pat&gt;_&lt;CB|MAX|MAND&gt;_Reg_matrix.tfm</code>.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Trap (legacy, 3c67957)</div>
-        <p>Legacy (3c67957). In <a href="../visor/VFACE/VFACE.html#visor-changes">VISOR</a> this keyword function is gone: VFACE does not match masks
-        itself, it hands the whole masks folder to AREG_CBCT as <code>t1_masks</code>
-        (<code>VISOR:SADT-VISOR tools/VFACE/src/sadt_vface/tools.py:225-233</code>) and the pairing
-        is AREG's.</p>
-        <p>Fragile detail: the mask is chosen by keyword in the file name
-        (<code>CB</code>→<code>["cb"]</code>, <code>MAND</code>→<code>["mand","md"]</code>, <code>MAX</code>→<code>["max","mx"]</code>) and <strong>the first
-        one found wins</strong> (<code>utils.py:42</code>). But
-        <code>&lt;pat&gt;_CB_Or_seg_MANDMASK.nii.gz</code> also contains "cb". It is only alphabetical
-        order (<code>CBMASK</code> &lt; <code>MANDMASK</code>) that keeps the cranial-base registration from
-        being masked by the mandible. Any renaming breaks this.</p>
-      </div>
+      <p>Outputs: for each region and patient, the registered scan and its transform. The mask is chosen by a keyword in its file name and the first match wins, which is fragile (<a href="VFACE.code.html#f-mask-keyword">details</a>).</p>
+
+            <a class="deep-link" href="VFACE.code.html#areg-cbct"><b>In the code</b><span>The Elastix parameters, the output names and the keyword-based mask selection</span></a>
+
 
       <h2 id="mesures">5. The algorithmic core: the measurements</h2>
 
       <h3 id="huit-types">5.1 The eight measurement types</h3>
 
-      <p>All instantiated by <code>AQ3DCLogic.createMeasurement</code>
-      (<code>functionaq3dc.py:1995</code>), from
-      the <code>Type of measurement</code> column of the xlsx: matched by <strong>exact string
-      equality</strong>. Positions are in LPS (<code>x</code> = left, <code>y</code> = posterior,
-      <code>z</code> = superior).</p>
+      <p>All are built from the <em>type of measurement</em> column of the Excel list, matched by exact text. Positions are in <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Type (exact string)</th><th>Inputs</th><th>Formula (<code>Measure.py</code>)</th></tr></thead>
+          <thead><tr><th>Type</th><th>Inputs</th><th>What it computes</th></tr></thead>
           <tbody>
-            <tr><td><code>Distance between 2 points T1</code> / <code>T2</code></td><td>P1, P2 at the same time point</td><td><code>d = p2 − p1</code>; <code>(lr, ap, si) = (−dx, −dy, dz)</code>; <code>3D = ‖d‖</code>; rounded to 3 decimals</td></tr>
-            <tr><td><code>Distance between 2 points T1 T2</code></td><td>P1 @T1, P2 @T2</td><td>identical, but <strong>crossed</strong> between the two point sets: this is the asymmetry measurement</td></tr>
-            <tr><td><code>Distance point line T1</code> / <code>T2</code></td><td>P, line (L1, L2)</td><td><code>d = reject(P − L2, L1 − L2)</code> = the component orthogonal to the line; if <code>L1 ≈ L2</code> (<code>atol=1e-5</code>), <code>d = P − L1</code></td></tr>
-            <tr><td><code>Distance point line T1 T2</code></td><td>two measurements</td><td><code>Diff2Measure</code>: <code>lr/ap/si</code> of T2 <strong>minus</strong> those of T1; <code>3D</code> recomputed as <code>‖(lr,ap,si)‖</code></td></tr>
-            <tr><td><code>Angle between 2 lines T1</code> / <code>T2</code></td><td>2 lines, same time point</td><td>see below</td></tr>
-            <tr><td><code>Angle between 2 lines T1 T2</code></td><td>2 T1 lines, 2 T2 lines</td><td><code>Diff2Measure</code> component by component</td></tr>
-            <tr><td><code>Angle line T1 and line T2</code></td><td>line @T1, line @T2</td><td>the same angle computation, lines coming from different time points</td></tr>
+            <tr><td>Distance between 2 points, T1 or T2</td><td>two points, same timepoint</td><td>the difference vector, its three components and its length</td></tr>
+            <tr><td>Distance between 2 points, T1 T2</td><td>one point at T1, one at T2</td><td>the same, but <strong>crossed</strong> between the two point sets: this is the asymmetry measurement</td></tr>
+            <tr><td>Distance point line, T1 or T2</td><td>a point and a line</td><td>the component of the point orthogonal to the line</td></tr>
+            <tr><td>Distance point line, T1 T2</td><td>two measurements</td><td>the T2 components <strong>minus</strong> the T1 ones</td></tr>
+            <tr><td>Angle between 2 lines, T1 or T2</td><td>two lines, same timepoint</td><td>an angle per anatomical plane</td></tr>
+            <tr><td>Angle between 2 lines, T1 T2</td><td>two T1 lines, two T2 lines</td><td>the differences of the angles</td></tr>
+            <tr><td>Angle line T1 and line T2</td><td>a line at each timepoint</td><td>the same angle computation across timepoints</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p><strong>Angle formula</strong> (<code>Angle.__computeAngles</code>,
-      <code>Measure.py:664</code>). <code>u = p2 − p1</code>,
-      <code>v = p4 − p3</code>. For each axis <code>a</code> of <code>[2, 0, 1]</code>, respectively <strong>yaw</strong>
-      (axial plane), <strong>pitch</strong> (sagittal plane), <strong>roll</strong> (coronal plane):</p>
+            <figure class="algo" data-scene="vface_dist" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: an arrow is drawn from one landmark to another, then its horizontal and vertical parts are shown"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">A measurement compares two points, usually a <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> and its counterpart in the mirror image after registration. Their difference is a vector. It is read in three directions (right-left, front-back, up-down), and its length is the 3D distance. In this coordinate system the right-left and front-back components are the negatives of x and y.</p><div class="formula"><math display="block"><mrow><mi class="k1">d</mi><mo>=</mo><msub><mi class="k3">p</mi><mn>2</mn></msub><mo>&#x2212;</mo><msub><mi class="k2">p</mi><mn>1</mn></msub></mrow></math></div><div class="formula"><math display="block"><mrow><mo stretchy="true" fence="true">(</mo><mi>lr</mi><mo>,</mo><mi>ap</mi><mo>,</mo><mi>si</mi><mo stretchy="true" fence="true">)</mo><mo>=</mo><mo stretchy="true" fence="true">(</mo><mo>&#x2212;</mo><msub><mi class="k1">d</mi><mi>x</mi></msub><mo>,</mo><mo>&#x2212;</mo><msub><mi class="k1">d</mi><mi>y</mi></msub><mo>,</mo><msub><mi class="k1">d</mi><mi>z</mi></msub><mo stretchy="true" fence="true">)</mo><mo>,</mo><mi>D</mi><mo>=</mo><mrow><mo>&#x2225;</mo><mi class="k1">d</mi><mo>&#x2225;</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k2"><b>p<sub>1</sub></b>the first landmark</li><li class="k3"><b>p<sub>2</sub></b>the second landmark (its counterpart)</li><li class="k1"><b>d</b>the vector between them</li><li class=""><b>lr, ap, si</b>its right-left, front-back and up-down parts</li><li class=""><b>D</b>the 3D distance</li></ul></div>
+      </figure>
 
-      <ol>
-        <li>drop component <code>a</code> (2D projection), normalize;</li>
-        <li><code>θ = degrees(arctan2(‖u × v‖, u · v))</code>;</li>
-        <li>if <code>p2 == p3</code> (the two lines share their vertex): <code>θ ← 180 − θ</code>, this is
-        what turns <code>RCo-RGo / RGo-Me</code> into an anatomical gonial angle;</li>
-        <li>sign: <code>z = u_x·v_y − u_y·v_x</code>; for the yaw axis the sign follows <code>z</code>, for
-        pitch and roll it is <strong>flipped</strong>.</li>
-      </ol>
 
-      <p>The <code>complement_checkbox</code> block (complement to 180°) is commented out:
-      <code>Measure.py:679</code>.</p>
+            <figure class="algo" data-scene="vface_angle" data-ms="6000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a second line turns away from a first one and the angle between them is drawn; with a shared end point, the supplementary angle is shown"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">For an angle, each of the two lines is a vector, and the angle is computed in a plane (once for each of the three anatomical planes, which gives yaw, pitch and roll). When the two lines share their end point, as for the gonial angle, the value is replaced by its supplement to get the anatomical angle.</p><div class="formula"><math display="block"><mrow><mi>&#x3b8;</mi><mo>=</mo><mo>arctan2</mo><mrow><mo stretchy="true" fence="true">(</mo><mrow><mo>&#x2225;</mo><mi class="k2">u</mi><mo>&#xd7;</mo><mi class="k3">v</mi><mo>&#x2225;</mo></mrow><mo>,</mo><mi class="k2">u</mi><mo>&#x22c5;</mo><mi class="k3">v</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi>&#x3b8;</mi><mo>&#x2190;</mo><mn>180&#xb0;</mn><mo>&#x2212;</mo><mi>&#x3b8;</mi><mo>,</mo><mi>if </mi><msub><mi>p</mi><mn>2</mn></msub><mo>=</mo><msub><mi>p</mi><mn>3</mn></msub></mrow></math></div><ul class="algo-legend"><li class="k2"><b>u</b>first line: from p<sub>1</sub> to p<sub>2</sub></li><li class="k3"><b>v</b>second line: from p<sub>3</sub> to p<sub>4</sub></li><li class="k1"><b>&#x3b8;</b>the angle</li><li class="k4"><b>180&deg; &minus; &#x3b8;</b>the supplement, used when the lines share their vertex</li></ul></div>
+      </figure>
 
-      <p><strong>Component meaning</strong>. <code>manageMeaningComponent()</code> fills in labels
-      (<code>R</code>/<code>L</code>, <code>A</code>/<code>P</code>, <code>S</code>/<code>I</code> for skeletal measurements; <code>M</code>/<code>D</code>, <code>B</code>/<code>L</code>, <code>E</code>/<code>I</code>
-      for teeth; <code>ClockWise</code>/<code>CounterC</code> for T1↔T2 angles). The returned
-      <code>*_Component</code> values are <strong>absolute values</strong>; it is <code>reorganizeStat</code>
-      (<code>createlistprocess.py:1599</code>) that
-      gives them back a sign from the label.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Trap</div>
-        <p><strong>Two opposite conventions coexist here</strong>: for a skeletal line
-        <code>Vertical = −|si|</code> when the direction is <code>S</code> (superior), whereas for a dental
-        line <code>Vertical = −|si|</code> when the direction is <code>I</code>. Worth checking before
-        reusing these columns.
-        An <code>Angle between 2 lines T1</code> angle falls into no branch of
-        <code>manageMeaningComponent</code> (neither dental, nor T1↔T2): its labels stay empty
-        and its value stays <strong>unsigned</strong>.</p>
-        <p>Also true in <a href="../visor/VFACE/VFACE.html#visor-changes">VISOR</a> for the two <code>Vertical</code> conventions: the dental branch
-        signs on <code>"I"</code> and the skeletal branch on <code>"S"</code>, both kept on
-        purpose (<code>VISOR:SADT-VISOR tools/VFACE/src/sadt_vface/features.py:140</code> and
-        <code>:158</code>).</p>
-      </div>
+      <p>Each yaw, pitch and roll is the angle in the axial, sagittal and coronal plane respectively. The measurement code returns absolute values with labels (right or left, anterior or posterior, superior or inferior; mesial or distal for teeth; clockwise or counter-clockwise for angles between timepoints), and the post-processing gives them back a sign from the label. Two opposite conventions coexist for the vertical axis, skeletal and dental (<a href="VFACE.code.html#f-vertical-sign">details</a>).</p>
 
-      <h3 id="liste-defaut">5.2 The default list (<code>DefaultList.zip</code>)</h3>
+            <a class="deep-link" href="VFACE.code.html#huit-types"><b>In the code</b><span>The exact type strings, the formulas with their lines and the sign-meaning tables</span></a>
 
-      <p>Outside the repository, downloaded by the <em>Default</em> button into
-      <code>&lt;Documents&gt;/SlicerDownloads/V_FACE/DefaultList</code>. The file name decides
-      its role (<code>SplitMeasurements</code>,
-      <code>createlistprocess.py:1831</code>):
-      <code>CB</code>/<code>CRANIAL</code>, <code>MAND</code>/<code>MANDIBLE</code>, <code>MAX</code>/<code>MAXILLA</code>, <code>FEAT</code>/<code>FEATURE</code>.</p>
+
+      <h3 id="liste-defaut">5.2 The default list</h3>
+
+      <p>The default measurement lists are downloaded separately; the file name decides the role of each (cranial base, mandible, maxilla, <a class="gterm" data-term="vface-leg-template" href="VFACE.code.html#reorganize-postprocess" title="See the code">feature template</a>).</p>
 
       <div class="table-wrap">
         <table>
           <thead><tr><th>File</th><th>Contents</th></tr></thead>
           <tbody>
-            <tr><td><code>CB_measurement.xlsx</code></td><td>26 distances + 4 angles</td></tr>
-            <tr><td><code>MAND_measurement.xlsx</code></td><td>15 distances (subset of CB)</td></tr>
-            <tr><td><code>MAX_measurement.xlsx</code></td><td>7 distances (subset of CB)</td></tr>
-            <tr><td><code>features.xlsx</code></td><td>the header: <code>ID</code> + 14 features + <code>Asymmetry</code>, <code>Mand</code>, <code>Max</code></td></tr>
+            <tr><td>Cranial base list</td><td>26 distances and 4 angles</td></tr>
+            <tr><td>Mandible list</td><td>15 distances (a subset of the first)</td></tr>
+            <tr><td>Maxilla list</td><td>7 distances (a subset of the first)</td></tr>
+            <tr><td>Feature template</td><td>the header: an ID, 14 features, then the three answers</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>CB's <strong>16 T1↔T2 distances</strong> (= direct asymmetry): <code>RFZyg/LFZyg</code>,
-      <code>ROr/LOr</code>, <code>A/A</code>, <code>ANS/ANS</code>, <code>IF/IF</code>, <code>RInfOr/LInfOr</code>, <code>RMZyg/LMZyg</code>,
-      <code>RPF/LPF</code>, <code>UR6MB/UL6MB</code>, <code>B/B</code>, <code>Pog/Pog</code>, <code>Me/Me</code>, <code>RGo/LGo</code>, <code>RCo/LCo</code>,
-      <code>RAF/LAF</code>, <code>LR6MB/LL6MB</code>. Note the pattern: a midline point is compared to
-      <strong>itself</strong> in the mirror (<code>A/A</code>, <code>B/B</code>, <code>Me/Me</code>), a lateral point is
-      compared to its <strong>contralateral counterpart</strong> (<code>RGo/LGo</code>) since the mirror has
-      swapped sides.</p>
+      <p>The cranial-base list holds <strong>16 distances between T1 and T2</strong>, which is the direct asymmetry. The pattern: a midline point is compared to <strong>itself</strong> in the mirror (A, B, Me), a lateral point to its <strong>counterpart on the other side</strong> (right gonion against left gonion) since the mirror has swapped sides. The <strong>10 T1-only distances</strong> are classic anatomical lengths. The <strong>4 angles</strong> are two gonial angles (T1 only, sharing a vertex, hence complemented to 180 degrees) and two angles between a T1 line and a T2 line; reversing the order of the points on the T2 side is deliberate, because the mirror swapped left and right and the two vectors then become almost collinear, so the angle tends toward 0 for a symmetric patient.</p>
 
-      <p>The <strong>10 T1-only distances</strong> are classic anatomical lengths:
-      <code>RCo-Pog</code>, <code>LCo-Pog</code>, <code>RGo-Pog</code>, <code>LGo-Pog</code>, <code>RCo-RGo</code>, <code>LCo-LGo</code>, <code>RAF-RCo</code>,
-      <code>LAF-LCo</code>, <code>UR6MB-LR6MB</code>, <code>UL6MB-LL6MB</code>.</p>
+            <a class="deep-link" href="VFACE.code.html#liste-defaut"><b>In the code</b><span>The lists with their landmark pairs and the first-sheet-only reading</span></a>
 
-      <p>The <strong>4 angles</strong>: <code>RCo-RGo / RGo-Me</code> and <code>LCo-LGo / LGo-Me</code> (gonial angles,
-      T1 only, shared vertex hence complemented to 180°); <code>LAF-RAF / RAF-LAF</code> and
-      <code>LPF-RPF / RPF-LPF</code> as <code>Angle line T1 and line T2</code>. <strong>Reversing the order of
-      the points in the T2 line is deliberate</strong>: since the mirror has swapped left and
-      right, writing <code>RAF-LAF</code> on the T2 side brings the two vectors back to being
-      near-collinear, so the measured angle tends toward 0 for a symmetric patient.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Trap (legacy only)</div>
-        <p><code>create_list_landmark</code>
-        (<code>createlistprocess.py:2152</code> at 3c67957) does
-        <code>pd.read_excel(path)</code> (line 2154) <strong>without <code>sheet_name=None</code></strong>: only the first sheet is
-        read. A <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> appearing only in the <code>Angle between 2 lines</code> sheet would
-        never be requested from ALI. It does not show up with the default list
-        because its 9 angle landmarks all also appear in the distances sheet.</p>
-        <p>Not present in <a href="../visor/VFACE/VFACE.html#visor-changes">VISOR</a>: <code>read_measurement_list</code> reads every sheet of the
-        workbook with <code>sheet_name=None</code>
-        (<code>VISOR:SADT-VISOR tools/VFACE/src/sadt_vface/aq3dc.py:122</code>).</p>
-      </div>
+      <h3 id="derive-landmarks">5.3 Deriving the maxillary landmarks without a second ALI pass</h3>
 
-      <h3 id="derive-landmarks">5.3 <code>derive_landmarks</code>: MAX landmarks without a second <a href="../ALI/ALI.html#ali-cbct">ALI</a> pass</h3>
+      <p>ALI is only run once, in the cranial-base frame. The landmarks in the maxillary frame are obtained through a rigid composition.</p>
 
-      <p><code>createlistprocess.py:1428</code>. ALI
-      is only run once, in the CB frame. The landmarks in the MAX frame are
-      obtained through rigid composition:</p>
+            <figure class="algo" data-scene="vface_derive" data-ms="6200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the same head and the same landmark are shown in three coordinate frames, one after the other"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The landmarks are searched once, in the cranial-base frame. The maxillary frame comes from the same centred scan, so a point can be carried from one frame to the other through the two orientation motions, without a second search: first to the centred scan, then, by the inverse of the second motion, to the maxillary frame.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">p</mi><mi>MAX</mi></msub><mo>=</mo><msup><msub><mi class="">T</mi><mi>MAX</mi></msub><mn>&#x2212;1</mn></msup><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="">T</mi><mi>CB</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k1">p</mi><mi>CB</mi></msub><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p</b>a landmark, expressed in the frame named below it</li><li class=""><b>T<sub>CB</sub></b>orientation motion of the cranial-base frame (a .tfm file)</li><li class=""><b>T<sub>MAX</sub></b>orientation motion of the maxillary frame; its inverse is used</li></ul></div>
+      </figure>
 
-      <pre><code>to_centred   = sitk.ReadTransform(&lt;pat&gt;_CB_Or_transform.tfm)
-from_centred = sitk.ReadTransform(&lt;pat&gt;_MAX_Or_transform.tfm).GetInverse()
-moved = from_centred.TransformPoint(to_centred.TransformPoint(p))</code></pre>
 
-      <p>Both <a href="../ASO/ASO.html">ASO</a> <code>.tfm</code> files share the same centered scan as their reference, so
-      centering cancels out and the composition is exact. Gain: a few minutes per
-      patient, and <strong>a single manual editing point</strong>, correcting a landmark at the
-      <code>t1_landmarks</code> pause automatically propagates to the MAX frame. Grouping into
-      output files reuses ALI's <code>GROUP_LABELS</code>, read via <code>ast.parse</code> on
-      <code>constants.py</code> to avoid importing
-      torch (<code>createlistprocess.py:1373</code>).</p>
+      <p>Both orientation transforms share the same centred scan as their reference, so centring cancels out and the composition is exact. The gain is a few minutes per patient and <strong>a single manual editing point</strong>: correcting a landmark at the review pause automatically propagates to the maxillary frame.</p>
 
-      <h3 id="reorganize-postprocess">5.4 <code>reorganizeStat</code> then <code>postprocess</code>: from measurement to feature</h3>
+            <a class="deep-link" href="VFACE.code.html#derive-landmarks"><b>In the code</b><span>The composition code, the transform files it needs and how ALI&rsquo;s group labels are read</span></a>
 
-      <p><code>run_aq3dc</code> produces one row per (patient × measurement) with 16 columns
-      (<code>R-L Component/Meaning</code>, <code>A-P</code>, <code>S-I</code>, <code>3D Distance</code>, <code>Yaw</code>, <code>Pitch</code>, <code>Roll</code>).
-      <code>reorganizeStat</code> flattens this into signed columns <code>Transverse</code>, <code>AP</code>,
-      <code>Vertical</code>, <code>3D</code>, <code>Yaw</code>, <code>Pitch</code>, <code>Roll</code>, plus <code>BL</code>, <code>MD</code>, <code>Rotation</code>,
-      <code>Arch</code>, <code>Segment</code> for dental lines. Columns that are entirely <code>"x"</code>
-      are dropped, so <code>Measurements_MAND.xlsx</code> and <code>Measurements_MAX.xlsx</code> have
-      no angular columns.</p>
 
-      <p><code>postprocess</code> (<code>createlistprocess.py:2546</code>)
-      takes the reverse path: it <strong>decodes each column name of <code>features.xlsx</code></strong>
-      to figure out which row of which xlsx to read.</p>
+      <h3 id="reorganize-postprocess">5.4 From measurement to feature</h3>
 
-      <pre class="ascii">CB_LPF_RPF/RPF_LPF_Roll
-└┬┘ └──────┬────────┘└┬─┘
- │         │          └ component  ("RL"-&gt;Transverse, "IS"-&gt;Vertical, "AP", Pitch, Yaw, Roll)
- │         └ landmarks ("/" -&gt; angle label "LPF-RPF / RPF-LPF")
- └ source file (CB, MAND, MAX)</pre>
+      <p>The measurement step produces one row per patient and measurement with 16 columns. A first function flattens this into signed columns (transverse, anterior-posterior, vertical, 3D, yaw, pitch, roll, plus tooth columns), dropping columns that are entirely empty, so the mandible and maxilla tables have no angular columns. The post-processing then goes the other way: it <strong>decodes each column name of the feature template</strong> to find which row of which table to read. A name tells the source table, the landmarks and the component; when it names more than two landmark segments, the feature is an <strong>average</strong> of the components of the corresponding lines. The output has one row per patient and empty answer columns, which the classifier fills.</p>
 
-      <p>When the remainder contains more than 2 segments, the feature is an <strong>average</strong>:
-      <code>CB_RAF_RCo_LAF_LCo_AP</code> = the average of the AP components of <code>RAF - RCo</code> and
-      <code>LAF - LCo</code>. Output: <code>Measurements/PostProcess_Measurements.xlsx</code>, one row
-      per patient, empty <code>Asymmetry</code>/<code>Mand</code>/<code>Max</code> columns.</p>
+            <a class="deep-link" href="VFACE.code.html#reorganize-postprocess"><b>In the code</b><span>The column-name grammar with its example and the output file</span></a>
+
 
       <h2 id="classifieur">6. The classifier</h2>
 
-      <p><code>VFACE_CLI</code> loads three joblib pickles
-      (<code>VFACE_CLI.py:96</code>). These are
-      <strong><code>lightgbm.sklearn.LGBMClassifier</code></strong> models, not a network, not a
-      hand-written rule tree.</p>
-
-      <div class="callout ok">
-        <div class="callout-title">Verified</div>
-        <p>The hyperparameters and the number of trees kept below were confirmed by
-        unpickling the three <code>.txt</code> files.</p>
-        <p><a href="../visor/VFACE/VFACE.html#visor-changes">VISOR</a> loads three files of the same names, <code>sym_asymm.txt</code>,
-        <code>mand_asym.txt</code> and <code>max_asym.txt</code>
-        (<code>VISOR:SADT-VISOR tools/VFACE/src/sadt_vface/classify.py:28-32</code>).</p>
-      </div>
+      <p>Three joblib files are loaded. They are <strong><a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> classifier</strong> models, not a network and not a hand-written rule tree. Hyperparameters and tree counts were confirmed by unpickling the files.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Model</th><th>Hyperparameters</th><th>Features</th><th>Trees kept</th></tr></thead>
+          <thead><tr><th>Model</th><th>Features</th><th>Trees kept</th></tr></thead>
           <tbody>
-            <tr><td><code>sym_asymm.txt</code></td><td><code>gbdt</code>, <code>objective=binary</code>, <code>num_leaves=31</code>, <code>learning_rate=0.03</code>, <code>n_estimators=5000</code>, <code>class_weight=balanced</code>, <code>random_state=42</code>, no regularization</td><td>14</td><td><strong>459</strong></td></tr>
-            <tr><td><code>mand_asym.txt</code></td><td>same</td><td>7</td><td><strong>3</strong></td></tr>
-            <tr><td><code>max_asym.txt</code></td><td>same</td><td>7</td><td><strong>11</strong></td></tr>
+            <tr><td>Symmetry</td><td>14</td><td><strong>459</strong></td></tr>
+            <tr><td>Mandible involved</td><td>7</td><td><strong>3</strong></td></tr>
+            <tr><td>Maxilla involved</td><td>7</td><td><strong>11</strong></td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>The 5000 estimators announced are never reached (early stopping during
-      training). The sub-models are therefore tiny: 3 and 11 trees of 5 to
-      7 leaves.</p>
+      <p>The 5,000 estimators announced are never reached (early stopping during training), so the sub-models are tiny. The main model rests for about 90&nbsp;% of its gain on <strong>two measurements</strong>: the transverse deviation of the chin (the menton against its mirror) and the vertical difference between the two ramus branches.</p>
 
-      <p><strong>The 14 features</strong> and the gain importance of the main model:</p>
+            <figure class="algo" data-scene="vface_trees" data-ms="7000">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a ball goes down three small decision trees, and the values of the leaves it reaches add up on a scale with a threshold at zero"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Each model is a set of small decision trees. The patient&rsquo;s row of numbers goes down every tree, answering one yes-or-no question at each fork, and lands on a leaf that holds a value. The values of all the leaves are added; a positive total means the second class, a negative one the first. The first model has 459 trees, the other two 3 and 11.</p><div class="formula"><math display="block"><mrow><mi class="k4">F</mi><mo>=</mo><munder><mo>&#x2211;</mo><mi>t</mi></munder><msub><mi class="">f</mi><mi class="">t</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">x</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi class="">p</mi><mo>=</mo><mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mo>&#x2212;</mo><mi class="k4">F</mi></mrow></msup></mrow></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>x</b>the patient&rsquo;s row of features</li><li class=""><b>f<sub>t</sub></b>the value of the leaf reached in tree t</li><li class="k4"><b>F</b>the sum of the leaves (zero is the threshold)</li><li class=""><b>p</b>the probability of class 1, Symmetric; above 0.5 the model answers class 1</li></ul></div>
+      </figure>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Feature</th><th>Gain</th></tr></thead>
-          <tbody>
-            <tr><td><code>CB_Me_Me_RL</code></td><td>3640</td></tr>
-            <tr><td><code>MAND_RCo_RGo_LCo_LGo_IS</code></td><td>1378</td></tr>
-            <tr><td><code>CB_Pog_Pog_RL</code></td><td>348</td></tr>
-            <tr><td><code>CB_B_B_RL</code></td><td>72</td></tr>
-            <tr><td><code>CB_LAF_RAF/RAF_LAF_Yaw</code></td><td>58</td></tr>
-            <tr><td><code>MAX_RPF_LPF_AP</code></td><td>15</td></tr>
-            <tr><td><code>CB_LPF_RPF/RPF_LPF_Yaw</code></td><td>10</td></tr>
-            <tr><td><code>CB_LPF_RPF/RPF_LPF_Roll</code></td><td>8</td></tr>
-            <tr><td><code>MAX_RPF_LPF_IS</code></td><td>8</td></tr>
-            <tr><td><code>MAX_RPF_LPF_RL</code></td><td>6</td></tr>
-            <tr><td><code>CB_RPF_LPF_IS</code></td><td>6</td></tr>
-            <tr><td><code>MAND_Me_Me_RL</code></td><td>4</td></tr>
-            <tr><td><code>MAX_ANS_ANS_RL</code></td><td>2</td></tr>
-            <tr><td><code>CB_RAF_RCo_LAF_LCo_AP</code></td><td>2</td></tr>
-          </tbody>
-        </table>
-      </div>
 
-      <p>The model therefore rests, for ~90%, on <strong>two measurements</strong>: the transverse
-      deviation of the chin (<code>Me</code> against its mirror) and the vertical difference
-      between the two ramus branches.</p>
-
-      <figure class="diagram">
+            <figure class="diagram">
         <svg viewBox="0 0 780 380" role="img" aria-label="Chaining of the three LightGBM models: sym_asymm decides Symmetric or Asymmetric; only Asymmetric cases go into mand_asym and max_asym">
-          <rect class="d-box" x="300" y="10" width="160" height="44" rx="6"/>
+          <a class="d-link" href="#reorganize-postprocess">
+<rect class="d-box" x="300" y="10" width="160" height="44" rx="6"/>
           <text class="d-label" x="380" y="37" text-anchor="middle">Features (14)</text>
+</a>
 
           <path class="d-arrow" d="M380 54 V84"/>
           <path class="d-arrow-head" d="M380 90 l-5 -9 h10 z"/>
 
-          <rect class="d-box-n" x="280" y="90" width="200" height="50" rx="6"/>
-          <text class="d-label" x="380" y="110" text-anchor="middle">sym_asymm.txt</text>
+          <a class="d-link" href="#classifieur">
+<rect class="d-box-n" x="280" y="90" width="200" height="50" rx="6"/>
+          <text class="d-label" x="380" y="110" text-anchor="middle">Symmetry model</text>
           <text class="d-label-s" x="380" y="125" text-anchor="middle">LightGBM, 459 trees</text>
+</a>
 
           <path class="d-arrow" d="M330 140 V165 H135 V184"/>
           <path class="d-arrow-head" d="M135 190 l-5 -9 h10 z"/>
           <path class="d-arrow" d="M430 140 V165 H625 V184"/>
           <path class="d-arrow-head" d="M625 190 l-5 -9 h10 z"/>
 
-          <rect class="d-box" x="40" y="190" width="190" height="48" rx="6"/>
+          <a class="d-link" href="#classifieur">
+<rect class="d-box" x="40" y="190" width="190" height="48" rx="6"/>
           <text class="d-label" x="135" y="212" text-anchor="middle">Symmetric</text>
           <text class="d-label-s" x="135" y="227" text-anchor="middle">Mand = False, Max = False</text>
+</a>
 
-          <rect class="d-box-a" x="530" y="190" width="190" height="48" rx="6"/>
+          <a class="d-link" href="#classifieur">
+<rect class="d-box-a" x="530" y="190" width="190" height="48" rx="6"/>
           <text class="d-label" x="625" y="212" text-anchor="middle">Asymmetric</text>
           <text class="d-label-s" x="625" y="227" text-anchor="middle">goes into the sub-models</text>
+</a>
 
           <path class="d-arrow" d="M625 238 V265 H495 V284"/>
           <path class="d-arrow-head" d="M495 290 l-5 -9 h10 z"/>
           <path class="d-arrow" d="M625 238 V265 H685 V284"/>
           <path class="d-arrow-head" d="M685 290 l-5 -9 h10 z"/>
 
-          <rect class="d-box-n" x="410" y="290" width="170" height="52" rx="6"/>
-          <text class="d-label" x="495" y="311" text-anchor="middle">mand_asym.txt</text>
+          <a class="d-link" href="#classifieur">
+<rect class="d-box-n" x="410" y="290" width="170" height="52" rx="6"/>
+          <text class="d-label" x="495" y="311" text-anchor="middle">Mandible model</text>
           <text class="d-label-s" x="495" y="326" text-anchor="middle">7 features, 3 trees → True/False</text>
+</a>
 
-          <rect class="d-box-n" x="600" y="290" width="170" height="52" rx="6"/>
-          <text class="d-label" x="685" y="311" text-anchor="middle">max_asym.txt</text>
+          <a class="d-link" href="#classifieur">
+<rect class="d-box-n" x="600" y="290" width="170" height="52" rx="6"/>
+          <text class="d-label" x="685" y="311" text-anchor="middle">Maxilla model</text>
           <text class="d-label-s" x="685" y="326" text-anchor="middle">7 features, 11 trees → True/False</text>
+</a>
         </svg>
-        <figcaption>The two sub-models are independent: neither is exclusive, a
-        patient can be both mandibular <em>and</em> maxillary asymmetric.</figcaption>
+        <figcaption>The two sub-models are independent: neither is exclusive, a patient can be both mandibular <em>and</em> maxillary asymmetric.</figcaption>
       </figure>
 
-      <p><strong>Chaining the three models</strong> (<code>classify_symmetry</code>,
-      <code>VFACE_CLI.py:136</code>):</p>
 
-      <ol>
-        <li>columns containing <code>/</code> are renamed by <code>clean_name</code> (<code>/</code> → <code>_</code>), which
-        makes <code>CB_LAF_RAF/RAF_LAF_Yaw</code> match the <code>feature_name_</code> stored
-        in the model, <code>CB_LAF_RAF_RAF_LAF_Yaw</code>;</li>
-        <li><code>model_sym_asym.predict(df[feature_name_])</code> → <code>Asymmetry</code> ∈
-        {<code>"Asymmetric"</code> (class 0), <code>"Symmetric"</code> (class 1)};</li>
-        <li><code>Mand</code> and <code>Max</code> are initialized to <code>"False"</code>, then <strong>only the
-        asymmetric cases</strong> go through <code>mand_asym</code> (7 features, 5 of them from the CB
-        block) and <code>max_asym</code> (7 features), each returning <code>"True"</code>/<code>"False"</code>;</li>
-        <li>the two sub-models are independent: both can be <code>"True"</code>
-        (mandibular <strong>and</strong> maxillary asymmetry), neither is exclusive.</li>
-      </ol>
+      <p><strong>Chaining the three models.</strong> The symmetry model answers every patient: asymmetric (class 0) or symmetric (class 1). The mandible and maxilla answers start as &ldquo;False&rdquo;, and <strong>only the asymmetric cases</strong> go through the two sub-models. They are independent: both can be true. The output is the feature table with the three answer columns; this is the final deliverable.</p>
 
-      <p>Output: <code>Classification/Classification.xlsx</code> = the features table augmented
-      with the three columns. This is the final deliverable.</p>
+            <a class="deep-link" href="VFACE.code.html#classifieur"><b>In the code</b><span>The hyperparameters, the 14 features with their gain, and the chaining code</span></a>
+
 
       <h2 id="revue">7. Manual review and batch navigation</h2>
 
       <h3 id="pauses">7.1 The pauses</h3>
 
-      <p>Added by commit <code>2609bc4</code>. A step in the plan can carry
-      <code>Review*</code> keys; the widget stops at the end of the step, loads the results into
-      the scene, and waits. The catalogue lives in
-      <code>review_steps.py</code>, kept separate from the pipeline so
-      the panel can list the pauses before <code>CreateListProcess</code> has even
-      created a single folder.</p>
+      <p>A step of the plan can ask the panel to stop at its end, load the results into the scene and wait. Three kinds of pause exist: <strong>view only</strong> (loaded and shown, nothing rewritten); <strong>editable <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a></strong> (unlocked and shown, and rewritten only if a point moved); and <strong>adjustable registration</strong> (the registered scan overlays the original at half opacity with interaction handles, and the correction is composed into the registration&rsquo;s own transform, because AutoMatrix downstream can only apply a single matrix). The quantification block is placed before the visualisation block, so that the one really useful editable pause does not arrive after five <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> segmentations.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Id</th><th>Label</th><th>Nature</th><th>Available if</th></tr></thead>
-          <tbody>
-            <tr><td><code>t1_landmarks_orientation_max</code></td><td>maxillary orientation <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a></td><td><strong>editable</strong></td><td>Full pipeline</td></tr>
-            <tr><td><code>t1_oriented_max</code></td><td>maxillary orientation</td><td>view only</td><td>Full pipeline</td></tr>
-            <tr><td><code>t1_landmarks_orientation_cb</code></td><td>cranial base orientation landmarks</td><td><strong>editable</strong></td><td>Full pipeline</td></tr>
-            <tr><td><code>t1_oriented_cb</code></td><td>cranial base orientation</td><td>view only</td><td>Full pipeline</td></tr>
-            <tr><td><code>t1_masks</code></td><td>bone masks</td><td>view only</td><td>except "already Registered"</td></tr>
-            <tr><td><code>mirror_masks</code></td><td>mirrored masks</td><td>view only</td><td>asymmetry + CMFReg</td></tr>
-            <tr><td><code>mirror_scans</code></td><td>mirrored scans</td><td>view only</td><td>asymmetry</td></tr>
-            <tr><td><code>registration_cb</code> / <code>_max</code> / <code>_mand</code></td><td>registrations</td><td><strong>adjustable</strong></td><td>except "already Registered"</td></tr>
-            <tr><td><code>t1_landmarks</code></td><td>all measurement landmarks</td><td><strong>editable</strong></td><td><a class="gterm" href="../glossary.html#g-quantification" title="See glossary">quantification</a></td></tr>
-            <tr><td><code>bone_surfaces</code></td><td>BDS surfaces (<code>_merged</code> only)</td><td>view only</td><td>visualization</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <a class="deep-link" href="VFACE.code.html#pauses"><b>In the code</b><span>The catalogue of pauses with their availability, and the Qt event-loop constraint</span></a>
 
-      <p>Three natures, three behaviors:</p>
-
-      <ul>
-        <li><strong><code>VIEW</code></strong>: loaded and displayed, nothing is rewritten.</li>
-        <li><strong><code>LANDMARKS</code></strong>: <code>loadEditableMarkups</code> forces <code>SetLocked(False)</code> on the node
-        and on every point, and makes the display visible, <a href="../ALI/ALI.html#ali-cbct">ALI</a> writes its points
-        locked and hidden. The starting positions are recorded; at
-        <code>Continue</code>, <code>savePauseEdits</code> only rewrites the files where at least one
-        point has moved (<code>VFACE.py:2095</code>).</li>
-        <li><strong><code>REGISTRATION</code></strong>: <code>setUpAdjustment</code> overlays the registered scan at
-        half opacity onto T1, attaches it to a <code>vtkMRMLLinearTransformNode</code> with
-        interaction handles. At <code>Continue</code>, <code>saveAdjustedRegistration</code>
-        (<code>VFACE.py:2207</code>) converts the RAS displacement to LPS
-        (<code>flip = diag(-1,-1,1)</code>, <code>lps = flip @ ras @ flip</code>) and <strong>composes it into
-        AREG's own <code>.tfm</code></strong>:
-        <code>sitk.CompositeTransform([areg, nudge.GetInverse()])</code>, because <a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a>
-        downstream can only apply a single matrix. The corrected volume is then
-        hardened and rewritten.</li>
-      </ul>
-
-      <p>Two important ordering constraints in the plan:
-      the quantification block is placed <strong>before</strong> the visualization block, so that
-      the only useful editable pause (<code>t1_landmarks</code>) does not arrive after five
-      nnU-Net segmentations; and <code>enterPauseForReview</code> loads nothing directly,
-      it arms a <code>QTimer.singleShot(0, self.beginReview)</code>, because this happens inside
-      a VTK observer callback, where the Qt event loop is not running and where loading a
-      volume would fill Slicer's stdout pipe with no reader (the same family of bug as
-      <code>_briefCliOutput</code> and <code>outputToFile</code>).</p>
-
-      <p><code>buildPauseQueue</code> (<code>VFACE.py:1813</code>) filters the files
-      found by <strong>patient identity</strong>, never by date: a reused output folder
-      contains the patients from earlier runs. <code>belongsToRun</code> accepts an id
-      that extends an expected id at a <code>_</code> boundary (heatmaps come out as
-      <code>C_0001_Mandible_ModelDistance</code>). If the filter empties the review entirely while
-      files did exist, it is <strong>disarmed</strong> rather than skipping a requested
-      pause.</p>
 
       <h3 id="batch-existe">7.2 Batch navigation: what exists</h3>
 
-      <div class="callout ok">
-        <div class="callout-title">Verified (legacy only)</div>
-        <p>Contrary to what an older project note states, the port from AREG
-        <strong>has been done</strong> (<code>2609bc4</code>, branch <code>vface-review-rebuild</code>).</p>
-        <p>Legacy (3c67957); not present in <a href="../visor/VFACE/VFACE.html#visor-changes">VISOR</a>: the pause-and-review system is not ported
-        (<code>VISOR:SADT-VISOR tools/VFACE/README.md:29-32</code>).</p>
-      </div>
+      <p>The port of the review from AREG has been done. The panel offers previous and next patient (saving the current edit first), the position in the batch, flagging, and a <strong><a class="gterm" data-term="vface-leg-rollback" href="VFACE.code.html#batch-existe" title="See the code">selective rollback</a></strong> that walks back to the nearest correctable step and replays the steps in between for the flagged patients only. In VISOR the pause-and-review system is not ported.</p>
 
-      <ul>
-        <li><code>Previous patient</code> / <code>Next patient</code> (<code>VFACE.py:2324</code>),
-        which save the current edit before switching patients;</li>
-        <li>the patient's name and their <code>i / n</code> position in <code>reviewPatientLabel</code>;</li>
-        <li><strong>flagging</strong>: <code>onReviewToggleFlag</code> marks the current patient in
-        <code>self.review_flagged</code>;</li>
-        <li><strong>selective rollback</strong>: <code>onReviewGoBack</code>
-        (<code>VFACE.py:2351</code>) walks back to the nearest correctable
-        step (<code>previousCorrectableStep</code>, which only stops on <code>LANDMARKS</code> or
-        <code>REGISTRATION</code>), reinjects the intermediate steps at the head of
-        <code>list_process</code>, and <strong>restricts them to the flagged patients</strong> via
-        <code>restrictStepToPatients</code>, a temp folder of symbolic links
-        (<code>shutil.copy</code> as fallback), tree structure preserved;</li>
-        <li><code>review_flagged_carry</code> passes the list of replayed patients on to the
-        next review queue build, so the others keep their accepted results;</li>
-        <li><code>clearReviewTempFolders</code> cleans up the link folders at the end of the run.</li>
-      </ul>
+            <a class="deep-link" href="VFACE.code.html#batch-existe"><b>In the code</b><span>The functions of the navigation and the rollback logic</span></a>
 
-      <p>The <code>Continue</code> button is named <code>Next step</code>: moving between patients and
-      advancing the run are two distinct actions.</p>
 
       <h3 id="batch-manque">7.3 Batch navigation: what is genuinely missing</h3>
 
-      <p>The gap is in <strong><code>INPUT_KEYS</code></strong>
-      (<code>review_steps.py:168</code>):</p>
+      <p>Only some steps can be narrowed to the flagged patients. For the others, a rollback replays the whole batch: for example both AMASSS runs, the <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a> registration of the maxilla and the mandible, or all five bone-surface runs. Narrowing the measurement and classification steps would be harmful, since they write an aggregated table rebuilt from scratch; the proper fix is to add the scan keys, not every folder key (<a href="VFACE.code.html#f-batch-missing">details</a>).</p>
 
-      <pre><code>INPUT_KEYS = ("input", "input_patient", "input_matrix")</code></pre>
+            <a class="deep-link" href="VFACE.code.html#batch-manque"><b>In the code</b><span>The list of narrowable input keys and the two lesser limits</span></a>
 
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug (legacy only)</div>
-        <p>Legacy (3c67957); not present in <a href="../visor/VFACE/VFACE.html#visor-changes">VISOR</a>, which has no batch navigation and no review step
-        (<code>VISOR:SADT-VISOR tools/VFACE/README.md:29-32</code>).</p>
-        <p>Only ALI, PRE_ASO, SEMI_ASO (<code>input</code>) and AutoMatrix (<code>input_patient</code>,
-        <code>input_matrix</code>) can be narrowed. Missing, for the VFACE pipeline:
-        <code>inputVolume</code> (<a href="../AMASSS/AMASSS.html#modeles">AMASSS</a>), <code>t1_folder</code> / <code>t2_folder</code> / <code>mask_folder_t1</code> (AREG),
-        <code>input_folder_CBCT</code> (resample), <code>input_path</code> (BDS), <code>t1_path</code> / <code>t2_path</code>
-        (AQ3DC), <code>t1_dir</code> / <code>t2_dir</code> (heatmaps), <code>source_folder</code> &amp;co
-        (<code>derive_landmarks</code>). AREG, for its part, covers <code>inputVolume</code>, <code>t1_folder</code>, <code>t2_folder</code>,
-        <code>T1</code>, <code>T2</code>, <code>IOS_folder</code>, <code>CBCT_folder</code>, <code>input_folder_CBCT</code>
-        (<code>Review.py:717</code>).</p>
-      </div>
-
-      <p>Concrete consequences:</p>
-
-      <ul>
-        <li>rollback from <code>t1_masks</code> → <a href="../ASO/ASO.html">ASO</a> is replayed for the single flagged patient,
-        but <strong>both AMASSS runs start over on the whole batch</strong> (the slowest step);</li>
-        <li>rollback from <code>registration_max</code> or <code>_mand</code> → the <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a> registration is
-        replayed for the whole batch;</li>
-        <li>rollback from <code>bone_surfaces</code> → all five BDS runs start over on the whole batch.</li>
-      </ul>
-
-      <p>Worth noting before "fixing" this: narrowing AQ3DC / <code>postprocess</code> /
-      the classification would be <strong>harmful</strong>, because these steps write an
-      aggregated xlsx rebuilt from scratch, restricting them would erase the rows of the
-      unflagged patients. The proper fix is to add the volume/scan keys, not
-      every folder key.</p>
-
-      <p>Two other, lesser limits:</p>
-
-      <ul>
-        <li><code>previousCorrectableStep</code> looks up the current step in <code>executed_steps</code> <strong>by
-        identity</strong>; after a first rollback, the history holds both the
-        original steps and their narrowed copies, and a second rollback replays a
-        list longer than needed;</li>
-        <li>the displayed counter (<code>Paused at step N/M</code>) is not rewound by a
-        rollback: <code>NumberProcess</code> increases, <code>ActualProcess</code> does not go back down.</li>
-      </ul>
-
-      <p>VFACE also lacks the equivalent of AREG's <code>_normalisedId</code> / <code>_matchAcrossNaming</code>
-      (pairing <code>P1</code> ↔ <code>P_0001</code>), but this does not matter to it: it only has one
-      modality.</p>
 
       <h2 id="sorties">8. Post-processing and outputs</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Folder under <code>OutputFolder</code></th><th>Contents</th><th>Survives cleanup</th></tr></thead>
+          <thead><tr><th>Folder under the output folder</th><th>Contents</th><th>Kept after cleanup</th></tr></thead>
           <tbody>
-            <tr><td><code>T1 Resample/CBCT</code></td><td>0.3 mm centered volumes</td><td>no</td></tr>
-            <tr><td><code>Centered T1 Scans/{CB,MAX}</code></td><td>centered volumes + centering <code>.tfm</code></td><td>no</td></tr>
-            <tr><td><code>Oriented T1 Scans/{CB,MAX}</code></td><td><code>&lt;pat&gt;_{CB,MAX}_Or.nii.gz</code>, <code>_transform.tfm</code>, <code>_lm_*.mrk.json</code></td><td>no</td></tr>
-            <tr><td><code>T1 Masks</code></td><td><code>&lt;base&gt;_seg_{CB,MAND,MAX}MASK.nii.gz</code></td><td>no</td></tr>
-            <tr><td><code>T2_Scan/{CB,MAX}</code> or <code>T2 Centered</code></td><td>the mirror (or the real T2 in longitudinal mode)</td><td>no</td></tr>
-            <tr><td><code>T2_Masks</code></td><td>mirrored masks, <strong>unused</strong> (CMFReg)</td><td>no</td></tr>
-            <tr><td><code>Registered Scan/&lt;region&gt;/&lt;pat&gt;_OutReg/</code></td><td>registered scan + <code>_Reg_matrix.tfm</code></td><td>no</td></tr>
-            <tr><td><code>T1 Landmarks/{CB,MAX}</code></td><td><a href="../ALI/ALI.html#ali-cbct">ALI</a> <code>.mrk.json</code> and derivatives</td><td>no</td></tr>
-            <tr><td><code>Mirrored Landmarks/{CB,MAX}</code></td><td><code>_mir</code> suffix</td><td>no</td></tr>
-            <tr><td><code>Mirrored &amp; Registered Landmarks/{CB,MAND,MAX}</code></td><td><code>_CB_reg</code>, <code>_MAND_reg</code>, <code>_MAX_reg</code> suffixes</td><td>no</td></tr>
-            <tr><td><code>Measurements</code></td><td><code>Measurements_{CB,MAND,MAX}.xlsx</code>, <code>PostProcess_Measurements.xlsx</code></td><td><strong>yes</strong> if Quantitative</td></tr>
-            <tr><td><code>Classification</code></td><td><code>Classification.xlsx</code></td><td><strong>yes</strong> if Quantitative</td></tr>
-            <tr><td><code>VTK Files/{T1 CB,T1 MAX,T2 CB,T2 MAND,T2 MAX}</code></td><td>BDS surfaces, LPS</td><td><strong>yes</strong> if Visualization</td></tr>
-            <tr><td><code>Heatmaps</code></td><td><code>&lt;pat&gt;_&lt;zone&gt;_ModelDistance.vtk</code></td><td><strong>yes</strong> if Visualization</td></tr>
+            <tr><td>Resampled, centred and oriented scans</td><td>volumes with their transforms and <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a></td><td>no</td></tr>
+            <tr><td>Masks, mirror, registered scans</td><td>AMASSS masks, the second scan, the registered scans and matrices</td><td>no</td></tr>
+            <tr><td>Landmarks (T1, mirrored, mirrored and registered)</td><td>the landmark files at each stage</td><td>no</td></tr>
+            <tr><td><code>Measurements</code></td><td>one table per region and the post-processed table</td><td><strong>yes</strong> if Quantitative</td></tr>
+            <tr><td><code>Classification</code></td><td>the final table</td><td><strong>yes</strong> if Quantitative</td></tr>
+            <tr><td>Bone surfaces and <code>Heatmaps</code></td><td>BDS surfaces and one signed-distance file per patient and zone</td><td><strong>yes</strong> if Visualization</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p><strong>The heatmaps</strong> (<code>batch_process</code>,
-      <code>createlistprocess.py:2219</code>) are
-      signed <code>vtkDistancePolyDataFilter</code> results between the T1 surface and the paired
-      T2 surface, over three zones (<code>merged</code> CB, <code>Mandible</code>, <code>Upper_Skull</code>). Each pair
-      runs in <strong>its own process</strong> (<code>_batch_worker.py</code>) because the VTK
-      filter allocates locators on the C++ side that <code>gc.collect()</code> does not free; up
-      to <code>min(4, cpu_count // 2)</code> workers in parallel, 600 s timeout, stdout/stderr sent to
-      files (never pipes: a chatty worker would block). Beyond 1M cumulative
-      points the worker decimates to 0.5, beyond 2M to 0.7, computes the distance
-      on the decimated meshes then <strong>reinterpolates</strong> onto the original mesh via
-      <code>vtkPointLocator</code>. The output array is called <code>Distance</code>.</p>
+            <figure class="algo" data-scene="vface_heat" data-ms="5800">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: each point of one surface is linked to the nearest point of another surface, and is coloured by that distance and on which side it lies"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">For every point of the baseline surface, the map holds its distance to the nearest point of the other surface, <strong>with a sign</strong> that says on which side the other surface lies. Colours stand for that signed distance; each map has its own scale, so compare the numbers and not the hues.</p><div class="formula"><math display="block"><mrow><mi class="">d</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mi>&#xb1;</mi><munder><mo>min</mo><mrow><mi>q</mi><mo>&#x2208;</mo><msub><mi>S</mi><mn>2</mn></msub></mrow></munder><mrow><mo>&#x2225;</mo><mi class="">v</mi><mo>&#x2212;</mo><mi class="">q</mi><mo>&#x2225;</mo></mrow></mrow></math></div><ul class="algo-legend"><li class=""><b>v</b>a point of the baseline surface</li><li class=""><b>q</b>a point of the other surface S<sub>2</sub></li><li class="k4"><b>d &gt; 0</b>the other surface lies on one side of v</li><li class="k2"><b>d &lt; 0</b>it lies on the other side</li></ul></div>
+      </figure>
 
-      <p><strong>Cleanup, and its trap.</strong> <code>OnEndProcess</code>
-      (<code>VFACE.py:2766</code>), if "Keep Intermediate files" is
-      unchecked, deletes <strong>every subfolder</strong> of <code>OutputFolder</code> except the list
-      above. Two bugs were fixed there and are worth knowing about:</p>
 
-      <pre><code>output = (self._parameterNode.OutputFolder or "").strip()
-if not output or not os.path.isabs(output) or not os.path.isdir(output):
-    raise ValueError(...)   # nothing gets cleaned up</code></pre>
+      <p>The maps are computed over three zones (merged cranial base, mandible, upper skull). Each pair runs in <strong>its own process</strong> because the VTK filter allocates memory that the garbage collector does not free; beyond a million points in total the surfaces are thinned by half, beyond two million by 70&nbsp;%, and the distance is carried back onto the original mesh. Unless &ldquo;Keep intermediate files&rdquo; is checked, every other sub-folder is deleted at the end; a past bug there could wipe the wrong folder and is fixed (<a href="VFACE.code.html#f-cleanup">details</a>).</p>
 
-      <div class="callout bug">
-        <div class="callout-title">Fixed bug (historical, legacy only)</div>
-        <p>Legacy (3c67957); not present in <a href="../visor/VFACE/VFACE.html#visor-changes">VISOR</a>, whose cleanup removes the single folder
-        <code>.vface_work</code> and nothing else
-        (<code>VISOR:SADT-VISOR tools/VFACE/src/sadt_vface/dispatch.py:409</code>).</p>
-        <p><code>Path("")</code> equals <code>Path(".")</code>, and <code>iterdir()</code> would then walk Slicer's
-        current working directory: a run with no output folder set <strong>would wipe out
-        the working directory tree</strong> of all its subfolders. And the test checked for
-        <code>"Quantification"</code> while the menu says <code>"Quantitative"</code>, so that
-        cleanup would erase <code>Measurements</code> and <code>Classification</code>: the results
-        themselves. Files at the root of the output folder are never
-        deleted (only <code>item.is_dir()</code> is processed).</p>
-      </div>
+            <a class="deep-link" href="VFACE.code.html#sorties"><b>In the code</b><span>The full folder table, the worker settings and the cleanup code</span></a>
+
 
       <h2 id="predit-calcule">9. What is predicted vs what is computed</h2>
 
@@ -1205,121 +744,50 @@ if not output or not os.path.isabs(output) or not os.path.isdir(output):
         <table>
           <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
           <tbody>
-            <tr><td>Resampling, centering</td><td><span class="badge calcule">computed</span> geometric</td><td><span class="badge cli"><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a> / <a href="../ASO/ASO.html">ASO</a></span></td></tr>
-            <tr><td><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">Landmarks</a> (orientation and measurements)</td><td><span class="badge predit">predicted</span> RL agents, monai DenseNet</td><td><span class="badge cli">ALI-CBCT</span></td></tr>
-            <tr><td>Orientation onto gold standard</td><td><span class="badge calcule">computed</span> rigid VTK <a class="gterm" href="../glossary.html#g-icp" title="See glossary">ICP</a> on landmarks</td><td><span class="badge cli">ASO SEMI</span></td></tr>
-            <tr><td>Bone masks</td><td><span class="badge predit">predicted</span> 3D UNet <a href="../AMASSS/AMASSS.html#modeles">AMASSS</a></td><td><span class="badge cli">AMASSS</span></td></tr>
-            <tr><td>Mirror</td><td><span class="badge calcule">computed</span> fixed matrix <code>diag(-1,1,1)</code></td><td><span class="badge cli"><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></span></td></tr>
-            <tr><td>Registration</td><td><span class="badge calcule">computed</span> rigid <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a>, MI, 3 resolutions</td><td><span class="badge cli">AREG</span></td></tr>
-            <tr><td>MAX landmarks</td><td><span class="badge calcule">computed</span> rigid composition of two <code>.tfm</code></td><td>Python, widget</td></tr>
-            <tr><td>Bone surfaces</td><td><span class="badge predit">predicted</span> nnU-Net DentalSegmentator</td><td>Python, widget, CUDA</td></tr>
-            <tr><td>Linear / angular measurements</td><td><span class="badge calcule">computed</span> geometric, numpy</td><td>Python, widget</td></tr>
-            <tr><td>Heatmaps</td><td><span class="badge calcule">computed</span> <code>vtkDistancePolyDataFilter</code></td><td>subprocess</td></tr>
-            <tr><td>Classification</td><td><span class="badge predit">predicted</span> LightGBM ×3</td><td><span class="badge cli">VFACE</span></td></tr>
+            <tr><td>Resampling, centring</td><td><span class="badge calcule">computed</span> geometric</td><td>MRI2CBCT, ASO</td></tr>
+            <tr><td><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">Landmarks</a> (orientation and measurements)</td><td><span class="badge predit">predicted</span> RL agents</td><td>ALI-CBCT</td></tr>
+            <tr><td>Orientation onto the gold standard</td><td><span class="badge calcule">computed</span> rigid <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> on landmarks</td><td>ASO</td></tr>
+            <tr><td>Bone masks</td><td><span class="badge predit">predicted</span> 3D UNet</td><td>AMASSS</td></tr>
+            <tr><td>Mirror</td><td><span class="badge calcule">computed</span> a fixed matrix</td><td>AutoMatrix</td></tr>
+            <tr><td>Registration</td><td><span class="badge calcule">computed</span> rigid <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a>, mutual information</td><td>AREG</td></tr>
+            <tr><td>Maxillary landmarks</td><td><span class="badge calcule">computed</span> composition of two transforms</td><td>the panel</td></tr>
+            <tr><td>Bone surfaces</td><td><span class="badge predit">predicted</span> <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a></td><td>the panel, CUDA</td></tr>
+            <tr><td>Linear and angular measurements</td><td><span class="badge calcule">computed</span> geometric</td><td>the panel</td></tr>
+            <tr><td><a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">Heat maps</a></td><td><span class="badge calcule">computed</span> a signed distance filter</td><td>subprocess</td></tr>
+            <tr><td>Classification</td><td><span class="badge predit">predicted</span> <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a>, three models</td><td>VFACE</td></tr>
           </tbody>
         </table>
       </div>
 
       <h2 id="pieges">10. Traps and fragile spots</h2>
 
+      <p>Each point is checked in the code and described, with its evidence, on the code page.</p>
+
       <ul>
-        <li><strong><code>derive_landmarks</code> cannot work outside "Full pipeline".</strong> In "File
-        already Oriented" / "already Registered" mode, <code>SplitOriented</code>
-        (<code>createlistprocess.py:1877</code>) only
-        copies the <code>.nii*</code> / <code>.nrrd*</code> files into <code>Oriented T1 Scans/</code>, <strong>not the
-        <code>.tfm</code> files</strong>. The "Deriving T1 <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">Landmarks</a> (MAX)" step then logs
-        <code>missing an orientation transform</code> for every patient, <code>T1 Landmarks/MAX</code>
-        stays empty, so does <code>Measurements_MAX.xlsx</code>, and the classification is missing
-        five features out of fourteen.</li>
-        <li><strong><code>CMFReg</code> does not change the registration</strong>, it only adds a
-        <code>T2_Masks</code> folder that nothing reads (§1).</li>
-        <li><strong>Hardcoded <code>_T1</code>/<code>_T2</code> suffixes</strong>, three copies marked <code>TIMEPOINT-SUFFIX</code> in
-        <code>createlistprocess</code>. A <code>_T3</code> silently breaks the pairing. The
-        reference note sits above <code>GetPatients</code> in
-        <code>AREG_CBCT/AREG_CBCT_utils/utils.py:70</code>.</li>
-        <li><strong>Keyword-based mask selection</strong>: <code>CBMASK</code> only beats <code>MANDMASK</code>
-        by alphabetical order (§4.4).</li>
-        <li><strong><code>_index_measurements</code> keeps the first row</strong> for a repeated landmark
-        label. Two measurements of different types on the same pair of points
-        (e.g. <code>B/B</code> in T1 and in T1↔T2) would shadow each other.</li>
-        <li><strong><code>writeMeasurementExcel</code> writes without <code>index=False</code></strong>: the xlsx files carry
-        a stray <code>Unnamed: 0</code> column.</li>
-        <li><strong>Measurement lists are matched by file name</strong> (<code>CB</code>, <code>MAND</code>,
-        <code>MAX</code>, <code>FEAT</code> uppercase in the name). A file named
-        <code>MAX_and_MAND.xlsx</code> would fall into whichever branch matches first.</li>
-        <li><strong>The Python steps freeze the interface.</strong> No thread: <code>startPythonProcess</code>
-        calls the function directly, with fd 1 and 2 redirected to a temporary file
-        (<code>outputToFile</code>,
-        <code>VFACE.py:2548</code>), torch and nnU-Net write from
-        C, where replacing <code>sys.stdout</code> would not be enough.</li>
-        <li><strong>The <code>spacing</code> parameter is passed as a Python list</strong> (<code>[0.3,0.3,0.3]</code>) to a
-        parameter declared <code>&lt;string&gt;</code> in the XML, and the CLI does <code>spacing.split(",")</code>.
-        It works because of Slicer's serialization, and <a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a> does the same thing,
-        but it is implicit.</li>
-        <li><strong>Notable dead code</strong>: the whole <code>AQ3DCWidget</code> widget (~1200 lines of
-        <code>functionaq3dc.py</code>, never instantiated outside
-        tests); <code>Measure.isUtilMeasure</code> (the call is commented out,
-        <code>functionaq3dc.py:2183</code>);
-        <code>check_skeletal</code> and <code>SKELETAL_LM_RL</code> in
-        <code>Measure.py</code>; <code>GetDictPatients</code> /
-        <code>GetMatrixPatients</code>; the <code>T1</code>/<code>T2</code> variables computed and never used
-        in <code>reorganizeStat</code>; the <code>QCheckBox</code> initialization of <code>keep_sign</code> in
-        <code>run_aq3dc</code> (the value is already <code>True</code>, never <code>None</code>); <code>VFACELogic.process</code>,
-        <code>VFACETest</code> and <code>registerSampleData</code> (Slicer template boilerplate, the
-        <code>VFACE1</code>/<code>VFACE2</code> URLs point to generic test data); the three
-        alternative segmentation models of
-        <code>segmentation_logic.py</code>.</li>
-        <li><strong>The "Test Files" button</strong> downloads AREG's archive
-        (<code>Or_FullyAuto.zip</code>), deletes its T2 (VFACE builds its own) and points
-        the input to the T1. There is no test archive of VFACE's own.</li>
+        <li><strong>The maxillary <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> derivation fails outside &ldquo;Full pipeline&rdquo;.</strong> The transform files are not copied, so the maxilla table is empty and five features out of fourteen are missing. <a href="VFACE.code.html#f-derive-outside-full">Evidence</a>.</li>
+        <li><strong><a class="gterm" data-term="vface-leg-cmfreg" href="VFACE.code.html#f-cmfreg" title="See the code">CMFReg</a> does not change the registration.</strong> <a href="VFACE.code.html#f-cmfreg-noop">Evidence</a>.</li>
+        <li><strong>Hardcoded T1 and T2 suffixes.</strong> A third timepoint silently breaks the pairing. <a href="VFACE.code.html#f-timepoint-suffix">Evidence</a>.</li>
+        <li><strong>Keyword-based mask selection.</strong> The cranial-base mask beats the mandible mask only by alphabetical order. <a href="VFACE.code.html#f-mask-keyword-li">Evidence</a>.</li>
+        <li><strong>A repeated landmark label keeps only its first row.</strong> <a href="VFACE.code.html#f-index-first-row">Evidence</a>.</li>
+        <li><strong>The Python steps freeze the interface.</strong> <a href="VFACE.code.html#f-ui-freeze">Evidence</a>.</li>
+        <li><strong>Only the first sheet of a measurement list is read.</strong> <a href="VFACE.code.html#f-first-sheet">Evidence</a>.</li>
       </ul>
 
       <h2 id="litterature">11. Literature</h2>
 
-      <p>The corresponding published work is <strong>"Automated classification of skeletal
-      facial asymmetry in <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> using a reproducible 3D Slicer workflow for
-      patient-specific decision support"</strong>, SPIE Medical Imaging 2026, vol. 13929,
-      art. 139292J, <a href="https://doi.org/10.1117/12.3087010">doi:10.1117/12.3087010</a>
-      (<a href="https://spie.org/medical-imaging/presentation/Automated-classification-of-skeletal-facial-asymmetry-in-CBCT-using-a/13929-89">SPIE page</a>).
-      The public abstract describes 170 Class III patients, and the same upstream
-      chain: standardized preprocessing, <strong>mirroring</strong>, <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> registration,
-      extraction of anatomical measurements.</p>
+      <p>The corresponding published work is &ldquo;Automated classification of skeletal facial asymmetry in <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> using a reproducible 3D Slicer workflow for patient-specific decision support&rdquo;, SPIE Medical Imaging 2026, vol. 13929, art. 139292J, <a href="https://doi.org/10.1117/12.3087010">doi:10.1117/12.3087010</a> (<a href="https://spie.org/medical-imaging/presentation/Automated-classification-of-skeletal-facial-asymmetry-in-CBCT-using-a/13929-89">SPIE page</a>). The public abstract describes 170 Class III patients and the same upstream chain: standardised preprocessing, mirroring, <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> registration, extraction of anatomical measurements.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Code / paper divergence</div>
-        <p><strong>The code diverges from the paper at the last step.</strong> The abstract describes an
-        <strong>unsupervised</strong> approach: dimensionality reduction (PCA, t-SNE, UMAP) then
-        <em>Spectral Clustering</em>, with UMAP+RBF giving the best silhouette score. The
-        module, on the other hand, ships <strong>three supervised binary LightGBM
-        classifiers</strong> trained on 14 fixed features. The two are not the same model;
-        nothing in the repository links the LightGBMs' training labels to the paper's
-        clusters, and the training script is not versioned.</p>
-        <p>Also true in <a href="../visor/VFACE/VFACE.html#visor-changes">VISOR</a>: the port reads the feature table with three gradient-boosted
-        classifiers (LightGBM), not with a clustering step
-        (<code>VISOR:SADT-VISOR tools/VFACE/src/sadt_vface/classify.py:1-8</code>;
-        <code>README.md:34-36</code>).</p>
-      </div>
-
-      <p>For the upstream building blocks, the references are those of their own modules:</p>
-
-      <ul>
-        <li><a href="https://link.springer.com/chapter/10.1007/978-3-031-45249-9_5">AMASSS / ALI-CBCT: Automated Orientation and Registration of CBCT Scans (LNCS)</a></li>
-        <li><a href="https://github.com/gaudot/SlicerDentalSegmentator">SlicerDentalSegmentator</a> (<code>Dataset111_453CT</code> weights)</li>
-        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools">SlicerAutomatedDentalTools</a></li>
-      </ul>
-
-      <p>Detailed bibliography, retrieved files and links to check:
-      <a href="SOURCES.html">SOURCES.html</a>.</p>
+      <p>The code diverges from the paper at the last step. The abstract describes an <strong>unsupervised</strong> approach (dimensionality reduction, then spectral clustering); the module ships <strong>three supervised binary <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> classifiers</strong> trained on 14 fixed features, and nothing in the repository links their training labels to the paper&rsquo;s clusters. <a href="VFACE.code.html#f-paper-divergence">Details</a>.</p>
 
       <footer class="footer">
-        <a href="../index.html">← All tool pages</a> ·
-        <a href="SOURCES.html">Bibliography for this tool</a> ·
-        Source: <code>VFACE.md</code>
+        <a href="../index.html">← All pages</a> · <a href="VFACE.code.html">Code page for this tool</a> · <a href="../visor/VFACE/VFACE.html">VISOR page for this tool</a> · <a href="SOURCES.html">Bibliography</a>
       </footer>
 
     </article>
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/algo.js"></script>
+<script src="../../assets/algo-VFACE.js"></script>
 </body>
 </html>

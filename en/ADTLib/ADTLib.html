@@ -119,79 +119,68 @@
       <header class="page-head">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Shared code</div>
         <h1>ADTLib</h1>
-        <p class="lede">Not a tool: no interface, no pipeline, no model. ADTLib is the code the twenty modules import, and almost every one of its files exists because the same function had been copied between two and fifteen times. Each module header records how many copies it replaced and what the copies had started to disagree about: that count is the point of this page.</p>
+        <p class="lede">Not a tool: no interface, no pipeline, no model. ADTLib is the code the twenty modules import, and almost every one of its files exists because the same function had been copied between two and fifteen times. Each module header records how many copies it replaced and what the copies had started to disagree about: that count is the point of this page. The file-level details are on <a href="ADTLib.code.html">the code page</a>.</p>
+        <div class="meta-row">
+          <span class="badge neutral">Shared code</span>
+          <a class="badge neutral" href="ADTLib.code.html">Code (developers)</a>
+        </div>
       </header>
 
-      <div class="callout note">
-        <div class="callout-title">Note</div>
-        <p>This page describes <code>ADT/ADTLib</code> on <code>upstream/main</code>, and it is the
-        only page of this atlas that documents code no user ever opens. It is here because
-        module behaviour now depends on it: a reader chasing what AREG does with a surface
-        ends up in <code>ADTLib/io/surface.py</code>, not in <code>AREG/</code>.</p>
-      </div>
+      <p>This page describes <code>ADT/ADTLib</code> on <code>upstream/main</code>, and it is the only page of this atlas that documents code no user ever opens. It is here because module behaviour now depends on it: a reader chasing what AREG does with a surface ends up in the shared surface reader, not in <code>AREG/</code>. <a href="ADTLib.code.html#f-scope-note">Evidence</a>.</p>
+
+      <h2 id="adtlib-overview">Overview: what modules take from it</h2>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>Area</th><th>What a module gets</th><th>What it replaced</th></tr></thead>
+        <tbody>
+          <tr><td>The shared contract</td><td>One core method class with three mixins, a typed request with declared fields, and named progress conventions</td><td>Six method declarations (934 lines), 473 undocumented reads of request keys, three conventions on one progress channel</td></tr>
+          <tr><td>The environment</td><td><a class="gterm" data-term="adtlib-conda" href="ADTLib.code.html#environnement" title="See the code">Conda helpers</a>, library checks, CUDA architecture handling, a <a class="gterm" data-term="adtlib-wheel" href="ADTLib.code.html#environnement" title="See the code">PyTorch3D</a> wheel chosen from the installed torch</td><td>Forty conda functions copied six times (656 lines), nine copies of the library check with three different answers</td></tr>
+          <tr><td>Reading, writing, naming</td><td>One <a class="gterm" data-term="adtlib-search" href="ADTLib.code.html#io" title="See the code">file search</a>, <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> and surface readers and writers, label detection, file-name cleaning, geometry helpers</td><td>A file search in fifteen copies, surface readers and writers in four or five, label detection in five</td></tr>
+          <tr><td>The rest</td><td>Logging, dark-mode <a class="gterm" data-term="adtlib-theming" href="ADTLib.code.html#reste" title="See the code">theming</a>, test-data download, model release bases, text formatting</td><td>The same ten logging lines in 151 files, 1 926 lines of theming, seven copies of the download</td></tr>
+        </tbody>
+      </table></div>
 
       <h2 id="situation">1. Where it sits</h2>
 
-      <p>Under everything, and inside no pipeline. ADTLib is declared first in the
-      extension's <code>CMakeLists.txt</code>, <em>"Shared code, declared before the modules
-      that import it"</em>, and the twenty tool directories import from it. It has no
-      <code>Process</code> of its own, nothing to run, and nothing to download.</p>
+      <p>Under everything, and inside no pipeline. ADTLib is declared first in the extension&rsquo;s build file, <em>&ldquo;Shared code, declared before the modules that import it&rdquo;</em>, and the twenty tool directories import from it. It has no processing of its own, nothing to run, and nothing to download.</p>
 
-      <p>Its own measure of itself, from the module headers: <strong>twenty-one modules, about
-      3 300 lines, replacing copies that together ran to several thousand</strong>. The header
-      of <code>theming.py</code> alone accounts for 1 926 lines of duplicate, and
-      <code>env/conda.py</code> for 656 across forty functions.</p>
+      <p>Its own measure of itself, from the module headers: <strong>twenty-one modules, about 3 300 lines, replacing copies that together ran to several thousand</strong>. The header of the <a class="gterm" data-term="adtlib-theming" href="ADTLib.code.html#reste" title="See the code">theming</a> module alone accounts for 1 926 lines of duplicate, and the <a class="gterm" data-term="adtlib-conda" href="ADTLib.code.html#environnement" title="See the code">conda helpers</a> for 656 across forty functions.</p>
+
+      <a class="deep-link" href="ADTLib.code.html#situation"><b>In the code</b><span>The declaration order in the build file and the line counts quoted by the module headers</span></a>
+
 
       <h2 id="import">2. How a module reaches it</h2>
 
-      <p>Slicer puts each extension's <code>qt-scripted-modules</code> directory on
-      <code>sys.path</code>, so a plain <code>import ADTLib</code> works from any module of
-      the extension and from a scripted CLI. A third route matters more than it looks:
-      once the modules publish Slicer's module search paths into the shapeaxi Conda
-      environment, <code>ADTLib</code> is importable <em>there too</em>. That is what
-      <code>ADTLib.env.install_pytorch</code> relies on: it is never imported by a widget,
-      it is run as <code>python -m ADTLib.env.install_pytorch</code> by the Conda
-      interpreter.</p>
+      <p>Slicer puts each extension&rsquo;s scripted-modules directory on the import path, so a plain <code>import ADTLib</code> works from any module of the extension and from a command-line module. A third route matters more than it looks: once the modules publish Slicer&rsquo;s module search paths into the shapeaxi Conda environment, ADTLib is importable <em>there too</em>. That is what the PyTorch installer relies on: it is never imported by a panel, it is run as a module by the Conda interpreter.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall</div>
-        <p><strong><code>ADTLib/__init__.py</code> and <code>io/__init__.py</code> must stay
-        free of imports.</strong> They run in the lean Conda environment too, which has
-        neither vtk, nor qt, nor slicer. A single import of one of those at package level
-        would break <em>every</em> submodule import on that route. Submodules that need them
-        import them themselves. <code>package_root()</code> exists for the same reason: it
-        returns the directory that has to be on <code>PYTHONPATH</code> for the Conda side
-        to find the package.</p>
-      </div>
+      <p>A consequence: the package&rsquo;s top-level files must stay free of imports, because they also run in the lean Conda environment, which has neither vtk, nor Qt, nor Slicer. <a href="ADTLib.code.html#f-init-imports">Evidence</a>.</p>
+
+      <a class="deep-link" href="ADTLib.code.html#import"><b>In the code</b><span>The three import routes and the package-root helper</span></a>
+
 
       <h2 id="contrat">3. The shared contract</h2>
 
-      <p>Three modules carry what the tools promise each other, rather than what they
-      compute.</p>
+      <p>Three modules carry what the tools promise each other, rather than what they compute.</p>
 
       <div class="table-wrap"><table>
         <thead><tr><th>Module</th><th>What it replaced</th><th>What it settles</th></tr></thead>
         <tbody>
-          <tr><td><code>method.py</code></td><td>six <code>Method(ABC)</code> declarations, 934 lines mostly contract rather than code</td><td>a core (<code>Process</code>, <code>TestProcess</code>, <code>NumberScan</code>, <code>search</code>) plus three mixins, <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a>, checkboxes, DICOM, because the six did <em>not</em> overlap at random: measured side by side, three clusters stood out sharply</td></tr>
-          <tr><td><code>requests.py</code></td><td>nothing; it names what was never written down</td><td><strong>473 <code>kwargs["..."]</code> accesses with no list anywhere.</strong> Each family now declares its fields, an unknown key is rejected <em>at construction</em>, and a missing one is <code>MISSING</code>: raising the same <code>KeyError</code> as before, at the same place, rather than becoming a silent empty value</td></tr>
-          <tr><td><code>progress_protocol.py</code></td><td>three undocumented conventions on one channel</td><td>see below</td></tr>
+          <tr><td>method</td><td>Six method declarations, 934 lines mostly contract rather than code</td><td>A core (process, test process, scan counting, <a class="gterm" data-term="adtlib-search" href="ADTLib.code.html#io" title="See the code">file search</a>) plus three mixins, for <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a>, checkboxes and DICOM, because the six did <em>not</em> overlap at random: measured side by side, three clusters stood out sharply</td></tr>
+          <tr><td>requests</td><td>Nothing; it names what was never written down</td><td><strong>473 reads of a request key with no list anywhere.</strong> Each family now declares its fields, an unknown key is rejected <em>at construction</em>, and a missing one raises the same error as before, at the same place, rather than becoming a silent empty value</td></tr>
+          <tr><td><a class="gterm" data-term="adtlib-progress" href="ADTLib.code.html#contrat" title="See the code">progress protocol</a></td><td>Three undocumented conventions on one channel</td><td>See the animation below</td></tr>
         </tbody>
       </table></div>
 
-      <div class="callout bug">
-        <div class="callout-title">Defect confirmed in the code</div>
-        <p><strong>Slicer multiplies <code>&lt;filter-progress&gt;</code> by a hundred, and
-        that factor is written down nowhere.</strong> It produced three conventions in one
-        repository: a CLI printing the fraction <code>0.42</code> makes 42 appear and the bar
-        advances, the intended use; a CLI printing the integer <code>2</code> makes 200
-        appear, which no bar can represent, so the interfaces compare against
-        <code>200</code> to learn that one more patient is done, and the CLI sends it as a
-        pulse <code>0 → 2 → 0</code> because Slicer only notifies the widget when the value
-        <em>changes</em>; and AMASSS, receiving both, guessed at run time which one it held
-        (<code>if progress &gt; 1: progress /= 100</code>). The three are now named, with the
-        constants carrying the value <strong>as the interface sees it</strong>, since that is
-        where the comparison happens.</p>
-      </div>
+      <figure class="algo" data-scene="adtlib_progress" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a command-line tool prints 0.42 and the bar shows 42; it prints 2 and the panel receives 200, which is read as one more patient done"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">A command-line tool reports progress by printing a number, and Slicer multiplies it by 100 before the panel sees it. Printing the fraction 0.42 makes 42 appear and the bar advances. Printing the integer 2 makes 200 appear, which no bar can show, so the panels read it as a signal: one more patient is done.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">p</mi><mtext>seen</mtext></msub><mo>=</mo><mn>100</mn><mo>&#xd7;</mo><msub><mi class="k2">p</mi><mtext>printed</mtext></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p<sub>seen</sub></b>the value the panel receives</li><li class="k2"><b>p<sub>printed</sub></b>the value the command-line tool prints: a fraction such as 0.42 for the bar, or the integer 2 as a pulse 0, 2, 0 (Slicer only notifies the panel when the value changes)</li></ul></div>
+      </figure>
+
+
+      <p>That factor of 100 is written down nowhere, and it produced three conventions in one repository. A tool printing the fraction makes the bar advance, the intended use. A tool printing the integer 2 makes 200 appear, so the interfaces compare against 200 to learn that one more patient is done, and the tool sends it as a pulse 0, 2, 0 because Slicer only notifies the panel when the value <em>changes</em>. AMASSS, receiving both, guessed at run time which one it held. The three are now named, with constants carrying the value <strong>as the interface sees it</strong>, since that is where the comparison happens. <a href="ADTLib.code.html#f-progress-factor">Evidence</a>.</p>
+
+      <a class="deep-link" href="ADTLib.code.html#contrat"><b>In the code</b><span>The three modules, the named constants and the confirmed progress defect</span></a>
+
 
       <h2 id="environnement">4. The environment</h2>
 
@@ -200,104 +189,80 @@
       <div class="table-wrap"><table>
         <thead><tr><th>Module</th><th>What it replaced</th></tr></thead>
         <tbody>
-          <tr><td><code>env/conda.py</code></td><td>six copies of each function, <strong>forty functions, 656 lines</strong>, drifted into three shapes, one still holding an unreachable <code>return</code> in <code>check_lib_wsl</code> that read two names nothing had bound</td></tr>
-          <tr><td><code>env/deps.py</code></td><td>nine copies of <code>check_lib_installed</code> under <strong>three incompatible answers to the same question</strong>: AREG and FlexReg wrote <code>if required_version: pass</code>, true as soon as the library was installed at all, the constraint was decoration</td></tr>
-          <tr><td><code>env/cuda.py</code></td><td>the architecture-list problem: a torch wheel carries compiled kernels for a fixed list of architectures</td></tr>
-          <tr><td><code>env/install_pytorch.py</code></td><td>the pytorch3d wheel tag, <strong>computed from the installed torch rather than left to pip</strong></td></tr>
+          <tr><td><a class="gterm" data-term="adtlib-conda" href="ADTLib.code.html#environnement" title="See the code">conda helpers</a></td><td>Six copies of each function, <strong>forty functions, 656 lines</strong>, drifted into three shapes, one still holding an unreachable <code>return</code> that read two names nothing had bound</td></tr>
+          <tr><td>library checks</td><td>Nine copies of the installed-library test under <strong>three incompatible answers to the same question</strong>: AREG and FlexReg answered true as soon as the library was installed at all, so a version constraint was decoration</td></tr>
+          <tr><td>CUDA</td><td>The architecture-list problem: a torch <a class="gterm" data-term="adtlib-wheel" href="ADTLib.code.html#environnement" title="See the code">wheel</a> carries compiled kernels for a fixed list of architectures</td></tr>
+          <tr><td>PyTorch installer</td><td>The pytorch3d wheel tag, <strong>computed from the installed torch rather than left to pip</strong></td></tr>
         </tbody>
       </table></div>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall</div>
-        <p><strong>A pytorch3d wheel whose tag does not match the installed torch crashes
-        with <code>undefined symbol</code> on import</strong>, not at install time. The tag
-        <code>0.7.9+pt2110cu128</code> means torch 2.11.0 and CUDA 12.8; the index is
-        <code>ImageMindAnalytics.github.io/pytorch3d-wheels</code>, because PyPI publishes no
-        wheel for modern combinations and the historical fbaipublicfiles index stopped at
-        Python 3.9 / torch 2.0. torch is installed here too, since computing the tag from
-        whatever torch happens to be present only works if that torch has a wheel at all:
-        <code>condaCreateEnv(["torch&gt;=2.8,&lt;2.13", …])</code> resolved to
-        <code>2.12.1+cu130</code> on 2026-09-16, a combination the index does not publish.</p>
-      </div>
+      <p>Why the tag is computed: a pytorch3d wheel whose tag does not match the installed torch crashes with an <code>undefined symbol</code> error on import, not at install time. The tag <code>0.7.9+pt2110cu128</code> means torch 2.11.0 and CUDA 12.8, and PyPI publishes no wheel for modern combinations, so a dedicated index is used. <a href="ADTLib.code.html#f-pytorch3d-tag">Evidence</a>.</p>
+
+      <a class="deep-link" href="ADTLib.code.html#environnement"><b>In the code</b><span>The four modules, the wheel index and the torch resolution that the index does not publish</span></a>
+
 
       <h2 id="io">5. Reading, writing, naming</h2>
 
       <div class="table-wrap"><table>
         <thead><tr><th>Module</th><th>Copies replaced</th><th>What was decided</th></tr></thead>
         <tbody>
-          <tr><td><code>io/fs.py</code></td><td><code>search</code> in <strong>fifteen copies, six variants</strong></td><td>six were a <code>search(self, …)</code> method and three the same thing as a free function: identical byte for byte once <code>self</code> is removed. The only two substantive differences became parameters</td></tr>
-          <tr><td><code>io/landmarks.py</code></td><td><code>LoadJsonLandmarks</code> ×3 strictly identical, <code>WriteJson</code> ×2</td><td>the variants that genuinely diverge, ASO_CBCT's, ALI_CBCT's, ALI_IOS's, <strong>stay where they are</strong></td></tr>
-          <tr><td><code>io/surface.py</code></td><td><code>ReadSurf</code> ×5, <code>WriteSurf</code> ×4</td><td>unlike the rest, <strong>these had diverged</strong>; the differences were measured before one was kept</td></tr>
-          <tr><td><code>labels.py</code></td><td><code>GetLabelSurface</code> and <code>isLabelSurface</code> ×5</td><td>methods of five <code>vtkTeeth</code> classes that were themselves copies, across <code>ASO_IOS_utils</code>, <code>FlexReg_utils</code>, <code>FlexReg_Method</code> ×2 and <code>AREG_IOS_utils</code></td></tr>
-          <tr><td><code>naming.py</code></td><td>six sites chaining <strong>fourteen <code>.split(...)[0]</code> calls in the same order</strong></td><td>the order is load-bearing: a longer marker must be cut before a shorter one it contains, or <code>_Scanreg</code> loses its tail to <code>_Scan</code> and two files stop pairing</td></tr>
-          <tr><td><code>geometry.py</code></td><td>two to four <strong>strictly identical</strong> copies each</td><td>measured line by line across <code>AREG_IOS_utils</code>, <code>ASO_IOS_utils</code>, <code>FlexReg_Method</code>, <code>ASO_CBCT_utils</code>; the genuinely divergent ones (FlexReg's <code>RotationMatrix</code>, ALI_IOS's <code>TransformSurf</code>) stay out</td></tr>
+          <tr><td><a class="gterm" data-term="adtlib-search" href="ADTLib.code.html#io" title="See the code">file search</a></td><td>A search in <strong>fifteen copies, six variants</strong></td><td>Six were methods and three the same thing as a free function: identical byte for byte once the object is removed. The only two substantive differences became parameters</td></tr>
+          <tr><td><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a></td><td>Reading ×3 strictly identical, writing ×2</td><td>The variants that genuinely diverge, in ASO_CBCT, ALI_CBCT and ALI_IOS, <strong>stay where they are</strong></td></tr>
+          <tr><td>surfaces</td><td>Reading ×5, writing ×4</td><td>Unlike the rest, <strong>these had diverged</strong>; the differences were measured before one was kept</td></tr>
+          <tr><td>labels</td><td>Label reading and detection ×5</td><td>Methods of five tooth classes that were themselves copies, across ASO_IOS, FlexReg and AREG_IOS</td></tr>
+          <tr><td>naming</td><td>Six sites chaining <strong>fourteen cuts of the file name in the same order</strong></td><td>The order is load-bearing: a longer marker must be cut before a shorter one it contains, or two files stop pairing</td></tr>
+          <tr><td>geometry</td><td>Two to four <strong>strictly identical</strong> copies each</td><td>Measured line by line across four modules; the genuinely divergent ones (FlexReg&rsquo;s rotation matrix, ALI_IOS&rsquo;s surface transform) stay out</td></tr>
         </tbody>
       </table></div>
+
+      <a class="deep-link" href="ADTLib.code.html#io"><b>In the code</b><span>The module names, the copy locations and the measured differences</span></a>
+
 
       <h2 id="reste">6. The rest</h2>
 
       <div class="table-wrap"><table>
         <thead><tr><th>Module</th><th>What it carries</th></tr></thead>
         <tbody>
-          <tr><td><code>logging_setup.py</code></td><td><strong>151 files carried the same ten lines</strong>, each setting <code>propagate = False</code> and attaching its own StreamHandler, which is exactly what made the extension's logging impossible to steer: raising a level or sending a run to a file meant editing all of them</td></tr>
-          <tr><td><code>theming.py</code></td><td>eleven copies of the recursive pass and nine of <code>applyDarkModeStyles</code>, <strong>1 926 lines</strong>, already drifting: an inert <code>!important</code> here, and one copy missing the <code>hasattr</code> guard that keeps the recursion off a parent widget</td></tr>
-          <tr><td><code>testdata.py</code></td><td>seven copies of <code>DownloadUnzip</code> with <strong>three distinct ways of being wrong, all three reproduced</strong>: among them, not everything published is a zip, ALI's <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> entry points at <code>MG_test_scan.nii.gz</code> and went straight into <code>zipfile.ZipFile</code></td></tr>
-          <tr><td><code>model_registry.py</code></td><td>the <strong>release bases</strong> only. It deliberately does not say <em>which</em> models a tool offers: that selection belongs to the tool, which is why the <code>getModelUrl</code> dictionaries stay put</td></tr>
-          <tr><td>MRI2CBCT leftovers</td><td>since the MRI2CBCT rewrite the module no longer imports <code>method.py</code> (the header of <code>method.py</code> still names it among the six); <code>MRI2CBCT_TEST_FILES</code> and <code>TMJ_CROP_MODEL</code> in <code>model_registry.py</code> have no reader, and <code>TMJ_CROP_MARKERS</code> in <code>naming.py</code> is read only by <code>test_naming.py</code>. What the panel does use: <code>testdata</code>, <code>env.deps</code>, <code>env.cuda</code></td></tr>
-          <tr><td><code>format.py</code></td><td>pure functions, standard library only: imported by the whole extension, so it may not depend on anything</td></tr>
+          <tr><td>logging</td><td><strong>151 files carried the same ten lines</strong>, each attaching its own handler, which made the extension&rsquo;s logging impossible to steer: raising a level or sending a run to a file meant editing all of them</td></tr>
+          <tr><td><a class="gterm" data-term="adtlib-theming" href="ADTLib.code.html#reste" title="See the code">theming</a></td><td>Eleven copies of the recursive pass and nine of the dark-mode function, <strong>1 926 lines</strong>, already drifting</td></tr>
+          <tr><td>test data</td><td>Seven copies of the download with <strong>three distinct ways of being wrong, all three reproduced</strong>: among them, not everything published is a zip, and ALI&rsquo;s <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> entry points at a <code>.nii.gz</code> file that went straight into a zip reader</td></tr>
+          <tr><td>model registry</td><td>The <strong>release bases</strong> only. It deliberately does not say <em>which</em> models a tool offers: that selection belongs to the tool</td></tr>
+          <tr><td>MRI2CBCT leftovers</td><td>Since the MRI2CBCT rewrite the module no longer uses the shared method class; two registry constants have no reader</td></tr>
+          <tr><td>format</td><td>Pure functions, standard library only: imported by the whole extension, so it may not depend on anything</td></tr>
         </tbody>
       </table></div>
 
+      <a class="deep-link" href="ADTLib.code.html#reste"><b>In the code</b><span>The drift details of each file and the dead constants of the MRI2CBCT leftovers</span></a>
+
+
       <h2 id="tests">7. What the tests pin down</h2>
 
-      <p>ADTLib ships <strong>22 tests</strong> in <code>ADT/Testing/Python/</code>, up from two.
-      They are the closest thing to a specification this shared layer has, and several were
-      written because grepping was not enough.</p>
+      <p>ADTLib ships <strong>22 <a class="gterm" data-term="adtlib-tests" href="ADTLib.code.html#tests" title="See the code">tests</a></strong>, up from two. They are the closest thing to a specification this shared layer has, and several were written because grepping was not enough. One checks that every library and version the repository hands to pip parses: three modules had quietly gained a constraint with an operator, producing a requirement that pip refuses outright. <strong>The defect is invisible on a machine that already has the library</strong>, so no amount of running the module locally shows it. The test walks the source rather than a hand-written list, so a list that gains a constraint tomorrow is covered.</p>
 
-      <p><code>test_pip_requirements.py</code> says why in its own header: every
-      <code>(library, version)</code> pair the repository hands to pip must parse, because
-      <code>f'{lib}=={version}'</code> is correct only while every entry carries a bare
-      version, and three modules had quietly gained a constraint with an operator, producing
-      <code>dicom2nifti==&gt;=2.6.2</code>, which pip refuses outright. <strong>The defect is
-      invisible on a machine that already has the library</strong>, so no amount of running
-      the module locally shows it. The test walks the source rather than a hand-written list,
-      so a list that gains a constraint tomorrow is covered without anyone remembering.</p>
+      <p>The others name behaviours the tool pages describe (ALI bounds, budget and progress contract, the ASO and AREG report rules, the output folder surviving a mode switch), plus the unit tests of the shared modules themselves. Run under a plain PythonSlicer, the suite reports <strong>188 tests and 4 errors</strong>, all four a missing torch in the ALI_CBCT tests: a property of the environment, not of the code. <a href="ADTLib.code.html#f-tests-verified">Evidence</a>.</p>
 
-      <p>The others name behaviours the tool pages describe:
-      <code>test_ali_cbct_bounds.py</code>, <code>test_ali_cbct_budget.py</code>,
-      <code>test_ali_progress_contract.py</code>,
-      <code>test_aso_cbct_report_is_not_landmarks.py</code>,
-      <code>test_aso_ios_landmark_intersection.py</code>,
-      <code>test_areg_review_skips_the_report.py</code>,
-      <code>test_output_folder_survives_mode_switch.py</code>, plus the unit tests of the
-      shared modules themselves, <code>test_fs</code>, <code>test_labels</code>,
-      <code>test_naming</code>, <code>test_surface</code>, <code>test_requests</code>,
-      <code>test_progress_protocol</code>, <code>test_deps</code>,
-      <code>test_cuda_channel</code>, <code>test_context_managers</code>,
-      <code>test_button_style</code>.</p>
+      <a class="deep-link" href="ADTLib.code.html#tests"><b>In the code</b><span>The test file names and the exact result of the run</span></a>
 
-      <div class="callout ok">
-        <div class="callout-title">Verified</div>
-        <p>Run under a plain <code>PythonSlicer</code>, the suite reports <strong>188 tests
-        and 4 errors</strong>. The four are <code>ModuleNotFoundError: torch</code> in the
-        ALI_CBCT tests, which reach <code>ADTLib/env/cuda.py</code>'s
-        <code>preferred_device()</code> at import time. They are a property of the
-        environment, not of the code: no torch, no device probe.</p>
-      </div>
 
       <h2 id="lire">8. Reading this layer</h2>
 
-      <p>Two habits make it legible. First, <strong>every module header states what it
-      replaced and what the copies disagreed about</strong>: that is where the reasoning
-      lives, not in this page. Second, the line that recurs across those headers is what
-      was <em>left out</em>: the variants that genuinely diverge stay in their tool.
-      <code>TestScan</code> and <code>TestModel</code> are not in <code>method.py</code>
-      because their arities plainly differ from one tool to the next, up to four arguments
-      in AREG, and <code>getModelUrl</code> returns a per-tool selection. Lifting them
-      would have meant inventing a contract none of the six actually honoured.</p>
+      <p>Two habits make it legible. First, <strong>every module header states what it replaced and what the copies disagreed about</strong>: that is where the reasoning lives, not in this page. Second, the line that recurs across those headers is what was <em>left out</em>: the variants that genuinely diverge stay in their tool. The test methods and the model-selection function are not in the shared method class because their arities plainly differ from one tool to the next; lifting them would have meant inventing a contract none of the six actually honoured.</p>
+
+      <a class="deep-link" href="ADTLib.code.html#lire"><b>In the code</b><span>Which functions were left in their tools, and why</span></a>
+
+
+      <h2 id="adtlib-findings">9. Known problems</h2>
+
+      <ul>
+        <li><strong>The package&rsquo;s top-level files must stay free of imports,</strong> or every submodule import breaks in the lean Conda environment. <a href="ADTLib.code.html#f-init-imports">Evidence</a>.</li>
+        <li><strong>The <a class="gterm" data-term="adtlib-progress" href="ADTLib.code.html#contrat" title="See the code">progress factor</a> of 100 is documented nowhere,</strong> and produced three conventions. <a href="ADTLib.code.html#f-progress-factor">Evidence</a>.</li>
+        <li><strong>A <a class="gterm" data-term="adtlib-wheel" href="ADTLib.code.html#environnement" title="See the code">pytorch3d</a> wheel that does not match the installed torch crashes at import,</strong> not at install. <a href="ADTLib.code.html#f-pytorch3d-tag">Evidence</a>.</li>
+        <li><strong>Verified:</strong> 188 <a class="gterm" data-term="adtlib-tests" href="ADTLib.code.html#tests" title="See the code">tests</a> and 4 errors, all four a missing torch. <a href="ADTLib.code.html#f-tests-verified">Evidence</a>.</li>
+      </ul>
 
       <footer class="footer">
         <a href="../index.html">← All pages</a> ·
+        <a href="ADTLib.code.html">Code page for this layer</a> ·
         Source: <code>ADT/ADTLib/</code> on <code>upstream/main</code>
       </footer>
 
@@ -305,5 +270,7 @@
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../assets/algo.js"></script>
+<script src="../../assets/algo-ADTLib.js"></script>
 </body>
 </html>

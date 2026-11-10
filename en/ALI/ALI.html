@@ -23,6 +23,7 @@
     <div class="sec-switch" role="group">
       <a href="../guide/ALI.html">Guide</a>
       <a href="../ALI/ALI.html" aria-current="true">Atlas</a>
+      <a href="../ALI/ALI.code.html">Code</a>
     </div>
     <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="legacy">
@@ -122,8 +123,9 @@
         <img class="tool-icon" src="../../assets/screens/ALI/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Landmarks &amp; orientation</div>
         <h1>ALI</h1>
-        <p class="lede">ALI does not compute anything itself: it is a dispatch widget that chooses between two backends with no shared code, <code>ALI_CBCT</code> (<a class="gterm" href="../glossary.html#g-rl" title="See glossary">reinforcement-learning agents</a> that move through a volume) and <code>ALI_IOS</code> (multi-view rendering and per-pixel segmentation on a mesh), to place anatomical <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> in <a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a>.</p>
+        <p class="lede">ALI places anatomical points, called <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a>, on a 3D scan automatically. This page explains how, step by step, with the maths: what goes in, what each step does to it, and what comes out. The module is a dispatcher between two separate programs: <strong>ALI_CBCT</strong>, where an <a class="gterm" data-term="ali-leg-agent" href="ALI.code.html#cbct-agent" title="See the code">agent</a> walks through a head volume, and <strong>ALI_IOS</strong>, where a tooth is photographed from <a class="gterm" data-term="ali-leg-cameras" href="ALI.code.html#ios-cameras" title="See the code">virtual cameras</a>. Where the code does something worth checking, a link leads to <a href="ALI.code.html">the code page</a>. This page describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26); the server port is <a href="../visor/ALI/ALI.html">ALI on VISOR</a>.</p>
         <div class="meta-row">
+          <a class="badge neutral" href="ALI.code.html">Code (developers)</a>
           <a class="badge paper" href="https://doi.org/10.1111/ocr.12642" target="_blank" rel="noopener" title="Describes ALI_CBCT. ALI_IOS has no publication. Open access: PMC10440369.">Gillot 2023 · Orthod Craniofac Res</a>
           <span class="badge cli">ALI_CBCT</span>
           <span class="badge cli">ALI_IOS</span>
@@ -133,129 +135,117 @@
         </div>
       </header>
 
-      <div class="callout note">
-        <div class="callout-title">Two code bases</div>
-        <p>Everything numbered below describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port, which runs the same tool on a server, is described in <a href="../visor/ALI/ALI.html">ALI on VISOR</a>. Notes added to the callouts say whether each finding still holds in VISOR; they cite SADT-VISOR at 6ba2a78, with <code>CB/</code> for <code>tools/ALI/ALI_CBCT/src/sadt_ali_cbct/</code> and <code>IO/</code> for <code>tools/ALI/ALI_IOS/src/sadt_ali_ios/</code>. Some sentences below were written against an earlier legacy revision (this page gives <code>ALI_CBCT.py</code> 270 lines, <code>ALI_IOS.py</code> 688, <code>ALI.py</code> 2286; at 3c67957 they are 371, 1133 and 2224); where 3c67957 differs, the callout or paragraph says so.</p>
+      <h2 id="apercu">Overview: what goes in, what comes out</h2>
+
+      <p>ALI takes a 3D image of a patient and returns a list of 3D points, each with a name: the tip of a tooth, a point on the skull base. The module on the Slicer screen does no computing itself. It only asks which kind of image you have and hands the work to one of two separate programs, which share no code. Other tools then use the points to orient a scan or to register two scans.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>ALI_CBCT</th><th>ALI_IOS</th></tr></thead>
+          <tbody>
+            <tr><td>Input</td><td>a <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> volume (the head scan), NIfTI or <a class="gterm" data-term="ali-leg-dicom" href="ALI.code.html#f-dicom-widget" title="See the code">DICOM</a></td><td>an intraoral surface mesh of the teeth, with a tooth number on every vertex (computed first if missing)</td></tr>
+            <tr><td>Idea</td><td>an <a class="gterm" data-term="ali-leg-agent" href="ALI.code.html#cbct-agent" title="See the code">agent</a> walks through the volume, one step at a time, until it reaches the point</td><td>each tooth is photographed from fixed <a class="gterm" data-term="ali-leg-cameras" href="ALI.code.html#ios-cameras" title="See the code">virtual cameras</a>, a network labels the pixels of each picture, and the labelled pixels are projected back onto the mesh</td></tr>
+            <tr><td>Output</td><td>one file per scan and per <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> group, in the format Slicer reads (<code>.mrk.json</code>)</td><td>one file per patient, jaw and network (<code>.json</code>)</td></tr>
+          </tbody>
+        </table>
       </div>
+
+      <p>Coordinates are written in <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>. The two programs run in different Python environments: ALI_CBCT inside Slicer's own, ALI_IOS in a separate conda environment, because it needs a graphics library Slicer does not ship.</p>
 
       <h2 id="situation">1. Where it sits in the pipeline</h2>
 
-      <p>ALI is a <strong><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> provider</strong> for almost the whole repository. Nobody calls the widget itself; both CLIs are called, though.</p>
+      <p>ALI is a <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> provider for most of the toolbox. The modules that call it, and why:</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Caller</th><th>Backend</th><th>How</th><th>Why</th></tr></thead>
-          <tbody>
-            <tr><td><code>ALI.py:999</code></td><td>ALI_CBCT</td><td><code>slicer.cli.run(slicer.modules.ali_cbct, …)</code></td><td>direct use</td></tr>
-            <tr><td><code>ALI.py:1246</code></td><td>ALI_IOS</td><td><code>conda run -n shapeaxi python -m ALI_IOS</code></td><td>direct use</td></tr>
-            <tr><td><code>ASO_Method/CBCT.py:515</code></td><td>ALI_CBCT</td><td><code>slicer.cli.run</code></td><td>landmarks for SEMI_ASO orientation</td></tr>
-            <tr><td><code>AREG_Method/IOSCBCT.py:300</code></td><td>both</td><td><code>slicer.cli.run</code></td><td>12 occlusal points on <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> <strong>and</strong> on <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>, to register one onto the other</td></tr>
-            <tr><td><code>GreedyReg_Method/Logic.py:495</code></td><td>ALI_CBCT</td><td><code>slicer.cli.run</code></td><td>"Distant Registration": landmark-based registration</td></tr>
-            <tr><td><code>FlexReg.py:2517</code></td><td>ALI_IOS (<code>Lower_MG_*.pth</code>)</td><td><code>conda run -n shapeaxi</code></td><td>the 13 mucogingival points of the MGL patch</td></tr>
-            <tr><td><code>Agent_CLI/manifest.yaml:2</code></td><td>both</td><td>remote pipeline</td><td>declared as <code>ali_cbct</code> / <code>ali_ios</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <ul>
+        <li><strong>ALI itself</strong>, used directly, for both modes.</li>
+        <li><strong>ASO</strong> asks ALI_CBCT for landmarks to orient a scan.</li>
+        <li><strong>AREG_IOSCBCT</strong> asks both for 12 <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> points on the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> and on the mesh, to register one onto the other.</li>
+        <li><strong>GreedyReg</strong> (distant registration) asks ALI_CBCT for landmark-based registration.</li>
+        <li><strong>FlexReg</strong> asks ALI_IOS for the 13 mucogingival points of the lower patch.</li>
+      </ul>
 
-      <p>On the outbound side:</p>
+      <p>When a mesh has no tooth labels, ALI_IOS needs a crown segmentation first. It can run it itself or receive it from the widget: two routes to the same result.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Called</th><th>When</th><th>Why</th></tr></thead>
-          <tbody>
-            <tr><td><code>CrownSegmentationcli</code> (ShapeAXI)</td><td>IOS, if a scan has no label array</td><td>segment the crowns: the cameras are aimed tooth by tooth</td></tr>
-            <tr><td><code>dentalmodelseg</code> directly</td><td>IOS, from the CLI itself (<code>segmentation.py:72</code>)</td><td>same thing, when the CLI is run outside the widget</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>So the ALI_IOS CLI knows how to segment on its own <strong>and</strong> the widget also segments it upstream: two paths to the same result, each inherited from the other.</p>
+      <a class="deep-link" href="ALI.code.html#situation"><b>In the code</b><span>The callers, with file and line, and the other tools that call ALI</span></a>
 
       <h2 id="fichiers">2. Files involved</h2>
 
-      <div class="callout note">
-        <div class="callout-title">Note · Legacy only</div>
-        <p><strong>Part of this module now lives in the shared layer.</strong> <a href="../ADTLib/ADTLib.html">ADTLib</a> centralises what several modules carried in copies: from here, <code>geometry.py</code>, <code>io/landmarks.py</code>, <code>testdata.py</code> and the contract of <code>method.py</code>. Its page records how many copies each file replaced.</p>
-        <p>Legacy (3c67957); not present in <a href="../visor/ALI/ALI.html">VISOR</a>: the server tools do not import ADTLib. What they share is the small <code>sadt-ali-common</code> package (<code>SADT-VISOR tools/ALI/common/src/sadt_ali_common/</code>: <code>discovery.py</code>, <code>markups.py</code>).</p>
-      </div>
+      <p>Two programs and a widget that picks between them. ALI_CBCT runs in Slicer's own Python, so it needs no extra environment. ALI_IOS needs pytorch3d, which does not exist in Slicer: it runs through a conda environment shared with several other tools. Neither needs a graphics card, but both are much slower without one.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
-          <tbody>
-            <tr><td><code>ALI/ALI.py</code></td><td>widget, 2286 lines: dispatch, UI, weight download, conda bootstrap</td><td>Slicer Python</td></tr>
-            <tr><td><code>ALI_Method/CBCT.py</code></td><td>builds ALI_CBCT's parameters</td><td>same</td></tr>
-            <tr><td><code>ALI_Method/IOS.py</code></td><td>builds those for segmentation + ALI_IOS</td><td>same</td></tr>
-            <tr><td><code>ALI_CBCT/ALI_CBCT.py</code></td><td>CLI, 270 lines: preprocessing then the agent loop</td><td><strong>Slicer Python</strong>, via <code>slicer.cli.run</code></td></tr>
-            <tr><td><code>ALI_CBCT_utils/</code></td><td>agent, brain, environment, preprocess</td><td>same</td></tr>
-            <tr><td><code>ALI_IOS/ALI_IOS.py</code></td><td>CLI, 688 lines: a single 500-line <code>main</code> function</td><td><strong>conda env <code>shapeaxi</code></strong></td></tr>
-            <tr><td><code>ALI_IOS_utils/</code></td><td>agent (cameras), render, surface, model (tables), io, orientation, segmentation</td><td>same</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>Non-obvious point: <strong>ALI_CBCT does not go through conda</strong>. It runs in Slicer's own Python, which is why <code>itk</code>, <code>dicom2nifti</code>, <code>pydicom</code> and <code>monai</code> are installed by <code>install_function</code> (<code>ALI.py:874</code>). ALI_IOS needs pytorch3d, which does not exist in Slicer: it goes through <code>conda run</code>. CUDA is required nowhere: both fall back to CPU (<code>DEVICE = cuda if available else cpu</code>), at the cost of time.</p>
-
-      <p>The ALI_IOS CLI is also registered as a Slicer module (<code>slicer.modules.ali_ios</code>, <code>ALI_IOS.xml</code>), and AREG calls it through that route: in Slicer's Python, then, where <code>pytorch3d</code> is not installed. A fragile path, see §7.</p>
+      <a class="deep-link" href="ALI.code.html#fichiers"><b>In the code</b><span>The file table, where each part runs and why CBCT skips conda</span></a>
 
       <h2 id="ali-cbct">3. ALI_CBCT: agents inside the volume</h2>
 
+      <p>The idea comes from reinforcement learning, but at run time nothing is learned: a trained network is used as a compass. For each <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> there is one <em><a class="gterm" data-term="ali-leg-agent" href="ALI.code.html#cbct-agent" title="See the code">agent</a></em>, which is a position in the volume. At every step the network looks at a small cube of the image around the agent and says which of six one-voxel moves brings it closest to the landmark. The agent moves, looks again, and repeats until it starts going in circles, which means it has arrived. It does this on a coarse grid, then again on a fine one, and averages six last attempts.</p>
+
       <figure class="diagram">
         <svg viewBox="0 0 920 260" role="img" aria-label="ALI_CBCT pipeline: geometric preprocessing, an agent that predicts a direction, looping until oscillation, Focus refinement, landmark output">
+          <a class="d-link" href="#ali-cbct">
           <rect class="d-box" x="10" y="30" width="140" height="50" rx="6"/>
           <text class="d-label" x="80" y="52" text-anchor="middle">CBCT volume</text>
           <text class="d-label-s" x="80" y="67" text-anchor="middle">DICOM / NIfTI</text>
+          </a>
 
           <path class="d-arrow" d="M155 55 H205"/>
           <text class="d-label-s" x="180" y="12" text-anchor="middle">raw volume</text>
           <path class="d-arrow-head" d="M205 55 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#cbct-pretraitements">
           <rect class="d-box" x="210" y="20" width="170" height="70" rx="6"/>
           <text class="d-label" x="295" y="45" text-anchor="middle">Preprocessing</text>
           <text class="d-label-s" x="295" y="61" text-anchor="middle">histo 1-99%, resampling</text>
           <text class="d-label-s" x="295" y="75" text-anchor="middle">isotropic 1 mm / 0.3 mm</text>
+          </a>
 
           <path class="d-arrow" d="M385 55 H435"/>
           <text class="d-label-s" x="410" y="12" text-anchor="middle">resampled</text>
           <path class="d-arrow-head" d="M435 55 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#cbct-environnement">
           <rect class="d-box" x="440" y="20" width="170" height="70" rx="6"/>
           <text class="d-label" x="525" y="45" text-anchor="middle">Environment</text>
-          <text class="d-label-s" x="525" y="61" text-anchor="middle">GetZone: crop 64³</text>
-          <text class="d-label-s" x="525" y="75" text-anchor="middle">renormalized [-1,1]</text>
+          <text class="d-label-s" x="525" y="61" text-anchor="middle">crop of 64³ voxels</text>
+          <text class="d-label-s" x="525" y="75" text-anchor="middle">rescaled to [-1, 1]</text>
+          </a>
 
           <path class="d-arrow" d="M615 55 H665"/>
-          <text class="d-label-s" x="640" y="12" text-anchor="middle">state: FOV 64³</text>
+          <text class="d-label-s" x="640" y="12" text-anchor="middle">what the agent sees</text>
           <path class="d-arrow-head" d="M665 55 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#cbct-agent">
           <rect class="d-box-n" x="670" y="20" width="180" height="70" rx="6"/>
           <text class="d-label" x="760" y="42" text-anchor="middle">Agent</text>
           <text class="d-label-s" x="760" y="58" text-anchor="middle">DenseNet3D + MLP</text>
           <text class="d-label-s" x="760" y="72" text-anchor="middle">predicts 1 of 6 moves</text>
+          </a>
 
           <path class="d-arrow" d="M760 90 C 760 160, 525 160, 525 92" fill="none"/>
-          <text class="d-label-s" x="620" y="104" text-anchor="middle">action: one step in 6 directions</text>
+          <text class="d-label-s" x="620" y="104" text-anchor="middle">move: one step in 6 directions</text>
           <path class="d-arrow-head" d="M525 92 l-6 -6 h9 z"/>
-          <text class="d-label-s" x="620" y="122" text-anchor="middle">Move() 1 voxel, loops until oscillation (Visited)</text>
+          <text class="d-label-s" x="620" y="122" text-anchor="middle">moves 1 voxel, repeats until it retraces its steps</text>
 
           <path class="d-arrow" d="M760 90 V150 H295 V92" fill="none"/>
-          <text class="d-label-s" x="430" y="166" text-anchor="middle">oscillation → finer scale</text>
-          <text class="d-label-s" x="430" y="182" text-anchor="middle">UpScale(): 1 mm → 0.3 mm, starts over</text>
+          <text class="d-label-s" x="430" y="166" text-anchor="middle">retraces its steps → finer scale</text>
+          <text class="d-label-s" x="430" y="182" text-anchor="middle">1 mm → 0.3 mm, starts over</text>
 
           <path class="d-arrow" d="M760 90 V210"/>
           <path class="d-arrow-head" d="M760 210 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#cbct-recherche">
           <rect class="d-box" x="670" y="215" width="180" height="40" rx="6"/>
-          <text class="d-label" x="760" y="240" text-anchor="middle">Focus(): 6 restarts</text>
+          <text class="d-label" x="760" y="240" text-anchor="middle">Averaging: 6 restarts</text>
+          </a>
 
           <path class="d-arrow" d="M665 235 H580"/>
-          <text class="d-label-s" x="622" y="255" text-anchor="middle">final landmark</text>
+          <text class="d-label-s" x="622" y="255" text-anchor="middle">final point</text>
           <path class="d-arrow-head" d="M575 235 l7 -4 v8 z"/>
 
+          <a class="d-link" href="#cbct-sortie">
           <rect class="d-box-a" x="415" y="215" width="160" height="40" rx="6"/>
           <text class="d-label" x="495" y="240" text-anchor="middle">Landmark (LPS)</text>
+          </a>
         </svg>
-        <figcaption>ALI_CBCT: one agent per <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a>, reused for every patient, walks <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> by voxel until it oscillates, changes scale, then averages six refinements (<code>Focus</code>).</figcaption>
+        <figcaption>ALI_CBCT: one agent per landmark, reused for every patient, walks <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> by voxel until it oscillates, changes scale, then averages six refinements (<a class="gterm" data-term="ali-leg-focus" href="ALI.code.html#cbct-recherche" title="See the code">final averaging</a>).</figcaption>
       </figure>
 
       <figure class="viewer3d" data-ali-cbct>
@@ -285,174 +275,145 @@
           <i data-k="upscale">oscillated: arrived. Scale now</i>
           <i data-k="steps">steps to reach the landmark</i>
         </span>
-        <figcaption>The <strong>real</strong> path, not a reconstruction: <code>ali_trace.py</code> reads it out of the agent&rsquo;s own <code>position_mem</code> while ALI_CBCT runs on the published test scan. Every agent starts at the <strong>centre of the volume</strong>. The network never says where the landmark is: it scores six directions and the agent moves <strong>one voxel</strong>. It stops when it starts retracing its own steps, switches from 1&nbsp;mm to 0.3&nbsp;mm, and starts again.</figcaption>
+        <figcaption>The <strong>real</strong> path, not a reconstruction: it was read out of the agent&rsquo;s own memory while ALI_CBCT ran on the published test scan (no patient data). Every agent starts at the <strong>centre of the volume</strong>. The network never says where the landmark is: it scores six directions and the agent moves <strong>one voxel</strong>. It stops when it starts retracing its own steps, switches from 1&nbsp;mm to 0.3&nbsp;mm, and starts again.</figcaption>
       </figure>
 
       <h3 id="cbct-pretraitements">3.1 Preprocessing</h3>
 
-      <p>Two steps, both written into <code>temp_fold</code> and <strong>never cleaned up</strong>:</p>
+      <p>Two operations, once per scan, before any agent moves.</p>
 
-      <ol>
-        <li><strong>Histogram windowing</strong>, <code>CorrectHisto(scan, out, 0.01, 0.99)</code> (<code>preprocess.py:14</code>): a 1000-bin histogram, normalized cumulative, clipped to the 1% and 99% percentiles, hard-bounded to <code>[-1500, 4000]</code> HU. Output <code>int16</code>, spacing/origin/direction preserved. Watch out: the default signature says <code>max_porcent=0.95</code>, but the call passes <code>0.99</code>.</li>
-        <li><strong>Isotropic resampling</strong>, one file per scale: <code>SetSpacing</code> (itk, linear interpolation, nearest-neighbor if <code>seg</code>/<code>Seg</code> is in the name) for each <code>sp</code> in <code>spacing = [1, 0.3]</code> mm. The new size is <code>size * spacing / sp</code> and the origin is recentered on the same physical box.</li>
-      </ol>
+      <figure class="algo" data-scene="clamp" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a histogram whose two tails are cut at the 1st and 99th percentiles and piled on those values"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Extreme intensities (metal, empty background) would dominate. Every voxel value is cut to the 1st to 99th percentile of the volume&rsquo;s own histogram, themselves kept inside [-1500, 4000].</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">I</mi><mtext>out</mtext></msub><mo>=</mo><mi>min</mi><mrow><mo stretchy="true" fence="true">(</mo><mi>max</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">I</mi><mo>,</mo><msub><mi class="k2">p</mi><mn>1</mn></msub><mo stretchy="true" fence="true">)</mo></mrow><mo>,</mo><msub><mi class="k3">p</mi><mn>99</mn></msub><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>I</b>intensity of a voxel</li><li class="k2"><b>p1</b>value under which 1 % of the voxels fall</li><li class="k3"><b>p99</b>value under which 99 % of the voxels fall</li></ul></div>
+      </figure>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall · Legacy only</div>
-        <p>The files are named <code>&lt;stem&gt;_sp&lt;1|0-3&gt;&lt;suffixes&gt;</code> and <strong>reused if they already exist</strong>: it's a cache, and therefore also a trap if the input changes without a name change.</p>
-        <p>Legacy (3c67957): still true, <code>ALI_CBCT/ALI_CBCT.py:199</code> and <code>:215</code> skip a file that exists. Not present in <a href="../visor/ALI/ALI.html">VISOR</a>: each scan gets its own scratch folder, removed when the scan is done (<code>SADT-VISOR CB/engine.py:910</code>), so one run never reads another's files.</p>
-      </div>
+      <figure class="algo" data-scene="resample" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a grid of 1 mm voxels is refined into a grid of 0.3 mm voxels over the same box"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The volume is resampled onto two grids of cubic voxels, 1&nbsp;mm and 0.3&nbsp;mm, by linear interpolation. The physical box stays the same: there are just more, smaller voxels.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">N</mi><mtext>new</mtext></msub><mo>=</mo><mfrac><mrow><mi class="k2">N</mi><mo>&#xd7;</mo><mi class="k3">s</mi></mrow><msub><mi class="k1">s</mi><mtext>new</mtext></msub></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>N<sub>new</sub>, s<sub>new</sub></b>voxels along an axis, and voxel size, on the new grid</li><li class="k2"><b>N</b>voxels along that axis in the scan</li><li class="k3"><b>s</b>voxel size in the scan</li></ul></div>
+      </figure>
 
-      <p>At load time (<code>environment.py:73</code>): <code>sitk.DICOMOrient(img, "LPS")</code>, without this, the agents, which only ever read the raw array and never the direction cosines, walk through a mirrored volume. Then <code>EnsureChannelFirst</code> + <code>BorderPad(padding)</code> with <code>padding = agent_FOV/2 + 1 = [33,33,33]</code>, so that any 64³ crop is valid wherever the agent stands.</p>
+      <p>The files written for each grid are named after the scan and reused if they already exist: a cache, and so also a trap if the input changes without a name change. When the volume is loaded it is also reoriented to <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a> and padded by 33 voxels on every side, so that the cube the agent looks at always has data, even at the border.</p>
 
-      <p>The array is stored in numpy <code>(z,y,x)</code> order and the origin is <strong>reversed</strong> to match that same order, but not the spacing, which stays <code>(x,y,z)</code>. This has no effect only because resampling makes the spacing isotropic.</p>
+      <a class="deep-link" href="ALI.code.html#cbct-pretraitements"><b>In the code</b><span>Percentiles, bins, interpolation, the cache files and the load-time padding</span></a>
 
       <h3 id="cbct-environnement">3.2 The environment</h3>
 
-      <p><code>Environment</code> (<code>environment.py:18</code>) is a patient: a dictionary <code>{scale_key: {image, spacing, origin, size}}</code> plus the list of predicted landmarks. One instance per patient, with every scale held in memory.</p>
+      <p>The &ldquo;environment&rdquo; is one patient: the image at each of the two grids. It answers a single question for the agent, <em>what is around this position?</em>, and it answers it with a cube.</p>
 
-      <p><code>GetZone(scale, center, crop_size)</code> is the only thing the agent ever sees of the world:</p>
+      <figure class="algo" data-scene="crop" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a small window slides over a scan slice, and its contents are stretched to the full range"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">At each step the agent sees only a cube of 64&times;64&times;64 voxels around itself: 64&nbsp;mm wide on the coarse grid, 19.2&nbsp;mm on the fine one. Its intensities are stretched to [-1, 1] with the minimum and maximum of <em>that cube</em>.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">x</mi><mtext>crop</mtext></msub><mo>=</mo><mn>2</mn><mo>&#xd7;</mo><mfrac><mrow><mi class="k1">x</mi><mo>&#x2212;</mo><mi class="k2">min</mi></mrow><mrow><mi class="k3">max</mi><mo>&#x2212;</mo><mi class="k2">min</mi></mrow></mfrac><mo>&#x2212;</mo><mn>1</mn></mrow></math></div><ul class="algo-legend"><li class="k1"><b>x</b>intensity of a voxel of the cube</li><li class="k2"><b>min</b>darkest value inside the cube</li><li class="k3"><b>max</b>brightest value inside the cube</li></ul></div>
+      </figure>
 
-      <pre><code>cropTransform = SpatialCrop(center.tolist() + self.padding, crop_size)
-rescale = ScaleIntensity(minv=-1.0, maxv=1.0, factor=None)
-crop = rescale(cropTransform(self.data[scale]["image"])).type(torch.float32)</code></pre>
-
-      <p>A <strong>64×64×64-voxel</strong> cube centered on the agent, renormalized <strong>per crop</strong> to <code>[-1,1]</code> (local min/max, not a global normalization). At scale <code>1</code> it covers a 64 mm side, at scale <code>0-3</code> 19.2 mm.</p>
+      <a class="deep-link" href="ALI.code.html#cbct-environnement"><b>In the code</b><span>The environment class and the crop call</span></a>
 
       <h3 id="cbct-agent">3.3 The agent and its network</h3>
 
-      <p>One agent per landmark (<code>agent.py:149</code>), instantiated once and then reused for every patient. A fresh <code>Brain</code> is built and its weights reloaded <strong>for each (patient, landmark) pair</strong> (<code>ALI_CBCT.py:123</code>): 2 DenseNets rebuilt and 2 <code>.pth</code> files reread per point and per scan.</p>
+      <figure class="algo" data-scene="moves" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: six scores, the highest one is chosen and the agent takes that move"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The network outputs six scores, one per possible one-voxel move (up, down, back, front, left, right), and the agent takes the highest. It predicts a <strong>direction</strong>, never a position.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">m</mi><mo>*</mo></msub><mo>=</mo><munder><mo>argmax</mo><mrow><mi class="k2">k</mi><mo>&#x2208;</mo><mo>{</mo><mn>1</mn><mo>,</mo><mo>&#x2026;</mo><mo>,</mo><mn>6</mn><mo>}</mo></mrow></munder><msub><mi class="k3">f</mi><mi class="k2">k</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi>crop</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>m*</b>the move taken</li><li class="k2"><b>k</b>one of the six moves</li><li class="k3"><b>f<sub>k</sub></b>the network&rsquo;s score for move k, computed from the cube</li></ul></div>
+      </figure>
 
-      <p>The network, <code>DNet</code> (<code>brain.py:39</code>):</p>
+      <p>The network is a 3D DenseNet followed by a small decision head. This is not a <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">heatmap</a>: it does not say where the point is, it says which way to step. There is one agent per landmark, and one network per landmark and per grid: the program rebuilds the networks and rereads their <a class="gterm" data-term="ali-leg-weights" href="ALI.code.html#cbct-poids" title="See the code">weights</a> for every scan and landmark. The head ends in a ReLU, so if all six scores are negative before it, all become 0 and the agent takes the first move (see <a href="#pieges">known issues</a>).</p>
 
-      <pre><code>self.featNet = DenseNet(spatial_dims=3, in_channels=1, out_channels=1024,
-                        growth_rate=34, block_config=(6, 12, 24, 16))
-self.dens = DN(in_channels=1024, out_channels=6)   # MLP 1024-512-256-128-6</code></pre>
-
-      <p>A 3D DenseNet-121 from monai (growth rate 34 instead of 32), followed by a 4-layer MLP. Input <code>[1, 1, 64, 64, 64]</code>, output 6 scores, one per move: <code>Up / Down / Back / Front / Left / Right</code>, that is, ±1 voxel along each of the array's three axes (<code>constants.py:29</code>).</p>
-
-      <p><strong>This is not a <a class="gterm" href="../glossary.html#g-heatmap" title="See glossary">heatmap</a>: it is a direction classifier.</strong> The network's <span class="badge predit">prediction</span> does not say where the point is, it says which way to step. <code>Predict</code> takes the <code>argmax</code> of the 6 scores (<code>brain.py:157</code>).</p>
-
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug · Also true in VISOR</div>
-        <p>Note that <code>DN.forward</code> applies a <code>relu</code> <strong>to the last layer too</strong>. So the scores are ≥ 0, and if all pre-activations are negative, all 6 come out as 0 and <code>argmax</code> systematically returns <code>0</code> ("Up"). The softmax commented out just below it suggests this wasn't the intent.</p>
-        <p>Also true in <a href="../visor/ALI/ALI.html">VISOR</a>: the ported head ends the same way (<code>SADT-VISOR CB/brain.py:90</code>; legacy <code>ALI_CBCT_utils/brain.py:35</code> at 3c67957).</p>
-      </div>
-
-      <p><strong>One network per scale</strong>: <code>Brain</code> instantiates one per <code>scale_key</code>, and <code>LoadModels</code> loads <code>&lt;label&gt;/1/*.pth</code> then <code>&lt;label&gt;/0-3/*.pth</code>.</p>
+      <a class="deep-link" href="ALI.code.html#cbct-agent"><b>In the code</b><span>The network definition, the move order and the ReLU</span></a>
 
       <h3 id="cbct-recherche">3.4 The search</h3>
 
-      <p><code>Agent.Search()</code> (<code>agent.py:345</code>):</p>
+      <figure class="algo" data-scene="walk" data-ms="7600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: an agent walks one cell at a time toward a landmark, circles around it, then repeats on a finer grid"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The agent starts at the centre and steps one voxel at a time. It remembers its last 10 positions: landing on one of them means it is circling, so it has arrived. It then moves to the finer grid, whose voxels are 1/0.3 times smaller, and walks again.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">p</mi><mtext>fine</mtext></msub><mo>=</mo><mi class="k1">p</mi><mo>&#xd7;</mo><mfrac><msub><mi class="k2">s</mi><mtext>coarse</mtext></msub><msub><mi class="k3">s</mi><mtext>fine</mtext></msub></mfrac><mo>=</mo><mi class="k1">p</mi><mo>&#xd7;</mo><mfrac><mn>1</mn><mn>0.3</mn></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p</b>the position, in voxels</li><li class="k2"><b>s<sub>coarse</sub></b>voxel size of the first grid, 1 mm</li><li class="k3"><b>s<sub>fine</sub></b>voxel size of the second grid, 0.3 mm</li></ul></div>
+      </figure>
 
-      <ol>
-        <li>scale 0 (1 mm), position <strong>at the center of the volume</strong>;</li>
-        <li>loop: <code>PredictAction()</code> → <code>Move()</code> by a step of <code>speed_per_scale[scale]</code> = 1 voxel;</li>
-        <li><strong>stopping criterion = oscillation</strong>. <code>Visited()</code> checks whether the current position is among the last 10 positions (<code>shortmem_size = 10</code>). Once the agent retraces its steps, it is considered to have arrived;</li>
-        <li><code>UpScale()</code>: moves to scale <code>0-3</code>, position converted through the spacing ratio, short-term memory cleared, and the search restarts;</li>
-        <li>at the final scale, <code>Visited()</code> ends the search.</li>
-      </ol>
+      <p>Rules around the walk: a move that would leave the volume is refused and the agent respawns at a random position; after three exits the landmark is dropped. The number of steps is also bounded: the legacy module stops a search after 1000 steps by default, with a 900 s guard and an early stop on known ground.</p>
 
-      <p><em>Superseded at 3c67957 (commit b87c02f, 2026-09-18): the budget is a step count, 1000 by default (<code>ALI_SEARCH_MAX_STEPS</code>), with a 900 s guard rail (<code>ALI_SEARCH_TIME_GUARD</code>), and a search that keeps circling known ground stops after 64 steps; legacy <code>ALI_CBCT_utils/agent.py:27</code>, <code>:33</code>, <code>:43</code>, <code>:471-491</code>. <a href="../visor/ALI/ALI.html">VISOR</a>: 900 steps, no time guard (<code>SADT-VISOR CB/engine.py:55</code>). The paragraph below describes the earlier, seconds-based budget.</em></p>
+      <figure class="algo" data-scene="focus" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: six restarts around the answer land close to each other, and their mean is the final point"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">On the fine grid, the agent restarts six times, 4 voxels away from its answer along &plusmn;x, &plusmn;y and &plusmn;z, and walks each time until it circles. The mean of the six landing points is the answer, which is why it can fall between two voxels.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">p</mi><mtext>final</mtext></msub><mo>=</mo><mfrac><mn>1</mn><mn>6</mn></mfrac><munderover><mo>&#x2211;</mo><mrow><mi class="k2">j</mi><mo>=</mo><mn>1</mn></mrow><mn>6</mn></munderover><msub><mi class="k3">p</mi><mi class="k2">j</mi></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p<sub>final</sub></b>the landmark</li><li class="k2"><b>j</b>one of the six restarts</li><li class="k3"><b>p<sub>j</sub></b>where restart j stopped</li></ul></div>
+      </figure>
 
-      <p>Time budget: <code>15 s</code> on GPU, <code>60 s</code> on CPU, per landmark and per patient, overridable with <code>ALI_SEARCH_MAX_TIME</code>. Overrun → <code>-1</code>, landmark not written. Same if the agent leaves the volume three times (<code>search_atempt &gt; 2</code>); each time it exits, it is respawned at random (<code>spawn_radius = 10</code> voxels around the start, at scales &gt; 0).</p>
-
-      <p><strong>The final refinement</strong>, <code>Focus()</code> (<code>agent.py:305</code>): from the position found, six restarts at <strong>4 voxels</strong> (1.2 mm at the final scale) along ±x, ±y, ±z; each one walks again until <code>Visited()</code>; the retained position is the <strong>average of the six landings</strong>. That is what makes the result sub-voxel.</p>
-
-      <div class="callout">
-        <div class="callout-title">Note · Superseded: <code>Focus</code> is bounded at 3c67957</div>
-        <p>An earlier revision of this page said <code>Focus</code> had no bound. At 3c67957 it has one: each of the six probes stops after <code>max_steps</code> (<code>SearchStepBudget()</code>, 1000 by default), logs a warning and keeps its last position (legacy <code>ALI_CBCT_utils/agent.py:325-341</code>, commit b87c02f, 2026-09-18). <a href="../visor/ALI/ALI.html">VISOR</a> is bounded too, more strictly: the refinement draws on the same step counter as the search and raises <code>NotFound</code> when it runs out (<code>SADT-VISOR CB/agent.py:238-243</code>).</p>
-      </div>
+      <a class="deep-link" href="ALI.code.html#cbct-recherche"><b>In the code</b><span>The agent loop, the memory, respawn, the step budget and the final averaging in the code</span></a>
 
       <h3 id="cbct-sortie">3.5 Output</h3>
 
-      <p><code>SavePredictedLandmarks(scale_keys[-1], output_dir)</code> (<code>environment.py:110</code>) converts the index back into a physical coordinate:</p>
+      <figure class="algo" data-scene="mm" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a voxel index is shifted by the origin and read on a millimetre ruler"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The agent counts voxels on a padded grid; the file needs millimetres. The origin of the volume is removed, then the result is multiplied by the voxel size.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">x</mi><mtext>mm</mtext></msub><mo>=</mo><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">v</mi><mo>&#x2212;</mo><mrow><mo>|</mo><mfrac><mi class="k3">o</mi><mi class="k4">s</mi></mfrac><mo>|</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow><mo>&#xd7;</mo><mi class="k4">s</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>x<sub>mm</sub></b>the coordinate, in millimetres, on one axis</li><li class="k2"><b>v</b>the voxel index found by the agent</li><li class="k3"><b>o</b>origin of the volume, in millimetres</li><li class="k4"><b>s</b>voxel size, in millimetres</li></ul></div>
+      </figure>
 
-      <pre><code>physical_origin = abs(ref_origin / ref_spacing)
-real_label_pos  = (pos - physical_origin) * ref_spacing
-real_label_pos  = [real_label_pos[2], real_label_pos[1], real_label_pos[0]]  # back to x,y,z</code></pre>
+      <p>The absolute value assumes the origin is negative on all three axes, true for an LPS volume centred at the origin. Since the legacy module reorients every volume to LPS first, the damage is limited (<a href="#pieges">known issues</a>).</p>
 
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug · Also true in VISOR, and no longer softened</div>
-        <p>The <code>abs()</code> assumes the origin is negative on all three axes: true for an LPS volume centered at the origin, false in general.</p>
-        <p>Legacy (3c67957): <code>ALI_CBCT_utils/environment.py:115</code>, but every volume is first reoriented to LPS (<code>:72</code>), which limits the damage. VISOR: the same line (<code>SADT-VISOR CB/environment.py:116</code>) with no reorientation, see <a href="../visor/ALI/ALI.html#visor-findings">Findings in VISOR</a>.</p>
-      </div>
+      <p>Points are grouped by anatomical family (CB, U, L, CI) and one file is written per group, coordinates in LPS. The <a class="gterm" data-term="ali-leg-description" href="ALI.code.html#ios-points-forces" title="See the code">description field</a> of each point is always empty.</p>
 
-      <p>Points are grouped by anatomical family (<code>LABEL_GROUPS</code>: <code>CB</code>, <code>U</code>, <code>L</code>, <code>CI</code>) and one file is written per group: <code>&lt;patient without extension&gt;_lm_Pred_&lt;group&gt;.mrk.json</code>, <code>coordinateSystem: "LPS"</code>, <code>description</code> <strong>always empty</strong> (<code>io.py:8</code>). <a href="../GreedyReg/GreedyReg.html">GreedyReg</a> flips it back to <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> (<code>Logic.py:520</code>).</p>
+      <a class="deep-link" href="ALI.code.html#cbct-sortie"><b>In the code</b><span>The coordinate conversion and the markups writer</span></a>
 
       <h3 id="cbct-poids">3.6 Weights</h3>
 
-      <p><code>GetBrain(dir)</code> (<code>io.py:78</code>) walks the tree recursively and infers the layout <strong>from the folder names</strong>, not from the file names:</p>
+      <p>The trained networks are found by their folder layout: one folder per landmark, one subfolder per grid (1 mm and 0.3 mm). The module downloads eight archives (cranial base, mandible, lower and upper teeth), and ASO and GreedyReg fetch the same weights from another release.</p>
 
-      <pre class="ascii"><code>&lt;dir_models&gt;/&lt;LANDMARK&gt;/&lt;SCALE&gt;/&lt;anything&gt;.pth
-              ^ 2 levels up          ^ 1 level up</code></pre>
-
-      <p>Verified on one installation: <code>Cranial_Base/Ba/1/Ba_Net_1.pth</code> and <code>Ba/0-3/Ba_Net_0-3.pth</code>. The <code>SCALE</code> values must be exactly <code>1</code> and <code>0-3</code>, since <code>scale_keys</code> comes from <code>str(spacing).replace(".", "-")</code>.</p>
-
-      <p>Download via the "Download latest models" button, eight archives (<code>CBCT.py:104</code>):</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Archive</th><th>Contents</th></tr></thead>
-          <tbody>
-            <tr><td><code>Cranial_Base.zip</code></td><td>Ba, S, N, RPo, LPo, RFZyg, LFZyg, C2-C4</td></tr>
-            <tr><td><code>Lower_Bones_1.zip</code>, <code>Lower_Bones_2.zip</code></td><td>mandible</td></tr>
-            <tr><td><code>Lower_Left_Teeth.zip</code>, <code>Lower_Right_Teeth.zip</code></td><td>lower teeth</td></tr>
-            <tr><td><code>Upper_Bones_v2.zip</code></td><td>maxilla</td></tr>
-            <tr><td><code>Upper_Left_Teeth_v2.zip</code>, <code>Upper_Right_Teeth_v2.zip</code></td><td>upper teeth</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>Base: <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/v0.1-v2.0_models/">https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/v0.1-v2.0_models/</a>. Extracted to <code>&lt;Documents&gt;/SlicerDownloads/ALI/ALI_CBCT/Models/Landmark/&lt;name&gt;/</code>. <a href="../ASO/ASO.html">ASO</a> and GreedyReg use a different release for the same weights: <a href="https://github.com/lucanchling/ALI_CBCT/releases/download/models_v01/">https://github.com/lucanchling/ALI_CBCT/releases/download/models_v01/</a>.</p>
+      <a class="deep-link" href="ALI.code.html#cbct-poids"><b>In the code</b><span>Weight discovery and the eight archives</span></a>
 
       <h2 id="ali-ios">4. ALI_IOS: multi-view rendering</h2>
 
+      <p>The mesh is scaled into a <a class="gterm" data-term="ali-leg-unit-sphere" href="ALI.code.html#ios-entrees" title="See the code">unit sphere</a>. Around each tooth, a few <a class="gterm" data-term="ali-leg-cameras" href="ALI.code.html#ios-cameras" title="See the code">virtual cameras</a> take pictures. A 2D network labels each pixel, and the pixels of the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> class are traced back to triangles of the mesh, whose centre is the landmark. The network is the only trained part; everything else is geometry.</p>
+
       <figure class="diagram">
         <svg viewBox="0 0 920 200" role="img" aria-label="ALI_IOS pipeline: unit-sphere scaling, per-tooth camera placement, Phong rendering, a 2D UNet that segments per pixel, back-projection to the 3D point">
+          <a class="d-link" href="#ios-entrees">
           <rect class="d-box" x="10" y="30" width="150" height="60" rx="6"/>
           <text class="d-label" x="85" y="55" text-anchor="middle">IOS mesh</text>
           <text class="d-label-s" x="85" y="70" text-anchor="middle">vtk/vtp/stl/obj/off</text>
+          </a>
 
           <path class="d-arrow" d="M165 60 H210"/>
           <path class="d-arrow-head" d="M210 60 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#ios-entrees">
           <rect class="d-box" x="215" y="20" width="170" height="80" rx="6"/>
           <text class="d-label" x="300" y="42" text-anchor="middle">Scale + arch</text>
-          <text class="d-label-s" x="300" y="58" text-anchor="middle">ScaleSurf → unit sphere</text>
-          <text class="d-label-s" x="300" y="72" text-anchor="middle">LowerArchMatrix (MG, SVD)</text>
+          <text class="d-label-s" x="300" y="58" text-anchor="middle">scaled to a unit sphere</text>
+          <text class="d-label-s" x="300" y="72" text-anchor="middle">levelling (MG only)</text>
           <text class="d-label-s" x="300" y="86" text-anchor="middle">geometric</text>
+          </a>
 
           <path class="d-arrow" d="M390 60 H435"/>
           <path class="d-arrow-head" d="M435 60 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#ios-cameras">
           <rect class="d-box" x="440" y="20" width="170" height="80" rx="6"/>
           <text class="d-label" x="525" y="42" text-anchor="middle">Per-tooth cameras</text>
           <text class="d-label-s" x="525" y="58" text-anchor="middle">O: 5, C: 12, MG: 3</text>
-          <text class="d-label-s" x="525" y="72" text-anchor="middle">Phong rendering: normal as RGB</text>
+          <text class="d-label-s" x="525" y="72" text-anchor="middle">shaded view: normal as colour</text>
           <text class="d-label-s" x="525" y="86" text-anchor="middle">+ z-buffer, 224×224</text>
+          </a>
 
           <path class="d-arrow" d="M615 60 H665"/>
           <path class="d-arrow-head" d="M665 60 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#ios-reseau">
           <rect class="d-box-n" x="670" y="20" width="170" height="80" rx="6"/>
           <text class="d-label" x="755" y="45" text-anchor="middle">monai 2D UNet</text>
           <text class="d-label-s" x="755" y="61" text-anchor="middle">per-pixel segmentation</text>
           <text class="d-label-s" x="755" y="75" text-anchor="middle">class 1 = landmark</text>
           <text class="d-label-s" x="755" y="89" text-anchor="middle">reloaded for every tooth</text>
+          </a>
 
           <path class="d-arrow" d="M755 100 V150 H300 V102" fill="none"/>
           <path class="d-arrow-head" d="M300 102 l-6 6 v-9 z" transform="translate(0,0)"/>
 
+          <a class="d-link" href="#ios-pixel-point">
           <rect class="d-box" x="215" y="140" width="270" height="45" rx="6"/>
-          <text class="d-label" x="350" y="158" text-anchor="middle">Pixel → face → vertices → octree snap</text>
-          <text class="d-label-s" x="350" y="173" text-anchor="middle">geometric, upscale sphere → file</text>
+          <text class="d-label" x="350" y="158" text-anchor="middle">Pixel → face → vertices → snap</text>
+          <text class="d-label-s" x="350" y="173" text-anchor="middle">geometric, back to file coordinates</text>
+          </a>
 
           <path class="d-arrow" d="M490 162 H540"/>
           <path class="d-arrow-head" d="M540 162 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#ios-sortie-poids">
           <rect class="d-box-a" x="545" y="142" width="170" height="42" rx="6"/>
           <text class="d-label" x="630" y="167" text-anchor="middle">Landmark (LPS)</text>
+          </a>
         </svg>
         <figcaption>ALI_IOS: the network (2D UNet) segments each rendered view at the pixel level; everything else, camera placement, pixel→vertex mapping, scaling back to the original size, is geometric.</figcaption>
       </figure>
@@ -471,305 +432,159 @@ real_label_pos  = [real_label_pos[2], real_label_pos[1], real_label_pos[0]]  # b
           <i data-k="segment">UNet segmenting the render of tooth</i>
           <i data-k="done">landmarks placed, one camera pass per tooth</i>
         </span>
-        <figcaption>The published test arch (ASO_IOS). It starts as plain surface: the numbering comes first, from <code>dentalmodelseg</code>, and <strong>everything depends on it</strong>, the label array is what gives each tooth&rsquo;s centroid, and therefore where the camera goes. Without it ALI_IOS finds no tooth and places nothing, which is why the step is shown rather than assumed. The inset is what the network actually sees: not a colour photo but the <strong>per-vertex normal remapped to RGB</strong> (<code>TexturesVertex</code>, <code>surface.py:101</code>), plus the z-buffer as a fourth channel. <strong>The camera path and the geometry are faithful; the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> positions here are illustrative</strong>: unlike the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> scene above, these are not real predictions, because ALI_IOS needs pytorch3d and a conda env.</figcaption>
+        <figcaption>The published test arch (no patient data). It starts as plain surface: the numbering of the teeth comes first, and <strong>everything depends on it</strong>, because the label of each tooth gives its centre, and so where the camera goes. Without it ALI_IOS finds no tooth and places nothing, which is why the step is shown rather than assumed. The inset is what the network sees: not a colour photo but each surface normal turned into a colour, plus the depth as a fourth channel. <strong>The camera path and the geometry are faithful; the landmark positions here are illustrative</strong>: unlike the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> scene above, these are not real predictions.</figcaption>
       </figure>
 
       <h3 id="ios-entrees">4.1 Inputs</h3>
 
-      <p><code>.vtk</code>, <code>.vtp</code>, <code>.stl</code>, <code>.obj</code>, <code>.off</code>. But <strong>everything depends on a tooth-label array</strong>, looked up under <code>PredictedID</code>, <code>predictedId</code> or <code>Universal_ID</code> (<code>surface.py:137</code>): that's what gives the centroid of each tooth, and therefore the camera position. Without an array, <code>RI</code> is set to zero and no label is found.</p>
-
-      <p>If the scan doesn't have one, <code>SegmentSurface</code> (<code>segmentation.py:72</code>) calls <code>dentalmodelseg</code> on a <strong>copy</strong> (a <code>.stl</code> passed to shapeaxi with <code>--overwrite 1</code> is deleted by <code>dental_model_seg.py</code>), via a csv (passing <code>--surf</code> a single file crashes shapeaxi on an attribute it doesn't define). Segmentation doesn't move the points, 5e-5 mm measured over 118k points according to the comment, so the landmarks stay valid in the original file.</p>
+      <p>Five mesh formats are read. But <strong>everything depends on a tooth-label array</strong> on the mesh: it gives the centre of each tooth, and therefore where the camera goes. Without one, no tooth is found. If the scan has none, a crown segmentation is run first, on a copy of the file; it does not move the points, so the landmarks stay valid in the original file.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 700 140" role="img" aria-label="dentalmodelseg: multi-view crown segmentation, called ahead of ALI_IOS when the mesh has no tooth-label array">
+          <a class="d-link" href="#ios-entrees">
           <rect class="d-box" x="10" y="40" width="180" height="60" rx="6"/>
           <text class="d-label" x="100" y="63" text-anchor="middle">IOS mesh</text>
           <text class="d-label-s" x="100" y="78" text-anchor="middle">no tooth label</text>
           <text class="d-label-s" x="100" y="92" text-anchor="middle">(a copy of the file)</text>
+          </a>
 
           <path class="d-arrow" d="M195 70 H245"/>
           <path class="d-arrow-head" d="M245 70 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#ios-entrees">
           <rect class="d-box-n" x="250" y="30" width="200" height="80" rx="6"/>
           <text class="d-label" x="350" y="55" text-anchor="middle">dentalmodelseg</text>
           <text class="d-label-s" x="350" y="71" text-anchor="middle">multi-view segmentation</text>
-          <text class="d-label-s" x="350" y="85" text-anchor="middle">(shapeaxi, CrownSegmentationcli)</text>
+          <text class="d-label-s" x="350" y="85" text-anchor="middle">(shapeaxi crown segmentation)</text>
           <text class="d-label-s" x="350" y="99" text-anchor="middle">shapeaxi conda env</text>
+          </a>
 
           <path class="d-arrow" d="M455 70 H505"/>
           <path class="d-arrow-head" d="M505 70 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#ios-entrees">
           <rect class="d-box-a" x="510" y="40" width="180" height="60" rx="6"/>
           <text class="d-label" x="600" y="63" text-anchor="middle">Universal_ID</text>
           <text class="d-label-s" x="600" y="78" text-anchor="middle">per tooth → centroids</text>
           <text class="d-label-s" x="600" y="92" text-anchor="middle">→ ALI_IOS camera placement</text>
+          </a>
         </svg>
         <figcaption>dentalmodelseg segments and numbers the teeth before ALI_IOS can place one camera per tooth. Called as a preprocessing step, not by ALI_IOS itself when a label array already exists.</figcaption>
       </figure>
 
-      <p><strong>Canonical scaling</strong>, <code>ScaleSurf</code> (<code>surface.py:24</code>): centering on the bounding-box midpoint, then <code>scale = 1 / ||max - center||</code>. The whole pipeline works inside this <strong>unit sphere</strong>; <code>Upscale</code> reverses the process at the end.</p>
+      <figure class="algo" data-scene="sphere" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a mesh is centred on its bounding box and scaled until its farthest corner touches the unit circle"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The mesh is centred on the middle of its bounding box, then divided by the largest distance from that centre to a corner. Every arch then fits in a sphere of radius 1, so the same camera distances serve every patient.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">p</mi><mtext>unit</mtext></msub><mo>=</mo><mfrac><mrow><mi class="k1">p</mi><mo>&#x2212;</mo><mi class="k2">c</mi></mrow><mrow><mo>&#x2225;</mo><mrow><msub><mi class="k3">b</mi><mtext>max</mtext></msub><mo>&#x2212;</mo><mi class="k2">c</mi></mrow><mo>&#x2225;</mo></mrow></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p</b>a vertex of the mesh</li><li class="k2"><b>c</b>middle of the bounding box</li><li class="k3"><b>b<sub>max</sub></b>the corner of the box farthest from c</li></ul></div>
+      </figure>
 
-      <p><strong>Leveling (MG only)</strong>, <code>LowerArchMatrix</code> (<code>orientation.py:89</code>): the MG cameras are built around a vertical axis assumed to be Z. The <a class="gterm" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane is fitted with <a class="gterm" href="../glossary.html#g-svd" title="See glossary">SVD</a> on the centroids of teeth 18–31 (at least 4 teeth, spread ≥ 4 labels), with the sign fixed so the crowns point up, then a <strong>minimal rotation</strong> (Rodrigues) brings the normal onto <code>+Z</code>. Below <code>MAX_TILT_DEGREES = 12°</code> the scan is left strictly untouched: sending an already-level scan into a fixed frame would rotate it within the plane and degrade the prediction. Landmarks are passed back through <code>inv(matrix)</code> before being written.</p>
+      <p><strong>Levelling (mucogingival network only).</strong> Its cameras are built around a vertical axis assumed to be Z, so the <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane is fitted through the lower teeth and the scan is tilted to bring that plane's normal onto Z. Under 12 degrees of tilt the scan is left untouched, and the landmarks are mapped back through the inverse rotation before being written.</p>
+
+      <a class="deep-link" href="ALI.code.html#ios-entrees"><b>In the code</b><span>Label lookup, the segmentation call, scaling and levelling</span></a>
 
       <h3 id="ios-cameras">4.2 The cameras</h3>
 
-      <p><code>GenPhongRenderer</code> (<code>render.py:11</code>):</p>
+      <p>The rendering is hard: one triangle per pixel, 224 by 224 pixels, so each pixel can be traced back to the triangle it shows. What the network sees is not a colour photo: each surface normal is turned into a colour, and the depth is added as a fourth channel.</p>
 
-      <pre><code>cameras = FoVPerspectiveCameras(znear=0.01, zfar=10, fov=90)
-raster_settings = RasterizationSettings(image_size=224, blur_radius=0, faces_per_pixel=1)</code></pre>
+      <figure class="algo" data-scene="cameras" data-ms="6000">
+        <div class="algo-stage"><div class="algo-tabs" role="group"><button type="button" data-net="O" aria-pressed="true">Occlusal</button><button type="button" data-net="C" aria-pressed="false">Cervical</button><button type="button" data-net="MG" aria-pressed="false">Mucogingival</button></div><svg viewBox="0 0 320 196" role="img" aria-label="Schematic side view of the cameras around a tooth for each of the three networks"></svg><p class="algo-tag"><span data-for="O" class="on">5 views, radius 0.2: along the tooth&rsquo;s axis, plus four tilted views.</span><span data-for="C">12 views, radius 0.3: all around the crown, horizontal or tilted.</span><span data-for="MG">3 views, radius 0.2: facing the cheek side, and tilted by &plusmn;0.35 rad.</span></p><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Each network looks at a tooth from its own set of virtual cameras. A camera stands at the tooth&rsquo;s centre plus a fixed direction, scaled by a radius.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">e</mi><mi>t,k</mi></msub><mo>=</mo><msub><mi class="k2">c</mi><mi>t</mi></msub><mo>+</mo><mi class="k3">r</mi><mo>&#xd7;</mo><msub><mi class="k4">d</mi><mi>k</mi></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>e</b>camera position for tooth t and view k</li><li class="k2"><b>c<sub>t</sub></b>centre of tooth t</li><li class="k3"><b>r</b>radius of the network</li><li class="k4"><b>d<sub>k</sub></b>direction of view k</li></ul></div>
+      </figure>
 
-      <p><code>image_size / blur_radius / faces_per_pixel</code> are positional arguments of the CLI, but <strong>every caller passes <code>224 / 0 / 1</code></strong> (<code>IOS.py:297</code>, <code>IOSCBCT.py:335</code>, <code>FlexReg.py:2517</code>). <code>blur_radius = 0</code> plus <code>faces_per_pixel = 1</code> means hard rasterization, one face per pixel: that's what makes <code>pix_to_face</code> usable as a pixel-to-face lookup table.</p>
+      <p>The occlusal (O) cameras use a table of directions in which two rows are normalised by the wrong vector, so they are slightly shorter than 1. It is harmless as long as the <a class="gterm" data-term="ali-leg-weights" href="ALI.code.html#cbct-poids" title="See the code">weights</a> were trained with the same table, and VISOR keeps it on purpose (<a href="ALI.code.html#f-o-table">details</a>).</p>
 
-      <p>The texture isn't a color: <code>TexturesVertex(verts_features=CN)</code> where <code>CN</code> is the <strong>per-vertex normal remapped to RGB</strong> (<code>(n*0.5+0.5)*255</code>, <code>surface.py:101</code>). So the network sees a Phong-lit normal map, plus the z-buffer as a 4th channel.</p>
+      <p>The mucogingival (MG) cameras are the only adaptive ones. The arch direction at a tooth is taken from its two neighbours; the cheek side is the horizontal perpendicular to it. The cameras do not look at the tooth's centre but at a point shifted by a typical offset for that tooth, learned from 155 training scans, so the gum point falls inside the picture.</p>
 
-      <p>One camera is placed per tooth, at <code>radius</code> from its centroid:</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Model</th><th>Radius</th><th>Cameras</th><th>Geometry</th></tr></thead>
-          <tbody>
-            <tr><td><code>O</code> (occlusal)</td><td>0.2</td><td>5</td><td><code>dic_cam['O']</code>, occlusal axis + 4 tilts</td></tr>
-            <tr><td><code>C</code> (cervical)</td><td>0.3</td><td>12</td><td><code>dic_cam['C']</code>, buccal/lingual crown</td></tr>
-            <tr><td><code>MG</code> (mucogingival)</td><td>0.2</td><td>3</td><td>computed on the fly, see below</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug · Also true in VISOR (kept on purpose)</div>
-        <p>The directions in <code>dic_cam['O']</code> are <strong>normalized incorrectly</strong>: <code>np.array([0.5,0,1.0]) / linalg.norm([0.5,0.5,1.0])</code> divides by the norm of a <em>different</em> vector (<code>model.py:66</code>). So the cameras are not on the sphere of radius <code>radius</code>. Harmless as long as the weights were trained with the same table.</p>
-        <p>At 3c67957 the table is at <code>ALI_IOS_utils/model.py:66-77</code>. <a href="../visor/ALI/ALI.html">VISOR</a> reproduces it on purpose, because the shipped weights were trained on these views (<code>SADT-VISOR IO/render.py:9-12</code>, table at <code>:39-54</code>). The two off-axis rows have a length of 0.913 or 0.791 instead of 1 (calculated: 1.118/1.2247 and 1.118/1.414).</p>
-      </div>
-
-      <p><strong>The MG cameras</strong>, the only adaptive part (<code>agent.py:280</code>):</p>
-
-      <ul>
-        <li><strong>arch tangent</strong>: the difference between the centroids of teeth <code>label-1</code> and <code>label+1</code> (the lower labels 18→31 run in sequence along the arch), flattened in z;</li>
-        <li><strong>buccal normal</strong>: horizontal perpendicular to the tangent, flipped if it points inward. The radial direction (tooth center − mesh center) used by the previous version is off by 35° on teeth 19/30 and 53° on tooth 31: the cameras were looking <em>along</em> the arch and the point fell outside the render;</li>
-        <li><strong>aim point</strong>: not the tooth centroid but <code>centroid + b·normal + t·tangent</code>, <code>z += v</code>, with <code>(b,t,v)</code> read from <code>MG_AIM_OFFSET</code> (<code>model.py:35</code>), the per-tooth median over 155 training scans, spread 0.02–0.03;</li>
-        <li>three cameras: the buccal normal, plus ±0.35 rad around the Y axis, placed at <code>radius</code> from the aim point and lowered by <code>0.15·radius</code>.</li>
-      </ul>
+      <a class="deep-link" href="ALI.code.html#ios-cameras"><b>In the code</b><span>The renderer settings, the direction tables and the adaptive MG cameras</span></a>
 
       <h3 id="ios-reseau">4.3 The network</h3>
 
-      <p>A 2D <code>monai.networks.nets.UNet</code>, loaded <strong>for every tooth</strong> (<code>net.load_state_dict</code> inside the loop, <code>ALI_IOS.py:852</code>):</p>
+      <p>A 2D UNet from the <a class="gterm" data-term="monai" href="../glossary.html#g-monai" title="See glossary">MONAI</a> library is loaded for every tooth. For the occlusal and cervical networks each camera is an independent picture and gets its own map of four classes. For the mucogingival network the three views are stacked as 12 channels and the network produces one map of three classes, read in the frame of the first camera. This is a per-pixel segmentation, not a <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">heatmap</a>: class 1 is the landmark, the others carry the secondary points (mesial and distal buccal for O, buccal for C).</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th></th><th><code>O</code> / <code>C</code></th><th><code>MG</code></th></tr></thead>
-          <tbody>
-            <tr><td><code>in_channels</code></td><td>4 (RGB + z-buffer)</td><td><strong>12</strong> (3 cameras × 4)</td></tr>
-            <tr><td><code>out_channels</code></td><td>4 classes</td><td>3 classes</td></tr>
-            <tr><td><code>channels</code></td><td><code>(16,32,64,128,256,512)</code></td><td>same</td></tr>
-            <tr><td><code>strides</code></td><td><code>(2,2,2,2,2)</code></td><td>same</td></tr>
-            <tr><td><code>num_res_units</code></td><td>4</td><td>4</td></tr>
-            <tr><td>Batch</td><td><strong>the cameras</strong> (<code>[ncam,4,224,224]</code>)</td><td>1 (<code>[1,12,224,224]</code>)</td></tr>
-            <tr><td>Output</td><td><code>[ncam,4,224,224]</code></td><td><code>[1,3,224,224]</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>One difference between paths is a known problem: for O and C the scores are truncated to integers before the most likely class is chosen, which merges close classes and falls back to the background on a tie. The mucogingival path uses the raw scores, and VISOR uses them everywhere.</p>
 
-      <p>A structural difference: for <code>O</code>/<code>C</code> each camera is an independent sample and each view produces its own map; for <code>MG</code> the three views are <strong>stacked as channels</strong> and the network produces <strong>a single map</strong>, interpreted in camera 0's frame (the indexing <code>tens_pix_to_face_model[0,0,0,y,x]</code> targets the first camera after the <code>permute(1,0,4,2,3)</code>).</p>
-
-      <p>This isn't a heatmap in the Gaussian-regression sense: it's a <strong>per-pixel segmentation</strong>. Class 1 is the landmark (<code>MG</code>, or <code>O</code>), 2 and 3 carry <code>MB</code>/<code>DB</code> (<code>O</code> model) or <code>CB</code> (<code>C</code> model): see <code>MODELS_DICT</code> and <code>dic_label</code> (<code>model.py:51</code>).</p>
-
-      <p>Decoding the output is where the two paths diverge (<code>ALI_IOS.py:948</code>):</p>
-
-      <pre><code># MG: argmax on the raw logits
-pred_data = torch.argmax(images_pred.detach().cpu().float(), dim=1)...
-# O / C: cast to int16 BEFORE the argmax
-pred_data = images_pred.detach().cpu().unsqueeze(0).type(torch.int16)
-pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
-
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug · Legacy only</div>
-        <p>The comment in the MG code explains why the second one is wrong: truncating the logits to integers merges close classes, and on a tie, <code>argmax</code> falls back to index 0 (the background). The fix was only applied to MG.</p>
-        <p>Legacy (3c67957): still true, <code>ALI_IOS/ALI_IOS.py:738-739</code> (cast) against <code>:731-736</code> (MG, raw logits). Not present in <a href="../visor/ALI/ALI.html">VISOR</a>: every network is decoded with an argmax on the raw logits (<code>SADT-VISOR IO/engine.py:199-216</code>). The VISOR README measured the cast on one mesh: 54 of 73 landmarks identical to upstream, 71 of 73 once the cast is restored (<code>tools/ALI/README.md:213-226</code>), so a VISOR O or C result is not the legacy result.</p>
-      </div>
+      <a class="deep-link" href="ALI.code.html#ios-reseau"><b>In the code</b><span>Network parameters, batching and the decoders</span></a>
 
       <h3 id="ios-pixel-point">4.4 From pixel to 3D point</h3>
 
-      <ol>
-        <li><code>index = (pred_data == 1.).nonzero()</code>: the pixels of the target class;</li>
-        <li><code>tens_pix_to_face[...]</code>: the rendered face under each of those pixels;</li>
-        <li>filtering, and it differs:
-          <ul>
-            <li><code>O</code>/<code>C</code>: <code>RemoveExtraFaces</code> keeps only faces where at least one vertex carries the tooth's <code>Universal_ID</code> (<code>surface.py:159</code>);</li>
-            <li><code>MG</code>: <strong>no per-tooth filtering</strong>, only <code>face &gt;= 0</code>. The mucogingival point sits on the gum, not on the crown; <code>RemoveExtraFaces</code> would eliminate all of them;</li>
-          </ul>
-        </li>
-        <li>the 3 vertices of each retained face, <strong>averaged</strong>;</li>
-        <li><code>vtkOctreePointLocator.FindClosestPoint</code>: the mean point is <strong>snapped onto an existing vertex</strong>, the average of a curved patch falls below the surface;</li>
-        <li><code>Upscale(pos, mean_arr, scale_factor)</code>: back to the file's coordinates.</li>
-      </ol>
+      <figure class="algo" data-scene="pixel" data-ms="6600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the pixels of a class point to mesh triangles, their vertices give a centroid, which is snapped to the surface"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The pixels of the target class point to the triangles they show. The landmark is the average of those triangles&rsquo; vertices, then snapped onto the nearest vertex of the mesh, because the average of a curved patch falls slightly under the surface.</p><div class="formula"><math display="block"><mrow><mi class="k1">L</mi><mo>=</mo><mfrac><mn>1</mn><mrow><mo>|</mo><mi class="k2">V</mi><mo>|</mo></mrow></mfrac><munder><mo>&#x2211;</mo><mrow><mi class="k3">v</mi><mo>&#x2208;</mo><mi class="k2">V</mi></mrow></munder><mi class="k3">v</mi></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mi class="k1">L</mi><mtext>snap</mtext></msub><mo>=</mo><munder><mo>argmin</mo><mrow><mi class="k4">q</mi><mo>&#x2208;</mo><mi>mesh</mi></mrow></munder><mrow><mo>&#x2225;</mo><mrow><mi class="k4">q</mi><mo>&#x2212;</mo><mi class="k1">L</mi></mrow><mo>&#x2225;</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>L</b>the landmark</li><li class="k2"><b>V</b>the vertices of the retained triangles</li><li class="k3"><b>v</b>one vertex</li><li class="k4"><b>q</b>a vertex of the mesh</li></ul></div>
+      </figure>
 
-      <h3 id="ios-points-forces">4.5 Forced points, and the <code>description</code> field</h3>
+      <p>For O and C only the triangles that touch the tooth's own vertices are kept. For MG there is no such filter, because the gum point is on the gum, not on the crown. The point is then scaled back to the coordinates of the file.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall · Legacy (3c67957) differs in VISOR</div>
-        <p>Three safeguards, <strong>MG only</strong>, driven by CLI options (<code>ALI_IOS.py:515</code>) that <strong>no caller in the repository passes</strong>, so their defaults always apply:</p>
-        <p>Still true of these three at 3c67957 (<code>ALI_IOS/ALI_IOS.py:1036-1052</code>; no other file passes them). The legacy has since gained eight more MG switches, all on by default: <code>--arch_scale</code>, <code>--smooth</code>, <code>--refine</code>, <code>--snap_to_surface</code>, <code>--complete_line</code>, <code>--paint_scan</code>, <code>--pick_patch</code>, <code>--fill_gaps</code> (<code>:1054-1116</code>). <a href="../visor/ALI/ALI.html">VISOR</a> has no options at all: forced points are always on (<code>SADT-VISOR IO/engine.py:472</code>, <code>:538-552</code>), missing teeth are always estimated, against the legacy default of False (<code>:354-358</code>), and the "anchored on the tooth" last resort below does not exist (<code>:564-565</code> returns nothing).</p>
-      </div>
+      <a class="deep-link" href="ALI.code.html#ios-pixel-point"><b>In the code</b><span>The pixel-to-face filters and the octree snap</span></a>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Option</th><th>Default</th><th>Effect</th></tr></thead>
-          <tbody>
-            <tr><td><code>--force_landmarks</code></td><td><strong>True</strong></td><td>if class 1 wins no pixel, take the <code>k</code> pixels where it is most likely</td></tr>
-            <tr><td><code>--force_topk</code></td><td><strong>50</strong></td><td>this <code>k</code>: <code>softmax(logits)[:,1]</code>, <code>topk(50)</code>, these pixels stand in for the prediction</td></tr>
-            <tr><td><code>--estimate_missing</code></td><td><strong>False</strong></td><td>place a point on a tooth missing from the segmentation, cameras aimed from a quadratic fit of the arch</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <h3 id="ios-points-forces">4.5 Forced points, and the description field</h3>
 
-      <p><code>EstimateMissingArchPositions</code> (<code>ALI_IOS.py:90</code>) fits a degree-2 polynomial of each centroid coordinate against the label index, on the teeth present (≥ 4 teeth, spread ≥ 4 labels), and evaluates it at <code>label</code> and <code>label ± 0.5</code> for the tangent. According to the code's error message, these points land <strong>4 to 21 mm</strong> off, against 0.5 mm for a point aimed at a real tooth, hence the default of <code>False</code>.</p>
+      <p>For the mucogingival network, three safeguards keep a point from going missing. If the landmark class wins no pixel, the 50 pixels where it is most likely stand in for the prediction. A tooth missing from the segmentation can get a point from a polynomial fit of the arch, but that option is off by default, because such points land 4 to 21 mm off, according to the code. If nothing lands on the mesh, the point is anchored on the tooth itself.</p>
 
-      <p>Last resort if nothing lands on the mesh: the point is anchored on the tooth itself, lowered by <code>0.2</code> in unit-sphere space, then snapped (<code>ALI_IOS.py:594</code>).</p>
+      <p>Every degradation is written into the <code>description</code> field of the point. FlexReg and AREG_IOS read it: any non-empty description is treated as doubtful and the point is skipped, so the curve passes over the gap. Points from the occlusal and cervical networks, and every CBCT point, have an empty description whatever their quality.</p>
 
-      <p><strong>Every degradation is written into the json.</strong> <code>entry["desc"]</code> becomes the control point's <code>description</code> field (<code>io.py:23</code>):</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Value</th><th>Cause</th></tr></thead>
-          <tbody>
-            <tr><td><code>cameras aimed from an arch fit, tooth not segmented</code></td><td><code>--estimate_missing</code></td></tr>
-            <tr><td><code>forced (confidence 0.123)</code></td><td>top-k on class 1</td></tr>
-            <tr><td><code>fallback (nothing predicted on the mesh)</code></td><td>anchored on the tooth</td></tr>
-            <tr><td>combinations, joined with <code>"; "</code></td><td></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>This is the field that <a href="../FlexReg/FlexReg.html">FlexReg</a> and <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> read: <code>DoubtfulLandmarks</code> (<code>mgl_patch.py:133</code>) treats <strong>any non-empty description</strong> as doubtful and discards the point, letting the spline skip over the gap, unless fewer than 3 points would remain. Measured over 364 predictions according to the comment: 4.2 mm median deviation from the neighboring curve, against 1.2 mm for the others.</p>
-
-      <div class="callout">
-        <div class="callout-title">Note · Also true in VISOR</div>
-        <p>Corollary: <code>O</code>/<code>C</code> points and <strong>every</strong> ALI_CBCT point have an empty <code>description</code>, whatever their quality. The flagging mechanism only exists for MG.</p>
-        <p>Also true in <a href="../visor/ALI/ALI.html">VISOR</a>: notes are filled only by the MG path (<code>SADT-VISOR IO/engine.py:571-575</code>, written by <code>:426</code>) and ALI_CBCT passes no description (<code>CB/engine.py:921</code>). Differences: at 3c67957 a won MG point also carries <code>confidence 0.xyz</code> (<code>ALI_IOS.py:553-554</code>), VISOR notes only forced points (<code>IO/engine.py:552</code>); and VISOR lists the degraded points in the run report, <code>landmarks_degraded</code> (<code>:414-419</code>).</p>
-      </div>
+      <a class="deep-link" href="ALI.code.html#ios-points-forces"><b>In the code</b><span>Options, defaults, the arch fit and every description value</span></a>
 
       <h3 id="ios-sortie-poids">4.6 Output and weights</h3>
 
-      <p>One file per (patient, arch, model): <code>&lt;patient&gt;_&lt;Lower|Upper&gt;_&lt;O|C|MG&gt;_Pred.json</code>, <code>coordinateSystem: "LPS"</code> (<code>io.py:67</code>). The coordinates are those of the input mesh, with no flip: the "LPS" label is true because the <code>.vtk</code> files in this pipeline are LPS, not because the code checks it.</p>
+      <p>One file per patient, jaw and network, in the coordinates of the input mesh. The weights are found from the file name alone (jaw, then network, then anything, then <code>.pth</code>). The module downloads one archive that contains the historical weights plus the mucogingival one, in the folder FlexReg expects.</p>
 
-      <p><code>GenControlPoint</code> filters on <code>landmarks_selected</code>: an <code>O</code> model always predicts <code>XO</code>/<code>XMB</code>/<code>XDB</code>, but only the requested types are written.</p>
-
-      <p>Weight discovery (<code>ALI_IOS.py:997</code>), from the file name alone:</p>
-
-      <pre class="ascii"><code>&lt;jaw&gt;_&lt;model_id&gt;_&lt;anything&gt;.pth
- ^ "Lower" present in the name? otherwise "Upper"
-        ^ basename.split("_")[1], must be O, C or MG</code></pre>
-
-      <p>Verified on one installation: <code>Lower_O_model.pth</code>, <code>Upper_C_model.pth</code>, <code>Lower_MG_v6.pth</code>. Two candidates for the same pair → <code>sorted()</code> settles it and a warning is issued. The widget itself detects <code>_O_</code>/<code>_C_</code> by substring (<code>ALI.py:2036</code>) and <code>Lower_MG_*</code> separately (<code>HasMGModel</code>, <code>ALI.py:856</code>): two conventions for the same file.</p>
-
-      <p>Download: <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/ALI_IOS_models/Models.zip">https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/ALI_IOS_models/Models.zip</a> (<code>IOS.py:238</code>), the contents of the historical ALIDDM v1.0.3 archive plus <code>Lower_MG_v6.pth</code>. Extracted to <code>&lt;Documents&gt;/SlicerDownloads/ALI/ALI_IOS/Models/Prediction/</code>: exactly the path FlexReg goes looking in.</p>
+      <a class="deep-link" href="ALI.code.html#ios-sortie-poids"><b>In the code</b><span>The output name, the weight naming and the download</span></a>
 
       <h2 id="predit-calcule">5. What's predicted vs. what's computed</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Block</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>Histogram windowing, resampling</td><td><span class="badge calcule">computed</span> geometric (SimpleITK / itk)</td><td><a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> CLI, Slicer Python</td></tr>
-            <tr><td>Agent's move direction</td><td><span class="badge predit">predicted</span> DenseNet3D + MLP network, 6 classes</td><td>CBCT CLI</td></tr>
-            <tr><td>Stopping criterion, scale-up, <code>Focus</code></td><td><span class="badge calcule">computed</span> geometric (oscillation detection, averaging)</td><td>CBCT CLI</td></tr>
-            <tr><td>Crown segmentation</td><td><span class="badge predit">predicted</span> multi-view network (DentalModelSeg)</td><td>conda <code>shapeaxi</code></td></tr>
-            <tr><td>Arch leveling (MG)</td><td><span class="badge calcule">computed</span> geometric, SVD on centroids</td><td><a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> CLI</td></tr>
-            <tr><td>Camera placement</td><td><span class="badge calcule">computed</span> geometric (centroids, arch tangent, <code>MG_AIM_OFFSET</code> prior)</td><td>IOS CLI</td></tr>
-            <tr><td>Per-pixel class map</td><td><span class="badge predit">predicted</span> monai 2D UNet network</td><td>IOS CLI</td></tr>
-            <tr><td>Pixel → face → vertex → point</td><td><span class="badge calcule">computed</span> geometric (<code>pix_to_face</code>, averaging, octree snap)</td><td>IOS CLI</td></tr>
-            <tr><td>Forced point (top-k)</td><td><span class="badge calcule">computed</span> geometric, on predicted probabilities</td><td>IOS CLI</td></tr>
+            <tr><td>Histogram windowing, resampling</td><td><span class="badge calcule">computed</span></td></tr>
+            <tr><td><a class="gterm" data-term="ali-leg-agent" href="ALI.code.html#cbct-agent" title="See the code">Agent</a>'s move direction (<a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>)</td><td><span class="badge predit">predicted</span> 3D DenseNet and a decision head, 6 classes</td></tr>
+            <tr><td>Stopping rule, change of scale, <a class="gterm" data-term="ali-leg-focus" href="ALI.code.html#cbct-recherche" title="See the code">final averaging</a></td><td><span class="badge calcule">computed</span> a memory of 10 positions, a mean</td></tr>
+            <tr><td>Crown segmentation (<a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>)</td><td><span class="badge predit">predicted</span> by another tool, multi-view network</td></tr>
+            <tr><td>Arch levelling, camera placement</td><td><span class="badge calcule">computed</span> geometry (centroids, arch tangent, a fixed offset for the gum)</td></tr>
+            <tr><td>Class of each pixel (IOS)</td><td><span class="badge predit">predicted</span> 2D UNet</td></tr>
+            <tr><td>Pixel to triangle to point</td><td><span class="badge calcule">computed</span></td></tr>
+            <tr><td>Forced point</td><td><span class="badge calcule">computed</span> on the network's probabilities</td></tr>
           </tbody>
         </table>
       </div>
 
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug · Legacy only</div>
-        <p>Nothing is trained here: the repository contains no training entry point. The <code>Agent.Train</code> / <code>Agent.Validate</code> methods (<code>agent.py:291</code>) call <code>self.brain.Train</code> / <code>self.brain.Validate</code>, <strong>which do not exist</strong> on the <code>Brain</code> class: dead code that would raise an <code>AttributeError</code>. Same for <code>Environment.LoadJsonLandmarks</code>, <code>GetRewardLst</code>, <code>GetRandomPoses*</code>, <code>GetSampleFromPoses</code>, <code>ResetLandmarks</code>: the entire training scaffolding was left behind by the rest.</p>
-        <p>Legacy (3c67957): still true, <code>ALI_CBCT_utils/agent.py:291-299</code>, and <code>environment.py:91</code>, <code>:170</code>, <code>:193-230</code>. Not present in <a href="../visor/ALI/ALI.html">VISOR</a>: the port is inference only and removed it (<code>SADT-VISOR CB/agent.py:10-12</code>, <code>CB/brain.py:8-12</code>, <code>CB/environment.py:3-6</code>).</p>
-      </div>
+      <p>Nothing is trained in this repository: there is no training entry point, and the training methods left in the code would fail if called.</p>
+
+      <a class="deep-link" href="ALI.code.html#predit-calcule"><b>In the code</b><span>The table with where each block runs, and the dead training code</span></a>
 
       <h2 id="environnement">6. Environment</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Value</th><th>Source</th></tr></thead>
-          <tbody>
-            <tr><td><a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> backend</td><td>Slicer Python + <code>itk</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code>, <code>monai</code> (<code>1.3.2</code> if Python ≥ 3.10, otherwise <code>0.7.0</code>)</td><td><code>ALI.py:874</code></td></tr>
-            <tr><td><a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> backend</td><td>conda env <code>shapeaxi</code>, shared with AREG, <a href="../ASO/ASO.html">ASO</a>, <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td><code>ALI.py:2074</code></td></tr>
-            <tr><td>Env Python</td><td><strong>3.12</strong></td><td><code>ALI.py:2076</code></td></tr>
-            <tr><td>Env creation</td><td><code>torch&gt;=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td><code>ALI.py:2098</code></td></tr>
-            <tr><td>pytorch3d</td><td>wheel chosen based on the installed torch version, PEP 503 index <code>ImageMindAnalytics.github.io/pytorch3d-wheels</code></td><td><code>install_pytorch.py</code></td></tr>
-            <tr><td>shapeaxi</td><td><code>&gt;=2.0.2</code>, installed <strong>after</strong> pytorch3d</td><td><code>install_pytorch.py:189</code></td></tr>
-            <tr><td>Windows</td><td>conda via WSL (<code>CondaSetUpCallWsl</code>), checks for <code>libxrender1</code>, <code>libgl1</code>/<code>libgl1-mesa-glx</code>, <code>libglx-mesa0</code></td><td><code>ALI.py:2165</code></td></tr>
-            <tr><td>GPU</td><td>never mandatory; <code>DEVICE</code> falls back to CPU on both sides</td><td><code>constants.py</code>, <code>ALI_IOS.py</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>ALI_CBCT uses Slicer's Python plus a few installed libraries. ALI_IOS uses a conda environment shared with AREG, ASO, FlexReg and DOCShapeAXI, with pytorch3d chosen to match the installed PyTorch. Neither requires a GPU. On Windows, conda is reached through WSL. The exact versions are listed on the code page.</p>
 
-      <p>Two installation details that are anything but trivial:</p>
-
-      <ul>
-        <li><code>verify_gpu()</code> (<code>install_pytorch.py:98</code>) runs an actual CUDA kernel (<code>knn_points</code>): a wheel built without kernels for the present GPU imports just fine and only breaks at the first render;</li>
-        <li><code>patch_dentalmodelseg()</code> (<code>install_pytorch.py:210</code>) <strong>rewrites the installed shapeaxi source</strong>: on 2.0.0–2.0.2, <code>dental_model_seg.py</code> calls <code>saxi_nets.DentalModelSeg</code>, a class that has moved to <code>saxi_nets_lightning</code>.</li>
-      </ul>
+      <a class="deep-link" href="ALI.code.html#environnement"><b>In the code</b><span>Versions, install checks and the patched package</span></a>
 
       <h2 id="pieges">7. Pitfalls and fragile spots</h2>
 
+      <p>Each point is checked in the code and described, with its evidence, on the code page; the list also appears in the <a href="../findings.html">findings</a>.</p>
+
       <ul>
-        <li><strong><code>Focus()</code> had no safeguard</strong> in the revision this page was written against. Superseded: bounded at 3c67957 (<code>agent.py:325-341</code>) and in <a href="../visor/ALI/ALI.html">VISOR</a> (<code>CB/agent.py:238-243</code>), see the note in 3.4.</li>
-        <li><strong><code>Move()</code> tests its bounds wrong</strong>: <code>if new_pos.all() &gt; 0 and (...)</code>, <code>.all()</code> returns a boolean, compared against <code>0</code>. The test checks "no coordinate is zero," not "no coordinate is negative" (<code>agent.py:242</code>). Superseded: since 7d901e4 (2026-09-18) the legacy tests the padded sampled zone coordinate by coordinate (<code>ALI_CBCT_utils/agent.py:114</code>, <code>:279-284</code>), and <a href="../visor/ALI/ALI.html">VISOR</a> tests <code>&gt;= 0</code> and <code>&lt; size</code> (<code>CB/agent.py:135-141</code>).</li>
-        <li><strong>The <code>int16</code> cast before <code>argmax</code></strong> is still there on the <code>O</code> and <code>C</code> models. The comment in the MG code explains precisely why it's wrong. Legacy only: still there at 3c67957 (<code>ALI_IOS.py:738-739</code>), absent from <a href="../visor/ALI/ALI.html">VISOR</a> (<code>IO/engine.py:216</code>).</li>
-        <li><strong><code>get_view_rasterize</code> for non-MG rasterizes without <code>R</code>/<code>T</code></strong>: <code>renderer.rasterizer(meshes.clone())</code> (<code>agent.py:366</code>) doesn't pass the matrices used by the render right above it, so <code>pix_to_face</code> comes from the default camera, not the one that produced the image. The MG path was written explicitly to fix this ("with the SAME R,T so pix_to_face stays aligned", <code>agent.py:268</code>). That's the original upstream code, and it was never replayed for <code>O</code>/<code>C</code>. Legacy only: still at <code>ALI_IOS_utils/agent.py:364</code> at 3c67957; <a href="../visor/ALI/ALI.html">VISOR</a> rasterises once per view, with <code>R</code> and <code>T</code> (<code>IO/render.py:402-412</code>).</li>
-        <li><strong><code>val_pred</code> / <code>post_pred</code></strong> (<code>ALI_IOS.py:942</code>): an <code>AsDiscrete(argmax=True, to_onehot=4)</code> is computed on every view and then never read. Dead computation on every single tooth.</li>
-        <li><strong>MG name collisions.</strong> Six of the 13 output names are the training name of a <em>different</em> tooth: <code>LR1MG</code> is the output for tooth 26 and the training name for tooth 25 (<code>model.py:25</code>). Any translation between the two conventions has to be decided on the whole label set, never label by label.</li>
-        <li><strong>The widget's DICOM path is broken.</strong> <code>Auto_CBCT</code> implements neither <code>NumberScanDCM</code>, nor <code>TestScanDCM</code>, nor <code>getTestFileListDCM</code>: the base versions return <code>None</code>. Checking "DICOM" gives <code>nb_patient = None</code>, then a <code>TypeError</code> when downloading the test files and a division by <code>None</code> in <code>OnEndProcess</code>. The CLI itself knows how to convert.</li>
-        <li><strong>The Agent manifest is incomplete.</strong> <code>ali_cbct</code> declares 6 parameters for 10 expected positionals, <code>ali_ios</code> declares 6 for 10 and <strong>omits <code>teeth_mg</code></strong> (index 4): the following values shift by one slot (<code>manifest.yaml:48</code>).</li>
-        <li><strong><code>temp_fold</code> is never cleaned up</strong> by ALI_CBCT, and resampled files are reused as-is if they exist: a silent cache between two runs. Legacy only: at 3c67957 the reuse is at <code>ALI_CBCT.py:199</code>, <code>:215</code>; <a href="../visor/ALI/ALI.html">VISOR</a> deletes a per-scan scratch folder (<code>CB/engine.py:910</code>).</li>
-        <li><strong><code>Auto_IOS.getALIModelList</code></strong> returns <code>super().getALIModelList()</code>, an empty abstract method → <code>None</code> (<code>IOS.py:183</code>).</li>
-        <li><strong><code>slicer.modules.ali_ios</code></strong> is called by AREG through <code>slicer.cli.run</code> (<code>IOSCBCT.py:350</code>), so inside Slicer's Python, where <code>pytorch3d</code> and <code>shapeaxi</code> are not installed. The ALI widget itself only ever calls it through <code>conda run</code>. The two paths cannot both work on the same install.</li>
-        <li><strong><code>SURFACE_LANDMARKS</code></strong> (<code>ALI.py:127</code>) offers <code>R</code>, <code>RIP</code>, <code>OIP</code>, which have no entry in <code>MODELS_DICT</code>: selecting them alone makes the CLI fail with "No matching models found."</li>
-        <li><strong><code>onPredictButton</code> chains the two <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> processes badly</strong>: the <code>if "CrownSegmentationcli"</code> and the <code>if "ALI_IOS"</code> that follows are not mutually exclusive, and the <code>else</code> after it attaches to the second one (<code>ALI.py:986</code>). When segmentation is needed, ALI_IOS is relaunched from <code>onProcessUpdate</code>; otherwise from <code>onPredictButton</code>. Two entry points for the same step.</li>
+        <li><strong>The final network layer is a ReLU</strong>, so an all-negative output makes the <a class="gterm" data-term="ali-leg-agent" href="ALI.code.html#cbct-agent" title="See the code">agent</a> always take the first move. <a href="ALI.code.html#f-relu">Evidence</a>.</li>
+        <li><strong>The millimetre conversion uses an absolute value</strong> that is only right for a negative origin; reorienting to <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a> first limits the damage. <a href="ALI.code.html#f-abs">Evidence</a>.</li>
+        <li><strong>O and C scores are truncated to integers before the argmax</strong>, merging close classes. <a href="ALI.code.html#f-int16">Evidence</a>.</li>
+        <li><strong>The O and C pictures are rasterised without the camera matrices</strong> used to render them, so the pixel-to-triangle lookup can come from the wrong camera. <a href="ALI.code.html#f-rasterize">Evidence</a>.</li>
+        <li><strong>The widget's <a class="gterm" data-term="ali-leg-dicom" href="ALI.code.html#f-dicom-widget" title="See the code">DICOM</a> path is broken</strong>: ticking DICOM ends in an error, although the CLI itself converts DICOM. <a href="ALI.code.html#f-dicom-widget">Evidence</a>.</li>
+        <li><strong>The Agent manifest is incomplete</strong>, so values shift by one slot for ali_ios. <a href="ALI.code.html#f-manifest">Evidence</a>.</li>
+        <li><strong>A silent cache between runs</strong>: resampled files are reused if they exist and are never cleaned up. <a href="ALI.code.html#f-tempfold">Evidence</a>.</li>
+        <li><strong>Two ways of running ALI_IOS cannot both work on one install</strong>: AREG calls it inside Slicer's Python, where pytorch3d is absent. <a href="ALI.code.html#f-ali-ios-slicer">Evidence</a>.</li>
+        <li><strong><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">Landmarks</a> R, RIP and OIP have no model</strong>: selecting them alone makes the CLI fail. <a href="ALI.code.html#f-surface-landmarks">Evidence</a>.</li>
+        <li><strong>MG output names collide with the training names</strong> of other teeth; translate on the whole label set, never label by label. <a href="ALI.code.html#f-mg-names">Evidence</a>.</li>
+        <li><strong>Other fragile spots</strong> (chained <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> processes, dead computation, the empty model list, the earlier unbounded <a class="gterm" data-term="ali-leg-focus" href="ALI.code.html#cbct-recherche" title="See the code">Focus</a> and bounds test) are described one by one on the code page. <a href="ALI.code.html#pieges">All pitfalls</a>.</li>
       </ul>
+
+      <a class="deep-link" href="ALI.code.html#pieges"><b>In the code</b><span>All pitfalls with file and line</span></a>
 
       <h2 id="litterature">8. Literature</h2>
 
-      <p>Both backends have their own paper, and the code matches what they describe: with one reservation for ALI_IOS.</p>
-
-      <p><strong>ALI_CBCT</strong>: <a href="https://onlinelibrary.wiley.com/doi/10.1111/ocr.12642">Automatic landmark identification in cone-beam computed tomography</a>, Gillot, Baquero, Cevidanes et al., <em>Orthodontics &amp; Craniofacial Research</em>, 2023. Detection is reframed as a <strong>classification problem</strong>: a virtual agent placed in the volume learns to navigate a multi-scale space toward the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a>.</p>
-
-      <div class="callout ok">
-        <div class="callout-title">Verified · Also true in VISOR for the algorithm</div>
-        <p>Reported mean error <strong>1.54 ± 0.87 mm</strong> over 32 landmarks, 4.2 s inference. That's exactly what the code does, including the two scales, 1 mm / 0.3 mm.</p>
-        <p>The algorithm is unchanged in VISOR: scales 1 mm and 0.3 mm (<code>SADT-VISOR CB/catalog.py:69</code>), field of view 64³ (<code>CB/agent.py:39</code>). The accuracy and the 4.2 s are the article's figures and were not re-measured on either side; VISOR's own timing notes are in <a href="../visor/ALI/ALI.html#visor-args">Arguments and I/O</a>.</p>
-      </div>
-
-      <p>Original repository: <a href="https://github.com/Maxlo24/ALI_CBCT">Maxlo24/ALI_CBCT</a>.</p>
-
-      <p><strong>ALI_IOS</strong>: <a href="https://www.juanfernandoaristizabal.com/wp-content/uploads/2024/12/automatic-landmark-identification-on-intra-oral-scans.pdf">Automatic Landmark Identification on IntraOralScans</a>, Baquero, Gillot, Prieto, Cevidanes, <em>Clinical Image-Based Procedures (CLIP 2022)</em>, LNCS 13746, p. 32-42.</p>
-
-      <div class="callout ok">
-        <div class="callout-title">Verified · Also true in VISOR, with a different decoder</div>
-        <p>Unit-sphere scaling, 5 2D views per tooth, per-view patch segmentation, averaging the patch coordinates, scaling back up: the description of the code's <code>O</code> model, to the letter.</p>
-        <p>Also true of the <a href="../visor/ALI/ALI.html">VISOR</a> code: unit sphere (<code>SADT-VISOR IO/surface.py:72</code>), five cameras per tooth for <code>O</code> (<code>IO/render.py:39-54</code>). The one departure is the argmax on O and C masks, see the <code>int16</code> callout above.</p>
-      </div>
-
-      <p>Original repository: <a href="https://github.com/DCBIA-OrthoLab/ALI_IOS">DCBIA-OrthoLab/ALI_IOS</a>; on the prototype side, <a href="https://projectweek.na-mic.org/PW36_2022_Virtual/Projects/ALIDDM/">ALIDDM</a>.</p>
-
-      <div class="callout">
-        <div class="callout-title">Note · Also true in VISOR, except arch leveling</div>
-        <p><strong>The MG path is not published.</strong> Adaptive buccal cameras, <code>MG_AIM_OFFSET</code>, 12-channel stacking, arch leveling, forced points and the <code>description</code> field: none of this appears in the CLIP paper, which only knows the spherical 5-view scheme. The figures cited (155 training scans, 4–21 mm for an estimated point, 364 predictions for <a href="../FlexReg/FlexReg.html">FlexReg</a>'s threshold) are sourced only in the code comments.</p>
-        <p>Also true in <a href="../visor/ALI/ALI.html">VISOR</a> except the leveling: adaptive buccal cameras (<code>SADT-VISOR IO/render.py:211-318</code>), <code>MG_AIM_OFFSET</code> (<code>IO/catalog.py:96</code>), 12-channel stacking (<code>IO/engine.py:175</code>), forced points (<code>:538-552</code>) and the <code>description</code> field (<code>:571-575</code>) are all there. Arch leveling does not exist in VISOR (no <code>LowerArchMatrix</code> in <code>ALI_IOS/src</code>); in the legacy it is at <code>ALI_IOS/ALI_IOS.py:817</code>.</p>
-      </div>
-
-      <p>On the Windows environment: <a href="https://www.researchgate.net/publication/390709249_Bridging_the_gap_enabling_PyTorch3D_and_advanced_dental_imaging_tools_on_Windows_through_WSL2">Bridging the gap: enabling PyTorch3D and advanced dental imaging tools on Windows through WSL2</a>.</p>
-
-      <p>Full references, retrieved full texts and links to visit: <a href="SOURCES.html">SOURCES.md</a>.</p>
+      <p>Both programs have their own paper, and the code matches what they describe, with one reservation for ALI_IOS. ALI_CBCT: Gillot, Baquero, Cevidanes et al., Orthodontics &amp; Craniofacial Research, 2023, which reframes detection as navigation of a virtual <a class="gterm" data-term="ali-leg-agent" href="ALI.code.html#cbct-agent" title="See the code">agent</a> through a multi-scale volume; the code does exactly that, with the same two grids. ALI_IOS: Baquero, Gillot, Prieto, Cevidanes, CLIP 2022: the <a class="gterm" data-term="ali-leg-unit-sphere" href="ALI.code.html#ios-entrees" title="See the code">unit sphere</a>, five views per tooth, per-view segmentation and averaging describe the <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> network to the letter. The mucogingival path is not published. The reported accuracy figures are the papers' and were not re-measured. Full references: <a href="SOURCES.html">SOURCES.md</a>; the comparison with the code is on the <a href="ALI.code.html#litterature">code page</a>.</p>
 
       <footer class="footer">
         <a href="../index.html">← All fact sheets</a> ·
-        <a href="SOURCES.html">This tool's bibliography</a> ·
-        Source: <code>ALI.md</code>
+        <a href="ALI.code.html">Code page for this tool</a> ·
+        <a href="SOURCES.html">This tool's bibliography</a>
       </footer>
 
     </article>
@@ -780,5 +595,6 @@ pred_data = torch.argmax(pred_data, dim=2).unsqueeze(2)</code></pre>
 <script src="../../assets/ali-cbct-mesh.js"></script>
 <script src="../../assets/ali-ios-mesh.js"></script>
 <script src="../../assets/ali-3d.js"></script>
+<script src="../../assets/algo.js"></script>
 </body>
 </html>

@@ -23,6 +23,7 @@
     <div class="sec-switch" role="group">
       <a href="../guide/BatchDentalSeg.html">Guide</a>
       <a href="../BatchDentalSeg/BatchDentalSeg.html" aria-current="true">Atlas</a>
+      <a href="../BatchDentalSeg/BatchDentalSeg.code.html">Code</a>
     </div>
     <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="legacy">
@@ -122,8 +123,9 @@
         <img class="tool-icon" src="../../assets/screens/BatchDentalSeg/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Segmentation</div>
         <h1>BatchDentalSeg</h1>
-        <p class="lede">Queue that drives <code>nnUNetv2_predict</code> over a batch of CT/<a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> scans, with four interchangeable weight bundles, DentalSegmentator and its three variants, plus all the guard-rail, geometry-restoration, and export work around them.</p>
+        <p class="lede">BatchDentalSeg labels the teeth and jaws of CT and <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> scans in a batch, with one multi-label network that gives every <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> its label in a single pass. This page explains the module step by step, with the maths of the parts that are computation rather than learning: how the scan is normalised, how the network&rsquo;s patches are blended, how the memory is estimated, how a scan is cropped and how left and right are corrected. Where the code does something worth checking, a link leads to <a href="BatchDentalSeg.code.html">the code page</a>.</p>
         <div class="meta-row">
+          <a class="badge neutral" href="BatchDentalSeg.code.html">Code (developers)</a>
           <a class="badge paper" href="https://doi.org/10.1016/j.jdent.2024.105130" target="_blank" rel="noopener" title="DentalSegmentator. The module's variants are not published.">Dot 2024 · J Dent</a>
           <span class="badge cli">BATCHDENTALSEG</span>
           <span class="badge cli">nnUNetv2_predict</span>
@@ -133,132 +135,69 @@
         </div>
       </header>
 
-      <p>Batch dento-maxillofacial segmentation of CT/CBCT scans. The module is not a
-      network: it is a <strong>queue and an orchestrator</strong> around
-      <code>nnUNetv2_predict</code>, with four interchangeable weight bundles. All the
-      learning happens outside this repository; what is written here is the model
-      choice, the memory guard-rails, the geometry restoration, and the exports.</p>
+      <h2 id="apercu">Overview: what goes in, what comes out</h2>
 
-      <div class="callout note">
-        <div class="callout-title">Two code bases</div>
-        <p>Everything numbered below describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port, which runs the same tool on a server, is described on its own page, <a href="../visor/BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg on VISOR</a>.</p>
+      <p>BatchDentalSeg takes CT or <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> scans of the head and labels the teeth and jaws in each one. A single 3D network looks at the whole scan and gives every <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> a label in one pass: it is not one network per structure, as in AMASSS. The module itself is a <a class="gterm" data-term="bds-l-queue" href="BatchDentalSeg.code.html#entrees-file" title="See the code">queue</a> around that network: it chooses the model, guards the memory, restores the geometry and writes the exports.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>In</th><th>What happens</th><th>Out</th></tr></thead>
+          <tbody>
+            <tr><td>a folder of scans (<code>.nii</code>, <code>.nii.gz</code>, <code>.gipl</code>), and one of <a class="gterm" data-term="bds-l-combo" href="BatchDentalSeg.code.html#modeles-combo" title="See the code">four models</a></td><td>each scan goes through <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>, one scan at a time; the <a class="gterm" data-term="bds-l-labelmap" href="BatchDentalSeg.code.html#coeur-labelmap" title="See the code">label map</a> is put back on the scan&rsquo;s own grid</td><td>a label map per scan (<code>&lt;scan&gt;_Segmentation.nii.gz</code>), and optionally STL, OBJ, VTK, glTF or one NIfTI file per segment</td></tr>
+          </tbody>
+        </table>
       </div>
+
+      <p>This page describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The server port is <a href="../visor/BatchDentalSeg/BatchDentalSeg.html">BatchDentalSeg on VISOR</a>.</p>
 
       <h2 id="situation">1. Where it sits in the pipeline</h2>
 
-      <p><strong>No other module in the repository calls BatchDentalSeg</strong>, and BatchDentalSeg
-      does not call any other module in the repository. It is a terminal tool. It does,
-      however, depend on an <strong>external Slicer extension</strong>, <code>NNUNet</code>
-      (<a href="https://github.com/KitwareMedical/SlicerNNUnet" target="_blank" rel="noopener">SlicerNNUNetLib</a>), from which it
-      uses three classes.</p>
+      <p>No other module of the repository calls BatchDentalSeg, and it calls none: it is a terminal tool. It depends on an external Slicer extension, NNUNet, for installing <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>, checking the model folder and running the prediction as a child process. It is a batch variant of DentalSegmentator, from which it reuses the widget, the icons and the weight download.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Called</th><th>Origin</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>SlicerNNUNetLib.InstallLogic</code></td><td>NNUNet extension</td><td><code>setupPythonRequirements()</code>: installs nnunetv2 in Slicer's Python</td></tr>
-            <tr><td><code>SlicerNNUNetLib.Parameter</code></td><td>NNUNet extension</td><td>validates the model directory tree and builds the command line</td></tr>
-            <tr><td><code>SlicerNNUNetLib.SegmentationLogic</code></td><td>NNUNet extension</td><td>writes the volume as NIfTI into a temporary folder, launches <code>nnUNetv2_predict</code> as a <code>QProcess</code>, reloads the segmentation</td></tr>
-            <tr><td><code>OpenAnatomyExport</code></td><td>SlicerOpenAnatomy extension</td><td>glTF export only; installed on the fly if absent</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>The module is a <strong>batch variant of DentalSegmentator</strong> (extension
-      <a href="https://github.com/gaudot/SlicerDentalSegmentator" target="_blank" rel="noopener">gaudot/SlicerDentalSegmentator</a>),
-      from which it reuses the widget, the icons, and the weight-download
-      mechanism. The contributors declared in
-      <code>BATCHDENTALSEG.py:35-41</code> mix the original
-      team (Dot, Gajny, Fenioux, Pelletier) with the UoM addition (Tulissi).</p>
+      <a class="deep-link" href="BatchDentalSeg.code.html#situation"><b>In the code</b><span>The table of classes called from the NNUNet extension</span></a>
 
       <h2 id="fichiers">2. Files involved</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Role</th><th>Size</th></tr></thead>
-          <tbody>
-            <tr><td><code>BATCHDENTALSEG.py</code></td><td>wraps <code>ScriptedLoadableModule</code>, only instantiates the widget</td><td>88 lines</td></tr>
-            <tr><td><code>SegmentationWidget.py</code></td><td><strong>everything</strong>: UI, queue, model choice, memory guard, crop, labels, exports</td><td>3037 lines</td></tr>
-            <tr><td><code>Queue.py</code></td><td>persistent queue, <code>QueueItem</code> / <code>SegmentationQueue</code></td><td>204 lines</td></tr>
-            <tr><td><code>PythonDependencyChecker.py</code></td><td>download and freshness check for the DentalSegmentator weights</td><td>192 lines</td></tr>
-            <tr><td><code>Utils.py</code>, <code>Signal.py</code>, <code>IconPath.py</code></td><td>Qt helpers</td><td></td></tr>
-            <tr><td><code>Resources/ML/</code></td><td>weight root; the repository ships <code>Dataset111_453CT/.../dataset.json</code> and <code>plans.json</code></td><td></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>Most of the code is one widget file of about 3000 lines: the interface, the <a class="gterm" data-term="bds-l-queue" href="BatchDentalSeg.code.html#entrees-file" title="See the code">queue</a>, the model choice, the <a class="gterm" data-term="bds-l-memory" href="BatchDentalSeg.code.html#coeur-memoire" title="See the code">memory guard</a>, the crop, the labels and the exports. A small queue file keeps the list of scans on disk, and a checker downloads and refreshes the DentalSegmentator weights. Everything runs in Slicer&rsquo;s Python; <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> itself is launched as a child process, one scan at a time. The weights arrive at run time.</p>
 
-      <p>Everything runs inside <strong>Slicer's Python</strong>. <code>nnUNetv2_predict</code> is launched as a
-      <strong>child process</strong> (<code>QProcess</code>), one scan at a time: unlike <a href="../AMASSS/AMASSS.html">AMASSS</a>, which
-      calls the <a class="gterm" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> Python API in-process.</p>
-
-      <p><code>MODULE_PYTHON_RESOURCES</code> of <code>CMakeLists.txt</code> lists three files of
-      <code>Resources/ML</code>: <code>download_info.json</code> and the <code>dataset.json</code> and
-      <code>plans.json</code> of <code>Dataset111_453CT</code> (<code>CMakeLists.txt:28-34</code>). The weights
-      themselves, and the files of the three other bundles, arrive at runtime. The <code>.pth</code> files are
-      <code>.gitignore</code>d.</p>
+      <a class="deep-link" href="BatchDentalSeg.code.html#fichiers"><b>In the code</b><span>The file table with line counts, and what the build file installs</span></a>
 
       <h2 id="entrees">3. Inputs, folder traversal, naming</h2>
 
       <h3 id="entrees-acceptees">3.1 What is accepted</h3>
 
-      <p><code>listVolumes()</code> (<code>Queue.py:28</code>)
-      does a <strong>non-recursive</strong> <code>glob</code> over four patterns: <code>*.nii</code>, <code>*.nii.gz</code>,
-      <code>*.gipl</code>, <code>*.gipl.gz</code>. Subfolders are not visited, and <strong>NRRD is not
-      recognized</strong>: Slicer's default format, and a format the repository's other modules
-      commonly produce.</p>
-
-      <p><code>volumeStem()</code> strips the compound suffix: <code>case01.nii.gz</code> → <code>case01</code> (a
-      <code>Path.stem</code> would leave <code>case01.nii</code>).</p>
+      <p>A folder is listed without going into sub-folders, for four patterns: <code>.nii</code>, <code>.nii.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>. NRRD, Slicer&rsquo;s default format, is not recognised.</p>
 
       <h3 id="entrees-file">3.2 The queue</h3>
 
-      <p>One entry = <strong>one scan</strong>, not one folder
-      (<code>QueueItem</code>, <code>Queue.py:52</code>):
-      <code>inputPath</code>, <code>outputDir</code>, <code>model</code>, <code>device</code>, <code>status</code>, <code>error</code>, <code>durationSec</code>,
-      <code>autoCrop</code>. Several folders with different models can therefore be
-      stacked in the same session.</p>
-
-      <p><code>addFolder()</code> skips a scan if <code>&lt;outputDir&gt;/&lt;stem&gt;_Segmentation.nii.gz</code> already
-      exists (the <em>Skip scans already segmented</em> checkbox, checked by default) or if it is
-      already in the queue.</p>
-
-      <p><strong>Persistence</strong>: the state is rewritten after each scan into
-      <code>&lt;outputDir&gt;/.batchdentalseg_queue.json</code>. On reload, a scan left in
-      <code>running</code> (Slicer killed mid-inference) is <strong>rewound</strong> to <code>pending</code> and
-      the index goes back to it.</p>
-
-      <p><code>isChunkBoundary()</code>: every <code>chunkSize</code> scans (default 5), <code>_coolDown()</code> does
-      a deep cleanup, removes orphan nodes, <code>torch.cuda.empty_cache()</code>
-      + <code>ipc_collect()</code>, <code>gc.collect()</code>.</p>
+      <p>One entry is one scan, not one folder, so several folders with different models can be stacked in the same session. A scan is skipped if its result already exists or if it is already queued. The state of the <a class="gterm" data-term="bds-l-queue" href="BatchDentalSeg.code.html#entrees-file" title="See the code">queue</a> is rewritten after each scan, so a session killed mid-inference resumes where it stopped. Every five scans (by default) a clean-up releases the graphics card and the memory.</p>
 
       <h3 id="entrees-reseau">3.3 What the network actually sees</h3>
 
-      <p>The widget does not preprocess anything. <code>SegmentationLogic._prepareInferenceDir()</code> does a
-      <code>slicer.util.exportNode(volumeNode, &lt;tmp&gt;/input/volume_0000.nii.gz)</code>, and <strong>all
-      of the preprocessing is nnU-Net's</strong>: transposition per
-      <code>transpose_forward</code>, resampling to the plan's <code>spacing</code>, <code>CTNormalization</code>
-      (clip to the 0.5% / 99.5% percentiles of the training set, then standardization
-      by its mean and standard deviation).</p>
+      <p>The widget preprocesses nothing: it exports the scan as a NIfTI file and everything else is <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>&rsquo;s. The scan is reordered along the axes the plan asks for, resampled to the plan&rsquo;s spacing, then normalised with the same recipe as every nnU-Net CT model.</p>
 
-      <p>The only preprocessing written in this repository is the <strong>automatic crop</strong> (§5.2), and
-      it is optional, reserved for replay after a memory failure.</p>
+      <figure class="algo" data-scene="amasss_norm" data-ms="6200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a histogram is cut at two percentiles, then shifted so that its mean sits at zero and stretched by its standard deviation"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Before the network sees the scan, nnU-Net resamples it to the spacing its model was trained at, then normalises the intensities: values are cut to two percentiles, then centred and scaled with the mean and standard deviation of the <em>training set</em>. These numbers come from each model&rsquo;s plan file, not from the repository.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">x</mi><mtext>norm</mtext></msub><mo>=</mo><mfrac><mrow><mi>clip</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k1">x</mi><mo>,</mo><msub><mi class="k2">p</mi><mtext>lo</mtext></msub><mo>,</mo><msub><mi class="k2">p</mi><mtext>hi</mtext></msub><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2212;</mo><mi class="k3">&#956;</mi></mrow><mi class="k4">&#963;</mi></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>x</b>the intensity of a <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a></li><li class="k2"><b>p<sub>lo</sub>, p<sub>hi</sub></b>the 0.5 % and 99.5 % percentiles of the foreground intensities of the training set</li><li class="k3"><b>&#956;</b>their mean</li><li class="k4"><b>&#963;</b>their standard deviation</li></ul></div>
+      </figure>
+
+      <p>The only preprocessing written in this repository is the optional <a class="gterm" data-term="bds-l-crop" href="BatchDentalSeg.code.html#coeur-crop" title="See the code">automatic crop</a> (section 5.2), reserved for a replay after a memory failure.</p>
+
+      <a class="deep-link" href="BatchDentalSeg.code.html#entrees"><b>In the code</b><span>The glob, the queue item, persistence and the clean-up cycle</span></a>
 
       <h2 id="modeles">4. The four models</h2>
 
       <h3 id="modeles-combo">4.1 What the combo box selects</h3>
 
-      <p><code>onApplyClickedForVolume()</code>
-      (<code>SegmentationWidget.py:1827</code>)
-      is an <code>if/elif</code> with four near-identical branches. Each builds the same
-      object:</p>
-
-      <pre><code>Parameter(folds="0", modelPath=basePath, device=self.deviceComboBox.currentText)</code></pre>
+      <p>The four entries run the same code: a prediction request is built with fold 0 and the chosen device, and only the weights folder and the label table change. The three variants (pediatric, naso-maxilla and universal) are downloaded as three files each; DentalSegmentator comes as the zip of the latest release of its repository. The downloads have no checksum and no resume, so an interrupted download leaves a truncated <a class="gterm" data-term="checkpoint" href="../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> that the next run takes for a complete one.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 920 260" role="img" aria-label="A single entry point in the code, four weight bundles out">
+          <a class="d-link" href="#modeles-combo">
           <rect class="d-box-a" x="330" y="14" width="260" height="46" rx="6"/>
-          <text class="d-label" x="460" y="33" text-anchor="middle">onApplyClickedForVolume()</text>
-          <text class="d-label-s" x="460" y="48" text-anchor="middle">if / elif: same Parameter(...)</text>
+          <text class="d-label" x="460" y="33" text-anchor="middle">Model choice</text>
+          <text class="d-label-s" x="460" y="48" text-anchor="middle">same call for all four</text>
+          </a>
 
           <path class="d-arrow" d="M460 60 V80"/>
           <path class="d-arrow" d="M460 80 H115"/>
@@ -274,33 +213,41 @@
           <path class="d-arrow-head" d="M575 100 l-4 -7 h8 z"/>
           <path class="d-arrow-head" d="M805 100 l-4 -7 h8 z"/>
 
+          <a class="d-link" href="#modeles-labels">
           <rect class="d-box-n" x="10" y="102" width="210" height="90" rx="6"/>
           <text class="d-label" x="115" y="122" text-anchor="middle">DentalSegmentator</text>
-          <text class="d-mono" x="115" y="140" text-anchor="middle">Dataset111_453CT</text>
+          <text class="d-mono" x="115" y="140" text-anchor="middle">453 CT scans</text>
           <text class="d-label-s" x="115" y="157" text-anchor="middle">5 labels, permanent dentition</text>
           <text class="d-label-s" x="115" y="172" text-anchor="middle">Upper Skull, Mandible,</text>
           <text class="d-label-s" x="115" y="185" text-anchor="middle">Upper/Lower Teeth, canal</text>
+          </a>
 
+          <a class="d-link" href="#modeles-labels">
           <rect class="d-box-n" x="240" y="102" width="210" height="90" rx="6"/>
           <text class="d-label" x="345" y="122" text-anchor="middle">PediatricDentalsegmentator</text>
-          <text class="d-mono" x="345" y="140" text-anchor="middle">Dataset001_380CT</text>
+          <text class="d-mono" x="345" y="140" text-anchor="middle">380 CT scans</text>
           <text class="d-label-s" x="345" y="157" text-anchor="middle">5 labels, same table</text>
           <text class="d-label-s" x="345" y="172" text-anchor="middle">as DentalSegmentator,</text>
           <text class="d-label-s" x="345" y="185" text-anchor="middle">mixed dentition</text>
+          </a>
 
+          <a class="d-link" href="#modeles-labels">
           <rect class="d-box-n" x="470" y="102" width="210" height="90" rx="6"/>
           <text class="d-label" x="575" y="122" text-anchor="middle">NasoMaxillaDentSeg</text>
-          <text class="d-mono" x="575" y="140" text-anchor="middle">Dataset001_max4</text>
+          <text class="d-mono" x="575" y="140" text-anchor="middle">max4 set</text>
           <text class="d-label-s" x="575" y="157" text-anchor="middle">6 labels, maxilla</text>
           <text class="d-label-s" x="575" y="172" text-anchor="middle">detached from the skull</text>
-          <text class="d-label-s" x="575" y="185" text-anchor="middle">(renaming defect, §9)</text>
+          <text class="d-label-s" x="575" y="185" text-anchor="middle">(naming defect, §9)</text>
+          </a>
 
+          <a class="d-link" href="#modeles-labels">
           <rect class="d-box-n" x="700" y="102" width="210" height="90" rx="6"/>
           <text class="d-label" x="805" y="122" text-anchor="middle">UniversalLabDentalsegmentator</text>
-          <text class="d-mono" x="805" y="140" text-anchor="middle">Dataset002_380CT</text>
+          <text class="d-mono" x="805" y="140" text-anchor="middle">380 CT scans</text>
           <text class="d-label-s" x="805" y="157" text-anchor="middle">55 labels, teeth, one</text>
           <text class="d-label-s" x="805" y="172" text-anchor="middle">at a time, no “Upper</text>
           <text class="d-label-s" x="805" y="185" text-anchor="middle">Skull” despite the UI</text>
+          </a>
 
           <path class="d-arrow" d="M115 192 V212"/>
           <path class="d-arrow" d="M345 192 V212"/>
@@ -310,135 +257,55 @@
           <path class="d-arrow-head" d="M345 212 l-4 -7 h8 z"/>
           <path class="d-arrow-head" d="M575 212 l-4 -7 h8 z"/>
           <path class="d-arrow-head" d="M805 212 l-4 -7 h8 z"/>
-          <text class="d-mono" x="115" y="228" text-anchor="middle">nnUNetv2_predict</text>
-          <text class="d-mono" x="345" y="228" text-anchor="middle">nnUNetv2_predict</text>
-          <text class="d-mono" x="575" y="228" text-anchor="middle">nnUNetv2_predict</text>
-          <text class="d-mono" x="805" y="228" text-anchor="middle">nnUNetv2_predict</text>
+          <text class="d-mono" x="115" y="228" text-anchor="middle">nnU-Net</text>
+          <text class="d-mono" x="345" y="228" text-anchor="middle">nnU-Net</text>
+          <text class="d-mono" x="575" y="228" text-anchor="middle">nnU-Net</text>
+          <text class="d-mono" x="805" y="228" text-anchor="middle">nnU-Net</text>
         </svg>
-        <figcaption>The combo box's four entries all go through the same code; only the dataset folder and the label table change.</figcaption>
+        <figcaption>The <a class="gterm" data-term="bds-l-combo" href="BatchDentalSeg.code.html#modeles-combo" title="See the code">combo box</a>&rsquo;s four entries all go through the same code; only the weights folder and the label table change.</figcaption>
       </figure>
+
+      <a class="deep-link" href="BatchDentalSeg.code.html#modeles-combo"><b>In the code</b><span>The four branches, the download paths and the checkpoint check</span></a>
+
+      <h3 id="modeles-nnunet">4.2 nnU-Net, verified in the code</h3>
+
+      <p>It is really <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> v2: the command it builds names the dataset, the trainer, the plan and the configuration (3D full resolution), one fold, a <a class="gterm" data-term="bds-l-window" href="BatchDentalSeg.code.html#modeles-nnunet" title="See the code">step of 0.5</a>, no test-time mirroring. The only setting the interface offers is the device (cuda, cpu or mps). Fold 0 only, never an ensemble.</p>
+
+      <figure class="algo" data-scene="amasss_window" data-ms="6200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: three overlapping windows slide along a scan, each with a bell-shaped weight; the weights add up to a nearly flat total"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The network sees one patch at a time. Patches are placed so that neighbours overlap by half. Each patch&rsquo;s prediction is weighted by a bell curve centred on the patch, so its middle counts more than its edges, and the weighted predictions are added and divided by the sum of the weights. The command asks for a step of 0.5 and no test-time mirroring; Gaussian weighting is nnU-Net&rsquo;s default.</p><div class="formula"><math display="block"><mrow><mi class="k1">p</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mfrac><mrow><munder><mo>&#x2211;</mo><mi class="k3">k</mi></munder><msub><mi class="k4">g</mi><mi class="k3">k</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow><msub><mi class="k5">p</mi><mi class="k3">k</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow><mrow><munder><mo>&#x2211;</mo><mi class="k3">k</mi></munder><msub><mi class="k4">g</mi><mi class="k3">k</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p(x)</b>the final score at <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> x</li><li class="k2"><b>x</b>a voxel</li><li class="k3"><b>k</b>one patch</li><li class="k4"><b>g<sub>k</sub></b>the bell-shaped weight of patch k (its spread is one eighth of the patch size)</li><li class="k5"><b>p<sub>k</sub></b>the network&rsquo;s score for patch k</li></ul></div>
+      </figure>
+
+      <a class="deep-link" href="BatchDentalSeg.code.html#modeles-nnunet"><b>In the code</b><span>The command line, the defaults and the process-wide environment variables</span></a>
+
+      <h3 id="modeles-architecture">4.3 Architecture and plan: what is verifiable</h3>
+
+      <p>Only the DentalSegmentator bundle ships its plan files in the repository: a plain convolutional 3D U-Net with six stages (32 features at the first, 320 at the last), patches of 128 &times; 160 &times; 112 voxels, a spacing of about 0.45 &times; 0.31 &times; 0.45 mm, a batch of 2 and CT normalisation. The plans of the other three models arrive with their download, so nothing more can be said about them from the code.</p>
+
+      <a class="deep-link" href="BatchDentalSeg.code.html#modeles-architecture"><b>In the code</b><span>The plan summary and the format notes</span></a>
+
+      <h3 id="modeles-labels">4.4 The labels produced, per model</h3>
+
+      <p>A table in the widget decides the values written into the output file. The first two models share the same five labels and differ only in what they were trained on (permanent against mixed dentition).</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Name in the combo box</th><th>Folder under <code>Resources/ML</code></th><th>Weight origin</th></tr></thead>
+          <thead><tr><th>Model</th><th>Labels</th><th>What they are</th></tr></thead>
           <tbody>
-            <tr><td><code>DentalSegmentator</code></td><td><code>Dataset111_453CT/nnUNetTrainer__nnUNetPlans__3d_fullres</code></td><td>zip of the <strong>latest release</strong> of <code>gaudot/SlicerDentalSegmentator</code>, resolved via the GitHub API</td></tr>
-            <tr><td><code>PediatricDentalsegmentator</code></td><td><code>Dataset001_380CT/...</code></td><td>3 files from <a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/PEDIATRICDENTALSEG_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/PEDIATRICDENTALSEG_MODEL</a></td></tr>
-            <tr><td><code>NasoMaxillaDentSeg</code></td><td><code>Dataset001_max4/...</code></td><td><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/NASOMAXILLADENTSEG_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/NASOMAXILLADENTSEG_MODEL</a></td></tr>
-            <tr><td><code>UniversalLabDentalsegmentator</code></td><td><code>Dataset002_380CT/...</code></td><td><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/UNIVERSALLAB_MODEL/checkpoint_final.pth" target="_blank" rel="noopener">releases/download/UNIVERSALLAB_MODEL</a></td></tr>
+            <tr><td>DentalSegmentator</td><td>5</td><td>1 Upper skull (maxilla included), 2 Mandible, 3 Upper teeth, 4 Lower teeth, 5 Mandibular canal; permanent dentition</td></tr>
+            <tr><td>PediatricDentalsegmentator</td><td>5</td><td>the same table; mixed dentition</td></tr>
+            <tr><td>NasoMaxillaDentSeg</td><td>6</td><td>1 Upper skull, 2 Mandible, 3 Maxilla, 4 Upper teeth, 5 Lower teeth, 6 Mandibular canal</td></tr>
+            <tr><td>UniversalLabDentalsegmentator</td><td>55</td><td>1 to 32 the permanent teeth one by one (Universal numbering), 33 to 52 the primary teeth, 53 Mandible, 54 Maxilla, 55 Mandibular canal; no &ldquo;Upper skull&rdquo;</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>The last three follow the same pattern: if
-      <code>&lt;basePath&gt;/fold_0/checkpoint_final.pth</code> is missing, three files are downloaded
-      (<code>checkpoint_final.pth</code>, <code>dataset.json</code>, <code>plans.json</code>) via
-      <code>slicer.util.downloadFile</code>. No checksum, no versioning, no
-      resume: an interrupted download leaves a truncated <a class="gterm" data-term="checkpoint" href="../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> that the code
-      will consider present on the next run.</p>
+      <p>The UniversalLab model does not segment the cranial vault, contrary to its description in the interface and to the README (see <a href="#pieges">pitfalls</a>).</p>
 
-      <p>DentalSegmentator goes through a separate path,
-      <code>PythonDependencyChecker</code>:
-      <code>Github().get_repo("gaudot/SlicerDentalSegmentator")</code>, then <strong>the first asset of
-      the first release</strong> listed, streamed down and unzipped. The URL used
-      is stored in <code>Resources/ML/download_info.json</code>, and a more recent
-      release triggers an update prompt. The file committed in the
-      repository points to
-      <a href="https://github.com/gaudot/SlicerDentalSegmentator/releases/download/v1.0.0-alpha/Dataset111_453CT_v100.zip" target="_blank" rel="noopener">Dataset111_453CT_v100.zip</a>.</p>
-
-      <h3 id="modeles-nnunet">4.2 nnU-Net, verified in the code</h3>
-
-      <p>Yes, this is nnU-Net v2, not just in name. The proof is in the call
-      chain: <code>Parameter.asArgList()</code> literally builds</p>
-
-      <pre><code>nnUNetv2_predict -i &lt;tmp&gt;/input -o &lt;tmp&gt;/output
-  -d Dataset111_453CT -tr nnUNetTrainer -p nnUNetPlans -c 3d_fullres
-  -f 0 -npp 1 -nps 1 -step_size 0.5 -device cuda -chk checkpoint_final.pth --disable_tta</code></pre>
-
-      <p><code>-d</code>, <code>-tr</code>, <code>-p</code>, <code>-c</code> are <strong>inferred from folder names</strong>: the parent folder
-      gives the <code>Dataset…</code>, and the configuration folder's name is split on <code>__</code>
-      into (trainer, plan, configuration). Hence the requirement
-      <code>Dataset&lt;id&gt;/&lt;trainer&gt;__&lt;plan&gt;__&lt;conf&gt;/fold_&lt;i&gt;/checkpoint_final.pth</code>.</p>
-
-      <p>Parameters not exposed to the user, default values from
-      <code>SlicerNNUNetLib.Parameter</code>: <code>stepSize = 0.5</code>, <code>disableTta = True</code> (no
-      mirror augmentation at test time), <code>folds = "0"</code> (<strong>a single fold</strong>, never
-      an ensemble), <code>nProcessPreprocessing = nProcessSegmentationExport = 1</code>, forced to
-      <code>0</code> on macOS (nnU-Net hangs on write there because of multiprocessing).</p>
-
-      <p>The only setting the UI offers is the device: <code>cuda</code> / <code>cpu</code> / <code>mps</code>. If
-      unavailable, only <strong>one</strong> question is asked for the whole queue
-      (<code>_deviceFallbackAccepted</code>), and in <em>Unattended</em> mode the CPU fallback is
-      accepted automatically.</p>
-
-      <p><code>nnUNet_raw</code>, <code>nnUNet_preprocessed</code>, and <code>nnUNet_results</code> are all pointed at the
-      model folder: three process-level environment variables, written by
-      <code>SegmentationLogic._startInferenceProcess</code>. Since <code>os.environ</code> is global, two
-      concurrent inferences in the same Slicer session would step on each other;
-      here the queue is strictly sequential, so the issue does not arise.</p>
-
-      <h3 id="modeles-architecture">4.3 Architecture and plan: what is verifiable</h3>
-
-      <p>Only <code>Dataset111_453CT</code> (DentalSegmentator) has its JSON files in the repository. Summary from
-      <code>plans.json</code>:</p>
-
-      <pre><code>UNet_class_name = PlainConvUNet     base/max features = 32 / 320
-n_conv_per_stage encoder [2,2,2,2,2,2]  decoder [2,2,2,2,2]
-pool_op_kernel_sizes = [1,1,1], 4 x [2,2,2], [2,2,1]   conv_kernel 6 x [3,3,3]
-patch_size = [128, 160, 112]    spacing = [0.4492, 0.3120, 0.4492] mm
-transpose_forward = transpose_backward = [1, 0, 2]     batch_size = 2, batch_dice
-normalization_schemes = CTNormalization
-foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</code></pre>
-
-      <p>This <code>plans.json</code> is in the <strong>nnU-Net format predating 2.4</strong> (flat
-      <code>UNet_class_name</code> / <code>pool_op_kernel_sizes</code> fields, no <code>architecture</code> block),
-      whereas the <a href="../AMASSS/AMASSS.html">AMASSS</a> bundles use the newer format. Both remain readable
-      by current nnunetv2.</p>
-
-      <p>The plans of the other three models <strong>cannot be determined from the
-      repository</strong>: they arrive with the download. Everything known about them comes
-      from the dictionaries hard-coded in the widget (§4.4) and from the README.</p>
-
-      <h3 id="modeles-labels">4.4 The labels produced, per model</h3>
-
-      <p><code>_get_active_label_map()</code>
-      (<code>SegmentationWidget.py:1945</code>)
-      is <strong>the</strong> reference table: it decides the values written into the
-      output NIfTI.</p>
-
-      <p><strong>DentalSegmentator and PediatricDentalsegmentator</strong>, <span class="badge predit">5 labels</span> identical,
-      confirmed by the <code>dataset.json</code> of bundle 111: 1 Upper Skull (maxilla
-      included), 2 Mandible, 3 Upper Teeth, 4 Lower Teeth, 5 Mandibular canal. What
-      distinguishes them is therefore <strong>not the output but the training data</strong>: permanent
-      dentition (<code>453CT</code>, 7 institutions) versus mixed dentition (<code>380CT</code>). The code
-      treats them in a rigorously identical way: same label table, same colors,
-      same post-processing; only <code>_modelBasePath</code> differs.</p>
-
-      <p><strong>NasoMaxillaDentSeg</strong>, <span class="badge predit">6 labels</span>, the maxilla <strong>detached</strong> from the skull:
-      1 Upper Skull, 2 Mandible, <strong>3 Maxilla</strong>, 4 Upper Teeth, 5 Lower Teeth,
-      6 Mandibular canal.</p>
-
-      <p><strong>UniversalLabDentalsegmentator</strong>, <span class="badge predit">55 labels</span>: the 32 permanent teeth
-      numbered one by one (1 = upper right 3<sup>rd</sup> molar → 32 = lower right 3<sup>rd</sup>
-      molar, going around the upper arch then the lower arch), then
-      20 primary teeth (33 → 52), then <code>Mandible</code> = 53, <code>Maxilla</code> = 54,
-      <code>Mandibular canal</code> = 55. No "Upper Skull": this model does not segment the
-      cranial vault, contrary to what its UI description shows and to what
-      the README says. The numbering is not arbitrary: label by label, values
-      1&ndash;32 are exactly the <strong>Universal Numbering System</strong> (1 = upper right
-      third molar &hellip; 32 = lower right third molar) and 33&ndash;52 are its letters
-      <code>A</code>&ndash;<code>T</code> for the primary teeth, so the <abbr title="F&eacute;d&eacute;ration dentaire internationale">FDI</abbr>
-      equivalent of a label is fixed, the figure below gives both.</p>
-
-      <div class="callout warn">
-        <div class="callout-title">Pitfall (the model fact holds in VISOR, the interface text does not)</div>
-        <p>The description shown in the UI for <code>UniversalLabDentalsegmentator</code> and the repository's README announce a segmentation of the cranial vault. The actual model has no "Upper Skull" label: it only numbers the teeth, plus mandible/maxilla/canal.</p>
-        <p><strong>Legacy (3c67957):</strong> the description reads "Segments: Upper Skull, Mandibular Canal, All teeth" (<code>SegmentationWidget.py:68-72</code>), and the label table has no Upper Skull (<code>SegmentationWidget.py:1949-1974</code>).
-        <strong>VISOR:</strong> the model description was corrected ("Every tooth labelled individually in Universal numbering, deciduous teeth included, plus Mandible, Maxilla and Mandibular canal", <code>SADT-VISOR sadt_batchdentalseg/catalogs.py:145-150</code>) and the 55-label table has no Upper Skull either (<code>catalogs.py:47-103</code>). The README of the Slicer client still repeats the error (<code>AutomatedDentalToolsRemote README.md:865-867</code>).</p>
-      </div>
-
-      <p>Values are set on each segment via a <code>LabelValue</code> tag
-      (<code>_segmentLabelValue</code>), which <strong>takes priority over the name</strong> when present.</p>
+      <figure class="algo" data-scene="bds_argmax" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: six class scores are read one after the other, keeping the best score and its class number"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">For every voxel the network gives one score per label, and the label written is the one with the highest score. On a tie the lower label number wins. This is the last step inside nnU-Net: its raw output is a score per label, and the <a class="gterm" data-term="bds-l-labelmap" href="BatchDentalSeg.code.html#coeur-labelmap" title="See the code">label map</a> is the position of the best one.</p><div class="formula"><math display="block"><mrow><mi class="k1">L</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><munder><mo>argmax</mo><mrow><mi class="k3">c</mi></mrow></munder><msub><mi class="k4">s</mi><mi class="k3">c</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>L(x)</b>the label written at voxel x</li><li class="k2"><b>x</b>a voxel</li><li class="k3"><b>c</b>one label</li><li class="k4"><b>s<sub>c</sub></b>the network&rsquo;s score for label c</li></ul></div>
+      </figure>
 
       <figure class="viewer3d" data-bds-3d>
         <div class="v3d-modes" role="group" aria-label="Model selected in the combo box">
@@ -457,7 +324,7 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
           <li data-step="0">0. read the volume: <code>nnUNet_raw</code>/<code>_preprocessed</code>/<code>_results</code> all point at the model folder</li>
           <li data-step="1">1. <code>nnUNetv2_predict</code>: <strong>one</strong> multi-label pass, <code>-f 0</code>, <code>-step_size 0.5</code>, <code>--disable_tta</code></li>
           <li data-step="2">2. <code>_buildLabelArray</code>: a single export, then one LUT remap to the official values</li>
-          <li data-step="3">3. <code>_exportVTKPerLabel</code>: windowed-sinc, 40&nbsp;% quadric decimation, RAS&rarr;LPS flip</li>
+          <li data-step="3">3. <code>_exportVTKPerLabel</code>: windowed-sinc, 40&nbsp;% quadric decimation, <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="See glossary">RAS</a>&rarr;<a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a> flip</li>
         </ol>
         <ol class="v3d-parts">
           <li data-part="SKULL" data-label="Upper Skull" style="--sw:#e3dd90" tabindex="0">
@@ -578,524 +445,235 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
           <i data-k="other">Not the pass on screen, only this model&rsquo;s label table, applied to the list.</i>
           <i data-k="notinscan">not produced on this scan</i>
         </span>
-        <figcaption>One network, four inventories, and 29 teeth counted one by one.
-        <strong>What is real.</strong> Everything on screen is a
-        <code>UniversalLabDentalsegmentator</code> pass run for this page on
-        <code>PreDentalSurgery</code>, the <code>CBCTDentalSurgery</code> sample
-        <em>Slicer itself</em> publishes: the one the module&rsquo;s own
-        <em>Test Files</em> button downloads, verified byte-identical by md5, so no
-        patient data leaves with this figure. One scan, <code>cuda</code>,
-        <strong>238.7&nbsp;s</strong>, queue finished 1 done / 0 failed. The pass wrote
-        <strong>32 labels</strong> of the 55 in its table: 29 individual teeth, plus
-        mandible&nbsp;(53), maxilla&nbsp;(54) and mandibular canal&nbsp;(55). The 23 that
-        are missing are missing from the <em>mouth</em>, not from the page: three
-        third molars (16, 17, 32) and the whole primary set (33&ndash;52), which an adult
-        does not have. Colours are the module&rsquo;s <code>UNIVERSAL_COLORS</code>, the
-        opacities its own 3D values, and every volume in the status line is
-        <em>measured</em> on the label map by <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> count.
-        <strong>The one thing to take away.</strong> Unlike
-        <a href="../AMASSS/AMASSS.html">AMASSS</a>, which loads one binary network per
-        structure and produces them one after another, this is a <em>single</em>
-        multi-label pass: all 32 labels come out of the same sweep, together. Switching
-        model above changes the label <em>table</em>, not the code: that is the
-        whole of <code>onApplyClickedForVolume()</code>&rsquo;s four branches. The list
-        then says, structure by structure, what the chosen model would have called it,
-        and marks what it would not have produced at all.
-        <strong>Read this before trusting a tooth.</strong> Label 1, the upper-right
-        third molar, comes out at <strong>4&nbsp;253&nbsp;mm&sup3;</strong>: four
-        times the next largest tooth (1&nbsp;028&nbsp;mm&sup3;) and larger than any molar
-        is. On this scan that label has collected material well beyond the tooth. It is
-        shown exactly as the model produced it, because a page about what the code does
-        is worth nothing if it quietly repairs the code&rsquo;s output.
-        <strong>What is staged, and said so.</strong> The sweep is one sliding window
-        made visible; nnU-Net tiles the volume in three dimensions, not bottom to top.
-        The change from the neutral instrument tint to the official colours at step&nbsp;2
-        is the LUT remap of <code>_buildLabelArray</code> dramatised: the
-        network&rsquo;s own class order is not observable from the output file. The
-        &ldquo;before&rdquo; surface is a plain threshold at 605, which is the Otsu split
-        between tissue and bone computed for this page (this CBCT is not HU-calibrated,
-        so no textbook bone value applies). And the surfaces are marching cubes +
-        windowed-sinc + quadric decimation run <em>for this page</em> by
-        <code>batchdentalseg_mesh.py</code>, 1&nbsp;200 triangles per tooth,
-        16&nbsp;000 for the mandible, 14&nbsp;000 for the maxilla, not the
-        module&rsquo;s own <code>.vtk</code> exports, which it also wrote.
-        <strong>Worth knowing</strong>: two of the 29 labels came out broken on this
-        scan, and both are shown unretouched. Label&nbsp;1 (upper-right third molar)
-        measures 4&nbsp;253&nbsp;mm&sup3;, four times any other tooth. Label&nbsp;2
-        (upper-right second molar) has a perfectly ordinary volume,
-        1&nbsp;019&nbsp;mm&sup3;, right at the median, but its material is
-        scattered in separate clumps across 94&nbsp;mm, reaching the far side of the
-        arch; label&nbsp;1 is broken up across 124&nbsp;mm the same way. Every other
-        tooth is one compact piece 7&ndash;22&nbsp;mm across. Volume alone would have
-        cleared label&nbsp;2, which is why the bounding box is checked too, and
-        why clicking either of those two frames most of the skull instead of a tooth.
-        That is the label, not the viewer.
-        </figcaption>
+        <figcaption>One network, four inventories, and 29 teeth counted one by one. <strong>What is real.</strong> Everything on screen is one pass of the UniversalLab model run for this page on the <em>CBCTDentalSurgery</em> sample that Slicer itself publishes (no patient data): one scan, on a graphics card, 238.7&nbsp;s. The pass wrote 32 labels of the 55 in its table: 29 individual teeth, plus mandible (53), maxilla (54) and mandibular canal (55). The 23 missing ones are missing from the <em>mouth</em>, not from the page: three third molars and the whole primary set. Colours are the module&rsquo;s own, and every volume in the status line is <em>measured</em> on the label map by voxel count. <strong>The one thing to take away.</strong> Unlike <a href="../AMASSS/AMASSS.html">AMASSS</a>, which uses one binary network per structure, this is a <em>single</em> multi-label pass: all labels come out of the same sweep. Switching model above changes the label <em>table</em>, not the code. <strong>What is staged.</strong> The sweep is one sliding window made visible; nnU-Net tiles the volume in three dimensions. The &ldquo;before&rdquo; surface is a plain threshold, and the surfaces were simplified for this page. <strong>Read this before trusting a tooth.</strong> Two of the 29 labels came out broken on this scan and are shown unretouched: label 1 (upper-right third molar) measures 4&nbsp;253&nbsp;mm&sup3;, four times any other tooth, and label 2 has an ordinary volume but is scattered across 94&nbsp;mm. Clicking either frames most of the skull instead of a tooth: that is the label, not the viewer.</figcaption>
       </figure>
+
+      <a class="deep-link" href="BatchDentalSeg.code.html#modeles-labels"><b>In the code</b><span>The label function, the segment tags and the UniversalLab numbering</span></a>
+
       <h2 id="coeur">5. The non-learned core</h2>
 
       <figure class="diagram">
         <svg viewBox="0 0 980 230" role="img" aria-label="Full pipeline, from the input volume to the output files">
+          <a class="d-link" href="#entrees-acceptees">
           <rect class="d-box" x="10" y="70" width="150" height="60" rx="6"/>
           <text class="d-label" x="85" y="96" text-anchor="middle">Input volume</text>
           <text class="d-label-s" x="85" y="112" text-anchor="middle">.nii / .nii.gz / .gipl</text>
+          </a>
 
           <path class="d-arrow" d="M160 100 H205"/>
           <path class="d-arrow-head" d="M205 100 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#entrees-reseau">
           <rect class="d-box" x="210" y="60" width="185" height="80" rx="6"/>
           <text class="d-label" x="302" y="82" text-anchor="middle">nnU-Net preprocessing</text>
           <text class="d-label-s" x="302" y="98" text-anchor="middle">transpose, resample,</text>
-          <text class="d-label-s" x="302" y="112" text-anchor="middle">CTNormalization</text>
-          <text class="d-label-s" x="302" y="127" text-anchor="middle">(driven by plans.json)</text>
+          <text class="d-label-s" x="302" y="112" text-anchor="middle">intensity normalisation</text>
+          <text class="d-label-s" x="302" y="127" text-anchor="middle">(driven by each model&rsquo;s plan)</text>
+          </a>
 
           <path class="d-arrow" d="M395 100 H440"/>
           <path class="d-arrow-head" d="M440 100 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#modeles-nnunet">
           <rect class="d-box-n" x="445" y="60" width="180" height="80" rx="6"/>
-          <text class="d-label" x="535" y="85" text-anchor="middle">nnUNetv2_predict</text>
-          <text class="d-label-s" x="535" y="101" text-anchor="middle">PlainConvUNet 3D</text>
+          <text class="d-label" x="535" y="85" text-anchor="middle">nnU-Net prediction</text>
+          <text class="d-label-s" x="535" y="101" text-anchor="middle">3D U-Net</text>
           <text class="d-label-s" x="535" y="115" text-anchor="middle">1 fold, no TTA</text>
           <text class="d-label-s" x="535" y="129" text-anchor="middle">network predicts</text>
+          </a>
 
           <path class="d-arrow" d="M625 100 H670"/>
           <path class="d-arrow-head" d="M670 100 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur-labelmap">
           <rect class="d-box" x="675" y="60" width="150" height="80" rx="6"/>
           <text class="d-label" x="750" y="85" text-anchor="middle">Label map</text>
-          <text class="d-label-s" x="750" y="101" text-anchor="middle">single export</text>
-          <text class="d-label-s" x="750" y="115" text-anchor="middle">+ numpy LUT</text>
+          <text class="d-label-s" x="750" y="101" text-anchor="middle">one export</text>
+          <text class="d-label-s" x="750" y="115" text-anchor="middle">+ remap</text>
           <text class="d-label-s" x="750" y="129" text-anchor="middle">(restored onto grid</text>
+          </a>
 
           <path class="d-arrow" d="M825 100 H870"/>
           <path class="d-arrow-head" d="M870 100 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#sorties">
           <rect class="d-box-a" x="875" y="55" width="95" height="90" rx="6"/>
           <text class="d-label" x="922" y="80" text-anchor="middle">Outputs</text>
           <text class="d-label-s" x="922" y="96" text-anchor="middle">NIfTI</text>
           <text class="d-label-s" x="922" y="110" text-anchor="middle">STL/OBJ</text>
           <text class="d-label-s" x="922" y="124" text-anchor="middle">VTK, glTF</text>
+          </a>
 
           <path class="d-arrow" d="M535 140 V170 H302 V140"/>
           <path class="d-arrow-head" d="M302 140 l-7 4 v-8 z"/>
-          <text class="d-label-s" x="418" y="185" text-anchor="middle">memory failure ⇒ auto crop (§5.2) ⇒ new attempt</text>
+          <text class="d-label-s" x="418" y="185" text-anchor="middle">memory failure ⇒ automatic crop (§5.2) ⇒ new attempt</text>
         </svg>
         <figcaption>The only learning happens in a single step; everything else, preprocessing, reconstruction, the replay loop, is computed.</figcaption>
       </figure>
 
       <h3 id="coeur-labelmap">5.1 Label map reconstruction and geometry restoration</h3>
 
-      <p><code>_buildLabelArray()</code>
-      (<code>SegmentationWidget.py:2010</code>):</p>
+      <p>The segmentation is turned into one <a class="gterm" data-term="bds-l-labelmap" href="BatchDentalSeg.code.html#coeur-labelmap" title="See the code">label map</a> in a single export, then remapped to the official values with a lookup table in one pass. The earlier version rasterised the full volume once per segment: 55 times for UniversalLab on a full-mouth <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>.</p>
 
-      <p>a single <code>ExportSegmentsToLabelmapNode</code>, with the explicit list of <code>segmentId</code>
-      (which pins down the correspondence "exported value <em>i</em>+1 ↔ <code>segIds[i]</code>"), then
-      a numpy LUT that remaps to the official values in one pass
-      (<code>lut[exported]</code>). The earlier version rasterized the full extent of the volume
-      once per segment: 55 rasterizations of a full-mouth <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> for
-      UniversalLab.</p>
+      <a class="deep-link" href="BatchDentalSeg.code.html#coeur-labelmap"><b>In the code</b><span>The single export and the lookup table</span></a>
 
       <h3 id="coeur-crop">5.2 Automatic crop (replay after memory failure)</h3>
 
-      <p>Optional, triggered by <em>Retry failed</em> after explicit confirmation.
-      <code>_applyAutoCrop()</code>
-      (<code>SegmentationWidget.py:1029</code>):</p>
+      <figure class="algo" data-scene="bds_crop" data-ms="6600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the pixels above an air threshold are boxed, the box is widened by a margin, and the volume is cut to that box if it keeps at most 85 percent of the voxels"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">After a memory failure, a replay can crop the scan to the patient. <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">Voxels</a> above an air threshold are boxed, the box is widened by 15&nbsp;mm on every side, and the crop is kept only if it removes more than 15 % of the voxels: a field of view that is already tight is left alone.</p><div class="formula"><math display="block"><mrow><mi class="k1">&#952;</mi><mo>=</mo><mi>min</mi><mo>+</mo><mn>0.15</mn><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k2">p</mi><mn>99.5</mn></msub><mo>&#x2212;</mo><mi>min</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi>kept</mi><mo>=</mo><munder><mo>&#x220F;</mo><mrow><mi>axes</mi></mrow></munder><mfrac><mrow><mi class="k3">hi</mi><mo>&#x2212;</mo><mi class="k3">lo</mi></mrow><mi class="k4">N</mi></mfrac><mo>&#x2264;</mo><mn>0.85</mn></mrow></math></div><ul class="algo-legend"><li class="k1"><b>&#952;</b>the air threshold; fixed at &#8722;500 when the scan is in Hounsfield units (minimum under &#8722;800)</li><li class="k2"><b>p<sub>99.5</sub></b>the 99.5th percentile of the intensities</li><li class="k3"><b>lo, hi</b>the box on one axis: first and last voxel above &#952;, widened by the margin</li><li class="k4"><b>N</b>the size of the scan on that axis</li></ul></div>
+      </figure>
 
-      <ul>
-        <li><strong>air/tissue threshold</strong> scale-tolerant: if <code>array.min() &lt; −800</code>, we are in
-          Hounsfield units and the threshold is <code>−500</code>; otherwise <code>min + 0.15 × (p99.5 − min)</code>;</li>
-        <li>bounding box of the <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxels</a> above the threshold, expanded by
-          <code>_CROP_MARGIN_MM = 15.0</code> mm converted to voxels per axis;</li>
-        <li>if more than <code>_CROP_MIN_GAIN = 0.85</code> of the voxels are kept, <strong>the crop is
-          abandoned</strong>: gaining less than 15% is not worth the risk;</li>
-        <li>the sub-volume keeps its spacing and axes, <strong>only the origin moves</strong>
-          (<code>ijkToRas.MultiplyPoint([i0,j0,k0,1])</code>). Nothing is interpolated.</li>
-      </ul>
+      <p>The cropped sub-volume keeps its spacing and axes, only its origin moves, and nothing is interpolated. After the prediction, the label map is pasted back into an array of the original size by a simple offset, so the output is always on the grid of the scan as acquired.</p>
 
-      <p><code>_restoreCropToOriginalGrid()</code> pastes the label map back into an array of the
-      original size by a simple index offset: the output is therefore always on the
-      grid of the scan as acquired.</p>
+      <a class="deep-link" href="BatchDentalSeg.code.html#coeur-crop"><b>In the code</b><span>The crop function, its constants and the paste-back</span></a>
 
       <h3 id="coeur-memoire">5.3 Memory guard: three lines of defense</h3>
 
-      <p>The code comment gives the real case: a scan filled 114 GB on a
-      125 GB machine, got killed by the OOM killer, and left its multiprocessing
-      workers alive holding the memory.</p>
+      <p>The code comment gives the real case: a scan filled 114 GB on a 125 GB machine, was killed by the system, and left its workers alive holding the memory. Hence three lines of defence, one per moment of the process: an estimate before launching, a monitor during the run, and a recovery after it.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 900 170" role="img" aria-label="Three lines of memory defense: before, during, after">
+          <a class="d-link" href="#coeur-memoire">
           <rect class="d-box" x="10" y="20" width="260" height="100" rx="6"/>
           <text class="d-label" x="140" y="42" text-anchor="middle">a) Before: a priori estimate</text>
-          <text class="d-label-s" x="140" y="60" text-anchor="middle">_estimatePeakRamGb()</text>
+          <text class="d-label-s" x="140" y="60" text-anchor="middle">estimate the peak</text>
           <text class="d-label-s" x="140" y="76" text-anchor="middle">FOV, spacing, label count</text>
           <text class="d-label-s" x="140" y="92" text-anchor="middle">budget = free RAM × 85%</text>
           <text class="d-label-s" x="140" y="108" text-anchor="middle">exceeded ⇒ failed without launching</text>
+          </a>
 
           <path class="d-arrow" d="M270 70 H315"/>
           <path class="d-arrow-head" d="M315 70 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur-memoire">
           <rect class="d-box" x="320" y="20" width="260" height="100" rx="6"/>
           <text class="d-label" x="450" y="42" text-anchor="middle">b) During: monitoring</text>
-          <text class="d-label-s" x="450" y="60" text-anchor="middle">_onMemCheck, every 3000 ms</text>
+          <text class="d-label-s" x="450" y="60" text-anchor="middle">checked every 3 s</text>
           <text class="d-label-s" x="450" y="76" text-anchor="middle">2 consecutive overruns</text>
           <text class="d-label-s" x="450" y="92" text-anchor="middle">(not a transient spike)</text>
           <text class="d-label-s" x="450" y="108" text-anchor="middle">⇒ kill order</text>
+          </a>
 
           <path class="d-arrow" d="M580 70 H625"/>
           <path class="d-arrow-head" d="M625 70 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#coeur-memoire">
           <rect class="d-box-a" x="630" y="20" width="260" height="100" rx="6"/>
           <text class="d-label" x="760" y="42" text-anchor="middle">c) After: recovery</text>
-          <text class="d-label-s" x="760" y="60" text-anchor="middle">_killInferenceTree(): entire tree</text>
-          <text class="d-label-s" x="760" y="76" text-anchor="middle">_reclaimStrayProcesses(): orphans</text>
-          <text class="d-label-s" x="760" y="92" text-anchor="middle">nnunetv2_predict / nnunetv2.inference</text>
+          <text class="d-label-s" x="760" y="60" text-anchor="middle">kill the whole process tree</text>
+          <text class="d-label-s" x="760" y="76" text-anchor="middle">sweep orphan processes</text>
+          <text class="d-label-s" x="760" y="92" text-anchor="middle">leftover nnU-Net workers</text>
           <text class="d-label-s" x="760" y="108" text-anchor="middle">"Free memory" button</text>
+          </a>
         </svg>
-        <figcaption>The memory guard's three lines of defense: each covers a different moment in the nnU-Net process lifecycle.</figcaption>
+        <figcaption>The <a class="gterm" data-term="bds-l-memory" href="BatchDentalSeg.code.html#coeur-memoire" title="See the code">memory guard</a>&rsquo;s three lines of defence: each covers a different moment in the life of the <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> process.</figcaption>
       </figure>
 
-      <p><strong>a) A priori estimate</strong>, <code>_estimatePeakRamGb()</code>
-      (<code>SegmentationWidget.py:1173</code>).
-      Since the physical volume of the field of view is independent of spacing, the number of
-      resampled voxels equals <code>fovMm3 / targetVoxelMm3</code>. The peak is reached in
-      <code>convert_predicted_logits_to_segmentation_with_correct_shape</code>, where, per class,
-      the following coexist: the sliding-window accumulator (<code>torch.half</code> on the
-      resampled grid, 2 bytes), its float64 copy (<code>data = data.astype(float)</code> on
-      the whole 4D array at once, 8 bytes), and <code>reshaped_final</code> (<code>torch.half</code> on the
-      original grid, 2 bytes). Hence
-      <code>logitsGb = (10 × C × Vresampled + 2 × C × Voriginal) / 2³⁰</code>, plus
-      <code>8 × (Voriginal + Vresampled)</code> for the float64 transients of <code>skimage.resize</code>,
-      plus <code>_RAM_FIXED_OVERHEAD_GB = 4.0</code> (torch, weights, workers). The <code>spacing</code> and the
-      label count are read from the <strong>same</strong> configuration folder, so as not to
-      cross one model's spacing with another model's label count.</p>
+      <figure class="algo" data-scene="bds_memory" data-ms="6400">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: two bars made of four memory terms are compared to a budget line; the shorter one passes, the longer one is refused"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Before launching anything, the module estimates the peak memory of one prediction from the size of the scan, the spacing of the model and the number of labels. If the estimate does not fit in the share of free memory it is allowed (85 % by default), the scan is marked failed with the reason, without ever starting nnU-Net.</p><div class="formula"><math display="block"><mrow><mi>bytes</mi><mo>=</mo><mn>10</mn><mi class="k1">C</mi><msub><mi class="k2">V</mi><mtext>res</mtext></msub><mo>+</mo><mn>2</mn><mi class="k1">C</mi><msub><mi class="k2">V</mi><mtext>orig</mtext></msub><mo>+</mo><mn>8</mn><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k2">V</mi><mtext>orig</mtext></msub><mo>+</mo><msub><mi class="k2">V</mi><mtext>res</mtext></msub><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi>peak</mi><mo>=</mo><mfrac><mi>bytes</mi><msup><mn>2</mn><mn>30</mn></msup></mfrac><mo>+</mo><mn>4</mn><mtext>&#160;GB</mtext><mo>&#x2264;</mo><mn>0.85</mn><mo>&#xd7;</mo><mi>free RAM</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>C</b>number of labels of the model</li><li class="k2"><b>V</b>voxels of the scan (orig) and of the grid the model works on (res)</li></ul></div>
+      </figure>
 
-      <p>Budget = <code>free RAM × ramLimitSpinBox</code> (default <strong>85%</strong>). Above it, the scan is
-      marked <code>failed</code> with the reason, without ever starting nnU-Net.</p>
+      <p>During the run, memory is sampled every 3 seconds and two consecutive overruns are needed to kill the process, so that a transient spike does not condemn a good scan. The whole process tree is killed, not only the direct child, because nnU-Net starts workers of its own, and orphan processes are swept up.</p>
 
-      <p><strong>b) Monitoring during execution</strong>: <code>_onMemCheck</code> samples every
-      <code>_RAM_SAMPLE_MS = 3000</code> ms; it takes <code>_RAM_CONSECUTIVE_HITS = 2</code> consecutive
-      overruns to kill (a transient spike must not condemn a good scan).</p>
-
-      <p><strong>c) Memory recovery</strong>: <code>_killInferenceTree()</code> kills the <strong>entire tree</strong>,
-      <code>QProcess.kill()</code> only reaches the direct child, yet nnU-Net does
-      multiprocessing. <code>_reclaimStrayProcesses()</code> sweeps processes whose command
-      line contains <code>nnunetv2_predict</code>, <code>nnunetv2/inference</code>, or <code>nnunet</code> and that
-      no longer belong to anyone. The <em>Free memory</em> button does this by hand.</p>
+      <a class="deep-link" href="BatchDentalSeg.code.html#coeur-memoire"><b>In the code</b><span>The estimate, the sampler, the process-tree kill and the stray sweep</span></a>
 
       <h3 id="coeur-fin">5.4 Fallback completion detection</h3>
 
-      <p><code>_checkInferenceCompletionFallback()</code>
-      (<code>SegmentationWidget.py:2611</code>):
-      when the "done with volume" line appears in nnU-Net's output, a timer
-      checks the output file's size every 1.5 s; <strong>two consecutive equal
-      readings</strong> ⇒ forced finalization, even if the <code>QProcess</code>'s <code>finished</code> signal
-      never arrived. Gives up after 40 attempts (60 s).</p>
+      <p>When nnU-Net prints its &ldquo;done&rdquo; line, a timer watches the output file&rsquo;s size, and two equal readings force the finish even if the process never signalled it; it gives up after 60 seconds. Each scan also has a watchdog (60 minutes by default) that marks it failed and moves on.</p>
 
-      <p>Additional guard-rail: a per-scan watchdog
-      (<code>itemTimeoutSpinBox</code>, default <strong>60 min</strong>) marks the scan as failed and moves to
-      the next one. <code>_finishCurrentItem</code> is the <strong>single exit point</strong>, guarded by
-      <code>_itemFinalized</code> against double advancement.</p>
+      <a class="deep-link" href="BatchDentalSeg.code.html#coeur-fin"><b>In the code</b><span>The fallback timer and the per-scan watchdog</span></a>
 
       <h3 id="coeur-miroir">5.5 Mirror correction (UniversalLab only)</h3>
 
-      <p><code>onResolveMirroring()</code>
-      (<code>SegmentationWidget.py:1321</code>),
-      a button visible only for UniversalLab. The network regularly confuses
-      left and right; the correction is purely geometric:</p>
+      <figure class="algo" data-scene="bds_mirror" data-ms="6200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a vertical plane through the central incisors separates left from right; two teeth carrying the label of the wrong side get the symmetric label"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The network sometimes confuses left and right. The correction is geometric: the mirror plane passes through the average position of the four central incisors; a tooth labelled as left that lies on the right of the plane (or the reverse) gets the symmetric label. The mandible, maxilla and canal are protected.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">R</mi><mtext>plane</mtext></msub><mo>=</mo><mfrac><mn>1</mn><mn>4</mn></mfrac><munder><mo>&#x2211;</mo><mrow><mi class="k2">&#8467;</mi><mo>&#x2208;</mo><mo>{</mo><mn>8</mn><mo>,</mo><mn>9</mn><mo>,</mo><mn>24</mn><mo>,</mo><mn>25</mn><mo>}</mo></mrow></munder><mover><msub><mi class="k1">R</mi><mi class="k2">&#8467;</mi></msub><mo>&#175;</mo></mover></mrow></math></div><div class="formula"><math display="block"><mrow><mover><msub><mi class="k1">R</mi><mi class="k2">&#8467;</mi></msub><mo>&#175;</mo></mover><mo>=</mo><mfrac><mn>1</mn><mrow><mo>|</mo><msub><mi class="k3">V</mi><mi class="k2">&#8467;</mi></msub><mo>|</mo></mrow></mfrac><munder><mo>&#x2211;</mo><mrow><mi class="k3">v</mi><mo>&#x2208;</mo><msub><mi class="k3">V</mi><mi class="k2">&#8467;</mi></msub></mrow></munder><msub><mi class="k1">R</mi><mi class="k3">v</mi></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>R</b>the right-left coordinate of a voxel, in <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="See glossary">RAS</a></li><li class="k2"><b>&#8467;</b>a tooth label (8, 9, 24, 25 are the central incisors)</li><li class="k3"><b>V<sub>&#8467;</sub>, v</b>the voxels carrying label &#8467;, and one of them</li></ul></div>
+      </figure>
 
-      <ol>
-        <li>reconstruction of the official label map (§5.1), then the <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> <em>R</em> coordinate of
-          each foreground voxel <strong>in numpy</strong> (<code>m00·x + m01·y + m02·z + m03</code>): the
-          previous version called <code>vtkMatrix4x4.MultiplyPoint</code> once per voxel and
-          per label;</li>
-        <li><strong>sagittal plane</strong> = average of the <em>R</em> centroids of the four central incisors
-          (labels 8, 9, 24, 25); if one is missing, the correction is refused;</li>
-        <li>for each lateralized label, the voxels on the wrong side of the plane receive the
-          value of the symmetric label (a table built by substituting
-          <code>left</code> ↔ <code>right</code> in the name); <code>{53, 54, 55}</code> are <strong>protected</strong>.</li>
-      </ol>
+      <p>If one of the four incisors is missing, the correction is refused. The result goes into a new node, <code>&lt;name&gt;_Mirrored</code>, and the original is kept.</p>
 
-      <p>The result goes into a new node <code>&lt;name&gt;_Mirrored</code>, the original is kept.</p>
+      <a class="deep-link" href="BatchDentalSeg.code.html#coeur-miroir"><b>In the code</b><span>The mirror function, the label dictionary and the plane computation</span></a>
 
       <h3 id="coeur-postproc">5.6 Missing post-processing</h3>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall (dead code is legacy only; the absence of cleanup also holds in VISOR)</div>
-        <p><code>_postProcessSegments()</code> only logs two lines (<code>SegmentationWidget.py:2526-2528</code>);
-        <code>_keepLargestIsland()</code> and <code>_removeSmallIsland()</code> (which would use
-        <code>_minimumIslandSize_mm3 = 60</code>) <strong>are never called anywhere</strong>: dead code inherited
-        from upstream DentalSegmentator. No morphological cleanup is therefore applied:
-        what comes out is nnU-Net's raw output, with its own internal
-        post-processing if present in the bundle.</p>
-        <p><strong>Also true in VISOR</strong> for the absence of cleanup: the nnU-Net output is put back on the scan grid and written as is
-        (<code>SADT-VISOR sadt_batchdentalseg/pipeline.py:323-346</code>); the island functions do not exist there.</p>
-      </div>
+      <p>No morphological cleanup is applied: what comes out is nnU-Net&rsquo;s raw output, with its own internal post-processing if the bundle ships one. Two island-removal functions exist but nothing calls them.</p>
+
+      <a class="deep-link" href="BatchDentalSeg.code.html#coeur-postproc"><b>In the code</b><span>The dead functions and what is left</span></a>
 
       <h2 id="sorties">6. Outputs</h2>
 
-      <p><code>onInferenceFinished</code> <strong>always</strong> writes, regardless of which formats
-      are checked, <code>&lt;outputFolder&gt;/&lt;stem&gt;_Segmentation.nii.gz</code>: a label map with the values
-      from <code>_get_active_label_map</code>, on the geometry (spacing, origin, <code>IJKToRAS</code>) of the
-      original volume, uncropped if a crop took place. This is the file
-      <code>expectedOutputPath()</code> looks for to decide a scan has already been processed.</p>
+      <p>Whatever formats are ticked, the module always writes <code>&lt;scan&gt;_Segmentation.nii.gz</code>, a <a class="gterm" data-term="bds-l-labelmap" href="BatchDentalSeg.code.html#coeur-labelmap" title="See the code">label map</a> on the geometry of the original volume. This is also the file the <a class="gterm" data-term="bds-l-queue" href="BatchDentalSeg.code.html#entrees-file" title="See the code">queue</a> looks for to decide that a scan is already done. Other formats go into the same folder:</p>
 
-      <p>Additional formats, checkboxes, all written into the same folder:</p>
+      <ul>
+        <li><strong>STL, OBJ:</strong> one file per segment.</li>
+        <li><strong>VTK per label:</strong> one file per label, cleaned, smoothed (60 windowed-sinc iterations), reduced by 40 % and flipped from <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="See glossary">RAS</a> to <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>.</li>
+        <li><strong>VTK merged:</strong> one file with every label, built the same way, with a constant label array.</li>
+        <li><strong>NIfTI per segment:</strong> one binary file per segment, not to be confused with the label map above.</li>
+        <li><strong>glTF:</strong> through the SlicerOpenAnatomy extension, with an adjustable decimation (0.9 by default).</li>
+      </ul>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Format</th><th>Function</th><th>Naming</th><th>Details</th></tr></thead>
-          <tbody>
-            <tr><td>STL, OBJ</td><td><code>ExportSegmentsClosedSurfaceRepresentationToFiles</code></td><td>one file per segment</td><td>smoothing 1.0, no merging</td></tr>
-            <tr><td>VTK (per label)</td><td><code>_exportVTKPerLabel</code></td><td><code>&lt;segNodeName&gt;_&lt;labelName&gt;.vtk</code></td><td>clean → <code>vtkWindowedSincPolyDataFilter</code> (60 it., <code>passBand</code> 0.05, smoothing of boundaries/sharp edges/non-manifold) → cell normals → <code>vtkQuadricDecimation</code> 40% → <strong>flip RAS→<a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a></strong> (<code>Scale(-1,-1,1)</code>), binary</td></tr>
-            <tr><td>VTK (merged)</td><td><code>_exportMergedVTK</code></td><td><code>&lt;segNodeName&gt;_merged.vtk</code></td><td><code>vtkDiscreteMarchingCubes</code> <strong>one contour per present label</strong>, same smoothing chain, then per-label thresholding, 40% decimation, constant <code>Label</code> cell array, concatenation, LPS flip</td></tr>
-            <tr><td>NIfTI (checkbox)</td><td><code>ExportSegmentsBinaryLabelmapRepresentationToFiles</code></td><td>one <strong>binary</strong> <code>.nii.gz</code> per segment</td><td>not to be confused with the label map above</td></tr>
-            <tr><td>glTF</td><td><code>OpenAnatomyExport</code></td><td></td><td>adjustable decimation factor (default 0.9); installs SlicerOpenAnatomy if needed</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p>A mesh export failure does not fail the scan: the NIfTI is already written, and the scan is marked done with a warning.</p>
 
-      <p>The mesh file names derive from the segmentation <strong>node</strong>'s name,
-      <code>&lt;stem&gt;_Segmentation</code>, not from the scan's name: segment names are sanitized
-      by <code>re.sub(r"[^0-9A-Za-z_-]+", "_", ...)</code>.</p>
-
-      <p>A mesh export failure <strong>does not fail the scan</strong>: the NIfTI is already
-      written, the scan is marked <code>done</code> with an <code>export warning</code>.</p>
-
-      <div class="callout ok">
-        <div class="callout-title">Verified: fixed in the code (legacy only)</div>
-        <p>A bug that was fixed, documented in the code of <code>_exportMergedVTK</code> (<code>SegmentationWidget.py:2823-2832</code>):
-        <code>vtkDiscreteMarchingCubes.SetValue</code> takes a contour <strong>index</strong>, not a label
-        value. Passing the label as the index left index 0 at contour value
-        0.0, so the background was contoured, smoothed, and normal-computed before being discarded.</p>
-        <p><strong>Legacy (3c67957); not present in VISOR:</strong> VISOR builds one surface per label from a binary mask
-        (<code>GenerateValues(1, 1, 1)</code>, <code>SADT-VISOR sadt_batchdentalseg/mesh_export.py:78-80</code>) and merges them
-        with <code>vtkAppendPolyData</code> (<code>mesh_export.py:205-207, 226-235</code>).</p>
-      </div>
+      <a class="deep-link" href="BatchDentalSeg.code.html#sorties"><b>In the code</b><span>The output table with every function and filter</span></a>
 
       <h2 id="predit">7. What is predicted vs what is computed</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Block</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td>Preprocessing (transposition, resampling, <code>CTNormalization</code>)</td><td><span class="badge calcule">computed</span> deterministic, driven by <code>plans.json</code></td><td><code>nnUNetv2_predict</code>, child process</td></tr>
-            <tr><td>Segmentation</td><td><span class="badge predit">predicted</span> <code>PlainConvUNet</code> 3D network, 1 fold, no TTA</td><td>same</td></tr>
-            <tr><td>Automatic crop</td><td><span class="badge calcule">computed</span> geometric (air threshold + bounding box)</td><td>widget, numpy</td></tr>
-            <tr><td>Restoration onto the original grid</td><td><span class="badge calcule">computed</span> index offset, no interpolation</td><td>widget, numpy</td></tr>
-            <tr><td>Label map reconstruction</td><td><span class="badge calcule">computed</span> single export + LUT</td><td>widget, VTK/numpy</td></tr>
-            <tr><td>Mirror correction</td><td><span class="badge calcule">computed</span> geometric (sagittal plane on the incisors)</td><td>widget, numpy</td></tr>
-            <tr><td>Meshes</td><td><span class="badge calcule">computed</span> <a class="gterm" href="../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a> + windowed-sinc + quadric decimation</td><td>widget, VTK</td></tr>
-            <tr><td>Memory estimation and guard</td><td><span class="badge calcule">computed</span> arithmetic on the <a class="gterm" href="../glossary.html#g-fov" title="See glossary">FOV</a> and the plans</td><td>widget, psutil</td></tr>
+            <tr><td>Reordering, resampling, intensity normalisation</td><td><span class="badge calcule">computed</span> deterministic, driven by the plan</td></tr>
+            <tr><td>Segmentation</td><td><span class="badge predit">predicted</span> 3D U-Net, one fold, no mirroring at test time</td></tr>
+            <tr><td><a class="gterm" data-term="bds-l-crop" href="BatchDentalSeg.code.html#coeur-crop" title="See the code">Automatic crop</a></td><td><span class="badge calcule">computed</span> air threshold and bounding box</td></tr>
+            <tr><td>Restoration onto the original grid</td><td><span class="badge calcule">computed</span> an index offset, no interpolation</td></tr>
+            <tr><td><a class="gterm" data-term="bds-l-labelmap" href="BatchDentalSeg.code.html#coeur-labelmap" title="See the code">Label map</a> reconstruction</td><td><span class="badge calcule">computed</span> one export and a lookup table</td></tr>
+            <tr><td><a class="gterm" data-term="bds-l-mirror" href="BatchDentalSeg.code.html#coeur-miroir" title="See the code">Mirror correction</a></td><td><span class="badge calcule">computed</span> a sagittal plane through the incisors</td></tr>
+            <tr><td>Meshes</td><td><span class="badge calcule">computed</span> <a class="gterm" data-term="marching-cubes" href="../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a>, smoothing, decimation</td></tr>
+            <tr><td><a class="gterm" data-term="bds-l-memory" href="BatchDentalSeg.code.html#coeur-memoire" title="See the code">Memory estimate</a> and guard</td><td><span class="badge calcule">computed</span> arithmetic on the scan and the plan</td></tr>
           </tbody>
         </table>
       </div>
 
       <p>The only learning is that of the four <a class="gterm" data-term="checkpoint" href="../glossary.html#g-checkpoint" title="See glossary">checkpoints</a>, outside this repository.</p>
 
+      <a class="deep-link" href="BatchDentalSeg.code.html#predit"><b>In the code</b><span>The same table with where each block runs</span></a>
+
       <h2 id="environnement">8. Environment</h2>
 
-      <p>Installed <strong>once per session</strong>, on the first <em>Apply</em>, by
-      <code>_runSetupThenStartQueue()</code>
-      (<code>SegmentationWidget.py:1749</code>):</p>
+      <p>Libraries are installed once per session, at the first Apply: torch (the build matching the detected driver, no version pinned), NumPy below 2 because current torch wheels are built against NumPy 1, psutil, and <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> through the NNUNet extension, which must be installed by hand. No conda, no WSL. A graphics card is optional, but the fallback message speaks of about an hour per scan on the CPU.</p>
 
-      <ol>
-        <li><code>pip install light-the-torch</code>, then <code>python -m light_the_torch install torch
-          torchvision</code>: <code>ltt</code> picks the CUDA wheel matching the detected driver,
-          <strong>no version is pinned</strong>;</li>
-        <li><code>pip install numexpr&gt;=2.10.2</code>;</li>
-        <li><code>pip install numpy&lt;2.0 numexpr&gt;=2.10.2 psutil</code>, via <code>PipRunner</code>, a <code>QProcess</code>
-          that returns control to the UI;</li>
-        <li><code>SlicerNNUNetLib.InstallLogic().setupPythonRequirements()</code>: <code>nnunetv2</code>,
-          outside this repository;</li>
-        <li><code>PythonDependencyChecker.downloadWeightsIfNeeded()</code>: DentalSegmentator weights
-          only.</li>
-      </ol>
-
-      <p><code>numpy&lt;2.0</code> for the same reason as in <a href="../AMASSS/AMASSS.html">AMASSS</a>: current torch wheels are
-      compiled against numpy 1.x.</p>
-
-      <p>The <strong>NNUNet extension must be installed manually</strong>: its absence is
-      detected (<code>import SlicerNNUNetLib</code>) and produces a message asking to
-      install it and restart. <code>SlicerOpenAnatomy</code>, on the other hand, installs itself
-      on the first glTF export.</p>
-
-      <p>No conda environment, no WSL. GPU is optional (<code>cpu</code>, <code>mps</code> available),
-      at the cost of "about an hour per scan" according to the fallback message.</p>
+      <a class="deep-link" href="BatchDentalSeg.code.html#environnement"><b>In the code</b><span>The install sequence step by step</span></a>
 
       <h2 id="pieges">9. Pitfalls and fragile points</h2>
 
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug: NasoMaxillaDentSeg (legacy only)</div>
-        <p><strong>Legacy (3c67957); not present in VISOR.</strong> VISOR renames no segment: the table is
-        <code>Upper Skull 1, Mandible 2, Maxilla 3, Upper Teeth 4, Lower Teeth 5, Mandibular canal 6</code>
-        (<code>SADT-VISOR sadt_batchdentalseg/catalogs.py:35-42</code>) and is what names the per-label files
-        (<code>pipeline.py:199-206</code>). The legacy analysis follows.</p>
-        <p><strong>The segment names and the label table diverge for
-        NasoMaxillaDentSeg.</strong> <code>_get_active_label_map</code> (<code>SegmentationWidget.py:1977-1987</code>) gives <code>Maxilla = 3</code>,
-        <code>Upper Teeth = 4</code>, <code>Lower Teeth = 5</code>, <code>Mandibular canal = 6</code>, while
-        <code>_updateSegmentationDisplay</code>
-        (<code>SegmentationWidget.py:2278</code>, list at <code>SegmentationWidget.py:2482</code>)
-        renames <code>Segment_1..6</code> using the list
-        <code>["Upper Skull", "Mandible", "Upper Teeth", "Lower Teeth", "Mandibular canal", "Maxilla "]</code>.</p>
-        <p>The first effect is <strong>visible on screen</strong>, before any question of export: the
-        list is not in the order of the table, so the last four segments
-        get the wrong name, the wrong color, and the wrong opacity.</p>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Segment</th><th>Actual structure</th><th>Displayed name</th></tr></thead>
-            <tbody>
-              <tr><td><code>Segment_3</code></td><td>Maxilla</td><td>"Upper Teeth"</td></tr>
-              <tr><td><code>Segment_4</code></td><td>Upper Teeth</td><td>"Lower Teeth"</td></tr>
-              <tr><td><code>Segment_5</code></td><td>Lower Teeth</td><td>"Mandibular canal"</td></tr>
-              <tr><td><code>Segment_6</code></td><td>Mandibular canal</td><td>"Maxilla" (with a trailing space)</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p>The fix is to reorder the list, and the accompanying <code>colors</code> and
-        <code>opacities</code> lists, to match <code>_get_active_label_map</code>, rather than just
-        removing the space.</p>
-        <p>But the renaming happens <strong>before</strong> the <code>LabelValue</code> tags are set, and
-        <code>_segmentLabelValue</code> then falls back on the name: <code>Segment_3</code>, which actually
-        carries label 3 (maxilla), is renamed "Upper Teeth" and <strong>exported
-        with value 4</strong>. Worse, <code>"Maxilla "</code> has a <strong>trailing space</strong>: the lookup
-        in the table fails, <code>Segment_6</code> (the mandibular canal) is logged as
-        "unexpected segment" and <strong>lost</strong> from the NIfTI. The two lists,
-        however, correspond perfectly for the other three models.</p>
-      </div>
+      <p>Each point is checked in the code and described, with its evidence, on the code page.</p>
 
       <ul>
-        <li><strong>The four branches of <code>onApplyClickedForVolume</code> are copy-pasted</strong>:
-          the UniversalLab branch still names its variable <code>pediatricCheckpoint</code> and
-          logs "Downloading pediatricdentalseg model…". Cosmetic, but misleading
-          when reading logs.</li>
+        <li><strong>NasoMaxillaDentSeg segments are renamed wrongly:</strong> the last four get the wrong name, colour and opacity, and the mandibular canal can be lost from the output. <a href="BatchDentalSeg.code.html#f-naso-rename">Evidence</a>.</li>
+        <li><strong>UniversalLab is described as segmenting the cranial vault</strong> in the interface and README, but it has no such label. <a href="BatchDentalSeg.code.html#f-universal-description">Evidence</a>.</li>
+        <li><strong>Downloading the DentalSegmentator weights wipes out the other three models.</strong> <a href="BatchDentalSeg.code.html#f-download-wipe">Evidence</a>.</li>
+        <li><strong>The release is resolved fragilely and no download is checked:</strong> the first asset of the latest release, no checksum. <a href="BatchDentalSeg.code.html#f-release-resolution">Evidence</a>.</li>
+        <li><strong>NRRD is not read and sub-folders are not walked;</strong> two scans of the same name overwrite the same result. <a href="BatchDentalSeg.code.html#f-nrrd">Evidence</a>.</li>
+        <li><strong>A single fold, never an ensemble:</strong> extra folds in a bundle are ignored. <a href="BatchDentalSeg.code.html#f-single-fold">Evidence</a>.</li>
+        <li><strong>The environment variables that point <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> at the model are process-wide,</strong> harmless here only because the <a class="gterm" data-term="bds-l-queue" href="BatchDentalSeg.code.html#entrees-file" title="See the code">queue</a> is sequential. <a href="BatchDentalSeg.code.html#f-environ">Evidence</a>.</li>
+        <li><strong>Dead code:</strong> the island-removal and post-processing functions are never called. <a href="BatchDentalSeg.code.html#f-dead-postproc">Evidence</a>.</li>
+        <li><strong>The install list is incomplete in the build file:</strong> only part of the model folder is listed. <a href="BatchDentalSeg.code.html#f-cmake">Evidence</a>.</li>
       </ul>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall (legacy only)</div>
-        <p><strong>Downloading the DentalSegmentator weights wipes out the other three models</strong>:
-        <code>downloadWeights()</code> does <code>shutil.rmtree(self.destWeightFolder)</code> on
-        <code>Resources/ML</code> (<code>PythonDependencyChecker.py:158-160</code>), which also holds <code>Dataset001_380CT</code>, <code>Dataset001_max4</code>, and
-        <code>Dataset002_380CT</code>. And <code>getDatasetPath()</code> looks for <code>rglob("dataset.json")</code>
-        <strong>anywhere</strong> under <code>Resources/ML</code> (<code>PythonDependencyChecker.py:123-127</code>), and
-        <code>areWeightsMissing()</code> then checks for <code>fold_*/*.pth</code> next to the first one found
-        (<code>PythonDependencyChecker.py:78-96</code>): if only the pediatric model is
-        present, the checker believes DentalSegmentator is installed.</p>
-        <p><strong>Legacy (3c67957); not present in VISOR:</strong> nothing is downloaded during a run
-        (<code>SADT-VISOR sadt_batchdentalseg/pipeline.py:15-17</code>); each bundle has its own folder (<code>dest</code>) in the server manifest
-        (<code>VISOR-serve scripts/data-manifest.yml:542-586</code>) and a bundle is accepted only if it holds
-        <code>dataset.json</code>, <code>plans.json</code> and <code>fold_0/checkpoint_final.pth</code>
-        (<code>nnunet_runner.py:57-73</code>).</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Pitfall (release resolution is legacy only; the integrity gap is only partly closed in VISOR)</div>
-        <p><strong>Fragile release resolution</strong>: <code>assets[0]</code> among all the assets of all
-        the releases (<code>PythonDependencyChecker.py:98-102</code>), via an <strong>unauthenticated</strong> GitHub client (60 requests/h per IP).
-        An asset added at the head of the latest release changes the downloaded model. And
-        <strong>no integrity check</strong> on the three <a class="gterm" data-term="checkpoint" href="../glossary.html#g-checkpoint" title="See glossary">checkpoints</a> downloaded one by one:
-        a truncated file is indistinguishable from a complete one.</p>
-        <p><strong>Legacy (3c67957); not present in VISOR for the resolution:</strong> the server manifest pins one URL per
-        file, by release tag (<code>VISOR-serve scripts/data-manifest.yml:546-585</code>). <strong>Only partly fixed for integrity:</strong>
-        a <code>sha256</code> is declared for two files of this tool only, the <code>dataset.json</code> and
-        <code>plans.json</code> of PediatricDentalSeg (<code>data-manifest.yml:563, 568</code>); the checkpoints and the DentalSegmentator
-        archive have a <code>size</code> and no hash, and the fetch script verifies only when a hash is present
-        (<code>VISOR-serve scripts/fetch_data.py:309-319</code>). A download goes to a scratch folder and is moved
-        into place once complete, so a truncated checkpoint is no longer taken for a finished one
-        (<code>fetch_data.py:300-306</code>).</p>
-      </div>
-
-      <ul>
-        <li><strong>NRRD is not recognized</strong> and subfolders are not traversed
-          (<code>listVolumes</code>), whereas the repository's other modules readily produce
-          NRRD and folder trees. <strong>Name collision</strong> is possible: two scans from
-          different folders sharing the same base name overwrite the same
-          <code>&lt;stem&gt;_Segmentation.nii.gz</code>.</li>
-        <li><strong>A single fold, never an ensemble</strong> (<code>folds="0"</code>): a bundle that shipped
-          <code>fold_1..4</code> would see them ignored.</li>
-        <li><strong><code>os.environ['nnUNet_results']</code></strong> is rewritten at every scan by
-          <code>SegmentationLogic</code>: harmless here (sequential queue), dangerous if
-          another nnU-Net inference runs in the same Slicer session.</li>
-        <li><strong>Dead code</strong>: <code>_saveSegmentationAsNifti</code>, <code>_postProcessSegments</code>,
-          <code>_keepLargestIsland</code>, <code>_removeSmallIsland</code>, <code>onExportClicked</code> (the
-          corresponding button is not wired into the batch layout).</li>
-      </ul>
-
-      <div class="callout warn">
-        <div class="callout-title">Pitfall (legacy only; corrected: CMake does list part of <code>Resources/ML</code>)</div>
-        <p><strong>Correction at 3c67957.</strong> <code>MODULE_PYTHON_RESOURCES</code> <em>does</em> list
-        <code>Resources/ML/download_info.json</code> and the <code>dataset.json</code> and <code>plans.json</code> of
-        <code>Dataset111_453CT</code> (<code>BATCHDENTALSEG/CMakeLists.txt:28-34</code>), so the statement that
-        <code>Resources/ML</code> is not installed was wrong for that commit. The JSON files of the three other
-        bundles are not listed.</p>
-        <p>What holds: the a priori memory estimate (§5.3) returns <code>None</code> when the plans or dataset
-        files cannot be read (<code>SegmentationWidget.py:1173-1203</code>), and the RAM check then lets the scan
-        through (<code>SegmentationWidget.py:1239-1241</code>).</p>
-        <p><strong>Not present in VISOR:</strong> the Slicer client has no memory guard (the panel is 97 lines,
-        <code>AutomatedDentalToolsRemote BATCHDENTALSEGRemote/BATCHDENTALSEGRemote.py:51-97</code>); admission is done by the server
-        (<code>VISOR-serve server/execution/admission.py:1-12</code>).</p>
-      </div>
+      <a class="deep-link" href="BatchDentalSeg.code.html#pieges"><b>In the code</b><span>Every pitfall with file and line</span></a>
 
       <h2 id="litterature">10. Literature</h2>
 
-      <p><strong>DentalSegmentator</strong> is published:</p>
+      <p><strong>DentalSegmentator</strong> is published: Dot G. et al., <em>DentalSegmentator: robust open source deep learning-based CT and <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> image segmentation</em>, Journal of Dentistry 147:105130, 2024 (<a href="https://doi.org/10.1016/j.jdent.2024.105130" target="_blank" rel="noopener">doi:10.1016/j.jdent.2024.105130</a>). It uses <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> v2, with 470 CT and CBCT scans from 7 institutions for training and a hold-out test of 256 scans, with a Dice of 92.2 &plusmn; 6.3 % internally and 94.2 &plusmn; 7.4 % externally. On this model, code and paper agree. The methodological foundation is Isensee et al., <em>nnU-Net</em>, Nature Methods 18(2):203-211, 2021.</p>
 
-      <blockquote>
-        <p>Dot G., Chaurasia A., Dubois G., Savoldelli C., Haghighat S., Azimian S.,
-        Rahbar Taramsari A., Sivaramakrishnan G., Issa J., Dubey A., Schouman T.,
-        Gajny L. <em>DentalSegmentator: robust open source deep learning-based CT and <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>
-        image segmentation.</em> Journal of Dentistry 147:105130, 2024.
-        <a href="https://doi.org/10.1016/j.jdent.2024.105130" target="_blank" rel="noopener">doi:10.1016/j.jdent.2024.105130</a>
-, PMID 38878813</p>
-      </blockquote>
-
-      <p>nnU-Net v2 (v2.2 per the Zenodo notice for the weights), <strong>470 CT and CBCT scans</strong> from
-      7 institutions for training, 5 structures, tested hold-out on 256 scans
-      (133 internal, 123 external): DSC 92.2 ± 6.3% internal, 94.2 ± 7.4%
-      external. The <code>dataset.json</code> shipped here announces <code>numTraining = 453</code>, consistent with
-      the corpus described.</p>
-
-      <div class="callout ok">
-        <div class="callout-title">Verified</div>
-        <p>On this model, code and paper agree. The weights are also
-        published under CC-BY-4.0 on <a href="https://zenodo.org/records/10829675" target="_blank" rel="noopener">Zenodo</a>
-        (concept DOI <a href="https://doi.org/10.5281/zenodo.10829674" target="_blank" rel="noopener">10.5281/zenodo.10829674</a>)
-, but this module fetches them from GitHub releases, not from Zenodo.</p>
-        <p><strong>Legacy:</strong> the module itself downloads them at the first Apply. <strong>VISOR:</strong> nothing is
-        fetched during a run; a setup script stages the same upstream release archive
-        (<code>gaudot/SlicerDentalSegmentator</code>, <code>Dataset111_453CT_v100.zip</code>,
-        <code>VISOR-serve scripts/data-manifest.yml:582-586</code>), still from GitHub and not from Zenodo.</p>
-      </div>
-
-      <p>The methodological foundation:</p>
-
-      <blockquote>
-        <p>Isensee F., Jaeger P.F., Kohl S.A.A., Petersen J., Maier-Hein K.H. <em>nnU-Net: a
-        self-configuring method for deep learning-based biomedical image segmentation.</em>
-        Nature Methods 18(2):203-211, 2021.
-        <a href="https://doi.org/10.1038/s41592-020-01008-z" target="_blank" rel="noopener">doi:10.1038/s41592-020-01008-z</a></p>
-      </blockquote>
-
-      <p><strong>The three variants are not attached to any publication in the repository.</strong>
-      The repository's README announces 513 CBCT scans in mixed dentition for
-      PediatricDentalSegmentator and UniversalLabDentalSegmentator, and 135 scans for
-      NasoMaxillaDentalSegmentator, with no reference and no test set. These figures
-      cannot be verified anywhere in the code: the corresponding <code>dataset.json</code>
-      files only arrive with the weight download. To be treated as internal
-      claims until a publication covers them.</p>
-
-      <ul>
-        <li><a href="https://github.com/gaudot/SlicerDentalSegmentator" target="_blank" rel="noopener">gaudot/SlicerDentalSegmentator</a>: upstream extension, and source of the DentalSegmentator weights</li>
-        <li><a href="https://github.com/KitwareMedical/SlicerNNUnet" target="_blank" rel="noopener">KitwareMedical/SlicerNNUnet</a>: the required <code>NNUNet</code> extension</li>
-        <li><a href="https://github.com/MIC-DKFZ/nnUNet" target="_blank" rel="noopener">MIC-DKFZ/nnUNet</a></li>
-        <li><a href="https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools" target="_blank" rel="noopener">SlicerAutomatedDentalTools</a></li>
-      </ul>
-
-      <p>Full references, retrieved PDFs, and links to consult: <a href="SOURCES.html">SOURCES.md</a>.</p>
+      <p><strong>The three variants are not attached to any publication in the repository.</strong> The README announces 513 CBCT scans in mixed dentition for two of them and 135 scans for the third, with no reference and no test set: these figures are internal claims until a publication covers them. The full text of the references is on the <a href="BatchDentalSeg.code.html#litterature">code page</a> and in <a href="SOURCES.html">SOURCES.md</a>.</p>
 
       <footer class="footer">
-        <a href="../index.html">← All pages</a> ·
-        <a href="SOURCES.html">Bibliography for this tool</a> ·
-        Source: <code>BatchDentalSeg.md</code>
+        <a href="../index.html">← All fact sheets</a> ·
+        <a href="BatchDentalSeg.code.html">Code page for this tool</a> ·
+        <a href="SOURCES.html">This tool's bibliography</a>
       </footer>
 
     </article>
@@ -1105,5 +683,8 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
 <script src="../../assets/scene3d.js"></script>
 <script src="../../assets/batchdentalseg-mesh.js"></script>
 <script src="../../assets/batchdentalseg-3d.js"></script>
+<script src="../../assets/algo.js"></script>
+<script src="../../assets/algo-AMASSS.js"></script>
+<script src="../../assets/algo-BatchDentalSeg.js"></script>
 </body>
 </html>

@@ -23,6 +23,7 @@
     <div class="sec-switch" role="group">
       <a href="../guide/ASO.html">Guide</a>
       <a href="../ASO/ASO.html" aria-current="true">Atlas</a>
+      <a href="../ASO/ASO.code.html">Code</a>
     </div>
     <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="legacy">
@@ -122,9 +123,11 @@
         <img class="tool-icon" src="../../assets/screens/ASO/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Landmarks &amp; orientation</div>
         <h1>ASO</h1>
-        <p class="lede">Looks for a rigid rotation that brings a <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> or an intraoral scan into the frame of a reference case (the "gold"), through a 3-point initialization followed by <a class="gterm" href="../glossary.html#g-icp" title="See glossary">ICP</a>: never an optimal least-squares registration.</p>
+        <p class="lede">ASO looks for a rigid rotation that brings a <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> or an intraoral scan into the frame of a <a class="gterm" data-term="aso-leg-reference" href="ASO.code.html#principe" title="See the code">reference case</a> (the &ldquo;gold&rdquo;), through a 3-point initialisation followed by <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a>: never an optimal least-squares registration. This page explains how, step by step, with the maths. Files, lines, code blocks and pitfalls are on <a href="ASO.code.html">the code page</a>.</p>
         <div class="meta-row">
           <a class="badge paper" href="https://doi.org/10.1007/978-3-031-45249-9_5" target="_blank" rel="noopener" title="Automated Orientation and Registration of CBCT Scans.">Anchling 2023 · LNCS 14242</a>
+          <span class="badge neutral">Atlas (explanation)</span>
+          <a class="badge neutral" href="ASO.code.html">Code (developers)</a>
           <span class="badge cli">PRE_ASO_CBCT</span>
           <span class="badge cli">SEMI_ASO_CBCT</span>
           <span class="badge cli">PRE_ASO_IOS</span>
@@ -135,40 +138,36 @@
         </div>
       </header>
 
-      <div class="callout note">
-        <div class="callout-title">Two code bases</div>
-        <p>Everything numbered below describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port, which runs the same tool on a server, is described in <a href="../visor/ASO/ASO.html">ASO on VISOR</a>. Notes added to the callouts say whether each finding still holds in VISOR; they cite SADT-VISOR at 6ba2a78, with <code>ASO/</code> for <code>tools/ASO/src/sadt_aso/</code> when the path is not written in full. The line numbers quoted in this page's text were taken from an earlier legacy revision and do not match 3c67957; the callouts below give the 3c67957 lines.</p>
-      </div>
+      <p><strong>Two code bases.</strong> This page describes the legacy Slicer module (SlicerAutomatedDentalTools at 3c67957, 2026-10-26). The VISOR port, which runs the same tool on a server, is described in <a href="../visor/ASO/ASO.html">ASO on VISOR</a>. Where VISOR differs, a sentence says so.</p>
 
-      <h2 id="situation">1. Where it sits in the pipeline</h2>
+      <h2 id="overview">Overview: what goes in, what comes out</h2>
 
-      <p>Nothing in the repository calls ASO. ASO, however, calls three tools, and
-      <strong><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> consumes its output directly</strong>: <code>AREG_IOS.py:324</code>
-      looks for <code>&lt;patient&gt;_SegOr.tfm</code> in the T1 and T2 folders, exactly the name
-      written by <code>PRE_ASO_IOS.py:422</code>, and
-      composes <code>inv(areg_matrix @ inv(matrix_aso))</code> to produce a single matrix from
-      raw scan to registered.</p>
-
-      <p><em>Legacy only.</em> In VISOR ASO calls one tool, <code>ALI_CBCT</code>, and is called by four: AREG_CBCT, AREG_IOS, AREG_IOSCBCT and VFACE (see <a href="../visor/ASO/ASO.html#visor-status">Status and where it lives</a>).</p>
+      <p>A scan can be in any pose in its file. ASO finds the <strong>rotation</strong> that brings it onto a reference patient who is already oriented, using a few anatomical points that both share. It works in two modalities and, for each, in two modes.</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Called</th><th>When</th><th>How</th></tr></thead>
+          <thead><tr><th></th><th><a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a></th><th>Intraoral scan (<a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>)</th></tr></thead>
           <tbody>
-            <tr><td><code>slicer.modules.pre_aso_cbct</code></td><td><a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>, Fully-Automated mode only</td><td><code>slicer.cli.run</code></td></tr>
-            <tr><td><code>slicer.modules.ali_cbct</code></td><td>CBCT, Fully-Automated mode only</td><td><code>slicer.cli.run</code></td></tr>
-            <tr><td><code>slicer.modules.semi_aso_cbct</code></td><td>CBCT, <strong>both</strong> modes</td><td><code>slicer.cli.run</code></td></tr>
-            <tr><td><code>CrownSegmentationcli</code> (ShapeAXI / <a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a>)</td><td><a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>, Fully-Automated mode</td><td><code>conda run -n shapeaxi</code></td></tr>
-            <tr><td><code>slicer.modules.pre_aso_ios</code></td><td>IOS, Fully-Automated mode</td><td><code>slicer.cli.run</code></td></tr>
-            <tr><td><code>slicer.modules.semi_aso_ios</code></td><td>IOS, Semi-Automated mode</td><td><code>slicer.cli.run</code></td></tr>
+            <tr><td>Input</td><td>a head scan; Semi mode also needs <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> files</td><td>upper and lower tooth meshes; Semi mode also needs landmark files</td></tr>
+            <tr><td>Automatic mode</td><td>landmarks predicted by ALI_CBCT</td><td>tooth <a class="gterm" data-term="aso-leg-centroids" href="ASO.code.html#mode-auto-ios" title="See the code">centroids</a>, after a crown segmentation</td></tr>
+            <tr><td>Method</td><td colspan="2">a first alignment from three points, then a rigid <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a></td></tr>
+            <tr><td>Output</td><td colspan="2">the oriented scan or mesh, the moved landmarks, and a transform</td></tr>
           </tbody>
         </table>
       </div>
 
-      <figure class="diagram">
+      <h2 id="situation">1. Where it sits in the pipeline</h2>
+
+      <p>Nothing in the repository calls ASO. ASO, however, calls three tools, and <strong><a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> consumes its output directly</strong>: it looks for the transform file written by ASO and composes it with its own matrix to produce a single matrix from the raw scan to the registered one. In <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>, the anchor points are not predicted <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> but <strong>tooth <a class="gterm" data-term="aso-leg-centroids" href="ASO.code.html#mode-auto-ios" title="See the code">centroids</a></strong>; ALI_IOS is never called.</p>
+
+      <p><em>Legacy only.</em> In VISOR, ASO calls one tool, ALI_CBCT, and is called by four (<a href="../visor/ASO/ASO.html#visor-status">see the VISOR page</a>).</p>
+
+            <figure class="diagram">
         <svg viewBox="0 0 640 320" role="img" aria-label="Overview of ASO's calls: a CBCT branch and an IOS branch, each in automatic or semi-automatic mode, converging onto an oriented output consumed by AREG_IOS">
+          <a class="d-link" href="#situation">
           <rect class="d-box-a" x="235" y="8" width="170" height="42" rx="6"/>
           <text class="d-label" x="320" y="34" text-anchor="middle">ASO (Slicer widget)</text>
+          </a>
 
           <path class="d-arrow" d="M300 50 C260 75, 200 80, 165 100"/>
           <text class="d-label-s" x="150" y="76" text-anchor="end">CBCT path</text>
@@ -210,81 +209,34 @@
           <text class="d-label" x="320" y="286" text-anchor="middle">oriented scan / mesh</text>
           <text class="d-label-s" x="320" y="300" text-anchor="middle">+ transform (.tfm or .npy)</text>
         </svg>
-        <figcaption>ASO's two backends, in automatic or semi-automatic mode. The oriented output is then read by another module (the file name <code>_SegOr.tfm</code> is the one AREG_IOS expects, shown here as plain text).</figcaption>
+        <figcaption>ASO&rsquo;s two backends, in automatic or semi-automatic mode. The oriented output is then read by another module (AREG_IOS expects the transform file named <code>_SegOr.tfm</code>). The boxes lead to the sections below.</figcaption>
       </figure>
 
-      <p><strong><a href="../ALI/ALI.html#ali-ios">ALI_IOS</a> is never called.</strong> <code>Auto_IOS.getALIModelList()</code>
-      (<code>IOS.py:161</code>) exists and points to a weights release,
-      but <code>SearchModelALI</code> is gated by <code>if self.type == "CBCT"</code>
-      (<code>ASO.py:995</code>, <code>ASO.py:1076</code>), and <code>SwitchMode</code>
-      hides the field in both IOS modes. In IOS, the anchor points are not
-      predicted <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> but <strong>tooth centroids</strong>.</p>
 
-      <p><code>CrownSegmentationcli</code> is not in this repository: it comes from SlicerDentalModelSeg.
-      <code>slicer.modules.crownsegmentationcli</code> is evaluated in <code>Auto_IOS.Process</code>
-      (<code>IOS.py:306</code>), so the extension must be installed
-      even though the module is ultimately not launched via <code>slicer.cli.run</code> (see §5.1).</p>
+            <a class="deep-link" href="ASO.code.html#situation"><b>In the code</b><span>The tools ASO calls, how, and the file AREG_IOS expects</span></a>
+
 
       <h2 id="fichiers">2. Files involved</h2>
 
-      <div class="callout note">
-        <div class="callout-title">Note · Legacy only</div>
-        <p><strong>Part of this module now lives in the shared layer.</strong> <a href="../ADTLib/ADTLib.html">ADTLib</a> centralises what several modules carried in copies: from here, <code>io/surface.py</code>, <code>io/landmarks.py</code>, <code>theming.py</code> and the contract of <code>method.py</code>. Its page records how many copies each file replaced.</p>
-        <p>Legacy (3c67957); not present in <a href="../visor/ASO/ASO.html">VISOR</a>: the server tool has no ADTLib. Its file-name vocabulary comes from the small <code>sadt-naming</code> package (<code>SADT-VISOR tools/ASO/pyproject.toml:51</code>).</p>
-      </div>
+      <p>A widget (interface, downloads, chaining of the command-line modules, conda), two helpers that build the parameters, and four command-line modules: one to <a class="gterm" data-term="aso-leg-recentering" href="ASO.code.html#pre-aso-cbct" title="See the code">recentre</a>, one to orient a <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>, one for <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> by <a class="gterm" data-term="aso-leg-centroids" href="ASO.code.html#mode-auto-ios" title="See the code">centroids</a>, one for IOS by <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a>. All of them go through Slicer&rsquo;s own Python; only the crown segmentation goes through a conda environment. None needs a GPU: it is VTK and SimpleITK. Part of the code now lives in the shared ADTLib layer.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
-          <tbody>
-            <tr><td><code>ASO/ASO.py</code></td><td>widget, 2590 lines: UI, downloads, chaining the CLIs, conda</td><td>Slicer's Python</td></tr>
-            <tr><td><code>ASO_Method/CBCT.py</code></td><td><code>Semi_CBCT</code> / <code>Auto_CBCT</code>: <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> lists, CLI parameters</td><td>same</td></tr>
-            <tr><td><code>ASO_Method/IOS.py</code></td><td><code>Semi_IOS</code> / <code>Auto_IOS</code>: segmentation bypass, parameters</td><td>same</td></tr>
-            <tr><td><code>PRE_ASO_CBCT.py</code></td><td>recentering the volume</td><td>CLI, Slicer's Python</td></tr>
-            <tr><td><code>SEMI_ASO_CBCT.py</code></td><td>the actual <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> orientation</td><td>same</td></tr>
-            <tr><td><code>ASO_CBCT_utils/utils.py</code></td><td>1045 lines: json merging, landmark sorting, InitICP, ICP, resampling</td><td>same</td></tr>
-            <tr><td><code>PRE_ASO_IOS.py</code></td><td><a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> orientation by tooth centroids</td><td>same</td></tr>
-            <tr><td><code>SEMI_ASO_IOS.py</code></td><td>IOS orientation by supplied landmarks</td><td>same</td></tr>
-            <tr><td><code>ASO_IOS_utils/</code></td><td><code>PrePreAso</code>, <code>ICP</code>, <code>vtkMeanTeeth</code>, mesh reading/writing</td><td>same</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <a class="deep-link" href="ASO.code.html#fichiers"><b>In the code</b><span>The files and where each runs</span></a>
 
-      <p>None of these CLIs runs in the conda environment: all of them go through
-      <code>slicer.cli.run</code>, so in Slicer's Python. Only <code>dentalmodelseg</code> goes through
-      <code>conda run -n shapeaxi</code> (<code>ASO.py:1459</code>).</p>
-
-      <div class="callout ok">
-        <div class="callout-title">Verified · Also true of the ASO tool in VISOR</div>
-        <p>None of ASO's CLIs require CUDA: it's all VTK and SimpleITK.</p>
-        <p>Also true in <a href="../visor/ASO/ASO.html">VISOR</a>: the ASO environment declares no torch (<code>SADT-VISOR tools/ASO/pyproject.toml</code>). The chain is not GPU-free, though: Fully-Automated CBCT without supplied landmarks calls <code>ALI_CBCT</code>, whose <code>device</code> defaults to <code>cuda</code> (<code>tools/ALI/ALI_CBCT/src/sadt_ali_cbct/__init__.py:95</code>).</p>
-      </div>
 
       <h2 id="principe">3. The shared geometric principle</h2>
 
-      <p>The target is not an analytical frame ("<a class="gterm" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane = z=0") but <strong>a reference
-      patient case</strong>, downloaded from a release: scan + fiducials for the
-      <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>, two meshes + two jsons for the <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>. The choice of frame is thus offloaded
-      into the data: <code>Occlusal and Midsagittal Plane</code> or
-      <code>Frankfurt Horizontal and Midsagittal Plane</code>
-      (<code>CBCT.py:68</code>) are two different golds, the same code
-      producing two different orientations.</p>
+      <p>The target is not an analytical frame (&ldquo;<a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane = z = 0&rdquo;) but <strong>a <a class="gterm" data-term="aso-leg-reference" href="ASO.code.html#principe" title="See the code">reference patient case</a></strong>, downloaded from a release: a scan and fiducials for the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>, two meshes and two <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> files for the <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>. The choice of frame is thus in the data: the Occlusal-and-midsagittal and the Frankfurt-and-midsagittal references are two different golds, and the same code produces two different orientations.</p>
 
       <p>In both backends the estimation follows the same two-stage scheme:</p>
 
-      <ol>
-        <li><strong>A 3-point initialization</strong>: a translation followed by two rotations
-        around hand-built axes, never a least-squares <a class="gterm" href="../glossary.html#g-procrustes" title="See glossary">Procrustes</a>/<a class="gterm" href="../glossary.html#g-kabsch" title="See glossary">Kabsch</a>;</li>
-        <li>a <code>vtkIterativeClosestPointTransform</code> in <code>RigidBody</code> mode on the anchor point
-        clouds, to refine.</li>
+      <ol class="steps">
+        <li><strong>A 3-point initialisation:</strong> a translation followed by two rotations around hand-built axes, never a least-squares fit;</li>
+        <li><strong>a rigid <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a></strong> on the anchor point clouds, to refine.</li>
       </ol>
 
-      <p>This is the point to remember: the matrix is <strong>not</strong> an optimal solution in
-      the least-squares sense over N correspondences. It is built through successive
-      rotations on a chosen triplet, then polished by an ICP that, for its part,
-      re-pairs the points <strong>by nearest neighbor</strong> rather than by label.</p>
+      <p>This is the point to remember: the matrix is <strong>not</strong> an optimal solution in the least-squares sense over N correspondences. It is built through successive rotations on a chosen <a class="gterm" data-term="aso-leg-triplet" href="ASO.code.html#semi-aso-cbct" title="See the code">triplet</a>, then polished by an ICP that re-pairs the points <strong>by nearest neighbour</strong> rather than by label.</p>
 
-      <figure class="viewer3d" data-aso="stages">
+            <figure class="viewer3d" data-aso="stages">
         <div class="v3d-stage">
           <span class="v3d-hint">Drag to rotate &middot; pinch or scroll to zoom</span>
           <span class="v3d-status" role="status" aria-live="polite"></span>
@@ -302,8 +254,12 @@
           <i data-k="placing">ALI is walking the agents to the landmarks</i>
           <i data-k="done">four stages applied: total rotation</i>
         </span>
-        <figcaption>The four transforms of <code>MG_test_Or_transform.tfm</code>, played one at a time. The file stores them <em>composed and inverted</em>, it maps the oriented scan back to the original, so what you see is each block inverted and the list taken backwards. That sequence reproduces the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> ASO wrote out to <strong>0.000&nbsp;mm</strong>, which is how the order was settled rather than assumed. Their magnitudes are 7.37&deg;, 2.76&deg;, 1.70&deg; and a 0.165&nbsp;mm shift, for a total of <strong>6.49&deg;</strong>: they partly cancel. <strong>They are deliberately not named.</strong> Saying which one is the ICP and which are the hand-built rotations of &sect;4.4 would take instrumenting ASO itself; until that is done the magnitudes are measured and the names would be guessed.</figcaption>
+        <figcaption>The four transforms of a transform file written by a legacy run, played one at a time. The file stores them <em>composed and inverted</em>, mapping the oriented scan back to the original, so what you see is each block inverted and the list taken backwards. That sequence reproduces the landmarks ASO wrote out to <strong>0.000&nbsp;mm</strong>, which is how the order was settled rather than assumed. Their magnitudes are 7.37&deg;, 2.76&deg;, 1.70&deg; and a 0.165&nbsp;mm shift, for a total of <strong>6.49&deg;</strong>: they partly cancel. <strong>They are deliberately not named.</strong> Saying which one is the ICP and which are the hand-built rotations of section 4.4 would take instrumenting ASO itself; until that is done the magnitudes are measured and the names would be guessed.</figcaption>
       </figure>
+
+
+            <a class="deep-link" href="ASO.code.html#principe"><b>In the code</b><span>The two-stage scheme and the viewer data</span></a>
+
 
       <h2 id="aso-cbct">4. ASO_CBCT</h2>
 
@@ -313,36 +269,41 @@
         <table>
           <thead><tr><th></th><th>Semi-Automated</th><th>Fully-Automated</th></tr></thead>
           <tbody>
-            <tr><td>Input</td><td>scans <strong>+</strong> fiducials <code>.mrk.json</code></td><td>scans alone (or DICOM)</td></tr>
-            <tr><td>Steps</td><td><code>SEMI_ASO_CBCT</code></td><td><code>PRE_ASO_CBCT</code> → <code>ALI_CBCT</code> → <code>SEMI_ASO_CBCT</code></td></tr>
-            <tr><td>Working folder</td><td><strong>the user's folder</strong></td><td>two <code>slicer.util.tempDirectory()</code></td></tr>
+            <tr><td>Input</td><td>scans <strong>+</strong> fiducials</td><td>scans alone (or DICOM)</td></tr>
+            <tr><td>Steps</td><td>the orientation alone</td><td><a class="gterm" data-term="aso-leg-recentering" href="ASO.code.html#pre-aso-cbct" title="See the code">recentering</a>, then <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> prediction, then the orientation</td></tr>
+            <tr><td>Working folder</td><td><strong>the user&rsquo;s folder</strong></td><td>two temporary folders</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>The automatic mode is therefore just the semi mode preceded by generating the
-      missing <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> (<code>CBCT.py:490</code>).</p>
+      <p>The automatic mode is therefore just the semi mode preceded by generating the missing landmarks.</p>
 
-      <figure class="diagram">
+            <figure class="diagram">
         <svg viewBox="0 0 760 210" role="img" aria-label="Comparison of ASO_CBCT's two modes: Fully-Automated chains recentering, network landmark prediction, then orientation; Semi-Automated jumps directly to orientation on supplied fiducials">
           <text class="d-label-s" x="10" y="18">Fully-Automated</text>
+          <a class="d-link" href="#pre-aso-cbct">
           <rect class="d-box" x="10" y="24" width="150" height="48" rx="6"/>
           <text class="d-label" x="85" y="45" text-anchor="middle">PRE_ASO_CBCT</text>
           <text class="d-label-s" x="85" y="60" text-anchor="middle">recentering (translation)</text>
+          </a>
 
           <path class="d-arrow" d="M160 48 H190"/>
           <path class="d-arrow-head" d="M190 48 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#ali-cbct">
           <rect class="d-box-n" x="195" y="24" width="150" height="48" rx="6"/>
           <text class="d-label" x="270" y="45" text-anchor="middle">ALI_CBCT</text>
           <text class="d-label-s" x="270" y="60" text-anchor="middle">landmarks, network</text>
+          </a>
 
           <path class="d-arrow" d="M345 48 H375"/>
           <path class="d-arrow-head" d="M375 48 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#semi-aso-cbct">
           <rect class="d-box-a" x="380" y="24" width="180" height="48" rx="6"/>
           <text class="d-label" x="470" y="45" text-anchor="middle">SEMI_ASO_CBCT</text>
           <text class="d-label-s" x="470" y="60" text-anchor="middle">triplet + rotations + ICP</text>
+          </a>
 
           <path class="d-arrow" d="M560 48 H590"/>
           <path class="d-arrow-head" d="M590 48 l-7 -4 v8 z"/>
@@ -358,9 +319,11 @@
           <path class="d-arrow" d="M130 150 H375"/>
           <path class="d-arrow-head" d="M375 150 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#semi-aso-cbct">
           <rect class="d-box-a" x="380" y="126" width="180" height="48" rx="6"/>
           <text class="d-label" x="470" y="147" text-anchor="middle">SEMI_ASO_CBCT</text>
           <text class="d-label-s" x="470" y="162" text-anchor="middle">triplet + rotations + ICP</text>
+          </a>
 
           <path class="d-arrow" d="M560 150 H590"/>
           <path class="d-arrow-head" d="M590 150 l-7 -4 v8 z"/>
@@ -369,168 +332,84 @@
           <text class="d-label" x="672" y="147" text-anchor="middle">output</text>
           <text class="d-mono" x="672" y="162" text-anchor="middle">.nii.gz + .tfm</text>
         </svg>
-        <figcaption>ASO_CBCT: the Fully-Automated mode only adds the recentering and landmark prediction by ALI_CBCT (<span class="badge predit">network</span>) ahead of an identical orientation (<span class="badge calcule">geometric</span>).</figcaption>
+        <figcaption>ASO_CBCT: the Fully-Automated mode only adds the recentering and the landmark prediction by ALI_CBCT (<span class="badge predit">network</span>) ahead of an identical orientation (<span class="badge calcule">geometric</span>). The boxes lead to their sections.</figcaption>
       </figure>
+
+
+            <a class="deep-link" href="ASO.code.html#modes-cbct"><b>In the code</b><span>The two modes with the commands</span></a>
+
 
       <h3 id="pre-aso-cbct">4.2 PRE_ASO_CBCT: recentering, no more network <span class="badge calcule">computed</span></h3>
 
-      <p>Despite its name and its six arguments, this CLI now does only one thing
-      (<code>PRE_ASO_CBCT.py:92</code>):</p>
+      <p>Despite its name and its six arguments, this module now does only one thing: recentre the volume. The pre-orientation network it was named for is disconnected; its training code and weights remain, downloaded and validated for nothing.</p>
 
-      <pre><code>T = -np.array(img.TransformContinuousIndexToPhysicalPoint(np.array(img.GetSize()) / 2.0))
-translation = sitk.TranslationTransform(3); translation.SetOffset(T.tolist())
-img_trans = ResampleImage(img, translation.GetInverse())</code></pre>
+            <figure class="algo" data-scene="aso_recenter" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a volume off the centre of the coordinate system is moved so that its centre lands on the origin; only its origin changes, not its voxels"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The volume is moved so that <strong>its centre sits on the origin of the coordinate system</strong>. Only the stored origin changes: the size, the <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> size and the voxels do not. This is what lets every later rotation be applied about the origin.</p><div class="formula"><math display="block"><mrow><mi class="k1">c</mi><mo>=</mo><mi class="k4">X</mi><mrow><mo stretchy="true" fence="true">(</mo><mfrac><mi class="k3">N</mi><mn>2</mn></mfrac><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><msup><mi class="k2">o</mi><mo>&#x2032;</mo></msup><mo>=</mo><mi class="k2">o</mi><mo>&#x2212;</mo><mi class="k1">c</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>c</b>the centre of the volume, in millimetres</li><li class="k4"><b>X</b>the conversion from a voxel position to millimetres</li><li class="k3"><b>N</b>the size of the volume, in voxels</li><li class="k2"><b>o, o&prime;</b>the stored origin (the grid corner) before and after</li></ul></div>
+      </figure>
 
-      <p><code>ResampleImage</code> keeps the size (<code>ratio = 1</code>), the spacing and the direction, and
-      sets <code>new_origin = orig_origin - orig_center</code>. Since the applied transform exactly
-      cancels this offset, <strong>no real interpolation takes place</strong>: only the physical
-      origin moves, and the volume ends up centered on the world origin. This is the
-      prerequisite for §4.4, where the rotation is applied around the origin.</p>
 
-      <p>The arguments <code>model_folder</code>, <code>SmallFOV</code> and <code>temp_folder</code> are parsed and never
-      used. <code>PreASOResample</code>
-      (<code>ResamplePreASO.py:196</code>, an isotropic
-      128³ resampling) is imported but never called, and <code>DenseNet</code>
-      (<code>Net.py:30</code>, a 3D monai <code>DenseNet169</code>
-      regressing a unit direction vector via cosine loss) is commented out in
-      <code>__init__.py</code>. <strong>There is no longer any
-      pre-orientation network in ASO_CBCT at all</strong>: its training code remains, the
-      <code>PreASOModels.zip</code> weights are still downloaded and validated
-      (<code>CBCT.py:126</code>, <code>TestModel</code> requires a <code>.ckpt</code>), for
-      nothing.</p>
+      <p>No real interpolation takes place, only the physical origin moves. This is the prerequisite for the orientation, where the rotation is applied about the origin. The module also writes a transform holding the translation, not inverted, even though its inverse is what was applied to the volume.</p>
 
-      <p>Output: the recentered volume under its original name, and
-      <code>&lt;name without extension&gt;.tfm</code> containing the translation <code>T</code>, <strong>not inverted</strong>,
-      even though it is <code>translation.GetInverse()</code> that was applied to the volume.</p>
+            <a class="deep-link" href="ASO.code.html#pre-aso-cbct"><b>In the code</b><span>The recentering code, the dead arguments, the broken DICOM fallback</span></a>
 
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug · Legacy only</div>
-        <p><code>convertdicom2nifti</code> (<code>utils.py:507</code>) tries
-        <code>sitk.ImageSeriesReader</code> then falls back to <code>dicom2nifti</code>. This fallback is broken:
-        it calls <code>search(output_folder, "nii.gz")</code>, but <code>search</code>
-        (<code>utils.py:189</code>) is declared as
-        <code>def search(self, path, *args)</code>, the first argument is absorbed by <code>self</code>,
-        <code>args</code> is empty, the returned dict is empty, and the <code>["nii.gz"]</code> access raises a
-        <code>KeyError</code>.</p>
-        <p>Legacy (3c67957): still true, at other lines: the call is <code>ASO_CBCT/ASO_CBCT_utils/utils.py:464</code>, the wrapper <code>def search(self, path, *args)</code> is <code>:194-196</code> and forwards to <code>ADTLib.io.fs.search</code>, which returns one key per extension given (<code>ADT/ADTLib/io/fs.py:26-47</code>), so with the arguments shifted it returns an empty dictionary. Not present in <a href="../visor/ASO/ASO.html">VISOR</a>: the fallback was rewritten (<code>SADT-VISOR ASO/cbct/dicom.py:127-151</code>).</p>
-      </div>
 
       <h3 id="ali-cbct">4.3 <a href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a>: the landmark provider <span class="badge predit">predicted</span></h3>
 
-      <p>Called on the temporary folder, both for input and output, with hard-coded
-      constants (<code>CBCT.py:515</code>): <code>spacing="[1,0.3]"</code>,
-      <code>speed_per_scale="[1,1]"</code>, <code>agent_FOV="[64,64,64]"</code>, <code>spawn_radius="10"</code>, and
-      <code>lm_type</code> reformatted into a literal Python list by <code>format_lm_string</code>
-      (<code>CBCT.py:482</code>). ALI_CBCT is a two-scale <strong>search
-      agent</strong> system (1 mm then 0.3 mm, a <a class="gterm" href="../glossary.html#g-fov" title="See glossary">FOV</a> 64³ <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxels</a> around
-      the agent); it writes <strong>one json per anatomical group</strong>,
-      <code>&lt;id&gt;_lm_Pred_&lt;group&gt;.mrk.json</code>
-      (<code>environment.py:138</code>), in <strong><a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a></strong>.
-      The weights are <code>&lt;Landmark&gt;_Net*.pth</code> files downloaded one per landmark from
-      <code>ALI_CBCT/releases/download/models_v01/&lt;LM&gt;.zip</code>.</p>
+      <p>Called on the temporary folder, with hard-coded constants (two scales, 1 mm then 0.3 mm, a field of view of 64&sup3; voxels around the agent). ALI_CBCT is a two-scale <strong>search agent</strong> system; it writes one landmark file per anatomical group, in <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>. The weights are downloaded one per landmark. The first thing the orientation module does is glue the per-group files back into one per patient, and delete the sources.</p>
 
-      <p>This is the whole point of <code>MergeJson</code>
-      (<code>utils.py:65</code>), the first call made by
-      SEMI_ASO_CBCT: gluing the per-group jsons back into a single <code>&lt;patient&gt;_lm_MERGED.mrk.json</code>
-, <strong>and deleting the source files</strong> (<code>os.remove</code>).</p>
+            <a class="deep-link" href="ASO.code.html#ali-cbct"><b>In the code</b><span>The constants passed to ALI_CBCT and the merge</span></a>
+
 
       <h3 id="semi-aso-cbct">4.4 SEMI_ASO_CBCT: the orientation <span class="badge calcule">computed</span></h3>
 
-      <p><strong>a) Pruning outlier landmarks.</strong> <code>GetLandmarkToRemove</code>
-      (<code>utils.py:341</code>) compares the <strong>full
-      distance matrix</strong> and the <strong>direction matrix</strong> between all the
-      landmarks of the scan and those of the gold. Actual constants: distance gap
-      &gt; 15 mm, angular gap &gt; 0.4 rad (and <code>-1</code> if &lt; 0.1 rad, meaning a
-      very consistent pair offsets a doubtful one). A landmark is dropped if its total
-      count exceeds the number of landmarks, or if its angular count alone
-      exceeds half of it. The analysis covers <strong>all</strong> landmarks in the json, not
-      only the checked ones.</p>
+      <p><strong>a) Pruning outlier landmarks.</strong> The full distance matrix and direction matrix between all landmarks of the scan and those of the gold are compared. A landmark is dropped if it disagrees by more than 15&nbsp;mm or 0.4 rad too often; a very consistent pair (under 0.1 rad) offsets a doubtful one. The analysis covers <strong>all</strong> landmarks in the file, not only the checked ones.</p>
 
-      <p><strong>b) The optimal triplet.</strong> <code>FindOptimalLandmarks</code>
-      (<code>utils.py:161</code>) randomly draws
-      triplets <code>(A, B, C)</code>, runs the initialization for each, and keeps the one that
-      minimizes the final average distance. Bounds: <code>n(n-1)(n-2)</code> distinct triplets or
-      <strong>2500 draws</strong>, whichever comes first.</p>
+      <p><strong>b) The optimal <a class="gterm" data-term="aso-leg-triplet" href="ASO.code.html#semi-aso-cbct" title="See the code">triplet</a>.</strong> Triplets <em>(A, B, C)</em> are drawn at random, the initialisation is run for each, and the one that minimises the final mean distance is kept. The bound is the number of distinct triplets or <strong>2500 draws</strong>, whichever comes first.</p>
 
-      <p><strong>c) The initialization</strong>, <code>InitICP</code>
-      (<code>utils.py:652</code>):</p>
+            <figure class="algo" data-scene="aso_triplet" data-ms="7200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: several triplets of landmarks are tried one after the other, each leaves a different mean distance to the reference, and the smallest is kept"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Three landmarks <em>(A, B, C)</em> are enough to build the coarse alignment, but which three? Every ordered triplet is tried, the alignment each one gives is measured, and the triplet that leaves the <strong>smallest mean distance</strong> to the reference is kept. With 7 landmarks there are 210 triplets; above 2500 a seeded sample is used instead, so the same request always gives the same answer.</p><div class="formula"><math display="block"><mrow><mi class="k3">N</mi><mo>=</mo><mi class="k3">n</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">n</mi><mo>&#x2212;</mo><mn>1</mn><mo stretchy="true" fence="true">)</mo></mrow><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">n</mi><mo>&#x2212;</mo><mn>2</mn><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mrow><mo stretchy="true" fence="true">(</mo><mi class="k4">A</mi><mo>,</mo><mi class="k4">B</mi><mo>,</mo><mi class="k4">C</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>*</mo><mo>=</mo><munder><mo>argmin</mo><mrow><mo>(</mo><mi>A</mi><mo>,</mo><mi>B</mi><mo>,</mo><mi>C</mi><mo>)</mo></mrow></munder><msup><mi class="k4">d</mi><mo>&#x203E;</mo></msup><mrow><mo stretchy="true" fence="true">(</mo><mi>A</mi><mo>,</mo><mi>B</mi><mo>,</mo><mi>C</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k3"><b>n, N</b>the number of landmarks, and of ordered triplets</li><li class="k4"><b>d&#x0304;</b>the mean distance to the reference after the coarse alignment from that triplet (the bars; the values drawn are illustrative)</li><li class="k2"><b>scan</b>the landmarks of the scan</li><li class="k1"><b>reference</b>the same landmarks on the reference</li></ul></div>
+      </figure>
 
-      <ol>
-        <li>translation bringing <code>A_source</code> onto <code>A_target</code>;</li>
-        <li>rotation about the axis <code>cross(v2, v1)</code> by the angle <code>arccos</code> of the dot
-        product, where <code>v1 = abs(B - A)</code> on the source side and
-        <code>v2 = abs(B - A)</code> on the target side: <strong>component-wise absolute
-        values</strong>, which folds both vectors into the positive octant and is not the
-        angle between the actual vectors;</li>
-        <li>a third rotation whose <strong>axis is <code>abs(B - A)</code> itself</strong>, not a cross
-        product: it is a roll around the axis just aligned, with its
-        angle computed from <code>C</code>.</li>
-      </ol>
 
-      <p><code>RotationMatrix</code> (<code>utils.py:936</code>) is the
-      quaternion-based Rodrigues formula, identical to the one in <a href="../FlexReg/FlexReg.html">FlexReg</a> and ASO_IOS.
-      A crucial point: <code>TransformMatrix = RotationTransformMatrix  # @ TranslationTransformMatrix</code>
-, the translation from step 1 is <strong>deliberately excluded</strong> from the returned
-      matrix. It is used to compute the rotations, not to move the volume.</p>
+      <p><strong>c) The initialisation</strong> is three steps: a translation of <em>A</em> onto its counterpart, a rotation about the cross product of the two folded vectors, and a roll about the axis just aligned. Its maths are in <a href="#cbct-maths">section 4.5</a>. The translation is <strong>deliberately excluded</strong> from the returned matrix: it is used to compute the rotations, not to move the volume.</p>
 
-      <p><strong>d) The ICP.</strong> <code>ICP_Transform</code> (<code>utils.py:620</code>)
-      converts the two dictionaries into vertex <code>vtkPolyData</code> and runs a
-      <code>vtkIterativeClosestPointTransform</code>: <code>SetModeToRigidBody()</code>,
-      <code>SetMaximumNumberOfIterations(1000)</code>, <code>StartByMatchingCentroidsOn()</code>. Its
-      translation is then zeroed out: <code>TransformMatrixBis[:3, 3] = [0, 0, 0]</code>.</p>
+      <p><strong>d) The <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a>.</strong> A rigid ICP, 1000 iterations, starting by matching <a class="gterm" data-term="aso-leg-centroids" href="ASO.code.html#mode-auto-ios" title="See the code">centroids</a>; its translation is then zeroed out.</p>
 
-      <p><strong>e) Composition.</strong> <code>TransformList</code> accumulates <code>[translation, R2, R3, R_icp]</code>, then
-      (<code>utils.py:816</code>):</p>
+            <figure class="algo" data-scene="aso_icp" data-ms="7600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: each point of the scan is paired with its nearest point of the reference, the scan is moved to fit those pairs, and the error shrinks over six iterations"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The ICP refines the alignment. At each step every point of the scan is paired with its <strong>nearest</strong> point of the reference, whatever its label, then the scan is moved rigidly to fit those pairs. The pairing is redone, and the error shrinks. Because it pairs by distance, a crossed pairing can be locked in when two landmarks are close, such as a left-right pair.</p><div class="formula"><math display="block"><mrow><mi class="k4">c</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k4">i</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><munder><mo>argmin</mo><mi>j</mi></munder><mrow><mo>&#x2225;</mo><mrow><mi>R</mi><msub><mi class="k2">p</mi><mi class="k4">i</mi></msub><mo>+</mo><mi>t</mi><mo>&#x2212;</mo><msub><mi class="k1">q</mi><mi>j</mi></msub></mrow><mo>&#x2225;</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mrow><mo stretchy="true" fence="true">(</mo><mi>R</mi><mo>,</mo><mi>t</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><munder><mo>argmin</mo><mrow><mi>R</mi><mo>,</mo><mi>t</mi></mrow></munder><munder><mo>&#x2211;</mo><mi>i</mi></munder><msup><mrow><mo>&#x2225;</mo><mrow><mi>R</mi><msub><mi class="k2">p</mi><mi>i</mi></msub><mo>+</mo><mi>t</mi><mo>&#x2212;</mo><msub><mi class="k1">q</mi><mrow><mi class="k4">c</mi><mrow><mo stretchy="true" fence="true">(</mo><mi>i</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></msub></mrow><mo>&#x2225;</mo></mrow><mn>2</mn></msup></mrow></math></div><ul class="algo-legend"><li class="k2"><b>p<sub>i</sub></b>the points of the scan</li><li class="k1"><b>q<sub>j</sub></b>the points of the reference</li><li class="k4"><b>c(i)</b>the reference point nearest to p<sub>i</sub>: the dashed lines</li><li class=""><b>R, t</b>a rigid motion; in <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> the translation is set to zero afterwards, and the bar at right is the mean error</li></ul></div>
+      </figure>
 
-      <pre><code>for i in range(len(TransformList) - 1, 0, -1):   # stops at 1: the translation is discarded
-    TransformSITK.AddTransform(TransformList[i])
-TransformSITKFinal = sitk.CompositeTransform(TransformSITK)
-TransformSITKFinal.AddTransform(input_transform)   # the PRE_ASO .tfm
-TransformSITKFinal = TransformSITKFinal.GetInverse()
-TransformSITK = TransformSITK.GetInverse()</code></pre>
 
-      <p><strong>The final result is therefore a pure rotation around the world origin.</strong>
-      This is consistent because PRE_ASO_CBCT centered the volume on that origin, and
-      this is precisely what the semi mode lacks.</p>
+      <p><strong>e) Composition.</strong> The rotations are composed, the recentering transform is added, and the whole is inverted. <strong>The final result is a pure rotation about the world origin.</strong> This is consistent because the first module centred the volume on that origin, and this is precisely what the semi mode lacks.</p>
 
-      <p><code>ResampleImage</code> (<code>utils.py:848</code>) calls
-      <code>SetReferenceImage(image)</code>: <strong>same grid, same size, same spacing</strong>,
-      linear interpolation, <code>DefaultPixelValue = 0</code>. The volume rotates within its
-      existing box, nothing is resampled to a different resolution, and whatever falls
-      outside the FOV is lost.</p>
+            <figure class="algo" data-scene="aso_resample" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the volume turns inside its own box; the corners that leave the box are lost"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The oriented volume is resampled on <strong>its own grid</strong>: same size, same voxel size, linear interpolation. So the volume turns inside its box, and whatever leaves the box is lost (the dashed outline). Outside the original volume the value is 0.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">I</mi><mtext>out</mtext></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><msub><mi class="k2">I</mi><mtext>in</mtext></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k4">T</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k2"><b>I<sub>in</sub></b>the recentred volume</li><li class="k1"><b>I<sub>out</sub>, box</b>the oriented volume, on the same grid (the box)</li><li class="k4"><b>T</b>the inverse of the rotations</li><li class="k3"><b>x</b>a voxel of the output</li></ul></div>
+      </figure>
 
-      <p><strong>f) Outputs</strong>, in <code>output_folder</code> with the same relative tree structure as
-      the input:</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Content</th></tr></thead>
-          <tbody>
-            <tr><td><code>&lt;patient&gt;_&lt;suffix&gt;.nii.gz</code></td><td>reoriented volume, <strong>always <code>.nii.gz</code></strong> regardless of the input format</td></tr>
-            <tr><td><code>&lt;patient&gt;_lm_&lt;suffix&gt;.mrk.json</code></td><td>rotated landmarks, written by <code>WriteJson</code> in <strong>LPS</strong></td></tr>
-            <tr><td><code>&lt;patient&gt;_&lt;suffix&gt;_transform.tfm</code></td><td><code>TransformSITKFinal</code>, ITK convention (fixed → moving)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <p><strong>f) Outputs.</strong> In the output folder, with the input&rsquo;s folder tree: the reoriented volume (<strong>always <code>.nii.gz</code></strong> regardless of the input format), the rotated landmarks (in LPS), and the transform. All three writes are skipped if the file already exists: rerunning on a non-empty output folder rewrites nothing and still ends in success.</p>
 
-      <p>All three writes are guarded by <code>if not os.path.exists(...)</code>: <strong>rerunning on
-      a non-empty output folder rewrites nothing</strong> and still ends in success.</p>
+            <a class="deep-link" href="ASO.code.html#semi-aso-cbct"><b>In the code</b><span>Each sub-step with its lines, the composition code and the outputs</span></a>
 
 
       <h3 id="arbre-cbct">The ASO_CBCT chain, step by step</h3>
 
-      <div class="pipe">
-        <p class="pipe-seed"><code>T1</code>: a <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> in any pose</p>
+            <div class="pipe">
+        <p class="pipe-seed">T1: a CBCT in any pose</p>
 
         <section class="pipe-phase" data-kind="prep">
           <h4>Automatic mode</h4>
           <ol>
             <li><span class="pipe-act"><a class="pipe-mod" href="#pre-aso-cbct">PRE_ASO_CBCT</a> recentres the scan <span class="badge calcule">computed</span>: there is no network here any more</span>
-                <span class="pipe-out">a translation, written as <code>.tfm</code></span></li>
+                <span class="pipe-out">a translation, written as .tfm</span></li>
             <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> predicts the orientation landmarks <span class="badge predit">predicted</span></span>
-                <span class="pipe-out"><code>.mrk.json</code>, LPS</span></li>
-            <li><span class="pipe-act"><a class="pipe-mod" href="#semi-aso-cbct">SEMI_ASO_CBCT</a> fits those landmarks onto a gold standard&rsquo;s: 3-landmark initialisation, then a rigid <code>vtkIterativeClosestPointTransform</code>, 1000 iterations <span class="badge calcule">computed</span></span>
-                <span class="pipe-out"><code>&lt;pat&gt;_&lt;suffix&gt;_transform.tfm</code></span></li>
+                <span class="pipe-out">.mrk.json, LPS</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="#semi-aso-cbct">SEMI_ASO_CBCT</a> fits those landmarks onto a gold standard&rsquo;s: 3-landmark initialisation, then a rigid vtkIterativeClosestPointTransform, 1000 iterations <span class="badge calcule">computed</span></span>
+                <span class="pipe-out">&lt;pat&gt;_&lt;suffix&gt;_transform.tfm</span></li>
           </ol>
         </section>
 
@@ -538,7 +417,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
           <h4>Semi-automatic mode</h4>
           <ol>
             <li><span class="pipe-act">the operator supplies the landmarks: steps 1 and 2 are skipped, step 3 is unchanged</span>
-                <span class="pipe-out">same <code>.tfm</code></span></li>
+                <span class="pipe-out">same .tfm</span></li>
           </ol>
         </section>
 
@@ -549,200 +428,78 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
         upstream. The matrices are written out in <a href="#cbct-maths">§4.5</a>.</p>
       </div>
 
+
+            <a class="deep-link" href="ASO.code.html#arbre-cbct"><b>In the code</b><span>The chain as a step list</span></a>
+
+
       <h3 id="cbct-maths">4.5 The orientation, written out</h3>
 
-      <p>Everything above is prose about code. Here is the same thing as arithmetic,
-      because two of ASO's choices only become visible once they are written down.
-      Notation: <math><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math>
-      is landmark <math><mi>A</mi></math> on the scan being oriented,
-      <math><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math>
-      the same landmark on the gold.</p>
+      <p>Everything above is prose about code. Here is the same thing as arithmetic, because two of ASO&rsquo;s choices only become visible once they are written down. Notation: <math><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math> is landmark A on the scan being oriented, <math><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math> the same landmark on the gold.</p>
 
-<figure class="formula"><figcaption>1. Translation onto the first landmark: computed, then thrown away</figcaption><math display="block"><mrow><mover><mi>t</mi><mo>&#x2192;</mo></mover><mo>=</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math></figure>
+      <p><strong>1. Translation onto the first landmark:</strong> computed, then thrown away. The volume is never translated: the first module already centred it on the origin.</p>
 
-      <p>The translation moves the source so the rotations can be computed on
-      superimposed points. It is then dropped: <code>TransformMatrix =
-      RotationTransformMatrix</code>, with the translation commented out of the
-      product. The volume is never translated: <code>PRE_ASO_CBCT</code>
-      already centred it on the origin.</p>
+      <div class="formula"><math display="block"><mrow><mover><mi>t</mi><mo>&#x2192;</mo></mover><mo>=</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow></math></div>
 
-<figure class="formula"><figcaption>2. First rotation: the vectors are folded into the positive octant first</figcaption><math display="block"><mrow><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>=</mo><mrow><mo>|</mo><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>B</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>=</mo><mrow><mo>|</mo><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>B</mi></msub><mo>&#x2212;</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow></mrow></math></figure>
+      <p><strong>2. First rotation.</strong> Read the bars carefully: they are a component-wise absolute value, not a norm. Both vectors are folded into the positive octant before the angle is taken, so what follows is the angle between the folded vectors, which is <em>not</em> the angle between the actual vectors. In the code the two vectors are first divided by their largest component, a positive scaling that cancels.</p>
 
-      <p><strong>Read those bars carefully.</strong> They are a component-wise
-      absolute value, not a norm. Both vectors are folded into the positive octant
-      before the angle is taken, so what follows is the angle between
-      <math><mrow><mo>|</mo><mover><mi>u</mi><mo>&#x2192;</mo></mover><mo>|</mo></mrow></math>
-      and <math><mrow><mo>|</mo><mover><mi>v</mi><mo>&#x2192;</mo></mover><mo>|</mo></mrow></math>,
-      which is <em>not</em> the angle between
-      <math><mover><mi>u</mi><mo>&#x2192;</mo></mover></math> and
-      <math><mover><mi>v</mi><mo>&#x2192;</mo></mover></math>. A landmark pair
-      pointing one way and its gold counterpart pointing the opposite way give the
-      same vector here.</p>
+            <figure class="algo" data-scene="aso_fold" data-ms="6800">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a vector pointing the other way is folded into the positive quadrant by taking absolute values, then turned onto its reference counterpart"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The first rotation turns the scan&rsquo;s first-to-second vector onto the reference&rsquo;s. Before the angle is taken, both vectors are <strong>folded into the positive quadrant</strong> (octant, in 3D) by taking the absolute value of each component. Folding is not a norm, and it changes the angle: a pair pointing one way and its reference counterpart pointing the opposite way give the same vector.</p><div class="formula"><math display="block"><mrow><msub><mover><mi class="k2">v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>=</mo><mrow><mo>|</mo><mrow><msub><mover><mi class="k2">p</mi><mo>&#x2192;</mo></mover><mi>B</mi></msub><mo>&#x2212;</mo><msub><mover><mi class="k2">p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mover><mi class="k1">v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>=</mo><mrow><mo>|</mo><mrow><msub><mover><mi class="k1">q</mi><mo>&#x2192;</mo></mover><mi>B</mi></msub><mo>&#x2212;</mo><msub><mover><mi class="k1">q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mi class="k4">&#x3b8;</mi><mn>1</mn></msub><mo>=</mo><mi>arccos</mi><mrow><mo stretchy="true" fence="true">(</mo><mfrac><mrow><msub><mover><mi class="k1">v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#x22c5;</mo><msub><mover><mi class="k2">v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow><mrow><mrow><mo>&#x2225;</mo><msub><mover><mi class="k1">v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#x2225;</mo></mrow><mrow><mo>&#x2225;</mo><msub><mover><mi class="k2">v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>&#x2225;</mo></mrow></mrow></mfrac><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mover><mi>a</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>=</mo><msub><mover><mi class="k1">v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#xd7;</mo><msub><mover><mi class="k2">v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math></div><ul class="algo-legend"><li class="k2"><b>p<sub>A</sub>, p<sub>B</sub>, v<sub>1</sub></b>landmarks of the scan, and their folded vector</li><li class="k1"><b>q<sub>A</sub>, q<sub>B</sub>, v<sub>2</sub></b>the same landmarks on the reference, and their folded vector</li><li class="k4"><b>&theta;<sub>1</sub></b>the angle the first rotation turns through; the dashed arc is the true angle, before folding</li><li class=""><b>a<sub>1</sub></b>the axis, perpendicular to both vectors</li></ul></div>
+      </figure>
 
-<div class="formula"><math display="block"><mrow><msub><mi>&#x3b8;</mi><mn>1</mn></msub><mo>=</mo><mi>arccos</mi><mrow><mo stretchy="true" fence="true">(</mo><mfrac><mrow><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#x22c5;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow><mrow><mrow><mo>&#x2225;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#x2225;</mo></mrow><mrow><mo>&#x2225;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>&#x2225;</mo></mrow></mrow></mfrac><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><msub><mover><mi>a</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub><mo>=</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>&#xd7;</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math></div>
 
-      <p>In the code the two vectors are first divided by their largest component
-      (<code>v1_u = v1 / np.amax(v1)</code>). That is a positive scaling, so it
-      cancels in both the quotient and the cross product: it changes nothing.</p>
+      <p><strong>3. Second rotation.</strong> Its axis is not a cross product but the vector the previous step just aligned: a roll about that axis, with an angle from a <em>third</em> landmark.</p>
 
-<figure class="formula"><figcaption>3. Second rotation: a roll about the axis just aligned, with an angle taken from a third landmark</figcaption><math display="block"><mrow><msub><mi>&#x3b8;</mi><mn>2</mn></msub><mo>=</mo><mi>&#x2220;</mi><mrow><mo stretchy="true" fence="true">(</mo><mrow><mo>|</mo><mrow><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>C</mi></msub><mo>&#x2212;</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo>,</mo><mrow><mo>|</mo><mrow><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>C</mi></msub><mo>&#x2212;</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><msub><mover><mi>a</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>=</mo><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math></figure>
+            <figure class="algo" data-scene="aso_roll" data-ms="5600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: seen along the axis just aligned, the third landmark is rolled around that axis until it faces its reference counterpart"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">After the first rotation, one degree of freedom is left: a <strong>roll about the axis just aligned</strong>. It is seen here end on, the axis pointing at the viewer. A third landmark gives the angle. Rolling about an axis that is already aligned cannot undo that alignment, which is why the order matters.</p><div class="formula"><math display="block"><mrow><msub><mi class="k4">&#x3b8;</mi><mn>2</mn></msub><mo>=</mo><mo>&#x2220;</mo><mrow><mo stretchy="true" fence="true">(</mo><mrow><mo>|</mo><mrow><msub><mover><mi class="k1">q</mi><mo>&#x2192;</mo></mover><mi>C</mi></msub><mo>&#x2212;</mo><msub><mover><mi class="k1">q</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo>,</mo><mrow><mo>|</mo><mrow><msub><mover><mi class="k2">p</mi><mo>&#x2192;</mo></mover><mi>C</mi></msub><mo>&#x2212;</mo><msub><mover><mi class="k2">p</mi><mo>&#x2192;</mo></mover><mi>A</mi></msub></mrow><mo>|</mo></mrow><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><msub><mover><mi>a</mi><mo>&#x2192;</mo></mover><mn>2</mn></msub><mo>=</mo><msub><mover><mi class="k2">v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math></div><ul class="algo-legend"><li class="k2"><b>p<sub>C</sub></b>the third landmark of the scan</li><li class="k1"><b>q<sub>C</sub></b>the third landmark of the reference</li><li class="k4"><b>&theta;<sub>2</sub></b>the roll angle</li><li class=""><b>a<sub>2</sub></b>the axis of the roll: the first rotation&rsquo;s own vector, folded</li></ul></div>
+      </figure>
 
-      <p>The second rotation is the other surprise. Its axis is not a cross product
-      but <math><mrow><msub><mover><mi>v</mi><mo>&#x2192;</mo></mover><mn>1</mn></msub></mrow></math>
-      itself: the axis the previous step just aligned. It is a roll around
-      that axis, and its angle comes from a <em>third</em> landmark. Rolling about
-      an already-aligned axis cannot undo that alignment, which is why the order
-      matters.</p>
 
-<figure class="formula"><figcaption>4. The rotation matrix: quaternion form of Rodrigues</figcaption><math display="block"><mrow><mi>&#x3b1;</mi><mo>=</mo><mi>cos</mi><mfrac><mi>&#x3b8;</mi><mn>2</mn></mfrac><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mo>,</mo><mi>&#x3b3;</mi><mo>,</mo><mi>&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mo>&#x2212;</mo><mover><mover><mi>a</mi><mo>&#x2192;</mo></mover><mo>&#x302;</mo></mover><mi>sin</mi><mfrac><mi>&#x3b8;</mi><mn>2</mn></mfrac></mrow></math></figure>
-<div class="formula"><math display="block"><mrow><mi>R</mi><mo>=</mo><mrow><mo stretchy="true" fence="true">[</mo><mtable><mtr><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b3;</mi><mo>+</mo><mi>&#x3b1;</mi><mi>&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b4;</mi><mo>&#x2212;</mo><mi>&#x3b1;</mi><mi>&#x3b3;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd></mtr><mtr><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b3;</mi><mo>&#x2212;</mo><mi>&#x3b1;</mi><mi>&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b3;</mi><mi>&#x3b4;</mi><mo>+</mo><mi>&#x3b1;</mi><mi>&#x3b2;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd></mtr><mtr><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;</mi><mi>&#x3b4;</mi><mo>+</mo><mi>&#x3b1;</mi><mi>&#x3b3;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b3;</mi><mi>&#x3b4;</mi><mo>&#x2212;</mo><mi>&#x3b1;</mi><mi>&#x3b2;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup></mrow></mtd></mtr></mtable><mo stretchy="true" fence="true">]</mo></mrow></mrow></math></div>
+      <p><strong>4. The rotation matrix</strong> is the quaternion-based <a class="gterm" data-term="aso-leg-rodrigues" href="ASO.code.html#cbct-maths" title="See the code">Rodrigues</a> formula, identical to the one in FlexReg and ASO_IOS. Two sign flips cancel: the vector part carries a minus, and the matrix is written transposed relative to the usual quaternion form. The result is the ordinary rotation of the angle about the axis.</p>
 
-      <p>Two sign flips cancel here: the vector part carries a minus, and the matrix
-      is written transposed relative to the usual quaternion form. The result is the
-      ordinary Rodrigues rotation of <math><mi>&#x3b8;</mi></math> about
-      <math><mover><mover><mi>a</mi><mo>&#x2192;</mo></mover><mo>&#x302;</mo></mover></math>.
-      The same function serves FlexReg and ASO_IOS.</p>
+            <figure class="algo" data-scene="aso_rotate" data-ms="6200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: five points are turned about an axis by the rotation matrix built from an angle, and move along arcs"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Each rotation is turned into a matrix by the quaternion form of Rodrigues&rsquo; formula. The angle and the axis give four numbers, and the matrix is built from them. The result is the ordinary rotation of the angle about the axis; the minus sign and the transposed layout cancel. Shown: five points turned about an axis as the angle grows.</p><div class="formula"><math display="block"><mrow><mi class="k3">&#x3b1;</mi><mo>=</mo><mi>cos</mi><mfrac><mi class="k4">&#x3b8;</mi><mn>2</mn></mfrac></mrow></math></div><div class="formula"><math display="block"><mrow><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">&#x3b2;</mi><mo>,</mo><mi class="k3">&#x3b3;</mi><mo>,</mo><mi class="k3">&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mo>&#x2212;</mo><mover><mover><mi class="k4">a</mi><mo>&#x2192;</mo></mover><mo>&#x302;</mo></mover><mi>sin</mi><mfrac><mi class="k4">&#x3b8;</mi><mn>2</mn></mfrac></mrow></math></div><ul class="algo-legend"><li class="k4"><b>&theta;, a&#x0302;</b>the angle, and the unit axis (the line through the points)</li><li class="k3"><b>&alpha;, &beta;, &gamma;, &delta;</b>the four numbers that stand for the rotation</li><li class=""><b>R</b>the 3&times;3 rotation matrix below; a point p becomes R&nbsp;p</li><li class="k2"><b>triplet</b>the three landmarks of the triplet, turned with the rest; the other two points follow</li></ul></div>
+      </figure>
 
-<figure class="formula"><figcaption>5. Composition: the translation of step 1 never enters the product</figcaption><math display="block"><mrow><mi>M</mi><mo>=</mo><msub><mi>R</mi><mi>icp</mi></msub><msub><mi>R</mi><mn>2</mn></msub><msub><mi>R</mi><mn>1</mn></msub><mo>&#x2003;</mo><mo>&#x2003;</mo><mrow><mo>(</mo><msub><mi>R</mi><mi>icp</mi></msub><mrow><mo>[</mo><mn>0:3</mn><mo>,</mo><mn>3</mn><mo>]</mo></mrow><mo>=</mo><mn>0</mn><mo>)</mo></mrow></mrow></math></figure>
 
-      <p>The ICP contributes a rotation only: its translation column is explicitly
-      zeroed (<code>TransformMatrixBis[:3, 3] = [0, 0, 0]</code>). The composite is
-      therefore a pure rotation about the world origin.</p>
+      <p>The matrix, written out from those four numbers:</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Why this is not a fit · Also true in VISOR</div>
-        <p>With <math><mi>N</mi></math> paired landmarks there is a closed-form
-        rotation that minimises the sum of squared distances, Kabsch, by the
-        singular value decomposition of the cross-covariance:</p>
-<figure class="formula"><figcaption>What a least-squares fit would compute, and what ASO does <em>not</em> do</figcaption><math display="block"><mrow><mi>H</mi><mo>=</mo><munder><mo>&#x2211;</mo><mi>k</mi></munder><mrow><mo stretchy="true" fence="true">(</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>k</mi></msub><mo>&#x2212;</mo><mover><mover><mi>p</mi><mo>&#x2192;</mo></mover><mo>&#xaf;</mo></mover><mo stretchy="true" fence="true">)</mo></mrow><msup><mrow><mo stretchy="true" fence="true">(</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>k</mi></msub><mo>&#x2212;</mo><mover><mover><mi>q</mi><mo>&#x2192;</mo></mover><mo>&#xaf;</mo></mover><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x22a4;</mo></msup><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><mi>H</mi><mo>=</mo><mi>U</mi><mi>&#x3a3;</mi><msup><mi>V</mi><mo>&#x22a4;</mo></msup><mo>&#x2003;</mo><mo>,</mo><mo>&#x2003;</mo><mi>R</mi><mo>=</mo><mi>V</mi><mi>D</mi><msup><mi>U</mi><mo>&#x22a4;</mo></msup></mrow></math></figure>
-        <p>with <math><mrow><mi>D</mi><mo>=</mo><mi>diag</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>1</mn><mo>,</mo><mi>det</mi><mo>(</mo><mi>V</mi><msup><mi>U</mi><mo>&#x22a4;</mo></msup><mo>)</mo><mo>)</mo></mrow></math>
-        guarding against a reflection. ASO computes nothing of the sort. It builds
-        two rotations from a triplet, keeps the triplet that happens to score best
-        over up to 2500 draws, and hands the result to an ICP that re-pairs the
-        points by nearest neighbour rather than by label. It is a search, not a
-        solution, which is exactly why the numbers in the viewer above show
-        the ICP doing more of the turning than the initialization it is supposed to
-        refine.</p>
-      <p>Also true in <a href="../visor/ASO/ASO.html">VISOR</a>, with one difference: the triplet search is exhaustive when there are at most <code>max_triplets</code> (2500) ordered triplets (7 landmarks give 210), otherwise a sample from a generator seeded by <code>seed</code>, instead of random draws from the global generator (<code>SADT-VISOR ASO/geometry.py:323-359</code>; legacy <code>ASO_CBCT_utils/utils.py:182-191</code>). The rotation is still handed to <code>vtkIterativeClosestPointTransform</code> (<code>ASO/cbct/icp.py:200-204</code>, <code>ASO/ios/icp.py:107-111</code>).</p>
-      </div>
+      <div class="formula"><math display="block"><mrow><mi>R</mi><mo>=</mo><mrow><mo stretchy="true" fence="true">[</mo><mtable><mtr><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;&#x3b3;</mi><mo>+</mo><mi>&#x3b1;&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;&#x3b4;</mi><mo>&#x2212;</mo><mi>&#x3b1;&#x3b3;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd></mtr><mtr><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;&#x3b3;</mi><mo>&#x2212;</mo><mi>&#x3b1;&#x3b4;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b3;&#x3b4;</mi><mo>+</mo><mi>&#x3b1;&#x3b2;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd></mtr><mtr><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b2;&#x3b4;</mi><mo>+</mo><mi>&#x3b1;&#x3b3;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><mn>2</mn><mrow><mo stretchy="true" fence="true">(</mo><mi>&#x3b3;&#x3b4;</mi><mo>&#x2212;</mo><mi>&#x3b1;&#x3b2;</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></mtd><mtd><mrow><msup><mi>&#x3b1;</mi><mn>2</mn></msup><mo>+</mo><msup><mi>&#x3b4;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b2;</mi><mn>2</mn></msup><mo>&#x2212;</mo><msup><mi>&#x3b3;</mi><mn>2</mn></msup></mrow></mtd></mtr></mtable><mo stretchy="true" fence="true">]</mo></mrow></mrow></math></div>
+
+      <p><strong>5. Composition.</strong> The ICP contributes a rotation only: its translation column is zeroed. The composite is therefore a pure rotation about the world origin.</p>
+
+      <div class="formula"><math display="block"><mrow><mi>M</mi><mo>=</mo><msub><mi>R</mi><mi>icp</mi></msub><msub><mi>R</mi><mn>2</mn></msub><msub><mi>R</mi><mn>1</mn></msub><mo>&#x2003;</mo><mrow><mo stretchy="true" fence="true">(</mo><msub><mi>R</mi><mi>icp</mi></msub><mrow><mo stretchy="true" fence="true">[</mo><mn>0:3</mn><mo>,</mo><mn>3</mn><mo stretchy="true" fence="true">]</mo></mrow><mo>=</mo><mn>0</mn><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div>
+
+      <p><strong>Why this is not a fit.</strong> With N paired landmarks there is a closed-form rotation that minimises the sum of squared distances, <a class="gterm" data-term="kabsch" href="../glossary.html#g-kabsch" title="See glossary">Kabsch</a>, by the singular value decomposition of the cross-covariance:</p>
+
+      <div class="formula"><math display="block"><mrow><mi>H</mi><mo>=</mo><munder><mo>&#x2211;</mo><mi>k</mi></munder><mrow><mo stretchy="true" fence="true">(</mo><msub><mover><mi>p</mi><mo>&#x2192;</mo></mover><mi>k</mi></msub><mo>&#x2212;</mo><mover><mover><mi>p</mi><mo>&#x2192;</mo></mover><mo>&#xaf;</mo></mover><mo stretchy="true" fence="true">)</mo></mrow><msup><mrow><mo stretchy="true" fence="true">(</mo><msub><mover><mi>q</mi><mo>&#x2192;</mo></mover><mi>k</mi></msub><mo>&#x2212;</mo><mover><mover><mi>q</mi><mo>&#x2192;</mo></mover><mo>&#xaf;</mo></mover><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x22a4;</mo></msup></mrow></math></div><div class="formula"><math display="block"><mrow><mi>H</mi><mo>=</mo><mi>U</mi><mi>&#x3a3;</mi><msup><mi>V</mi><mo>&#x22a4;</mo></msup></mrow></math></div><div class="formula"><math display="block"><mrow><mi>R</mi><mo>=</mo><mi>V</mi><mi>D</mi><msup><mi>U</mi><mo>&#x22a4;</mo></msup></mrow></math></div>
+
+      <p>with D = diag(1, 1, det(V&nbsp;U<sup>&#x22a4;</sup>)) guarding against a reflection. ASO computes nothing of the sort. It builds two rotations from a triplet, keeps the triplet that happens to score best over up to 2500 draws, and hands the result to an ICP that re-pairs the points by nearest neighbour rather than by label. It is a search, not a solution, which is exactly why the numbers in the viewer above show the ICP doing more of the turning than the initialisation it is supposed to refine. In VISOR the triplet search is exhaustive when there are few enough, otherwise seeded.</p>
+
+            <a class="deep-link" href="ASO.code.html#cbct-maths"><b>In the code</b><span>The same maths, the Kabsch callout</span></a>
+
 
       <h2 id="aso-ios">5. ASO_IOS</h2>
 
-      <h3 id="mode-auto-ios">5.1 Automatic mode: crown centroids</h3>
-
-      <p><strong>a) Segmentation bypass.</strong> <code>__BypassCrownseg__</code>
-      (<code>IOS.py:196</code>) opens each mesh and looks for a
-      <code>PredictedID</code>, <code>UniversalID</code> or <code>Universal_ID</code> array. Already-segmented meshes are
-      copied directly into the segmentation's <strong>output</strong> folder with the
-      suffix <code>_Seg</code>; the others go to the input folder to be segmented, with
-      exotic formats converted to <code>.vtk</code> along the way.</p>
-
-      <p><strong>b) <a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a></strong> <span class="badge predit">predicted</span>, via conda (<code>IOS.py:288</code>):</p>
-
-      <pre><code>conda run -n shapeaxi python -m CrownSegmentationcli \
-  None &lt;csv&gt; &lt;out&gt; 0 latest 0 Universal_ID 0 Seg &lt;vtk_folder&gt; &lt;dentalmodelseg_path&gt;</code></pre>
-
-      <p>Argument order: <code>surf</code>, <code>input_csv</code>, <code>out</code>, <code>overwrite</code>, <code>model</code>,
-      <code>crown_segmentation</code>, <code>array_name</code>, <code>fdi</code>, <code>suffix</code>, <code>vtk_folder</code>,
-      <code>dentalmodelseg_path</code>. <strong><code>overwrite = "0"</code> and <code>suffix = "Seg"</code></strong>: unlike
-      <a href="../FlexReg/FlexReg.html">FlexReg</a>, ASO does not overwrite the input file, it produces a <code>&lt;name&gt;_Seg.vtk</code> in
-      a temporary folder. The network is the same one (multi-view Fly-by-CNN,
-      universal 1–32 numbering in <code>Universal_ID</code>), bundled in the pip package <code>shapeaxi</code>:
-      the <code>latest</code> architecture and weights cannot be determined from this repository.</p>
-
-      <p>The <code>dentalmodelseg_path</code> computed in <code>Process</code> is dead: <code>run_conda_tool</code>
-      (<code>ASO.py:1459</code>) replaces it with the result of a
-      <code>which dentalmodelseg</code> inside the environment. The <code>if os.path.isfile(path_input)</code>
-      branch (<code>IOS.py:279</code>) is dead too, <code>path_input</code> is
-      always a folder created by <code>os.makedirs</code>, and it references a <code>self.input</code> that
-      does not exist. <code>path_preor</code> is created and never used.</p>
-
-      <p>Execution is <strong>synchronous and blocking</strong>: <code>run_conda_tool</code> loops on
-      <code>process.is_alive()</code> while calling <code>slicer.app.processEvents()</code>, tracks progress
-      by re-reading the log, then removes the step from the queue before <code>onPredictButton</code>
-      launches <code>slicer.cli.run</code> on the next one.</p>
-
-      <p><strong>c) <code>PrePreAso</code>: the orientation</strong> <span class="badge calcule">computed</span>, the core
-      (<code>pre_icp.py:103</code>). <code>organizeLandmark</code> (<code>pre_icp.py:34</code>) sorts the
-      3 or 4 chosen teeth into <code>(left, middle(s), right)</code> using the universal
-      numbering: on the upper arch (1–16) the number increases from right
-      to left, so <code>max → left</code>; on the lower arch (17–32) it's the reverse.</p>
-
-      <p><code>vtkMeanTeeth</code> (<code>icp.py:415</code>) averages the
-      vertices carrying each <code>Universal_ID</code>. With 4 teeth, the two middle centroids
-      are averaged together → it always comes back to <strong>three points</strong>.</p>
-
-      <p><code>make_vector</code> builds, for each triplet, a local basis:
-      <code>normal = cross(m→d, m→g)</code> (the normal of the plane through the three points), <code>perpen</code>
-      = the right→left direction, <code>direction = cross(normal, perpen)</code>. Then:</p>
-
-      <ol>
-        <li>rotation about the axis <code>cross(normal_source, normal_target)</code> by the angle
-        <code>arccos(dot)</code>: the plane of the scan's three centroids is brought onto the gold's;</li>
-        <li><code>direction_source</code> is rotated by this matrix, then a second rotation
-        about the axis <code>cross(direction_source, direction_target)</code> fixes the roll within
-        this plane;</li>
-        <li>a translation that makes the <strong>centroids</strong> of the two triplets coincide.</li>
-      </ol>
-
-      <p>No scaling. The 4×4 matrix is returned along with the transformed
-      mesh.</p>
-
-      <p><strong>d) The refinement.</strong> <code>ICP([InitIcp(), vtkICP()], option=vtkMeanTeeth(dents))</code>
-      (<code>PRE_ASO_IOS.py:346</code>). The <code>option</code> is
-      applied to both meshes before the chain runs: <strong>the ICP only ever sees the 3 or
-      4 centroids</strong>, never the crown geometry. <code>InitIcp</code>
-      (<code>icp.py:136</code>) is the class version of ASO_CBCT's
-      <code>InitICP</code>: the same <code>abs()</code>, the same roll axis, the same
-      <code>FindOptimalLandmarks</code> with 2500 draws. <code>vtkICP</code> is the same
-      rigid <code>vtkIterativeClosestPointTransform</code>, but with <strong>100 iterations</strong> instead of
-      1000, and its translation is not zeroed out.</p>
-
-      <p>The final matrix is <code>output_icp["matrix"] @ matrix</code>: ICP after PrePreAso.</p>
-
-      <figure class="viewer3d" data-aso-ios>
-        <div class="v3d-stage">
-          <span class="v3d-hint">Drag to rotate &middot; pinch or scroll to zoom</span>
-          <span class="v3d-status" role="status" aria-live="polite"></span>
-        </div>
-        <div class="v3d-run">
-          <button class="v3d-go" type="button">Orient the arch again</button>
-        </div>
-        <span class="v3d-i18n" hidden>
-          <i data-k="seg">dentalmodelseg is numbering the teeth, </i>
-          <i data-k="centroids">crown centroids, the mean of the vertices carrying each label</i>
-          <i data-k="gap">mean distance to the reference landmarks:</i>
-        </span>
-        <figcaption>The whole automatic pipeline, in the order the code runs it. First <code>dentalmodelseg</code> numbers the teeth: before that they are just surface. Then <code>vtkMeanTeeth</code> reduces each one to a single point: the <strong>mean of the vertices carrying its label</strong>. Only then does the orientation run, and it runs <em>on those points</em>, not on the meshes. The motion is the matrix ASO actually wrote (<code>matrix_new_9.npy</code>): <strong>3.26&deg;</strong> and <strong>15.71&nbsp;mm</strong>. Unlike the <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> scene, the millimetres here mean something: the gold <em>is</em> an arch, and the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> carry the same labels tooth by tooth, so the 41 matched pairs can be compared directly. Mean distance falls from <strong>16.14&nbsp;mm</strong> to <strong>2.95&nbsp;mm</strong>. Applying the matrix to the starting landmarks reproduces the ones ASO wrote out to 0.000&nbsp;mm: input, transform and output agree exactly.</figcaption>
-      </figure>
-
-      <h3 id="mode-semi-ios">5.2 Semi mode: supplied landmarks <span class="badge calcule">computed</span></h3>
-
-      <p><code>SEMI_ASO_IOS.py</code>. Same machinery, <code>option</code>
-      becomes <code>SelectKey(liste_de_landmarks)</code> (<code>icp.py:480</code>):
-      a simple key filter over the landmark dictionaries. No more <code>PrePreAso</code>,
-      no more segmentation: <code>InitIcp</code> then <code>vtkICP</code> on the named landmarks.</p>
-
-      <p>Landmark names are built by a Cartesian product in the UI:
-      <code>{dent}{repère}</code> with repère ∈ <code>O, MB, DB</code> (occlusal) or <code>CB, CL, OIP, R, RIP</code>
-      (cervical), then <code>listlandmark2diclandmark</code> splits them by arch based solely on the
-      initial <code>U</code>/<code>L</code> (<code>utils.py:275</code>).</p>
-
-      <p>The matrix obtained from the landmarks is then applied to the full mesh.</p>
-
-      <figure class="diagram">
+            <figure class="diagram">
         <svg viewBox="0 0 760 200" role="img" aria-label="Comparison of ASO_IOS's two modes: Fully-Automated segments the crowns via a network then orients by tooth centroids; Semi-Automated orients directly on landmarks supplied by the operator">
           <text class="d-label-s" x="10" y="18">Fully-Automated</text>
+          <a class="d-link" href="#mode-auto-ios">
           <rect class="d-box-n" x="10" y="24" width="170" height="48" rx="6"/>
           <text class="d-label" x="95" y="45" text-anchor="middle">CrownSegmentationcli</text>
           <text class="d-label-s" x="95" y="60" text-anchor="middle">segmentation, network (conda)</text>
+          </a>
 
           <path class="d-arrow" d="M180 48 H210"/>
           <path class="d-arrow-head" d="M210 48 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#mode-auto-ios">
           <rect class="d-box-a" x="215" y="24" width="200" height="48" rx="6"/>
           <text class="d-label" x="315" y="45" text-anchor="middle">PRE_ASO_IOS</text>
           <text class="d-label-s" x="315" y="60" text-anchor="middle">PrePreAso + ICP (centroids)</text>
+          </a>
 
           <path class="d-arrow" d="M415 48 H445"/>
           <path class="d-arrow-head" d="M445 48 l-7 -4 v8 z"/>
@@ -758,9 +515,11 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
           <path class="d-arrow" d="M160 150 H210"/>
           <path class="d-arrow-head" d="M210 150 l-7 -4 v8 z"/>
 
+          <a class="d-link" href="#mode-semi-ios">
           <rect class="d-box-a" x="215" y="126" width="200" height="48" rx="6"/>
           <text class="d-label" x="315" y="147" text-anchor="middle">SEMI_ASO_IOS</text>
           <text class="d-label-s" x="315" y="162" text-anchor="middle">InitIcp + vtkICP</text>
+          </a>
 
           <path class="d-arrow" d="M415 150 H445"/>
           <path class="d-arrow-head" d="M445 150 l-7 -4 v8 z"/>
@@ -769,290 +528,194 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
           <text class="d-label" x="540" y="147" text-anchor="middle">output</text>
           <text class="d-mono" x="540" y="162" text-anchor="middle">.vtk + matrix_&lt;name&gt;.npy</text>
         </svg>
-        <figcaption>ASO_IOS: the only structural difference between the two modes is the presence, upstream, of a network-based segmentation (<span class="badge predit">network</span>) that supplies the centroids, the orientation itself is the same ICP on 3 points.</figcaption>
+        <figcaption>ASO_IOS: the only structural difference between the two modes is a network-based segmentation upstream (<span class="badge predit">network</span>) that supplies the <a class="gterm" data-term="aso-leg-centroids" href="ASO.code.html#mode-auto-ios" title="See the code">centroids</a>; the orientation itself is the same <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> on 3 points. The boxes lead to their sections.</figcaption>
       </figure>
+
+
+      <h3 id="mode-auto-ios">5.1 Automatic mode: crown centroids</h3>
+
+      <p><strong>a) Segmentation bypass.</strong> Each mesh is opened and looked at for a tooth-label array. Already-segmented meshes skip the network; the others go to the segmentation. <strong>b) The segmentation</strong> <span class="badge predit">predicted</span>, through conda: a multi-view network that numbers the teeth in the universal 1&ndash;32 scheme. ASO does not overwrite the input mesh: the segmented copy lands in a temporary folder. The step is synchronous and blocking.</p>
+
+      <p><strong>c) The orientation</strong> <span class="badge calcule">computed</span>, the core. The 3 or 4 chosen teeth are sorted into left, middle(s) and right using the universal numbering; each tooth becomes the mean of the vertices carrying its label; with 4 teeth the two middle centroids are averaged, so it always comes back to <strong>three points</strong>.</p>
+
+            <figure class="algo" data-scene="aso_centroid" data-ms="5400">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the vertices of each tooth are averaged into a single point, and three of them are used"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Without <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> files, each tooth is reduced to <strong>one point: the mean of the vertices that carry its label</strong>. Only these points, three or four teeth, are used afterwards, never the crown geometry. The teeth must already be labelled on the mesh: ASO does not segment.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">c</mi><mi>t</mi></msub><mo>=</mo><mfrac><mn>1</mn><mrow><mo>|</mo><msub><mi class="k2">V</mi><mi>t</mi></msub><mo>|</mo></mrow></mfrac><munder><mo>&#x2211;</mo><mrow><mi>v</mi><mo>&#x2208;</mo><msub><mi class="k2">V</mi><mi>t</mi></msub></mrow></munder><mi>v</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>c<sub>t</sub></b>the centroid of tooth t; the three large ones are the teeth used</li><li class="k2"><b>V<sub>t</sub></b>the vertices carrying the label of tooth t (the dots)</li></ul></div>
+      </figure>
+
+
+            <figure class="algo" data-scene="aso_plane" data-ms="7200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: the plane through three tooth centroids is turned onto the plane of the reference, then turned in that plane, then moved so that the centroids coincide"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The coarse alignment of a jaw uses its three points (left, middle, right; two middle teeth averaged when four are ticked). First, the <strong>plane</strong> of the three points is turned onto the reference&rsquo;s plane. Then the jaw is turned within that plane to match the left-right direction. Last, the centroids are made to coincide.</p><div class="formula"><math display="block"><mrow><mi class="k2">n</mi><mo>=</mo><mrow><mo stretchy="true" fence="true">(</mo><mi>d</mi><mo>&#x2212;</mo><mi>m</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>&#xd7;</mo><mrow><mo stretchy="true" fence="true">(</mo><mi>g</mi><mo>&#x2212;</mo><mi>m</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi>a</mi><mo>=</mo><msub><mi class="k2">n</mi><mtext>scan</mtext></msub><mo>&#xd7;</mo><msub><mi class="k1">n</mi><mtext>ref</mtext></msub></mrow></math></div><div class="formula"><math display="block"><mrow><mi class="k4">&#x3b8;</mi><mo>=</mo><mi>arccos</mi><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k2">n</mi><mtext>scan</mtext></msub><mo>&#x22c5;</mo><msub><mi class="k1">n</mi><mtext>ref</mtext></msub><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k2"><b>n, scan</b>the normal of the plane of the scan&rsquo;s three centroids</li><li class="k1"><b>ref</b>the same for the reference</li><li class=""><b>g, m, d</b>left, middle and right centroids</li><li class="k4"><b>&theta;, a</b>the angle and axis that bring one normal onto the other</li></ul></div>
+      </figure>
+
+
+      <p>No scaling. <strong>d) The refinement.</strong> The ICP only ever sees these 3 or 4 centroids, never the crown geometry: the same initialisation as in <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> (with absolute values and a roll), then a rigid ICP with <strong>100 iterations</strong> instead of 1000, whose translation is not zeroed out. The final matrix is the ICP composed after the jaw alignment.</p>
+
+            <figure class="viewer3d" data-aso-ios>
+        <div class="v3d-stage">
+          <span class="v3d-hint">Drag to rotate &middot; pinch or scroll to zoom</span>
+          <span class="v3d-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="v3d-run">
+          <button class="v3d-go" type="button">Orient the arch again</button>
+        </div>
+        <span class="v3d-i18n" hidden>
+          <i data-k="seg">dentalmodelseg is numbering the teeth, </i>
+          <i data-k="centroids">crown centroids, the mean of the vertices carrying each label</i>
+          <i data-k="gap">mean distance to the reference landmarks:</i>
+        </span>
+        <figcaption>The whole automatic pipeline, in the order the code runs it. First the segmentation numbers the teeth: before that they are just surface. Then each tooth is reduced to a single point: the <strong>mean of the vertices carrying its label</strong>. Only then does the orientation run, and it runs <em>on those points</em>, not on the meshes. The motion is the matrix ASO actually wrote: <strong>3.26&deg;</strong> and <strong>15.71&nbsp;mm</strong>. Unlike the CBCT scene, the millimetres here mean something: the reference <em>is</em> an arch, and the landmarks carry the same labels tooth by tooth, so the 41 matched pairs can be compared directly. Mean distance falls from <strong>16.14&nbsp;mm</strong> to <strong>2.95&nbsp;mm</strong>. Applying the matrix to the starting landmarks reproduces the ones ASO wrote out to 0.000&nbsp;mm: input, transform and output agree exactly.</figcaption>
+      </figure>
+
+
+            <a class="deep-link" href="ASO.code.html#mode-auto-ios"><b>In the code</b><span>Segmentation bypass, the conda call, PrePreAso, the ICP chain</span></a>
+
+
+      <h3 id="mode-semi-ios">5.2 Semi mode: supplied landmarks <span class="badge calcule">computed</span></h3>
+
+      <p>Same machinery: the landmark dictionaries are filtered by name, then the initialisation and the ICP run on the named landmarks alone, with no segmentation and no jaw alignment. Landmark names are built in the interface as tooth by type (<a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a>, or cervical), and split by arch from their first letter. The matrix obtained from the landmarks is then applied to the whole mesh.</p>
+
+            <a class="deep-link" href="ASO.code.html#mode-semi-ios"><b>In the code</b><span>SelectKey and landmark names</span></a>
 
 
       <h3 id="arbre-ios">The ASO_IOS chain, step by step</h3>
 
-      <div class="pipe">
+            <div class="pipe">
         <p class="pipe-seed">an intra-oral scan: a surface mesh, no volume</p>
 
         <section class="pipe-phase" data-kind="prep">
           <h4>Automatic mode: crown centroids</h4>
           <ol>
-            <li><span class="pipe-act"><code>__BypassCrownseg__</code> looks for a <code>PredictedID</code>, <code>UniversalID</code> or <code>Universal_ID</code> array: an already-segmented mesh skips the network</span>
-                <span class="pipe-out">copied as <code>&lt;name&gt;_Seg</code></span></li>
-            <li><span class="pipe-act"><code>DentalModelSeg</code> labels the crowns, through <code>conda run -n shapeaxi</code> <span class="badge predit">predicted</span></span>
-                <span class="pipe-out"><code>&lt;name&gt;_Seg.vtk</code>, in a temporary folder</span></li>
+            <li><span class="pipe-act">__BypassCrownseg__ looks for a PredictedID, UniversalID or <a class="gterm" data-term="universal-id" href="../glossary.html#g-universal-id" title="See glossary">Universal_ID</a> array: an already-segmented mesh skips the network</span>
+                <span class="pipe-out">copied as &lt;name&gt;_Seg</span></li>
+            <li><span class="pipe-act">DentalModelSeg labels the crowns, through conda run -n shapeaxi <span class="badge predit">predicted</span></span>
+                <span class="pipe-out">&lt;name&gt;_Seg.vtk, in a temporary folder</span></li>
             <li><span class="pipe-act">the centroid of each labelled crown becomes a landmark <span class="badge calcule">computed</span></span>
                 <span class="pipe-out">one point per tooth</span></li>
-            <li><span class="pipe-act"><code>PRE_ASO_IOS</code> then a rigid ICP onto the gold standard&rsquo;s centroids <span class="badge calcule">computed</span></span>
-                <span class="pipe-out">the oriented mesh + its <code>.tfm</code></span></li>
+            <li><span class="pipe-act">PRE_ASO_IOS then a rigid ICP onto the gold standard&rsquo;s centroids <span class="badge calcule">computed</span></span>
+                <span class="pipe-out">the oriented mesh + its .tfm</span></li>
           </ol>
         </section>
 
         <section class="pipe-phase" data-kind="measure">
           <h4>Semi mode: supplied landmarks</h4>
           <ol>
-            <li><span class="pipe-act"><code>SelectKey</code> filters the landmark dictionaries by name, then <code>InitIcp</code> and <code>vtkICP</code> run on those names alone: no segmentation, no <code>PrePreAso</code> <span class="badge calcule">computed</span></span>
-                <span class="pipe-out">same <code>.tfm</code></span></li>
+            <li><span class="pipe-act">SelectKey filters the landmark dictionaries by name, then InitIcp and vtkICP run on those names alone: no segmentation, no PrePreAso <span class="badge calcule">computed</span></span>
+                <span class="pipe-out">same .tfm</span></li>
           </ol>
         </section>
 
         <p class="pipe-note">Unlike <a href="../FlexReg/FlexReg.html">FlexReg</a>, ASO does not
-        overwrite the input mesh: <code>overwrite = "0"</code> and <code>suffix = "Seg"</code>, so
+        overwrite the input mesh: overwrite = "0" and suffix = "Seg", so
         the segmentation lands in a temporary folder.</p>
       </div>
 
+
+            <a class="deep-link" href="ASO.code.html#arbre-ios"><b>In the code</b><span>The chain as a step list</span></a>
+
+
       <h3 id="occlusion">5.3 Occlusion</h3>
 
-      <p>A checkbox that forces a single arch
-      (<code>ASO.py:2544</code>, <code>ASO.py:2552</code>): the chosen arch drives the orientation, and
-      <strong>the same matrix is applied to the opposite arch</strong> (<code>file[jaw.inv()]</code>,
-      <code>PRE_ASO_IOS.py:216</code>) to preserve the
-      occlusal relationship. Upper/lower pairing is done by file name, via
-      <code>Files_vtk_link</code> / <code>Files_vtk_json_semilink</code>
-      (<code>data_file.py</code>): the recognized markers
-      are <code>Upper</code>/<code>_U_</code> and <code>Lower</code>/<code>_L_</code>.</p>
+      <p>A checkbox forces a single arch: the chosen arch drives the orientation, and <strong>the same matrix is applied to the opposite arch</strong> to preserve the occlusal relationship. Upper and lower files are paired by name, from a few recognised markers. When no marker is found, the legacy silently treats the file as lower; VISOR refuses it.</p>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall · Legacy only</div>
-        <p><code>UpperOrLower</code>
-        (<code>utils.py:183</code>) <strong>defaults to <code>"Lower"</code></strong> when no marker is found: a
-        poorly named file is silently treated as mandibular.</p>
-        <p>Legacy (3c67957): still true, <code>ASO_IOS/ASO_IOS_utils/utils.py:98-107</code> (<code>default="Lower"</code>). Not present in <a href="../visor/ASO/ASO.html">VISOR</a>: a file with no jaw token raises <code>JawError</code>, is skipped and counted, with no default (<code>SADT-VISOR ASO/ios/pipeline.py:43</code>, <code>:83-107</code>).</p>
-      </div>
+            <a class="deep-link" href="ASO.code.html#occlusion"><b>In the code</b><span>The driving jaw and the default to Lower</span></a>
+
 
       <h3 id="sorties-ios">5.4 IOS outputs</h3>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>File</th><th>Written by</th><th>Content</th></tr></thead>
+          <thead><tr><th>File</th><th>Content</th></tr></thead>
           <tbody>
-            <tr><td><code>&lt;input_name&gt;&lt;suffix&gt;.vtk</code></td><td><code>WriteSurf</code></td><td>oriented mesh, extension forced to <code>.vtk</code> if unknown</td></tr>
-            <tr><td><code>&lt;patient&gt;_SegOr.tfm</code></td><td><code>saveMatrixAsTfm</code></td><td><strong>auto only</strong>, fixed name regardless of the suffix</td></tr>
-            <tr><td><code>matrix_&lt;name&gt;.npy</code></td><td><code>np.save</code></td><td><strong>semi only</strong>, raw 4×4 matrix</td></tr>
-            <tr><td><code>&lt;name&gt;Error.txt</code></td><td><code>WritefileError</code></td><td>in the <code>Error/</code> subfolder of the output folder</td></tr>
+            <tr><td>the mesh with the suffix, <code>.vtk</code></td><td>the oriented mesh; extension forced to <code>.vtk</code> if unknown</td></tr>
+            <tr><td><code>&lt;patient&gt;_SegOr.tfm</code></td><td><strong>auto only</strong>, a fixed name whatever the suffix</td></tr>
+            <tr><td><code>matrix_&lt;name&gt;.npy</code></td><td><strong>semi only</strong>, the raw 4&times;4 matrix</td></tr>
+            <tr><td>an error file per failing case</td><td>in an <code>Error/</code> subfolder</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>With the default suffix <code>Or</code> and the <code>_Seg</code> added by the segmentation, a file
-      <code>P01_U.vtk</code> comes out as <code>P01_U_SegOr.vtk</code>: the name AREG_IOS expects.</p>
+      <p>The transform is written inverted (ITK&rsquo;s fixed-to-moving convention), as an affine transform, with no LPS-RAS conversion: meshes are read and written in the file&rsquo;s own coordinates. This is consistent end to end with AREG_IOS, which reads it back as it is. VISOR keeps the convention and changes the file name.</p>
 
-      <div class="callout ok">
-        <div class="callout-title">Verified · Also true in VISOR (convention), name changed</div>
-        <p><code>saveMatrixAsTfm</code> (<code>utils.py:300</code>) inverts the
-        matrix (ITK fixed → moving convention) and writes it as an <code>AffineTransform</code>. <strong>No
-        LPS↔<a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a> conjugation</strong>: ASO_IOS never flips anything, meshes are read and
-        rewritten in the file's own coordinates (LPS for a <code>.vtk</code>), and the matrix is
-        expressed in that same frame. This is consistent end to end with <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a>, which
-        reads it back as is.</p>
-        <p>Legacy (3c67957): <code>ASO_IOS_utils/utils.py:172-184</code>. Also true in <a href="../visor/ASO/ASO.html">VISOR</a>: same inverted matrix written as an <code>AffineTransform</code> (<code>SADT-VISOR ASO/ios/pipeline.py:548-554</code>). The file name is not the same: <code>&lt;patient&gt;_&lt;Upper|Lower&gt;_&lt;suffix&gt;.tfm</code> (<code>:542</code>), not <code>&lt;patient&gt;_SegOr.tfm</code>. AREG_IOS in VISOR collects the upper-arch <code>.tfm</code> files by patient stem with the jaw tokens dropped (<code>tools/AREG/AREG_IOS/src/sadt_areg_ios/dispatch.py:255-280</code>); the end-to-end chain was not run.</p>
-      </div>
+            <a class="deep-link" href="ASO.code.html#sorties-ios"><b>In the code</b><span>The writers and the tfm convention</span></a>
 
-      <h2 id="flexreg">6. Comparison with <a href="../FlexReg/FlexReg.html">FlexReg</a>'s orientation</h2>
 
-      <p><code>FlexReg_Method/orientation.py</code> and
-      <code>ASO_IOS_utils/pre_icp.py</code> are <strong>the same
-      algorithm, copy-pasted</strong>. <code>make_vector</code> is identical character for character; the
-      bodies of <code>orientation()</code> and <code>PrePreAso()</code> differ only on three points:</p>
+      <h2 id="flexreg">6. Comparison with <a href="../FlexReg/FlexReg.html">FlexReg</a>&rsquo;s orientation</h2>
+
+      <p>FlexReg&rsquo;s orientation and ASO_IOS&rsquo;s jaw alignment are <strong>the same algorithm, copy-pasted</strong>. They differ on three points:</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th></th><th>ASO_IOS <code>PrePreAso</code></th><th>FlexReg <code>orientation</code></th></tr></thead>
+          <thead><tr><th></th><th>ASO_IOS</th><th>FlexReg</th></tr></thead>
           <tbody>
-            <tr><td>Target</td><td>the <strong>gold mesh's centroids</strong>, read with the same <code>vtkMeanTeeth</code></td><td>three hard-coded points, <code>[[-0.5,-0.5,0], [0,0,0], [0.5,-0.5,0]]</code></td></tr>
-            <tr><td>Teeth</td><td>3 or 4 chosen by the operator, sorted by <code>organizeLandmark</code></td><td><strong>3, 5, 12, 14</strong> hard-coded (UR6, UR4, UL4, UL6)</td></tr>
-            <tr><td>Return</td><td><code>(mesh, matrix)</code></td><td><code>mesh</code> alone</td></tr>
+            <tr><td>Target</td><td>the <strong>gold mesh&rsquo;s <a class="gterm" data-term="aso-leg-centroids" href="ASO.code.html#mode-auto-ios" title="See the code">centroids</a></strong></td><td>three hard-coded points</td></tr>
+            <tr><td>Teeth</td><td>3 or 4 chosen by the operator</td><td><strong>3, 5, 12, 14</strong> hard-coded (UR6, UR4, UL4, UL6)</td></tr>
+            <tr><td>Return</td><td>the mesh and the matrix</td><td>the mesh alone</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p><code>transformation.py</code> is likewise duplicated between the two (same <code>RotationMatrix</code>,
-      <code>TransformSurf</code>, <code>TransformDict</code>, formatting aside), and ASO_IOS's <code>icp.py</code>
-      holds the classes from which <code>FlexReg_Method/util.py</code> reuses <code>vtkTeeth</code>,
-      <code>vtkMeanTeeth</code> and <code>vtkMeshTeeth</code>.</p>
+      <p>Practical consequence: FlexReg produces a <strong>canonical and reproducible</strong> frame (<a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> plane near z = 0, +y anterior), which lets it reason in 2D within the XY plane. ASO_IOS produces an orientation <strong>relative to a reference patient</strong>: no guarantee that the occlusal plane lands on z = 0, and FlexReg has no <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> refinement where ASO adds one.</p>
 
-      <p>Practical consequence: FlexReg produces a <strong>canonical and reproducible</strong> frame
-      (occlusal plane ≈ z=0, +y anterior), which then lets it reason in 2D
-      within the XY plane. ASO_IOS produces an orientation <strong>relative to a
-      reference patient</strong>: no guarantee that the occlusal plane lands on z=0, and no
-      ICP refinement in FlexReg where ASO adds one.</p>
+            <a class="deep-link" href="ASO.code.html#flexreg"><b>In the code</b><span>The identical functions</span></a>
+
 
       <h2 id="predit-calcule">7. What is predicted vs. what is computed</h2>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
+          <thead><tr><th>Block</th><th>Nature</th></tr></thead>
           <tbody>
-            <tr><td><a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> recentering</td><td><span class="badge calcule">geometric</span> (translation)</td><td><code>PRE_ASO_CBCT</code></td></tr>
-            <tr><td>CBCT <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> (auto mode)</td><td><span class="badge predit">network</span>, multi-scale search agents</td><td><code>ALI_CBCT</code></td></tr>
-            <tr><td>Pruning outlier landmarks</td><td><span class="badge calcule">geometric</span>, distances + angles</td><td><code>SEMI_ASO_CBCT</code></td></tr>
-            <tr><td>Optimal triplet + rotations</td><td><span class="badge calcule">geometric</span>, random search ≤ 2500 draws</td><td><code>SEMI_ASO_CBCT</code> / <code>PRE_ASO_IOS</code></td></tr>
-            <tr><td>Refinement</td><td><span class="badge calcule">geometric</span>, rigid VTK ICP</td><td>same</td></tr>
-            <tr><td><a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> crown segmentation</td><td><span class="badge predit">network</span>, multi-view (<a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a>)</td><td><code>conda run -n shapeaxi</code></td></tr>
-            <tr><td>Tooth centroids</td><td><span class="badge calcule">geometric</span>, vertex averaging</td><td><code>PRE_ASO_IOS</code></td></tr>
-            <tr><td>IOS orientation</td><td><span class="badge calcule">geometric</span>, 2 rotations + translation</td><td><code>PrePreAso</code></td></tr>
+            <tr><td><a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> <a class="gterm" data-term="aso-leg-recentering" href="ASO.code.html#pre-aso-cbct" title="See the code">recentering</a></td><td><span class="badge calcule">geometric</span> a translation</td></tr>
+            <tr><td>CBCT <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> (auto mode)</td><td><span class="badge predit">network</span> multi-scale search agents, <a href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a></td></tr>
+            <tr><td>Pruning outlier landmarks</td><td><span class="badge calcule">geometric</span> distances and angles</td></tr>
+            <tr><td>Optimal <a class="gterm" data-term="aso-leg-triplet" href="ASO.code.html#semi-aso-cbct" title="See the code">triplet</a> and rotations</td><td><span class="badge calcule">geometric</span> random search, up to 2500 draws</td></tr>
+            <tr><td>Refinement</td><td><span class="badge calcule">geometric</span> rigid <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a></td></tr>
+            <tr><td><a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> crown segmentation</td><td><span class="badge predit">network</span> multi-view, <a href="../ALI/ALI.html#ios-entrees">DentalModelSeg</a></td></tr>
+            <tr><td>Tooth <a class="gterm" data-term="aso-leg-centroids" href="ASO.code.html#mode-auto-ios" title="See the code">centroids</a></td><td><span class="badge calcule">geometric</span> vertex averaging</td></tr>
+            <tr><td>IOS orientation</td><td><span class="badge calcule">geometric</span> two rotations and a translation</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>The two networks that are called are pre-trained and only serve to <strong>supply
-      anchor points</strong>. ASO_CBCT's learned pre-orienter (<code>DenseNet169</code>) has been
-      disconnected.</p>
+      <p>The two networks that are called are pre-trained and only serve to <strong>supply anchor points</strong>. ASO_CBCT&rsquo;s learned pre-orienter has been disconnected.</p>
 
       <h2 id="environnement">8. Environment</h2>
 
-      <p>Two distinct regimes, and this is a source of confusion.</p>
+      <p>Two distinct regimes. <strong>The command-line modules</strong> run in Slicer&rsquo;s Python, which the widget fills with whatever is missing (itk, torch, pytorch_lightning, dicom2nifti, pydicom, monai). <strong>The conda environment</strong> (Python 3.12, shared with ALI, AREG, FlexReg and DOCShapeAXI) is only set up for the automatic <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> mode. No GPU is required by ASO itself; it is required by the crown segmentation. In VISOR nothing is installed in Slicer and the ASO environment has no torch.</p>
 
-      <p><strong>The CLIs</strong> run in Slicer's Python. <code>install_function</code>
-      (<code>ASO.py:74</code>) <code>pip_install</code>s whatever is missing there: <code>itk</code>,
-      <code>torch==2.2.0</code>, <code>pytorch_lightning</code>, <code>dicom2nifti==2.6.2</code>, <code>pydicom==3.0.2</code> and
-      <code>monai</code> at 1.3.2 (Python ≥ 3.10) or 0.7.0 otherwise.</p>
+            <a class="deep-link" href="ASO.code.html#environnement"><b>In the code</b><span>What is installed where, the conda environment</span></a>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall · Legacy only</div>
-        <p><code>torch</code>, <code>pytorch_lightning</code> and <code>monai</code> are only used by <code>Net.py</code> and by <a href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a>:
-        in semi-CBCT mode and in <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>, ASO installs them for nothing, with the risk of
-        overwriting another module's version of torch (the dialog says so itself: "Doing it
-        could break other modules").</p>
-        <p>Legacy (3c67957): still true, <code>ASO/ASO.py:89-91</code> and the dialog text at <code>:124</code>. Not present in <a href="../visor/ASO/ASO.html">VISOR</a>: nothing is installed in Slicer's Python, and the ASO environment has no torch (<code>SADT-VISOR tools/ASO/pyproject.toml</code>).</p>
-      </div>
-
-      <p><strong>The conda environment</strong> is only set up for the automatic IOS mode, by
-      <code>onCheckRequirements</code> (<code>ASO.py:1911</code>):</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Element</th><th>Value</th><th>Source</th></tr></thead>
-          <tbody>
-            <tr><td>Env</td><td><code>shapeaxi</code>, shared with <a href="../ALI/ALI.html">ALI</a>, AREG, <a href="../FlexReg/FlexReg.html">FlexReg</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a></td><td><code>ASO.py:2397</code></td></tr>
-            <tr><td>Python</td><td><strong>3.12</strong></td><td><code>ASO.py:2399</code></td></tr>
-            <tr><td>Creation</td><td><code>SimpleITK</code> only: torch, <code>ocnn==2.2.1</code>, pytorch3d and shapeaxi come afterwards</td><td><code>ASO.py:2419</code></td></tr>
-            <tr><td>pytorch3d + shapeaxi</td><td>pre-built wheels chosen based on the installed torch version</td><td><code>install_pytorch.py</code></td></tr>
-            <tr><td>Windows</td><td>conda via WSL (<code>CondaSetUpCallWsl</code>) + checking for <code>libxrender1</code>, <code>libgl1</code>/<code>libgl1-mesa-glx</code>, <code>libglx-mesa0</code></td><td><code>check_lib_wsl</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Pitfall · Legacy only</div>
-        <p><code>install_pytorch.py</code> resolves the build tag (<code>0.7.9+pt2110cu128</code> = torch 2.11.0,
-        CUDA 12.8) from the PEP 503 index
-        <code>https://ImageMindAnalytics.github.io/pytorch3d-wheels/simple/</code>: installing a
-        wheel whose tag doesn't match the torch present produces an <code>undefined symbol</code>
-        at import time.</p>
-        <p>Legacy (3c67957); not present in <a href="../visor/ASO/ASO.html">VISOR</a> for ASO: no pytorch3d and no conda. The segmentation that needed them is the separate tool <code>Crown_Seg</code>, called by the AREG chains and by <code>ALI_IOS</code>, not by ASO (<code>SADT-VISOR ASO/ios/pipeline.py:367-377</code>).</p>
-      </div>
-
-      <p>No GPU is required by ASO itself; it is required by
-      <code>dentalmodelseg</code>.</p>
 
       <h2 id="pieges">9. Pitfalls and fragile points</h2>
 
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug · First half superseded at 3c67957, second half Legacy only</div>
-        <p><strong>The <code>.tfm</code> requirement is fixed in the legacy.</strong> An earlier revision of this page said <code>SEMI_ASO_CBCT.py</code> required <code>data["tfm"]</code> and failed with a <code>KeyError</code> on every patient without a <code>.tfm</code>. At 3c67957 it reads <code>data.get("tfm")</code> and registers from the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> alone, with an identity as the prior transform (<code>SEMI_ASO_CBCT/SEMI_ASO_CBCT.py:52-59</code>, <code>ASO_CBCT_utils/utils.py:666-676</code>; commit e703ec0, 2026-09-29). In <a href="../visor/ASO/ASO.html">VISOR</a> no <code>.tfm</code> is read at all and the recentering is folded into the transform it writes (<code>SADT-VISOR ASO/cbct/icp.py:168-170</code>).</p>
-        <p><strong>And even without that, the semi mode has no recentering.</strong> Since the
-        orientation is a pure rotation around the world origin (§4.4e), an off-center
-        volume ends up outside its own FOV, <code>DefaultPixelValue = 0</code>.</p>
-        <p>This second part is still true of the legacy at 3c67957: <code>Semi_CBCT.Process</code> launches <code>semi_aso_cbct</code> and nothing else (<code>ASO/ASO_Method/CBCT.py:379-393</code>). Not present in <a href="../visor/ASO/ASO.html">VISOR</a>: every scan is recentered before the orientation, whatever the mode (<code>SADT-VISOR ASO/dispatch.py:719</code>, and the supplied landmarks are moved with it, <code>:756</code>).</p>
-      </div>
-
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug · Legacy only</div>
-        <p><strong><code>MergeJson</code> deletes files in the input folder.</strong> In semi mode,
-        <code>input_dir</code> is the user's folder: all of its <code>.mrk.json</code> files without <code>MERGED</code>
-        in their name are merged and then <strong>erased</strong>
-        (<code>utils.py:114</code>).</p>
-        <p>Legacy (3c67957): still true, <code>ASO_CBCT_utils/utils.py:63-120</code> (the <code>os.remove</code> is at <code>:120</code>), called at <code>SEMI_ASO_CBCT.py:172</code>; since de4600b (2026-10-06) it skips JSON files that are not markups, so ALI's report is no longer merged or deleted, but landmark files still are. Not present in <a href="../visor/ASO/ASO.html">VISOR</a>: the files are merged in memory per patient, nothing is written or deleted in the input (<code>SADT-VISOR ASO/cbct/pipeline.py:232-253</code>).</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Pitfall · Also true in VISOR</div>
-        <p><strong>The coordinate system of the jsons is never checked.</strong>
-        <code>LoadJsonLandmarks</code> reads <code>position</code> raw; <a href="../ALI/ALI.html">ALI</a> and ASO write LPS, but a
-        fiducial exported as RAS from Slicer will be read with x and y
-        flipped, with no warning.</p>
-        <p>Legacy (3c67957): <code>ASO_CBCT_utils/utils.py</code>, <code>LoadJsonLandmarks</code> reads <code>position</code> and never <code>coordinateSystem</code>. Also true in <a href="../visor/ASO/ASO.html">VISOR</a>: <code>load_landmarks</code> reads the position as it is (<code>SADT-VISOR ASO/markups.py:35-64</code>); the only occurrence of <code>coordinateSystem</code> in the tool's sources is the <code>"LPS"</code> it writes (<code>markups.py:75</code>).</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Pitfall · Legacy only</div>
-        <p><strong>Inconsistent minimum landmark count.</strong> The UI requires 3 checked landmarks
-        (<code>TestCheckbox</code>, <code>CBCT.py:78</code>) but <code>ICP</code> bails out
-        as soon as <code>len(list_landmark) &lt;= 3</code> (<code>utils.py:767</code>).
-        So 4 are actually needed, and more if pruning removes some.</p>
-        <p>Legacy (3c67957): still true, the interface check is <code>ASO/ASO_Method/CBCT.py:70</code> (<code>&lt; 3</code>) and the ICP exit is <code>ASO_CBCT_utils/utils.py:661</code> (<code>&lt;= 3</code>). Not present in <a href="../visor/ASO/ASO.html">VISOR</a>: the minimum is 3 everywhere (<code>SADT-VISOR ASO/cbct/icp.py:27</code>, <code>:134</code>; <code>ASO/dispatch.py:251-255</code>).</p>
-      </div>
+      <p>Each point is checked in the code and described, with its evidence, on the code page.</p>
 
       <ul>
-        <li><strong>The ICP re-pairs by nearest neighbor.</strong> <code>vtkIterativeClosestPointTransform</code>
-        ignores labels: on landmarks that are pairwise close (left/right
-        pairs), it can lock in a crossed pairing that the initialization
-        had already gotten wrong.</li>
-        <li><strong>The <code>abs()</code> calls in <code>InitICP</code>.</strong> The vectors are folded into the positive
-        octant before the angle calculation, in both backends. Since the retained
-        triplet is the one that minimizes the measured error, the search
-        compensates for this, but nothing should be concluded from the geometry of
-        this step taken in isolation.</li>
+        <li><strong>The semi mode has no <a class="gterm" data-term="aso-leg-recentering" href="ASO.code.html#pre-aso-cbct" title="See the code">recentering</a></strong>, so an off-centre volume ends up outside its own field of view (and the old transform-file requirement is fixed). <a href="ASO.code.html#f-semi-no-recentering">Evidence</a>.</li>
+        <li><strong>The <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> merge deletes files</strong> in the input folder. <a href="ASO.code.html#f-mergejson-deletes">Evidence</a>.</li>
+        <li><strong>The DICOM fallback is broken.</strong> <a href="ASO.code.html#f-dicom-fallback">Evidence</a>.</li>
+        <li><strong>The coordinate system of landmark files is never checked.</strong> <a href="ASO.code.html#f-coordinate-system">Evidence</a>.</li>
+        <li><strong>Inconsistent minimum landmark count</strong> (3 in the interface, 4 in practice). <a href="ASO.code.html#f-min-landmarks">Evidence</a>.</li>
+        <li><strong>Nothing is rewritten if the output exists.</strong> <a href="ASO.code.html#f-no-overwrite">Evidence</a>.</li>
+        <li><strong>Patient identifiers diverge between ASO and AREG</strong>, so ASO&rsquo;s transform is never found for some names. <a href="ASO.code.html#f-patient-id">Evidence</a>.</li>
+        <li><strong>A mesh with no jaw marker</strong> is silently treated as lower. <a href="ASO.code.html#f-ios-jaw-default">Evidence</a>.</li>
+        <li><strong>Libraries installed for nothing</strong>, at the risk of overwriting another module&rsquo;s torch. <a href="ASO.code.html#f-torch-install">Evidence</a>; <a href="ASO.code.html#f-pytorch3d-wheels">pytorch3d wheels</a>.</li>
+        <li><strong>The <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> re-pairs by nearest neighbour</strong>, and the initialisation folds vectors with absolute values: nothing should be concluded from the geometry of that step in isolation. <a href="ASO.code.html#f-not-a-fit">Why this is not a fit</a>.</li>
+        <li><strong>Dead code, a non-inverted transform file and time-point suffixes</strong> (only <code>_T1</code> and <code>_T2</code> are cut) are listed on the code page.</li>
       </ul>
 
-      <div class="callout warn">
-        <div class="callout-title">Pitfall · Legacy only</div>
-        <p><strong>Nothing is rewritten if the file already exists.</strong> All three <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> outputs are
-        guarded by <code>if not os.path.exists</code>. A second pass after fixing a parameter
-        produces no visible effect and still ends in success.</p>
-        <p>Legacy (3c67957): still true, <code>SEMI_ASO_CBCT.py:94</code>, <code>:111</code>, <code>:124</code> and <code>PRE_ASO_CBCT.py:134</code>, <code>:156</code>. Not present in <a href="../visor/ASO/ASO.html">VISOR</a>: each job writes into a fresh output folder created by the server (VISOR-serve <code>execution/dispatch.py:427-430</code>) and the outputs are written unconditionally (<code>SADT-VISOR ASO/cbct/pipeline.py:367-374</code>).</p>
-      </div>
+            <a class="deep-link" href="ASO.code.html#pieges"><b>In the code</b><span>The pitfalls with their evidence</span></a>
 
-      <div class="callout bug">
-        <div class="callout-title">Confirmed bug · Legacy only</div>
-        <p><strong>Patient identifiers diverge between ASO and AREG.</strong>
-        <code>PatientNumber</code> (<code>utils.py:298</code>) cuts on
-        <code>_U</code>/<code>_L</code>, while <a href="../AREG_IOS/AREG_IOS.html">AREG_IOS</a> rebuilds it as <code>patient_id.split("_")[0]</code>
-        (<code>AREG_IOS.py:321</code>). A name like <code>P01_T1_U.vtk</code>
-        gives <code>P01_T1</code> on one side and <code>P01</code> on the other: ASO's <code>.tfm</code> is never
-        found, and AREG settles for a <code>logger.warning</code>.</p>
-        <p>Legacy (3c67957): the divergence is still there, at other lines: <code>PatientNumber</code> is <code>ASO_IOS/ASO_IOS_utils/utils.py:167</code> and AREG_IOS builds the short id at <code>AREG_IOS/AREG_IOS.py:271</code>. ASO writes <code>&lt;PatientNumber&gt;_SegOr.tfm</code> only when the occlusion is linked; with independent arches the jaw stays in the name (<code>ASO_IOS/PRE_ASO_IOS/PRE_ASO_IOS.py:216-224</code>). The second <code>PatientNumber</code> definition mentioned in an earlier revision of this page no longer exists in this file. Not present in <a href="../visor/ASO/ASO.html">VISOR</a> as stated: ASO writes <code>&lt;patient&gt;_&lt;jaw&gt;_&lt;suffix&gt;.tfm</code> (<code>SADT-VISOR ASO/ios/pipeline.py:542</code>) and AREG_IOS pairs by <code>patient_stem</code> with the jaw tokens dropped (<code>AREG_IOS/dispatch.py:255-280</code>); read in code, the chain was not run end to end.</p>
-      </div>
-
-      <ul>
-        <li><strong>Dead code</strong>: <code>Net.py</code> (<code>DenseNet</code>) and <code>PreASOResample</code> on the CBCT side; the
-        <code>search</code> with a phantom <code>self</code>; <code>DisplayALIIOS</code>; <code>Files_vtk_json_link</code>;
-        <code>vtkMiddleTeeth</code>; <code>npSameNumberPoint</code> (the <code>source.shape[0] &lt; target.shape[0]</code>
-        branch, which references an undefined <code>target_points</code>); the orphan file
-        <code>LinearTransform_t.tfm</code>, referenced nowhere.</li>
-        <li><strong>PRE_ASO_CBCT's <code>.tfm</code> is written non-inverted</strong>, even though it is its inverse
-        that was applied to the volume. It is later composed and then inverted as a
-        block in SEMI_ASO_CBCT; worth checking before reusing this file on its own.</li>
-        <li><strong>Time-point suffixes.</strong> <code>PatientScanLandmark</code>
-        (<code>CBCT.py:27</code>) only cuts on <code>_T1</code>/<code>_T2</code>; a
-        <code>_T3</code> breaks the pairing. The comment is already there in the code.</li>
-      </ul>
 
       <h2 id="litterature">10. Literature</h2>
 
-      <p>The reference paper for ASO_CBCT is <strong>Automated Orientation and Registration
-      of Cone-Beam Computed Tomography Scans</strong> (Anchling, Hutin, Cevidanes et al.,
-      Lecture Notes in Computer Science, 2023). Its description matches the code: <a href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a>
-      identifies the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> regardless of the input orientation, then the
-      orientation is obtained "by first aligning 3 randomly chosen landmarks, then
-      refining with ICP." Reported errors: &lt; 3° and &lt; 2 mm against experts.
-      The paper does not mention the <code>DenseNet</code> pre-orienter, consistent with the
-      fact that it is no longer connected.</p>
+      <p>The reference paper for ASO_CBCT is <strong>Automated Orientation and Registration of Cone-Beam Computed Tomography Scans</strong> (Anchling, Hutin, Cevidanes et al., Lecture Notes in Computer Science, 2023). Its description matches the code: <a href="../ALI/ALI.html#ali-cbct">ALI_CBCT</a> identifies the <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> regardless of the input orientation, then the orientation is obtained &ldquo;by first aligning 3 randomly chosen landmarks, then refining with <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a>.&rdquo; Reported errors: under 3&deg; and 2&nbsp;mm against experts. The paper does not mention the pre-orientation network, consistent with the fact that it is no longer connected.</p>
 
-      <p>For ALI_CBCT itself: <strong>Automatic landmark identification in cone-beam computed
-      tomography</strong> (Gillot et al., <em>Orthodontics &amp; Craniofacial Research</em>, 2023).</p>
+      <p>For ALI_CBCT itself: <strong>Automatic landmark identification in cone-beam computed tomography</strong> (Gillot et al., <em>Orthodontics &amp; Craniofacial Research</em>, 2023).</p>
 
-      <p><strong>ASO_IOS has no paper of its own.</strong> The closest published text is
-      <em>AReg <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>: Automatic Registration on IntraOral Scans</em> (Hutin, Anchling, Cevidanes
-      et al., LNCS 2023), which describes the initial alignment by shared tooth
-      centroids, that is, exactly <code>PrePreAso</code>. The rest (tooth selection by
-      the operator, ICP refinement on 3 centroids, occlusion mode) is
-      unpublished internal development.</p>
+      <p><strong>ASO_IOS has no paper of its own.</strong> The closest published text is <em>AReg <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a>: Automatic Registration on IntraOral Scans</em> (Hutin, Anchling, Cevidanes et al., LNCS 2023), which describes the initial alignment by shared tooth <a class="gterm" data-term="aso-leg-centroids" href="ASO.code.html#mode-auto-ios" title="See the code">centroids</a>, that is, exactly the jaw alignment. The rest (tooth selection by the operator, ICP refinement on 3 centroids, <a class="gterm" data-term="aso-leg-occlusion" href="ASO.code.html#occlusion" title="See the code">occlusion</a> mode) is unpublished internal development.</p>
 
       <ul>
         <li><a href="https://github.com/lucanchling/ASO">ASO (original repository, Anchling)</a></li>
@@ -1068,9 +731,10 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
 
       <footer class="footer">
         <a href="../index.html">← All pages</a> ·
-        <a href="SOURCES.html">Bibliography for this tool</a> ·
-        Source: <code>ASO.md</code>
+        <a href="ASO.code.html">Code page for this tool</a> ·
+        <a href="SOURCES.html">Bibliography for this tool</a>
       </footer>
+
 
     </article>
     <aside class="toc"></aside>
@@ -1080,5 +744,7 @@ TransformSITK = TransformSITK.GetInverse()</code></pre>
 <script src="../../assets/aso-mesh.js"></script>
 <script src="../../assets/aso-ios-mesh.js"></script>
 <script src="../../assets/aso-3d.js"></script>
+<script src="../../assets/algo.js"></script>
+<script src="../../assets/algo-ASO.js"></script>
 </body>
 </html>

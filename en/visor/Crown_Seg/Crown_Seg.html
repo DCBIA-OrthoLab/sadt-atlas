@@ -22,6 +22,7 @@
     <div class="sec-switch" role="group">
       <a href="../../guide/visor.html">Guide</a>
       <a href="../../visor/Crown_Seg/Crown_Seg.html" aria-current="true">Atlas</a>
+      <a href="../../visor/Crown_Seg/Crown_Seg.code.html">Code</a>
     </div>
     <p class="sec-hint">how it works, step by step</p>
     <div class="gen-wrap" data-gen="visor">
@@ -119,39 +120,45 @@
       <header class="page-head">
         <div class="breadcrumb"><a href="../../index.html">SADT Atlas</a> › <a href="../index.html">VISOR</a> › Segmentation</div>
         <h1>Crown_Seg: tooth numbering, VISOR only</h1>
-        <p class="lede">Crown_Seg writes the dental number of every tooth of an intraoral surface scan into a per-vertex array, so that the <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> and registration tools that follow can find the teeth. It has no page of its own in the legacy atlas because the legacy repository has no such tool: the work was done by an external Slicer command-line module, called from four modules. VISOR makes it a tool of its own, called by three other tools.</p>
+        <p class="lede">Crown_Seg writes the dental number of every tooth of an intraoral surface scan into a per-vertex array, so that the <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmark</a> and registration tools that follow can find the teeth. It has no page of its own in the legacy atlas because the legacy repository has no such tool: the work was done by an external Slicer command-line module, called from four modules. VISOR makes it a tool of its own, called by three other tools. This page explains it step by step; the details a developer needs are on <a href="Crown_Seg.code.html">the code page</a>.</p>
         <div class="meta-row">
           <span class="badge neutral">VISOR only</span>
           <span class="badge neutral">SADT-VISOR 6ba2a78</span>
           <span class="badge neutral">VISOR-serve e9a7e5d</span>
           <span class="badge neutral">Remote 19b95e8</span>
+          <a class="badge neutral" href="Crown_Seg.code.html">Code (developers)</a>
         </div>
       </header>
 
-      <div class="callout note">
-        <div class="callout-title">No legacy module</div>
-        <p>The legacy repository (SlicerAutomatedDentalTools at 3c67957) contains no Crown_Seg module and no file with &ldquo;crown&rdquo; or &ldquo;dentalmodelseg&rdquo; in its path (<code>git ls-tree</code> on that commit, observed). What it contains are calls to the <code>CrownSegmentationcli</code> module of the separate SlicerDentalModelSeg extension, and a small copy of the same call inside the ALI_IOS command line. The exact correspondence is in <a href="#legacy">Legacy counterpart</a>. How VISOR runs a tool on a server is described in <a href="../architecture.html">Architecture</a>.</p>
-      </div>
+      <p><strong>No legacy module.</strong> The legacy repository (SlicerAutomatedDentalTools at 3c67957) contains no Crown_Seg module. What it contains are calls to the <code>CrownSegmentationcli</code> module of the separate SlicerDentalModelSeg extension, and a small copy of the same call inside the ALI_IOS command line. The exact correspondence is in <a href="#legacy">Legacy counterpart</a>. How VISOR runs a tool on a server is described in <a href="../architecture.html">Architecture</a>. <a href="Crown_Seg.code.html#f-no-legacy">Evidence</a>.</p>
 
-      <p>Paths: <code>SADT-VISOR cs/</code> is <code>tools/Crown_Seg/src/sadt_crownseg/</code>, <code>ali_ios/</code> is <code>tools/ALI/ALI_IOS/src/sadt_ali_ios/</code>, and <code>VISOR-serve</code> paths start at <code>server/</code> unless they name <code>docs/</code> or <code>scripts/</code>. &ldquo;Observed&rdquo; marks what was re-run while writing this page; everything else was read in the code.</p>
+      <h2 id="crownseg-overview">Overview: what goes in, what comes out</h2>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>In</th><th>Out</th></tr></thead>
+        <tbody>
+          <tr><td>One intraoral surface mesh (<code>.vtk</code> or <code>.stl</code>), or a folder of them, and the tooth-numbering system to use (Universal or <a class="gterm" data-term="crownseg-fdi" href="Crown_Seg.code.html#numbering" title="See the code">FDI</a>)</td><td>A copy of each mesh as <code>.vtk</code> with a per-vertex array of tooth numbers (Universal 1 to 32, gum 33, or the FDI equivalent), and a <code>run_report.json</code> that says what happened to each mesh</td></tr>
+        </tbody>
+      </table></div>
 
       <h2 id="status">1. Status and where it lives</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>State</th></tr></thead>
-          <tbody>
-            <tr><td>API name</td><td><code>Crown_Seg</code>, declared by <code>[tool.sadt] tool = true, name = "Crown_Seg"</code> (<code>SADT-VISOR tools/Crown_Seg/pyproject.toml:33-35</code>).</td></tr>
-            <tr><td>Environment</td><td>Python 3.11, its own environment: <code>torch==2.11.0</code>, <code>vtk==9.6.2</code>, <code>numpy==2.3.2</code> (<code>pyproject.toml:7,16-18</code>). The segmentation engine is an optional extra, <code>segmentation</code>: <code>shapeaxi&gt;=2.0.2</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code>, <code>pytorch3d==0.7.9+pt2110cu128</code>, <code>torchvision==0.26.0</code> (<code>pyproject.toml:37-48</code>), so that the package can be imported, and its schema published, without the GPU stack.</td></tr>
-            <tr><td>Engine</td><td>Not ported: <code>shapeaxi.dental_model_seg.main</code> is called directly with the namespace its own <code>cml()</code> would build (<code>cs/pipeline.py:10-15,336-366</code>). One workaround of the tool's own: <code>_restore_moved_class</code> points shapeaxi 2.0.x at the class it moved (<code>cs/pipeline.py:105-140</code>).</td></tr>
-            <tr><td>Weights</td><td>One <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a>, <code>07-21-22_val-loss0.169.pth</code> (6,612,456 bytes), from the Fly-by-CNN 3.0 release, staged under <code>DATA/Crown_Seg/models/</code> (<code>VISOR-serve scripts/data-manifest.yml:259-262</code>) and again under <code>DATA/ALI/models/Crown_Seg_Model/</code> so that ALI_IOS can pass its models folder on (<code>scripts/data-manifest.yml:235</code>). A folder given as <code>model</code> is searched recursively for a <code>.pth</code> whose name carries <code>val-loss</code>; two candidates are refused, naming both (<code>cs/pipeline.py:186-262</code>).</td></tr>
-            <tr><td>Client</td><td>Module <code>Crown Segmentation</code> (category &ldquo;Automated Dental Tools Remote&rdquo;), 75 lines, no Remote suffix: <code>TOOL_NAME = "Crown_Seg"</code>, form generated from the schema, a check box to load the labelled meshes as models, at most 12 (<code>AutomatedDentalToolsRemote Crown_Seg/Crown_Seg.py:27-28,54-69</code>). It has no icon and no tests.</td></tr>
-            <tr><td>Calls</td><td>None: it is a leaf (<code>VISOR-serve docs/TOOL_GRAPH.md:28,44</code>).</td></tr>
-            <tr><td>Declared resources</td><td>None. No <code>[tools.Crown_Seg]</code> section exists in <code>server/deployment.toml</code>, so there is no timeout, width or upload limit of its own; the global <code>TOOL_TIMEOUT_SECONDS = 0</code> means no limit (<code>server/config.py:77</code>). A thread sweep recorded in a comment of the admission code puts a run at about 55 s whatever the thread count, from 1 to 56 (<code>server/execution/admission.py:413,425-428</code>, a measurement quoted from the code, not re-run here).</td></tr>
-            <tr><td>State</td><td>Implemented. 8 test files under <code>tests/</code>; the AREG sibling READMEs describe the chain as not validated end to end with the real tools (<code>SADT-VISOR tools/AREG/README.md:132-137</code>). The tool has no environment of its own on this machine, so its tests and its engine were not run; the checks marked &ldquo;observed&rdquo; below used the environment of AREG_IOS, which has vtk but not the segmentation engine.</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Item</th><th>State</th></tr></thead>
+        <tbody>
+          <tr><td>API name</td><td>Crown_Seg, a server tool declared in its own project file.</td></tr>
+          <tr><td>Environment</td><td>Python 3.11 with its own environment (torch, vtk, numpy). The segmentation engine is an optional extra, so that the package can be imported, and its schema published, without the GPU stack.</td></tr>
+          <tr><td>Engine</td><td>Not ported: <a class="gterm" data-term="crownseg-shapeaxi" href="Crown_Seg.code.html#pipeline-engine" title="See the code">shapeaxi</a>&rsquo;s own tooth-segmentation function is called directly, with the options its command line would build. One workaround of the tool&rsquo;s own repairs an import path that shapeaxi 2.0.x moved.</td></tr>
+          <tr><td>Weights</td><td>One <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> (6.6 MB, from the Fly-by-CNN 3.0 release), staged on the server and again where ALI_IOS can pass its models folder on. A folder given as the model is searched recursively for a <code>.pth</code> whose name carries <code>val-loss</code>; two candidates are refused, naming both.</td></tr>
+          <tr><td>Client</td><td>A small panel (&ldquo;Crown Segmentation&rdquo;): a form generated from the schema and a check box to load the labelled meshes as models, at most 12. It has no icon and no tests.</td></tr>
+          <tr><td>Calls</td><td>None: it is a leaf.</td></tr>
+          <tr><td>Declared resources</td><td>None: no timeout, width or upload limit of its own. A thread sweep recorded in a comment of the server&rsquo;s admission code puts a run at about 55 s whatever the thread count (a measurement quoted from the code, not re-run here).</td></tr>
+          <tr><td>State</td><td>Implemented, with 8 test files. The sibling AREG READMEs describe the chain as not validated end to end with the real tools. The tool has no environment of its own on this machine, so its tests and its engine were not run.</td></tr>
+        </tbody>
+      </table></div>
+
+      <a class="deep-link" href="Crown_Seg.code.html#status"><b>In the code</b><span>File and line for every row, the pinned versions and the checkpoint search</span></a>
+
 
       <h2 id="callers">2. Who calls it</h2>
 
@@ -160,17 +167,23 @@
           <rect class="d-band" x="0" y="8" width="940" height="276" rx="8"/>
           <text class="d-label-s" x="14" y="28">server, one venv per tool</text>
 
-          <rect class="d-box" x="20" y="44" width="220" height="56" rx="6"/>
+          <a class="d-link" href="#callers">
+<rect class="d-box" x="20" y="44" width="220" height="56" rx="6"/>
           <text class="d-label" x="130" y="68" text-anchor="middle">ALI_IOS</text>
           <text class="d-label-xs" x="130" y="86" text-anchor="middle">mesh without labels, on the fly</text>
+</a>
 
-          <rect class="d-box" x="20" y="112" width="220" height="56" rx="6"/>
+          <a class="d-link" href="#callers">
+<rect class="d-box" x="20" y="112" width="220" height="56" rx="6"/>
           <text class="d-label" x="130" y="136" text-anchor="middle">AREG_IOS</text>
           <text class="d-label-xs" x="130" y="154" text-anchor="middle">Fully-Automated, T1 and T2</text>
+</a>
 
-          <rect class="d-box" x="20" y="180" width="220" height="56" rx="6"/>
+          <a class="d-link" href="#callers">
+<rect class="d-box" x="20" y="180" width="220" height="56" rx="6"/>
           <text class="d-label" x="130" y="204" text-anchor="middle">AREG_IOSCBCT</text>
           <text class="d-label-xs" x="130" y="222" text-anchor="middle">Semi-Automated, Fully-Automated</text>
+</a>
 
           <path class="d-arrow" d="M240 72 H322"/>
           <path class="d-arrow-head" d="M330 72 l-7 -4 v8 z"/>
@@ -180,85 +193,88 @@
           <path class="d-arrow-head" d="M330 208 l-7 -4 v8 z"/>
           <text class="d-label-xs" x="282" y="64" text-anchor="middle">sup.run</text>
 
-          <rect class="d-box-a" x="332" y="44" width="250" height="192" rx="6"/>
+          <a class="d-link" href="#pipeline">
+<rect class="d-box-a" x="332" y="44" width="250" height="192" rx="6"/>
           <text class="d-label" x="457" y="72" text-anchor="middle">Crown_Seg</text>
           <text class="d-label-s" x="457" y="98" text-anchor="middle">skips meshes that already</text>
           <text class="d-label-s" x="457" y="114" text-anchor="middle">carry a label array,</text>
-          <text class="d-label-s" x="457" y="138" text-anchor="middle">shapeaxi dental_model_seg.main</text>
+          <text class="d-label-s" x="457" y="138" text-anchor="middle">shapeaxi tooth segmentation</text>
           <text class="d-label-s" x="457" y="154" text-anchor="middle">on the others, one checkpoint</text>
           <text class="d-label-xs" x="457" y="182" text-anchor="middle">numbering Universal or FDI</text>
           <text class="d-label-xs" x="457" y="198" text-anchor="middle">GPU, or CPU when there is no card</text>
+</a>
 
           <path class="d-arrow" d="M582 140 H643"/>
           <path class="d-arrow-head" d="M650 140 l-7 -4 v8 z"/>
 
-          <rect class="d-box" x="652" y="96" width="268" height="88" rx="6"/>
+          <a class="d-link" href="#args">
+<rect class="d-box" x="652" y="96" width="268" height="88" rx="6"/>
           <text class="d-label" x="786" y="122" text-anchor="middle">Output folder</text>
           <text class="d-label-s" x="786" y="144" text-anchor="middle">labelled .vtk copies</text>
           <text class="d-label-s" x="786" y="160" text-anchor="middle">run_report.json, status per mesh</text>
+</a>
 
-          <rect class="d-box-n" x="652" y="204" width="268" height="60" rx="6"/>
+          <a class="d-link" href="#callers">
+<rect class="d-box-n" x="652" y="204" width="268" height="60" rx="6"/>
           <text class="d-label" x="786" y="228" text-anchor="middle">ASO</text>
           <text class="d-label-xs" x="786" y="246" text-anchor="middle">reads the labels, never calls Crown_Seg</text>
+</a>
         </svg>
-        <figcaption>The three callers of Crown_Seg (<code>VISOR-serve docs/TOOL_GRAPH.md:11-18</code> and the <code>calls</code> list of ALI_IOS, observed). ASO refuses a mesh without labels instead of segmenting it (<code>SADT-VISOR tools/ASO/src/sadt_aso/dispatch.py:882-895</code>).</figcaption>
+        <figcaption>The three callers of Crown_Seg, one of which (ALI_IOS) calls it only for the meshes that carry no labels. ASO refuses a mesh without labels instead of segmenting it.</figcaption>
       </figure>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Caller</th><th>When</th><th>Call</th></tr></thead>
-          <tbody>
-            <tr><td>ALI_IOS</td><td>any mesh of the batch with no label array, before the <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a></td><td><code>sup.run("Crown_Seg", meshes=&lt;staged folder&gt;, model=&lt;the models folder it was handed&gt;, device=&lt;the deployment's device&gt;)</code>, then reads <code>run_report.json</code> and renames each result to the input name; a mesh that fails is dropped alone (<code>ali_ios/dispatch.py:58,193-300</code>)</td></tr>
-            <tr><td>AREG_IOS</td><td>Fully-Automated, for both scans (T1 and T2)</td><td><code>sup.run("Crown_Seg", meshes=&lt;folder&gt;, suffix="Seg"[, model=...])</code>, no <code>device</code> (<code>SADT-VISOR tools/AREG/AREG_IOS/src/sadt_areg_ios/tools.py:113-130</code>, <code>dispatch.py:172-173</code>)</td></tr>
-            <tr><td>AREG_IOSCBCT</td><td>Semi-Automated and Fully-Automated, not Registration</td><td>the same call on the intraoral folder (<code>tools/AREG/AREG_IOSCBCT/src/sadt_areg_ioscbct/tools.py:102-119</code>, <code>dispatch.py:311-315,334</code>)</td></tr>
-            <tr><td>ASO</td><td>never</td><td>an intraoral mesh with no landmarks and no label array is refused with &ldquo;Run 'Crown_Seg' over them first&rdquo; (<code>tools/ASO/src/sadt_aso/dispatch.py:882-895</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Caller</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td>ALI_IOS</td><td>Any mesh of the batch with no label array, before the <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>. It then reads the <a class="gterm" data-term="crownseg-report" href="Crown_Seg.code.html#args" title="See the code">report</a> and renames each result to the input name; a mesh that fails is dropped alone.</td></tr>
+          <tr><td>AREG_IOS</td><td>Fully-Automated mode, for both scans (T1 and T2).</td></tr>
+          <tr><td>AREG_IOSCBCT</td><td>Semi-Automated and Fully-Automated modes, not Registration.</td></tr>
+          <tr><td>ASO</td><td>Never: an intraoral mesh with no landmarks and no label array is refused with &ldquo;Run Crown_Seg over them first&rdquo;.</td></tr>
+        </tbody>
+      </table></div>
 
-      <p>In the AREG deployment the field <code>crown_model</code> is hidden and opted out of the hosted-model convention, so Crown_Seg finds its own <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> (<code>VISOR-serve server/deployment.toml:49-52,64-68,85</code>).</p>
+      <p>In the AREG deployment the model field is hidden, so Crown_Seg finds its own <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a>.</p>
+
+      <a class="deep-link" href="Crown_Seg.code.html#callers"><b>In the code</b><span>The call lines in each caller and the deployment settings</span></a>
+
 
       <h2 id="files">3. Files involved</h2>
 
-      <p>Line counts at 6ba2a78. There is no legacy file to compare with: the legacy work lived in an external extension (see
-      <a href="#legacy">Legacy counterpart</a>).</p>
+      <p>There is no legacy file to compare with: the legacy work lived in an external extension (see <a href="#legacy">Legacy counterpart</a>). The tool is two main files: one that holds the argument defaults and the call, and a longer one that holds everything else (constants, the <a class="gterm" data-term="crownseg-shapeaxi" href="Crown_Seg.code.html#pipeline-engine" title="See the code">shapeaxi</a> import and its repair, device choice, <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> search, discovery, the two branches, the call to shapeaxi and the <a class="gterm" data-term="crownseg-report" href="Crown_Seg.code.html#args" title="See the code">report</a>), plus a layout file, an errors file, and 8 test files.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>File</th><th>Lines</th><th>Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>cs/__init__.py</code></td><td>113</td><td><code>run()</code>: argument defaults, <code>_own_models</code>, the array name from the numbering, the call to <code>segment_crowns</code> (<code>cs/__init__.py:18-29,30-113</code>)</td></tr>
-            <tr><td><code>cs/pipeline.py</code></td><td>613</td><td>everything else: constants, the shapeaxi import and its repair, device, <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> search, discovery, the two branches, the call to shapeaxi, the report</td></tr>
-            <tr><td><code>cs/layout.py</code></td><td>36</td><td>hides <code>model</code> and <code>array_name</code>, labels <code>numbering</code> "Tooth numbering"</td></tr>
-            <tr><td><code>cs/errors.py</code></td><td>20</td><td><code>ToolInputError</code> (422) and <code>ToolUnavailableError</code> (503)</td></tr>
-            <tr><td><code>pyproject.toml</code>, <code>uv.lock</code></td><td>111, 2576</td><td>the venv; the lock resolves <code>shapeaxi</code> to 2.0.2 (<code>uv.lock:2178-2179</code>)</td></tr>
-            <tr><td><code>tests/</code></td><td>2886</td><td><code>test_arguments</code>, <code>test_discovery</code>, <code>test_engine_seam</code>, <code>test_model_discovery</code>, <code>test_provenance</code>, <code>test_real_data</code>, <code>test_report</code>, <code>test_run</code>, plus <code>conftest.py</code></td></tr>
-            <tr><td>Remote <code>Crown_Seg/Crown_Seg.py</code></td><td>75</td><td>the client panel (<a href="#status">section 1</a>)</td></tr>
-            <tr><td>VISOR-serve <code>scripts/data-manifest.yml:235,259-263</code></td><td>–</td><td>the checkpoint, twice, and the test mesh <code>T1_01_U_segmented.vtk</code></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <a class="deep-link" href="Crown_Seg.code.html#files"><b>In the code</b><span>The file table with line counts and the client panel</span></a>
+
 
       <h2 id="pipeline">4. The pipeline</h2>
 
       <figure class="diagram">
         <svg viewBox="0 0 1440 490" role="img" aria-label="Crown_Seg pipeline: resolve the checkpoint, discover meshes, split them into already labelled and to be segmented; copy the first as .vtk; write the others into a csv and call shapeaxi dental_model_seg.main, which loads each surface, predicts 34 classes per face with DentalModelSeg, moves them to the points, post-processes and optionally converts to FDI; then check each output, write run_report.json and remove the scratch folder.">
 <text class="d-label" x="14" y="75" text-anchor="start">per run</text>
+<a class="d-link" href="#pipeline-run">
 <rect class="d-box" x="120" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="235" y="73.5" text-anchor="middle">Resolve checkpoint</text>
 <text class="d-label-s" x="235" y="88.5" text-anchor="middle">file, folder (val-loss), DATA</text>
+</a>
+<a class="d-link" href="#pipeline-run">
 <rect class="d-box" x="384" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="499" y="73.5" text-anchor="middle">Discover meshes</text>
 <text class="d-label-s" x="499" y="88.5" text-anchor="middle">.vtk .stl, recursive</text>
+</a>
+<a class="d-link" href="#pipeline-run">
 <rect class="d-box" x="648" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="763" y="73.5" text-anchor="middle">Scratch folder</text>
 <text class="d-label-s" x="763" y="88.5" text-anchor="middle">.crownseg_work/</text>
+</a>
+<a class="d-link" href="#pipeline-run">
 <rect class="d-box" x="912" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="1027" y="73.5" text-anchor="middle">Sort meshes</text>
 <text class="d-label-s" x="1027" y="88.5" text-anchor="middle">label array present?</text>
+</a>
+<a class="d-link" href="#pipeline-run">
 <rect class="d-box" x="1176" y="45" width="230" height="64" rx="6"/>
 <text class="d-label" x="1291" y="73.5" text-anchor="middle">Engine importable?</text>
 <text class="d-label-s" x="1291" y="88.5" text-anchor="middle">else recorded, run goes on</text>
+</a>
 <path class="d-arrow" d="M350 77 H382"/>
 <path class="d-arrow-head" d="M382 77 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M614 77 H646"/>
@@ -268,18 +284,26 @@
 <path class="d-arrow" d="M1142 77 H1174"/>
 <path class="d-arrow-head" d="M1174 77 l-7 -4 v8 z"/>
 <text class="d-label" x="14" y="175" text-anchor="start">branches</text>
+<a class="d-link" href="#pipeline-run">
 <rect class="d-box" x="120" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="235" y="173.5" text-anchor="middle">Copy as .vtk</text>
 <text class="d-label-s" x="235" y="188.5" text-anchor="middle">&lt;rel&gt;/&lt;base&gt;_&lt;suffix&gt;.vtk</text>
+</a>
+<a class="d-link" href="#pipeline-run">
 <rect class="d-box" x="384" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="499" y="173.5" text-anchor="middle">crownseg_input.csv</text>
 <text class="d-label-s" x="499" y="188.5" text-anchor="middle">meshes to segment</text>
+</a>
+<a class="d-link" href="#pipeline-run">
 <rect class="d-box" x="648" y="145" width="230" height="64" rx="6"/>
 <text class="d-label" x="763" y="173.5" text-anchor="middle">Resolve device</text>
 <text class="d-label-s" x="763" y="188.5" text-anchor="middle">cuda:0, else cpu</text>
+</a>
+<a class="d-link" href="#pipeline-run">
 <rect class="d-box" x="912" y="145" width="230" height="64" rx="6"/>
-<text class="d-label" x="1027" y="173.5" text-anchor="middle">shapeaxi main()</text>
-<text class="d-label-s" x="1027" y="188.5" text-anchor="middle">Namespace, stdout swallowed</text>
+<text class="d-label" x="1027" y="173.5" text-anchor="middle">shapeaxi, one call</text>
+<text class="d-label-s" x="1027" y="188.5" text-anchor="middle">options set, output silenced</text>
+</a>
 <path class="d-arrow" d="M614 177 H646"/>
 <path class="d-arrow-head" d="M646 177 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M878 177 H910"/>
@@ -292,21 +316,31 @@
 <text class="d-label-s" x="509" y="140" text-anchor="start">to segment</text>
 <text class="d-label" x="14" y="275" text-anchor="start">shapeaxi</text>
 <text class="d-label-s" x="14" y="291" text-anchor="start">each mesh</text>
+<a class="d-link" href="#pipeline-engine">
 <rect class="d-box" x="120" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="235" y="273.5" text-anchor="middle">Load surface</text>
 <text class="d-label-s" x="235" y="288.5" text-anchor="middle">UnitSurfTransform</text>
+</a>
+<a class="d-link" href="#pipeline-engine">
 <rect class="d-box-n" x="384" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="499" y="273.5" text-anchor="middle">DentalModelSeg</text>
 <text class="d-label-s" x="499" y="288.5" text-anchor="middle">34 channels per face</text>
+</a>
+<a class="d-link" href="#pipeline-engine">
 <rect class="d-box" x="648" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="763" y="273.5" text-anchor="middle">Faces to points</text>
 <text class="d-label-s" x="763" y="288.5" text-anchor="middle">softmax, sum, argmax</text>
+</a>
+<a class="d-link" href="#pipeline-engine">
 <rect class="d-box" x="912" y="245" width="230" height="64" rx="6"/>
 <text class="d-label" x="1027" y="273.5" text-anchor="middle">Post-processing</text>
 <text class="d-label-s" x="1027" y="288.5" text-anchor="middle">islands, dilate, erode</text>
+</a>
+<a class="d-link" href="#numbering">
 <rect class="d-box" x="1176" y="245" width="230" height="64" rx="6"/>
-<text class="d-label" x="1291" y="273.5" text-anchor="middle">ConvertFDI</text>
+<text class="d-label" x="1291" y="273.5" text-anchor="middle">Convert to FDI</text>
 <text class="d-label-s" x="1291" y="288.5" text-anchor="middle">only if numbering = FDI</text>
+</a>
 <path class="d-arrow" d="M350 277 H382"/>
 <path class="d-arrow-head" d="M382 277 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M614 277 H646"/>
@@ -318,18 +352,26 @@
 <path class="d-arrow" d="M1027 209 V227 H235 V243"/>
 <path class="d-arrow-head" d="M235 243 l-4 -7 h8 z"/>
 <text class="d-label" x="14" y="375" text-anchor="start">outputs</text>
+<a class="d-link" href="#args">
 <rect class="d-box" x="120" y="345" width="230" height="64" rx="6"/>
 <text class="d-label" x="235" y="373.5" text-anchor="middle">Write labelled mesh</text>
 <text class="d-label-s" x="235" y="388.5" text-anchor="middle">crownseg_input_&lt;suffix&gt;/...</text>
+</a>
+<a class="d-link" href="#args">
 <rect class="d-box" x="384" y="345" width="230" height="64" rx="6"/>
 <text class="d-label" x="499" y="373.5" text-anchor="middle">Output exists?</text>
 <text class="d-label-s" x="499" y="388.5" text-anchor="middle">segmented, else failed</text>
+</a>
+<a class="d-link" href="#args">
 <rect class="d-box" x="648" y="345" width="230" height="64" rx="6"/>
 <text class="d-label" x="763" y="373.5" text-anchor="middle">run_report.json</text>
 <text class="d-label-s" x="763" y="388.5" text-anchor="middle">status and produced per mesh</text>
+</a>
+<a class="d-link" href="#args">
 <rect class="d-box" x="912" y="345" width="230" height="64" rx="6"/>
 <text class="d-label" x="1027" y="373.5" text-anchor="middle">Remove scratch</text>
 <text class="d-label-s" x="1027" y="388.5" text-anchor="middle">in a finally</text>
+</a>
 <path class="d-arrow" d="M350 377 H382"/>
 <path class="d-arrow-head" d="M382 377 l-7 -4 v8 z"/>
 <path class="d-arrow" d="M614 377 H646"/>
@@ -344,202 +386,145 @@
 <rect class="d-box-n" x="301" y="460" width="26" height="16" rx="4"/>
 <text class="d-label-s" x="335" y="472" text-anchor="start">network: predicts</text>
 </svg>
-        <figcaption>Crown_Seg on the server. The first two rows are the tool's own code (<code>cs/pipeline.py:384-551</code>); the third is shapeaxi's <code>dental_model_seg.main</code>, unchanged, read in an installed copy of shapeaxi 2.0.2, the version the lock file resolves. One box is a network (violet outline). A mesh that already carries labels takes the left branch and never reaches the network.</figcaption>
+        <figcaption>Crown_Seg on the server. The first two rows are the tool&rsquo;s own code; the third is the segmentation engine of <a class="gterm" data-term="crownseg-shapeaxi" href="Crown_Seg.code.html#pipeline-engine" title="See the code">shapeaxi</a>, unchanged. One box is a network (violet outline). A mesh that already carries labels takes the left branch and never reaches the network.</figcaption>
       </figure>
 
       <h3 id="pipeline-run">4.1 What the tool does around the engine</h3>
 
       <ol>
-        <li><strong><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">Checkpoint</a> first</strong>: <code>find_checkpoint</code> accepts a <code>.pth</code> file, or a folder searched recursively for a file whose
-        name carries <code>val-loss</code>; none or two is a <code>ToolInputError</code> naming them (<code>cs/pipeline.py:186-262</code>). Empty
-        <code>model</code> means <code>&lt;data_root&gt;/Crown_Seg/models</code> (<code>cs/__init__.py:18-29,104</code>). This happens before anything is created
-        (<code>cs/pipeline.py:407-413</code>).</li>
-        <li><strong>Discovery</strong>: one <code>.vtk</code> or <code>.stl</code>, or a folder walked recursively and sorted; nothing found is a 422
-        (<code>cs/pipeline.py:292-320</code>). The input root, used to mirror the tree, is the folder or the single file's parent
-        (<code>:323-330</code>).</li>
-        <li><strong>Sorting</strong>: with <code>skip_segmented</code> (default true), <code>is_segmented</code> opens each mesh and reads only the names of its
-        point arrays; any of <code>PredictedID</code>, <code>UniversalID</code>, <code>Universal_ID</code>, <code>FDI_ID</code> sends it to the copy branch
-        (<code>cs/pipeline.py:56,267-289,449-451</code>).</li>
-        <li><strong>Copy branch</strong>: each labelled mesh is written as <code>.vtk</code> polydata to <code>&lt;output&gt;/&lt;relative folder&gt;/&lt;base&gt;_&lt;suffix&gt;.vtk</code>,
-        an <code>.stl</code> being converted (<code>cs/pipeline.py:480-487,594-613</code>). The labels are not touched.</li>
-        <li><strong>Segment branch</strong>: the remaining paths go into <code>.crownseg_work/crownseg_input.csv</code> under a <code>surf</code> header, the device
-        is resolved to <code>cuda:0</code> or <code>cpu</code> (<code>:170-178</code>), and shapeaxi is called once for the whole list with this namespace
-        (<code>cs/pipeline.py:336-366,508-531</code>):</li>
+        <li><strong><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">Checkpoint</a> first.</strong> The weights are found before anything is created, so a refused request leaves the output folder as it found it.</li>
+        <li><strong>Discovery.</strong> One <code>.vtk</code> or <code>.stl</code>, or a folder walked recursively and sorted; nothing found is refused.</li>
+        <li><strong>Sorting.</strong> With <em><a class="gterm" data-term="crownseg-skip" href="Crown_Seg.code.html#pipeline-run" title="See the code">skip segmented</a></em> on (the default), each mesh is opened and only the names of its point arrays are read. If one of <code>PredictedID</code>, <code>UniversalID</code>, <code>Universal_ID</code> or <code>FDI_ID</code> is there, the mesh goes to the copy branch.</li>
+        <li><strong>Copy branch.</strong> Each labelled mesh is written as <code>.vtk</code> in the output folder, an <code>.stl</code> being converted. The labels are not touched.</li>
+        <li><strong>Segment branch.</strong> The remaining meshes are listed in a small work table, the device is resolved to the GPU or the CPU, and shapeaxi is called once for the whole list.</li>
       </ol>
 
-      <pre><code>Namespace(surf=None, csv=csv_path, model=checkpoint, suffix=suffix, out=output_dir,
-          num_workers=max(1, num_workers), crown_segmentation=0, array_name=array_name,
-          fdi=1 if numbering == "FDI" else 0, overwrite=0, device=device,
-          vtk_folder=input_root)
-with contextlib.redirect_stdout(io.StringIO()):
-    dental_model_seg.main(args)</code></pre>
+      <p>If shapeaxi cannot be imported, the run goes on for the copy branch and records that the engine was unavailable; a mesh that needed the network then has no output and is marked failed.</p>
 
-      <p>Before the call, <code>_import_dental_model_seg</code> imports shapeaxi lazily and, when <code>saxi_nets</code> lacks <code>DentalModelSeg</code>
-      (every 2.0.x release, according to the comment), points it at <code>saxi_nets_lightning.DentalModelSeg</code> (<code>cs/pipeline.py:105-167</code>). If
-      the import fails, the run goes on for the copy branch and records <code>engine_available: false</code> with the error
-      (<code>cs/pipeline.py:466-472</code>); a mesh that needed the network then has no output and is <code>failed</code>.</p>
+      <a class="deep-link" href="Crown_Seg.code.html#pipeline-run"><b>In the code</b><span>The exact options passed to shapeaxi, the import repair and the order of the steps</span></a>
+
 
       <h3 id="pipeline-engine">4.2 Inside shapeaxi</h3>
 
-      <p>Read in shapeaxi 2.0.2's <code>dental_model_seg.py</code> (an installed copy; identical, for these functions, to the ShapeAXI checkout 2b34042):</p>
+      <p>The network is shapeaxi&rsquo;s tooth segmentation network, with 34 output classes. Each surface is loaded one at a time and rendered from several views; for each pixel the network returns scores for the classes, together with the face of the mesh that the pixel shows.</p>
 
-      <ul>
-        <li>the network is <code>saxi_nets_lightning.DentalModelSeg(custom_model=args.model, device=device)</code>, with <code>out_channels = 34</code>
-        (<code>:23,26</code>);</li>
-        <li>each surface is loaded through <code>SaxiDataset</code> with <code>UnitSurfTransform()</code>, batch size 1, <code>persistent_workers=True</code>
-        (<code>:82-84</code>), which is why <code>num_workers</code> must be at least 1;</li>
-        <li>the network returns per-view predictions and the face each pixel shows; the softmax of the predictions masked to visible pixels is
-        summed per face, the arg-max gives one label per face, and each face's label is given to its first vertex (<code>:91-111</code>);</li>
-        <li>post-processing: <code>RemoveIslands</code> for the gum label 33 with a threshold of 500, then for every label with 200, then a closing
-        per label, <code>DilateLabel</code> then <code>ErodeLabel</code>, two iterations each (<code>:118-130</code>);</li>
-        <li><code>ConvertFDI</code> if <code>fdi == 1</code> (<code>:52,225-236</code>, next section);</li>
-        <li>with <code>overwrite=0</code> and a csv input, the result goes to <code>&lt;out&gt;/&lt;csv stem&gt;_&lt;suffix&gt;/&lt;input path without
-        vtk_folder&gt;_&lt;suffix&gt;.vtk</code> (<code>:154-176</code>). Crown_Seg recomputes this path rather than parsing shapeaxi's output
-        (<code>cs/pipeline.py:369-381</code>), then marks each mesh <code>segmented</code> if the file exists and <code>failed</code> otherwise
-        (<code>:533-546</code>).</li>
-      </ul>
+      <figure class="algo" data-scene="crownseg_vote" data-ms="6400">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: four pixels that show the same face each give three class probabilities, the probabilities are added per class, and the highest class colours the face"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The network gives, for every pixel of each rendered view, a probability for each tooth class. For a given face of the mesh, the probabilities of all the pixels that show it are added up, and the class with the largest total becomes the face&rsquo;s label.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">&#x2113;</mi><mi class="k3">f</mi></msub><mo>=</mo><munder><mo>argmax</mo><mi class="k2">c</mi></munder><munder><mo>&#x2211;</mo><mrow><mi class="k4">p</mi><mo>&#x2208;</mo><msub><mi>P</mi><mi class="k3">f</mi></msub></mrow></munder><msub><mi>softmax</mi><mi class="k2">c</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><msub><mi class="k5">z</mi><mi class="k4">p</mi></msub><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>&ell;<sub>f</sub></b>the label given to face f</li><li class="k2"><b>c</b>one of the classes (34 in all: the teeth, the gum and no tooth)</li><li class="k3"><b>P<sub>f</sub></b>the pixels, over all the views, that show face f</li><li class="k4"><b>p</b>one of those pixels</li><li class="k5"><b>z<sub>p</sub></b>the raw scores of the network for pixel p, turned into probabilities by the softmax</li></ul></div>
+      </figure>
+
+
+      <p>That gives one label per face, and each face&rsquo;s label is then given to its first vertex. The labels are then cleaned.</p>
+
+      <figure class="algo" data-scene="crownseg_clean" data-ms="5200">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: a grid of labelled cells with stray cells and a hole; the stray cells are removed, then a closing fills the hole"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The labels are cleaned in two steps (schematic grid, not real data). First, small isolated pieces of a label are removed: a stray cell of another tooth inside a tooth, or a tooth label left in the gum. Then a <a class="gterm" data-term="crownseg-islands" href="Crown_Seg.code.html#pipeline-engine" title="See the code">closing</a>, a dilation followed by an erosion, fills the small holes inside each label without moving its outline.</p></div>
+      </figure>
+
+
+      <p>The cleaning removes islands first for the gum label (33), with a threshold of 500, then for every label, with 200, then closes each label with a dilation followed by an erosion, two iterations each. The result is written to a predictable path, which Crown_Seg recomputes instead of reading shapeaxi&rsquo;s output, and each mesh is marked segmented if its file exists and failed otherwise.</p>
+
+      <a class="deep-link" href="Crown_Seg.code.html#pipeline-engine"><b>In the code</b><span>The network class, the data loader, the post-processing calls and the output path rule</span></a>
+
 
       <h3 id="numbering">4.3 Tooth numbering: Universal and FDI</h3>
 
-      <p>The network always predicts Universal numbers: 1 to 32 for the teeth, 33 for the gum. With <code>numbering = "FDI"</code>, shapeaxi's
-      <code>ConvertFDI</code> maps every value through one look-up table (shapeaxi 2.0.2 <code>dental_model_seg.py:225-236</code>):</p>
+      <figure class="algo" data-scene="crownseg_fdi" data-ms="7600">
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: each Universal tooth number from 1 to 32 is read in a look-up table and its FDI number appears below it"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">The network always predicts Universal numbers, 1 to 32 for the teeth and 33 for the gum. With <a class="gterm" data-term="crownseg-fdi" href="Crown_Seg.code.html#numbering" title="See the code">FDI</a> numbering requested, every value is passed through one look-up table.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">ID</mi><mtext>FDI</mtext></msub><mo>=</mo><mi class="k2">LUT</mi><mo stretchy="true" fence="true">[</mo><msub><mi class="k3">ID</mi><mtext>Universal</mtext></msub><mo stretchy="true" fence="true">]</mo></mrow></math></div><ul class="algo-legend"><li class="k1"><b>ID<sub>FDI</sub></b>the tooth number in the FDI system, 0 for the gum</li><li class="k2"><b>LUT</b>a table of 34 entries, written in shapeaxi</li><li class="k3"><b>ID<sub>Universal</sub></b>the number predicted by the network, used as the position in the table</li></ul></div>
+      </figure>
 
-      <pre><code>LUT = [0, 18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28,
-          38,37,36,35,34,33,32,31, 41,42,43,44,45,46,47,48, 0]
-labels = LUT[labels]          # index = Universal value, entry = FDI value</code></pre>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Universal value</th><th>FDI value</th><th>Teeth</th></tr></thead>
-          <tbody>
-            <tr><td>1 to 8</td><td>18 down to 11</td><td>upper right, third molar to central incisor</td></tr>
-            <tr><td>9 to 16</td><td>21 up to 28</td><td>upper left, central incisor to third molar</td></tr>
-            <tr><td>17 to 24</td><td>38 down to 31</td><td>lower left, third molar to central incisor</td></tr>
-            <tr><td>25 to 32</td><td>41 up to 48</td><td>lower right, central incisor to third molar</td></tr>
-            <tr><td>33 (gum)</td><td>0</td><td>gum</td></tr>
-            <tr><td>0</td><td>0</td><td>–</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Universal value</th><th>FDI value</th><th>Teeth</th></tr></thead>
+        <tbody>
+          <tr><td>1 to 8</td><td>18 down to 11</td><td>upper right, third molar to central incisor</td></tr>
+          <tr><td>9 to 16</td><td>21 up to 28</td><td>upper left, central incisor to third molar</td></tr>
+          <tr><td>17 to 24</td><td>38 down to 31</td><td>lower left, third molar to central incisor</td></tr>
+          <tr><td>25 to 32</td><td>41 up to 48</td><td>lower right, central incisor to third molar</td></tr>
+          <tr><td>33 (gum)</td><td>0</td><td>gum</td></tr>
+        </tbody>
+      </table></div>
 
-      <p>shapeaxi writes the converted integers back <strong>under the same array name</strong> (<code>vtk_id.SetName(args.array_name)</code>,
-      <code>:233-235</code>). Because the two systems share most of their range, an FDI array called <code>Universal_ID</code> would be read without error
-      as other teeth: FDI 18 is the upper right third molar, Universal 18 a lower left molar; FDI 33 is a lower left canine, Universal 33 the gum
-      (comment at <code>cs/pipeline.py:62-80</code>). Crown_Seg therefore names the array after the numbering: <code>array_name</code> left empty becomes
-      <code>Universal_ID</code> or <code>FDI_ID</code> (<code>array_name_for</code>, <code>cs/pipeline.py:58-85</code>; <code>cs/__init__.py:44,106</code>). Every
-      downstream reader looks for Universal names only, so an FDI mesh is refused by ALI_IOS, ASO or AREG_IOS instead of being misread (see
-      <a href="#findings">Findings</a>). All legacy callers passed <code>fdi 0</code>; FDI output is new in practice, and Universal remains the default
-      (<code>cs/__init__.py:46</code>).</p>
+      <p>shapeaxi writes the converted integers back <strong>under the same <a class="gterm" data-term="crownseg-array-name" href="Crown_Seg.code.html#numbering" title="See the code">array name</a></strong>. Because the two systems share most of their range, an FDI array called <code>Universal_ID</code> would be read without error as other teeth: FDI 18 is the upper right third molar, Universal 18 a lower left molar. Crown_Seg therefore names the array after the numbering: left empty, the array name becomes <code>Universal_ID</code> or <code>FDI_ID</code>. Every downstream reader looks for Universal names only, so an FDI mesh is refused by ALI_IOS, ASO or AREG_IOS instead of being misread. All legacy callers asked for Universal numbers; FDI output is new in practice, and Universal remains the default.</p>
 
-      <h2 id="args">5. Arguments and I/O</h2>
+      <a class="deep-link" href="Crown_Seg.code.html#numbering"><b>In the code</b><span>The look-up table, the array-name rule and the checks in the downstream tools</span></a>
 
-      <p>Types and defaults are those of the published schema (observed: <code>scripts/describe.py</code> run on the tool with the interpreter of AREG_IOS, which has vtk; the tool's own environment is absent here). The schema declares no <code>extensions</code> for <code>meshes</code>.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Argument</th><th>Published type</th><th>Default</th><th>Widget and rule</th></tr></thead>
-          <tbody>
-            <tr><td><code>meshes</code></td><td>path, required</td><td>–</td><td>a file or a folder; <code>.vtk</code> and <code>.stl</code> only, folders searched recursively (<code>cs/pipeline.py:51,292-320</code>)</td></tr>
-            <tr><td><code>output_dir</code></td><td>path, required</td><td>–</td><td>not shown; filled by the server</td></tr>
-            <tr><td><code>model</code></td><td>path</td><td>empty</td><td>hidden (<code>cs/layout.py:5-15</code>). Empty means <code>DATA/Crown_Seg/models</code> (<code>cs/__init__.py:18-29,104</code>)</td></tr>
-            <tr><td><code>array_name</code></td><td>str</td><td>empty</td><td>hidden (<code>cs/layout.py:17-30</code>). Empty follows the numbering: <code>Universal_ID</code> or <code>FDI_ID</code> (<code>cs/pipeline.py:58-84</code>)</td></tr>
-            <tr><td><code>suffix</code></td><td>str</td><td><code>Seg</code></td><td>text field</td></tr>
-            <tr><td><code>numbering</code></td><td>str, 2 choices</td><td><code>Universal</code></td><td>&ldquo;Tooth numbering&rdquo;: Universal or FDI (<code>cs/layout.py:33-35</code>)</td></tr>
-            <tr><td><code>skip_segmented</code></td><td>bool</td><td>true</td><td>pass a mesh that already carries a label array through unchanged</td></tr>
-            <tr><td><code>device</code></td><td>str, 2 choices</td><td><code>cuda</code></td><td>technical, not shown to the clinician; <code>cuda</code> becomes <code>cuda:0</code> when a card is visible and falls back to CPU with a warning otherwise (<code>cs/pipeline.py:170-178</code>). When the caller names none, the server's own <code>DEVICE</code> replaces the default (<code>VISOR-serve server/base.py:876-896</code>)</td></tr>
-            <tr><td><code>num_workers</code></td><td>int</td><td>2</td><td>technical; forced to at least 1 because shapeaxi builds its loader with <code>persistent_workers=True</code> (<code>cs/pipeline.py:354-356</code>). The server lists it among the channel arguments it may set (<code>VISOR-serve server/execution/runner.py:1171</code>) but never writes a width of one over it (<code>server/execution/runner.py:1244-1262</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <h2 id="args">5. What you can choose</h2>
 
-      <p><strong>Outputs.</strong> The tool returns the output folder, so there are no named outputs. Two trees can appear, depending on what happened to each mesh: a mesh segmented by the network is written under <code>&lt;output&gt;/crownseg_input_&lt;suffix&gt;/&lt;relative path without extension&gt;_&lt;suffix&gt;.vtk</code> (<code>cs/pipeline.py:369-381,514</code>), and a mesh that already carried labels is copied, converted to <code>.vtk</code>, to <code>&lt;output&gt;/&lt;relative folder&gt;/&lt;base&gt;_&lt;suffix&gt;.vtk</code> (<code>cs/pipeline.py:480-487,594-613</code>). The caller is expected to read <code>run_report.json</code> rather than guess. The scratch folder <code>.crownseg_work/</code> is removed in a <code>finally</code> (<code>cs/pipeline.py:87,435-439</code>), and the <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> is resolved before it exists, so a refused request leaves the output folder as it found it (<code>cs/pipeline.py:407-413</code>).</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Setting</th><th>Default</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Meshes</td><td>required</td><td>A file or a folder; <code>.vtk</code> and <code>.stl</code> only, folders searched recursively.</td></tr>
+          <tr><td>Suffix</td><td>Seg</td><td>Added to each output name.</td></tr>
+          <tr><td>Tooth numbering</td><td>Universal</td><td>Universal or <a class="gterm" data-term="crownseg-fdi" href="Crown_Seg.code.html#numbering" title="See the code">FDI</a>.</td></tr>
+          <tr><td><a class="gterm" data-term="crownseg-skip" href="Crown_Seg.code.html#pipeline-run" title="See the code">Skip segmented</a></td><td>on</td><td>Pass a mesh that already carries a label array through unchanged.</td></tr>
+        </tbody>
+      </table></div>
 
-      <p><strong><code>run_report.json</code>.</strong> <code>tool</code>, <code>checkpoint</code> (by name), <code>array_name</code>, <code>suffix</code>, <code>numbering</code>, <code>device</code>, <code>cases</code> (per mesh: <code>status</code>, <code>input</code>, <code>produced</code>, and <code>error</code> on failure), <code>segmented_meshes</code>, <code>engine_available</code>, <code>engine_error</code>, a <code>summary</code> with the counts of <code>total</code>, <code>segmented</code>, <code>already_segmented</code>, <code>engine_unavailable</code> and <code>failed</code>, and <code>duration_seconds</code> (<code>cs/pipeline.py:556-590</code>). A mesh that shapeaxi wrote nothing for is a <code>failed</code> case; the run as a whole fails only when no mesh at all was produced (<code>cs/pipeline.py:540-551</code>).</p>
+      <p>Four more settings are technical and hidden from the clinician: the model (empty means the tool&rsquo;s own folder), the <a class="gterm" data-term="crownseg-array-name" href="Crown_Seg.code.html#numbering" title="See the code">array name</a> (empty follows the numbering), the device (cuda by default, falling back to the CPU with a warning when no card is visible) and the number of data-loading workers (at least 1).</p>
 
-      <p><strong>Privacy of the logs.</strong> shapeaxi prints the path of every mesh it saves, and the path carries the patient's file name: its standard output is swallowed (<code>cs/pipeline.py:341-345,365-366</code>), and the paths of the output are recomputed rather than parsed from it (<code>cs/pipeline.py:369-381</code>).</p>
+      <p><strong>Outputs.</strong> The tool returns its output folder. Two trees can appear: a mesh segmented by the network lands under a folder named after the work table, and a mesh that already carried labels is copied beside its relative path. The caller is expected to read <code>run_report.json</code> rather than guess. It lists, per mesh, a status (segmented, already segmented, engine unavailable or failed), the input and the produced file, plus a summary of the counts and the duration. The run as a whole fails only when no mesh at all was produced. <a class="gterm" data-term="crownseg-shapeaxi" href="Crown_Seg.code.html#pipeline-engine" title="See the code">shapeaxi</a> prints the path of every mesh it saves, and that path carries the patient&rsquo;s file name, so its output is swallowed.</p>
+
+      <a class="deep-link" href="Crown_Seg.code.html#args"><b>In the code</b><span>The published argument types, the report keys and the privacy handling of the logs</span></a>
+
 
       <h2 id="predicted">6. What is predicted vs computed</h2>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
-          <tbody>
-            <tr><td><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">Checkpoint</a> search, discovery, sorting on array names, copy branch</td><td><span class="badge calcule">computed</span> file system and VTK</td><td>server, Crown_Seg venv</td></tr>
-            <tr><td>Label per face, 34 classes</td><td><span class="badge predit">predicted</span> <strong>network</strong>: shapeaxi <code>DentalModelSeg</code>, checkpoint <code>07-21-22_val-loss0.169.pth</code></td><td>server, GPU when visible</td></tr>
-            <tr><td>Faces to points, island removal, closing</td><td><span class="badge calcule">computed</span> inside shapeaxi</td><td>server</td></tr>
-            <tr><td>Universal to FDI</td><td><span class="badge calcule">computed</span> look-up table</td><td>server</td></tr>
-            <tr><td>Report, statuses, output paths</td><td><span class="badge calcule">computed</span></td><td>server</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Block</th><th>Nature</th></tr></thead>
+        <tbody>
+          <tr><td><a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">Checkpoint</a> search, discovery, sorting on array names, copy branch</td><td><span class="badge calcule">computed</span> file system and VTK</td></tr>
+          <tr><td>Label per face, 34 classes</td><td><span class="badge predit">predicted</span> by the network (<a class="gterm" data-term="crownseg-shapeaxi" href="Crown_Seg.code.html#pipeline-engine" title="See the code">shapeaxi</a> tooth segmentation, GPU when visible)</td></tr>
+          <tr><td>Faces to points, <a class="gterm" data-term="crownseg-islands" href="Crown_Seg.code.html#pipeline-engine" title="See the code">island</a> removal, closing</td><td><span class="badge calcule">computed</span> inside shapeaxi</td></tr>
+          <tr><td>Universal to <a class="gterm" data-term="crownseg-fdi" href="Crown_Seg.code.html#numbering" title="See the code">FDI</a></td><td><span class="badge calcule">computed</span> look-up table</td></tr>
+          <tr><td><a class="gterm" data-term="crownseg-report" href="Crown_Seg.code.html#args" title="See the code">Report</a>, statuses, output paths</td><td><span class="badge calcule">computed</span></td></tr>
+        </tbody>
+      </table></div>
 
-      <p>Every tooth number comes from the network; nothing checks it against the anatomy afterwards. The README's reproducibility note
-      (<a href="#findings">Findings</a>) concerns the post-processed array, not the raw prediction.</p>
+      <p>Every tooth number comes from the network; nothing checks it against the anatomy afterwards.</p>
+
+      <a class="deep-link" href="Crown_Seg.code.html#predicted"><b>In the code</b><span>Where each block runs</span></a>
+
 
       <h2 id="legacy">7. Legacy counterpart</h2>
 
-      <p>There is no legacy Crown_Seg to compare line by line. Four places of the legacy repository at 3c67957 do the work, and the table says which part of Crown_Seg each one corresponds to. <code>ADTLib</code> has no part in it: the shared layer does not mention the segmentation, except for one repair of the installed library (<code>ADT/ADTLib/env/install_pytorch.py:404-444</code>).</p>
+      <p>There is no legacy Crown_Seg to compare line by line. Four places of the legacy repository at 3c67957 do the work, and the table says which part of Crown_Seg each one corresponds to.</p>
 
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Legacy piece (3c67957)</th><th>What it does</th><th>VISOR counterpart</th></tr></thead>
-          <tbody>
-            <tr><td>The <code>CrownSegmentationcli</code> module of the extension SlicerDentalModelSeg, not in the repository; ALI, ASO, AREG and FlexReg call it (<code>ALI/ALI.py:1188</code>, <code>ASO/ASO.py:1472</code>, <code>ASO/ASO_Method/IOS.py:314</code>, <code>AREG/AREG.py:1819</code>, <code>FlexReg/FlexReg.py:3481-3487</code>)</td><td>runs the <code>dentalmodelseg</code> executable of the <code>shapeaxi</code> environment in a subprocess and ignores its return code (read in a copy of the extension, version not established); a missing module stops the run with a request to install the extension (<code>ALI/ALI_Method/IOS.py:307-315</code>)</td><td>the tool <code>Crown_Seg</code> itself, called through <code>sup.run</code> from ALI_IOS, AREG_IOS and AREG_IOSCBCT; no extension to install; a mesh without output is <code>failed</code> alone</td></tr>
-            <tr><td><code>__BypassCrownseg__</code> and <code>__isSegmented__</code> in the ALI Slicer method (<code>ALI/ALI_Method/IOS.py:183-226</code>)</td><td>sorts the meshes into those that carry <code>PredictedID</code>, <code>UniversalID</code> or <code>Universal_ID</code> and those that do not; copies the first group as <code>&lt;name&gt;_Seg&lt;ext&gt;</code> into a flat folder, extension kept (<code>IOS.py:196</code>)</td><td><code>skip_segmented</code> and <code>is_segmented</code>, with a fourth name <code>FDI_ID</code>; the copy is converted to <code>.vtk</code> and keeps the folder tree (<code>cs/pipeline.py:56,267-289,480-487</code>)</td></tr>
-            <tr><td><code>IsSegmented</code> and <code>SegmentSurface</code> in the ALI_IOS command line, called when a scan has no labels (<code>ALI_IOS/ALI_IOS.py:906-908</code>, <code>ALI_IOS/ALI_IOS_utils/segmentation.py:33-133</code>)</td><td>the closest ancestor in the repository: the same executable with <code>--array_name Universal_ID --fdi 0 --suffix Seg --overwrite 0 --crown_segmentation 0</code> and a one-line csv (<code>segmentation.py:106-109</code>). Its <code>IsSegmented</code> also requires the label array to hold more than one value, and it reads <code>.vtk</code> and <code>.vtp</code> (<code>segmentation.py:33-56</code>)</td><td><code>is_segmented</code> only tests the array names, on <code>.vtk</code> and <code>.stl</code> (<code>cs/pipeline.py:267-289</code>); ALI_IOS asks the tool instead of shelling out (<code>ali_ios/dispatch.py:229-266</code>)</td></tr>
-            <tr><td>The parameters of the call, as ALI builds them (<code>ALI/ALI_Method/IOS.py:258-270</code>)</td><td><code>model "latest"</code>, which the extension's CLI turns into no <code>--model</code> option, so shapeaxi falls back to its default model, downloaded from the URL in its own <code>dental_model_path.json</code> (ShapeAXI checkout 2b34042, <code>saxi_nets_lightning.py:1233-1247</code>; the PyPI release that VISOR installs was not read); <code>fdi 0</code>; <code>overwrite 0</code>; <code>suffix Seg</code>; <code>array_name Universal_ID</code></td><td>the staged <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> is passed as <code>model</code>; <code>numbering</code> replaces <code>fdi</code> and the array name follows it; <code>overwrite=0</code> is fixed (<code>cs/pipeline.py:343-361</code>)</td></tr>
-            <tr><td>FlexReg's call (<code>FlexReg/FlexReg.py:3481-3487,3681-3686</code>)</td><td><code>overwrite 1</code> and <code>suffix None</code>: the call rewrites the file it was given</td><td>nothing is ever written outside <code>output_dir</code>; the input is not modified</td></tr>
-            <tr><td><code>patch_dentalmodelseg()</code> (<code>ADT/ADTLib/env/install_pytorch.py:404-444</code>)</td><td>rewrites the installed shapeaxi file so that <code>saxi_nets.DentalModelSeg</code> reads <code>saxi_nets_lightning.DentalModelSeg</code></td><td><code>_restore_moved_class</code>, which repairs the import at run time instead of editing a file (<code>cs/pipeline.py:105-140</code>)</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Legacy piece</th><th>What it did</th><th>VISOR counterpart</th></tr></thead>
+        <tbody>
+          <tr><td>The <code>CrownSegmentationcli</code> module of the extension SlicerDentalModelSeg, called by ALI, ASO, AREG and FlexReg</td><td>Ran the dental-model-segmentation executable of the <a class="gterm" data-term="crownseg-shapeaxi" href="Crown_Seg.code.html#pipeline-engine" title="See the code">shapeaxi</a> environment in a subprocess and ignored its return code; a missing module stopped the run with a request to install the extension</td><td>The tool Crown_Seg itself, called through the supervisor from ALI_IOS, AREG_IOS and AREG_IOSCBCT; no extension to install; a mesh without output is marked failed alone</td></tr>
+          <tr><td>The bypass and the already-segmented test in the ALI Slicer method</td><td>Sorted the meshes into those that carry a label array and those that do not; copied the first group as <code>&lt;name&gt;_Seg&lt;ext&gt;</code> into a flat folder</td><td><em><a class="gterm" data-term="crownseg-skip" href="Crown_Seg.code.html#pipeline-run" title="See the code">Skip segmented</a></em>, with a fourth name <code>FDI_ID</code>; the copy is converted to <code>.vtk</code> and keeps the folder tree</td></tr>
+          <tr><td>The same two steps in the ALI_IOS command line</td><td>The closest ancestor in the repository: the same executable with fixed options and a one-line table. Its test also required the label array to hold more than one value, and it read <code>.vtk</code> and <code>.vtp</code></td><td>Only the array names are tested, on <code>.vtk</code> and <code>.stl</code>; ALI_IOS asks the tool instead of shelling out</td></tr>
+          <tr><td>The parameters of the call, as ALI builds them</td><td>Model &ldquo;latest&rdquo;, which falls back to shapeaxi&rsquo;s default model downloaded from a URL; Universal numbers; no overwrite; suffix Seg</td><td>The staged <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> is passed as the model; the numbering replaces the <a class="gterm" data-term="crownseg-fdi" href="Crown_Seg.code.html#numbering" title="See the code">FDI</a> flag and the <a class="gterm" data-term="crownseg-array-name" href="Crown_Seg.code.html#numbering" title="See the code">array name</a> follows it</td></tr>
+          <tr><td>FlexReg&rsquo;s call</td><td>Overwrite on and no suffix: the call rewrote the file it was given</td><td>Nothing is ever written outside the output folder; the input is not modified</td></tr>
+          <tr><td>A patch of the installed library in the shared layer</td><td>Rewrote the installed shapeaxi file so that one class path pointed to the moved class</td><td>An import repair at run time, instead of editing a file</td></tr>
+        </tbody>
+      </table></div>
 
-      <p>What did not change is the engine and its post-processing: both sides run shapeaxi's own <code>dental_model_seg</code>, so the numbers it writes come from the same network. A shapeaxi call that wrote nothing for a mesh used to be invisible (the legacy ignores the return code); it is now a <code>failed</code> case for that mesh alone, and an error only when no mesh at all came out (<code>cs/pipeline.py:540-551</code>).</p>
+      <p>What did not change is the engine and its post-processing: both sides run shapeaxi&rsquo;s own tooth segmentation, so the numbers it writes come from the same network. A shapeaxi call that wrote nothing for a mesh used to be invisible; it is now a failed case for that mesh alone, and an error only when no mesh at all came out.</p>
 
-      <h2 id="findings">8. Findings in VISOR</h2>
+      <a class="deep-link" href="Crown_Seg.code.html#legacy"><b>In the code</b><span>The same table with the file and line of every piece</span></a>
 
-      <div class="callout warn">
-        <div class="callout-title">FDI numbering over a mesh that is already labelled</div>
-        <p>With <code>numbering = "FDI"</code> and <code>skip_segmented</code> on, a mesh that already carries a label array is copied unchanged (<code>cs/pipeline.py:480-487</code>; <code>_write_as_vtk</code> converts the file format, not the labels), while the report states <code>array_name = "FDI_ID"</code> and <code>numbering = "FDI"</code> (<code>cs/pipeline.py:556-561</code>). The copy keeps its Universal integers under their Universal name, so the report announces a numbering the file does not hold. Observed: a synthetic mesh carrying a <code>Universal_ID</code> array was passed through <code>segment_crowns</code> with <code>fdi=True</code> and <code>array_name="FDI_ID"</code>; the report read <code>numbering: "FDI"</code> and <code>array_name: "FDI_ID"</code>, and the output file held only <code>Universal_ID</code> with its original value. The segmentation engine is not installed in the environment used, so the case status read <code>engine_unavailable</code> instead of <code>already_segmented</code>; the copy path is the same. The tests do not cover this crossing (<code>tests/test_run.py:488-503</code>).</p>
-      </div>
 
-      <div class="callout warn">
-        <div class="callout-title">Four names recognised here, three downstream</div>
-        <p>Crown_Seg treats a mesh as segmented if it holds any of <code>PredictedID</code>, <code>UniversalID</code>, <code>Universal_ID</code> or <code>FDI_ID</code> (<code>cs/pipeline.py:56</code>). ALI_IOS, ASO and AREG_IOS read only the first three (<code>ali_ios/surface.py:19</code>, <code>SADT-VISOR tools/ASO/src/sadt_aso/markups.py:19</code>, <code>AREG_IOS/src/sadt_areg_ios/surfaces.py:39</code>). A mesh that has only <code>FDI_ID</code> therefore passes Crown_Seg and is refused by the next tool: intended (the tool's own comment says so, <code>cs/pipeline.py:64-80</code>), but with no symptom before that next tool. The comment of ALI_IOS saying that these are &ldquo;the same three names CrownSeg writes and recognizes&rdquo; (<code>ali_ios/surface.py:18</code>) is inexact. Read in code.</p>
-      </div>
+      <h2 id="findings">8. Known problems</h2>
 
-      <div class="callout warn">
-        <div class="callout-title">Meshes in <code>.vtp</code> or <code>.obj</code> are invisible to Crown_Seg</div>
-        <p>Crown_Seg discovers <code>.vtk</code> and <code>.stl</code> only (<code>cs/pipeline.py:51,292-320</code>), while AREG_IOS accepts <code>.vtk .vtp .stl .obj</code> as input (<code>AREG_IOS/src/sadt_areg_ios/surfaces.py:35</code>) and, in Fully-Automated mode, hands its folder to Crown_Seg (<code>dispatch.py:172-173</code>). A folder holding only such meshes is refused (&ldquo;No surface mesh found in the input&rdquo;, <code>cs/pipeline.py:314-319</code>); in a mixed folder they are left out of Crown_Seg's output, which is the folder AREG_IOS continues with. The legacy ALI_IOS copy of the call did read <code>.vtp</code> (<code>segmentation.py:33-56</code>). Read in code; not run.</p>
-      </div>
-
-      <div class="callout warn">
-        <div class="callout-title">Two output trees: read the report</div>
-        <p>A segmented mesh lands under <code>crownseg_input_&lt;suffix&gt;/</code>, a mesh that was already labelled lands beside its relative path, so a glob over one tree misses the other (<code>cs/pipeline.py:369-381,480-487</code>). ALI_IOS reads <code>cases[key].produced</code> from <code>run_report.json</code> instead (<code>ali_ios/dispatch.py:240-252</code>), which is what the report is for. A mesh of a degraded installation carries the status <code>engine_unavailable</code> yet is copied with its <code>produced</code> path (<code>cs/pipeline.py:495-505</code>), so a client that filtered on <code>already_segmented</code> alone would skip it. Read in code.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">The tool graph in the server docs is out of date</div>
-        <p><code>VISOR-serve docs/TOOL_GRAPH.md:27-28,43</code> lists ALI_IOS as a leaf. The schema that ALI_IOS publishes declares <code>calls = ['Crown_Seg']</code> (observed with <code>scripts/describe.py</code> in the ALI_IOS environment), because its dispatch calls <code>Crown_Seg</code> through a module constant (<code>ali_ios/dispatch.py:58,229</code>). The document says it is generated from those schemas and checked at boot; the copy in the repository is older than the code.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">Documentation that disagrees with the code</div>
-        <p>The README says that the model is a required argument (<code>README.md:33</code>), and so does the docstring of the pipeline (<code>cs/pipeline.py:16-23</code>); the argument is optional, with an empty default that resolves to the tool's own folder (<code>cs/__init__.py:41</code>, comment at <code>cs/__init__.py:35-40</code>). The README also names the folder <code>DATA/CrownSeg/testfiles</code> (<code>README.md:178</code>) while the code and the manifest use <code>DATA/Crown_Seg</code>, and it counts 176 tests (<code>README.md:225,232</code>) where 162 test functions are defined in <code>tests/</code> (a <code>def test_</code> count; parametrisation may explain the gap). AREG never passes <code>device</code> to Crown_Seg, unlike ALI_IOS (<code>SADT-VISOR tools/AREG/AREG_IOS/src/sadt_areg_ios/tools.py:113-130</code>), so on a CPU-only server the default <code>cuda</code> falls back to the CPU with a warning, or is replaced by the server's <code>DEVICE</code>. Read in code.</p>
-      </div>
-
-      <div class="callout ok">
-        <div class="callout-title">What the tool protects</div>
-        <p>The <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> is resolved before any file is created, so a refused request leaves nothing behind (<code>cs/pipeline.py:407-413</code>); a folder that holds two checkpoints is refused with both named, so the vintage of the weights is never silent (<code>cs/pipeline.py:244-251</code>); shapeaxi's standard output, which carries file names, is swallowed (<code>cs/pipeline.py:365</code>); the scratch folder is removed in a <code>finally</code> (<code>cs/pipeline.py:435-439</code>); the input is never modified. Read in code.</p>
-      </div>
-
-      <div class="callout note">
-        <div class="callout-title">Reproducibility</div>
-        <p>The tool's README reports that the raw prediction <code>PredictedID</code> is bit-identical to a reference port, and that the post-processed <code>Universal_ID</code> varies from run to run, including between two runs of the same code (826 to 2,607 points of 294,260). This is the README's measurement (<code>SADT-VISOR tools/Crown_Seg/README.md:176-209</code>, section &ldquo;Validated against&rdquo;), not re-run here.</p>
-      </div>
+      <ul>
+        <li><strong><a class="gterm" data-term="crownseg-fdi" href="Crown_Seg.code.html#numbering" title="See the code">FDI</a> numbering over a mesh that is already labelled:</strong> the copy keeps its Universal integers, while the <a class="gterm" data-term="crownseg-report" href="Crown_Seg.code.html#args" title="See the code">report</a> announces FDI. <a href="Crown_Seg.code.html#f-fdi-labelled">Evidence</a>.</li>
+        <li><strong>Four names recognised here, three downstream:</strong> a mesh that only has <code>FDI_ID</code> passes Crown_Seg and is refused by the next tool. <a href="Crown_Seg.code.html#f-array-names">Evidence</a>.</li>
+        <li><strong>Meshes in <code>.vtp</code> or <code>.obj</code> are invisible to Crown_Seg,</strong> although AREG_IOS accepts them. <a href="Crown_Seg.code.html#f-formats">Evidence</a>.</li>
+        <li><strong>Two output trees:</strong> read the report instead of globbing. <a href="Crown_Seg.code.html#f-output-trees">Evidence</a>.</li>
+        <li><strong>The tool graph in the server docs is out of date.</strong> <a href="Crown_Seg.code.html#f-tool-graph">Evidence</a>.</li>
+        <li><strong>Some documentation disagrees with the code</strong> (the model is said to be required, a folder name, a test count). <a href="Crown_Seg.code.html#f-docs">Evidence</a>.</li>
+        <li><strong>What the tool protects:</strong> nothing is left behind by a refused request, the input is never modified, file names stay out of the logs. <a href="Crown_Seg.code.html#f-protects">Evidence</a>.</li>
+        <li><strong>Reproducibility:</strong> the raw prediction is bit-identical to a reference port, the post-processed array varies from run to run. <a href="Crown_Seg.code.html#f-reproducibility">Evidence</a>.</li>
+      </ul>
 
       <footer class="footer">
         <a href="../../index.html">← All pages</a> ·
+        <a href="Crown_Seg.code.html">Code page for this tool</a> ·
         <a href="../index.html">VISOR</a> ·
         Sources: <code>SADT-VISOR tools/Crown_Seg</code> at 6ba2a78, <code>VISOR-serve</code> e9a7e5d, <code>AutomatedDentalToolsRemote</code> 19b95e8, legacy 3c67957
       </footer>
@@ -548,5 +533,7 @@ labels = LUT[labels]          # index = Universal value, entry = FDI value</code
     <aside class="toc"></aside>
   </div>
 </div>
+<script src="../../../assets/algo.js"></script>
+<script src="../../../assets/algo-Crown_Seg.js"></script>
 </body>
 </html>
