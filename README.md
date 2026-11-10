@@ -48,6 +48,27 @@ at `upstream/main` = `3c67957` (2026-10-26). Every `file.py:line` reference was
 checked against that revision. When the code moves, replay the audit from this SHA and
 update this line.
 
+**VISOR.** Since November 2026 the English tree also documents VISOR, the new
+generation of the tools (a Slicer client, an inference server, one virtualenv per
+tool). Every tool now has **four pages**: Atlas and Guide for the legacy module
+(`en/<Tool>/<Tool>.html`, `en/guide/<Tool>.html`) and Atlas and Guide for its VISOR
+port (`en/visor/<Tool>/<Tool>.html`, `en/visor/guide/<Tool>.html`). The sidebar has a
+*Legacy | VISOR* switch above *Guide | Atlas*, and the module list follows the
+generation of the page. VISOR also adds the transverse pages `en/visor/*.html`
+(architecture, run lifecycle, deployment, security, tests), `en/guide/visor.html`, and
+`en/visor/Crown_Seg/`, a tool that exists only in VISOR. The other six languages still describe the legacy code only and have
+to be retranslated. The VISOR pages were read at:
+
+| Repository | Branch read | Commit |
+|---|---|---|
+| `VISOR-serve` (server) | `conf/vface-deployment` | `e9a7e5d` |
+| `AutomatedDentalToolsRemote` (Slicer client) | `main` | `19b95e8` |
+| `SADT-VISOR` (tool catalogue) | `tool/vface` | `6ba2a78` |
+| `volume_crypto` (attestation prototype, not part of VISOR) | `crypto/two-machine-chain` | `d975dab` |
+
+[`sources.json`](sources.json) is the machine-readable version of both this table and
+the legacy SHA above. See *Updating the pages when the sources move* below.
+
 - The **Guide** addresses whoever uses the tools: what it is for, what to supply, what
   to check. No implementation detail.
 - The **Atlas** addresses whoever reads or modifies the code: the full pipeline, what
@@ -120,6 +141,25 @@ Each theme handles its own light and dark variants.
 
 **The sidebar is only ever modified in `nav.py`.** `build.py` then rewrites it into
 every page. That is what keeps a hundred-odd copies from drifting apart.
+
+## Updating the pages when the sources move
+
+Do not re-read the repositories. Every source repository has a reference commit in
+[`sources.json`](sources.json); the pages are only claimed to be true at that commit.
+
+```bash
+python3 sources_diff.py                  # per repository: commits, files, pages to revisit
+python3 sources_diff.py -v               # plus the changed files
+python3 sources_diff.py --patch visor-serve   # the real diff since the reference, to read
+# ... re-audit only what the diff touches, edit the pages ...
+python3 build.py
+python3 sources_diff.py --stamp          # move every reference to the current HEAD
+```
+
+A page is listed when a changed file matches one of the repository's `pages` rules in
+`sources.json`; the rules are a starting point, a changed file can still affect a page
+they do not name. Stamp only after re-auditing: the reference commit is the claim that
+the pages were checked against it. Update the SHA lines of this README with it.
 
 ## Languages
 

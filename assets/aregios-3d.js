@@ -5,8 +5,8 @@
    then ICP onto a surface extracted from the CBCT by thresholding ».
 
    Trois choses que la scene doit rendre visibles :
-   - la surface CBCT sort d'un seuil a 400, EN DUR dans le code, qui prend
-     l'os et l'email sans les distinguer ;
+   - la surface CBCT sort d'un seuil d'isosurface (adaptatif au 3c67957, avec
+     400 en repli), qui prend l'os et l'email sans les distinguer ;
    - les points sont apparies PAR ETIQUETTE, jamais par position -- apparier
      deux listes partielles par rang associerait des points sans rapport ;
    - le pre-alignement a deux garde-fous, au moins 3 paires et un residu RMS

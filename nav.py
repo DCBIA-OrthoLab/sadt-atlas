@@ -110,6 +110,25 @@ READING = ["FlexReg", "ALI", "AMASSS", "ASO", "AREG_IOS", "AREG_CBCT", "AREG_IOS
            "SurgMovPred", "AutoCrop3D", "AutoMatrix", "CNE", "MedX",
            "MedicalDataAnonymizer", "Agent"]
 
+# VISOR : la nouvelle generation d'outils (client Slicer + serveur d'inference).
+# Anglais seulement pour l'instant : les autres langues n'ont ni ces pages ni ce
+# groupe dans la barre laterale (voir `sidebar`), elles seront retraduites plus tard.
+# (slug de visor/<slug>.html, libelle)
+VISOR_PAGES = [
+    ("index",         "Overview"),
+    ("architecture",  "Architecture"),
+    ("run-lifecycle", "A run, step by step"),
+    ("deployment",    "Packaging and deployment"),
+    ("security",      "Security and privacy"),
+    ("testing",       "Tests and provenance"),
+]
+# outils sans portage VISOR (leur fiche a une section #visor qui dit ce qui existe)
+VISOR_NOT_PORTED = ["MRI2CBCT", "MedX", "MedicalDataAnonymizer"]
+# outils ayant des pages VISOR (tous ceux du site, plus Crown_Seg qui n'existe qu'en VISOR)
+VISOR_TOOLS = [t for t, _ in TOOLS] + ["Crown_Seg"]
+# page du Guide qui explique l'usage de VISOR
+VISOR_GUIDE = ("visor", "Using VISOR")
+
 UI = {
     "fr": {
         "tagline":   "SlicerAutomatedDentalTools, outil par outil",
@@ -256,6 +275,9 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     def href(tool):
         return up + rel_of(tool)
 
+    def vhref(tool):
+        return up + (f"visor/guide/{tool}.html" if section == "guide" else f"visor/{tool}/{tool}.html")
+
     def link(tool, cur):
         """L'entree de barre laterale d'un outil, pour CETTE langue.
 
@@ -295,10 +317,43 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     out.append("      " + "".join(bits))
     out.append('    </div>')
 
-    # bascule Guide / Atlas: sur une page d'outil, on reste sur le même outil
+    # bascule Guide / Atlas: sur une page d'outil, on reste sur le même outil.
+    # Quatre pages par outil : legacy ou VISOR, Guide ou Atlas.
     on_tool = current in {t for t, _ in TOOLS}
-    sw = (("guide", f"guide/{current}.html" if on_tool else "guide/index.html"),
-          ("atlas", f"{current}/{current}.html" if on_tool else "index.html"))
+    cur_s = str(current)
+    on_visor = lang == "en" and (cur_s == VISOR_GUIDE[0] or cur_s.startswith("visor/"))
+    vt = cur_s[6:] if on_visor and cur_s.startswith("visor/") and cur_s[6:] in VISOR_TOOLS else None
+    T = current if on_tool else vt                     # l'outil de la page, s'il y en a un
+    if vt:
+        sw = (("guide", f"visor/guide/{vt}.html" if vt in {t for t, _ in TOOLS} else f"guide/{VISOR_GUIDE[0]}.html"),
+              ("atlas", f"visor/{vt}/{vt}.html"))
+    elif on_visor:
+        sw = (("guide", f"guide/{VISOR_GUIDE[0]}.html"), ("atlas", "visor/index.html"))
+    else:
+        sw = (("guide", f"guide/{current}.html" if on_tool else "guide/index.html"),
+              ("atlas", f"{current}/{current}.html" if on_tool else "index.html"))
+    # bascule Legacy / VISOR (anglais seulement) : AU-DESSUS de Guide / Atlas. Elle mene a la
+    # page de l'autre generation pour le meme outil et la meme section.
+    mode0 = "visor" if on_visor else "legacy"
+    if lang == "en":
+        tools_all = {t for t, _ in TOOLS}
+        if T and T in tools_all:
+            lg = f"guide/{T}.html" if section == "guide" else f"{T}/{T}.html"
+            vi = f"visor/guide/{T}.html" if section == "guide" else f"visor/{T}/{T}.html"
+        elif T:                                          # Crown_Seg : pas de page legacy
+            lg = "index.html"
+            vi = f"visor/{T}/{T}.html"
+        elif section == "guide":
+            lg, vi = "guide/index.html", f"guide/{VISOR_GUIDE[0]}.html"
+        else:
+            lg, vi = "index.html", "visor/index.html"
+        cur_attr = ' aria-current="true"'
+        on_lg = cur_attr if mode0 == "legacy" else ""
+        on_vi = cur_attr if mode0 == "visor" else ""
+        out.append('    <div class="sec-switch gen-switch" role="group" aria-label="Generation">')
+        out.append(f'      <a href="{up}{lg}" data-gen-to="legacy"{on_lg}>Legacy</a>')
+        out.append(f'      <a href="{up}{vi}" data-gen-to="visor"{on_vi}>VISOR</a>')
+        out.append('    </div>')
     out.append('    <div class="sec-switch" role="group">')
     for key, r in sw:
         on = ' aria-current="true"' if key == section else ""
@@ -320,6 +375,9 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     # deux cases bordees se lisaient comme deux objets, pas comme un choix.
     out.append(f'    <p class="sec-hint">{esc(ui[section + "_hint"])}</p>')
 
+    if lang == "en":
+        out.append(f'    <div class="gen-wrap" data-gen="{mode0}">')
+        out.append('    <div class="gen-legacy">')
     for cat, labels in CATS.items():
         tools = [t for t, c in TOOLS if c == cat]
         if not tools:
@@ -336,6 +394,40 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
             cur = ' aria-current="page"' if t == current else ""
             out.append(link(t, cur))
         out.append("    </ul></div>")
+
+    if lang == "en":
+        out.append("    </div>")   # gen-legacy
+        out.append('    <div class="gen-visor">')
+        out.append('    <div class="nav-group"><h4>VISOR</h4><ul>')
+        if section == "atlas":
+            for slug, label in VISOR_PAGES:
+                cur = ' aria-current="page"' if current == f"visor/{slug}" else ""
+                out.append(f'      <li><a href="{up}visor/{slug}.html"{cur}>{esc(label)}</a></li>')
+        else:
+            cur = ' aria-current="page"' if current == VISOR_GUIDE[0] else ""
+            out.append(f'      <li><a href="{up}guide/{VISOR_GUIDE[0]}.html"{cur}>{esc(VISOR_GUIDE[1])}</a></li>')
+            out.append(f'      <li><a href="{up}visor/index.html">Architecture (Atlas)</a></li>')
+        out.append("    </ul></div>")
+        for cat, labels in CATS.items():
+            tools = [t for t, c in TOOLS if c == cat and t not in VISOR_NOT_PORTED]
+            if not tools:
+                continue
+            out.append(f'    <div class="nav-group"><h4>{esc(labels[lang])}</h4><ul>')
+            for t in tools:
+                cur = ' aria-current="page"' if t == current else ""
+                cur = ' aria-current="page"' if t == vt else ""
+                out.append(f'      <li><a href="{vhref(t)}"{cur}>{t}</a></li>')
+            if cat == "segmentation" and section == "atlas":
+                cur = ' aria-current="page"' if vt == "Crown_Seg" else ""
+                out.append(f'      <li><a href="{up}visor/Crown_Seg/Crown_Seg.html"{cur}>Crown_Seg</a></li>')
+            out.append("    </ul></div>")
+        out.append('    <div class="nav-group"><h4>Not ported to VISOR</h4><ul>')
+        for t in VISOR_NOT_PORTED:
+            cur = ' aria-current="page"' if t == vt else ""
+            out.append(f'      <li><a href="{vhref(t)}"{cur}>{t}</a></li>')
+        out.append("    </ul></div>")
+        out.append("    </div>")   # gen-visor
+        out.append("    </div>")   # gen-wrap
 
     out.append(f'    <div class="nav-group"><h4>{esc(ui["cross"])}</h4><ul>')
     for key in ("findings", "glossary"):
