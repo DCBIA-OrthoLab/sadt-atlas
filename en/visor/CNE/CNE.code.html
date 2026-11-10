@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../../CNE/CNE.html" data-gen-to="legacy">Legacy</a>
-      <a href="../../visor/CNE/CNE.html" data-gen-to="visor" aria-current="true">VISOR</a>
+      <a href="../../CNE/CNE.code.html" data-gen-to="legacy">Legacy</a>
+      <a href="../../visor/CNE/CNE.code.html" data-gen-to="visor" aria-current="true">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/CNE.html">Guide</a>
@@ -413,7 +413,11 @@ if finish_reason == "length":   # cut off at max_tokens
       <p>The TMJ instruction is the legacy string verbatim: "Using the following note, extract structured key-value pairs about the
       patient's symptoms and diagnoses:" (<code>extraction.py:41-44</code>). Ortho gets no system message, as in legacy. The tool does
       not compare the note's length with the window: <code>context_for</code> only rejects a negative value
-      (<code>extraction.py:146-153</code>), and any error raised by llama.cpp is caught for that note (<code>__init__.py:200-212</code>).</p>
+      (<code>extraction.py:146-153</code>), and any error raised by llama.cpp is caught for that note (<code>__init__.py:200-212</code>).
+      In llama-cpp-python 0.3.36 (<code>llama.py:1343-1358</code>) the engine raises only when the prompt alone reaches <code>n_ctx</code>;
+      otherwise <code>max_tokens</code> is cut down to <code>n_ctx</code> minus the prompt length, the note is never truncated, and a
+      generation stopped by that shortened limit reports <code>finish_reason == "length"</code>, which fails the note
+      (<code>__init__.py:293-297</code>). The pin is 0.3.35, whose code was not read.</p>
 
       <h3 id="visor-parsing">3.5 Reading the answer and writing it</h3>
 
@@ -421,8 +425,9 @@ if finish_reason == "length":   # cut off at max_tokens
 
       <ol>
         <li><strong>JSON first</strong>: the slice from the first <code>{</code> to the last <code>}</code> is parsed; a dict under
-        <code>"extraction"</code> is unwrapped (<code>extraction.py:261-275</code>). The slicing is the legacy one.</li>
-        <li><strong>Then <code>key: value</code> lines</strong>: keys are lowercase words and underscores, at least 60 % of the non-empty lines
+        <code>"extraction"</code> is unwrapped; an empty result or a JSON value that is not an object is refused (<code>extraction.py:261-275</code>). The slicing is the legacy one.</li>
+        <li><strong>Then <code>key: value</code> lines</strong>: a key starts with a lowercase letter and holds lowercase letters, digits, spaces and underscores
+        (up to 61 characters, spaces become <code>_</code>, <code>extraction.py:230,296</code>), at least 60 % of the non-empty lines
         must match, and a repeated key keeps its first value (<code>extraction.py:230-235,278-301</code>). The source says the published TMJ
         fine-tune answers in this form, 46 fields and no JSON (<code>:244-245</code>).</li>
         <li><strong>Otherwise nothing is written</strong> and the note fails (<code>__init__.py:299-305</code>). Legacy wrote the raw answer.</li>
@@ -624,9 +629,11 @@ output  output_dir/P01/Extraction_B_001.txt.json
         <p>The legacy concern about long notes (legacy page, <a href="../../CNE/CNE.html#pieges">§11</a>) is only half closed. A cut-off
         <em>answer</em> is now refused (<code>__init__.py:293-297</code>) and <code>max_tokens</code> defaults to 2048 instead of 500. But nothing
         compares the note with the <a class="gterm" data-term="cne-window" href="CNE.html#visor-model" title="See the explanation">context window</a> or checks that <code>max_tokens</code> leaves room in it: <code>context_for</code> only
-        rejects a negative value (<code>extraction.py:146-153</code>). With the Ortho default the answer budget alone equals the window
-        (2048 and 2048, <code>:49</code>, <code>__init__.py:51</code>). What llama.cpp does then was not checked; whatever it raises fails that one
-        note (<code>__init__.py:200-212</code>). Read in the code.</p>
+        rejects a negative value (<code>extraction.py:146-153</code>). With the Ortho default the answer limit alone equals the window
+        (2048 and 2048, <code>:49</code>, <code>__init__.py:51</code>). In llama-cpp-python 0.3.36 (<code>llama.py:1343-1358</code>) the engine raises only when the
+        prompt alone reaches <code>n_ctx</code>; otherwise it shortens <code>max_tokens</code> to <code>n_ctx</code> minus the prompt and the note is never cut.
+        So with Ortho a note passes as long as the answer ends within what the note leaves, and fails (<code>finish_reason == "length"</code>) when it does not;
+        whatever the engine raises fails that one note (<code>__init__.py:200-212</code>).</p>
       </div>
 
       <div id="f-output-names" class="callout note">

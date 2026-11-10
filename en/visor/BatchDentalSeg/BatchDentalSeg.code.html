@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../../BatchDentalSeg/BatchDentalSeg.html" data-gen-to="legacy">Legacy</a>
-      <a href="../../visor/BatchDentalSeg/BatchDentalSeg.html" data-gen-to="visor" aria-current="true">VISOR</a>
+      <a href="../../BatchDentalSeg/BatchDentalSeg.code.html" data-gen-to="legacy">Legacy</a>
+      <a href="../../visor/BatchDentalSeg/BatchDentalSeg.code.html" data-gen-to="visor" aria-current="true">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/BatchDentalSeg.html">Guide</a>
@@ -443,18 +443,29 @@ def _convert_to_nifti(scan_path, destination):                  # pipeline.py:14
       <code>failed</code> with "could not be read" and skipped; only when none can be read does the run stop
       (<code>pipeline.py:278-298</code>).</p>
 
-      <p>No intensity windowing, no crop and no resampling is written in this package. All of the
-      preprocessing is nnU-Net's own, from each bundle's <code>plans.json</code>: transposition, resampling to the
-      plan's spacing, CT normalisation. The legacy auto-crop is not ported, on purpose: upstream applied it
+      <p>No intensity windowing and no crop is written in this package. The only resamplings it adds are the optional
+      GPU one (§3.5) and the one that puts the result back on the scan grid (§3.6, <code>pipeline.py:152-171</code>).
+      The rest of the preprocessing is nnU-Net's own, from each bundle's <code>plans.json</code>, and runs in this
+      order (nnunetv2 2.8.1 as installed in the tool's environment, <code>nnunetv2/preprocessing/preprocessors/default_preprocessor.py</code>):
+      transposition (<code>:56</code>), crop to the non-zero region (<code>:65</code>), normalisation (<code>:82</code>, the
+      comment above it says it MUST come before resampling), then resampling to the plan's spacing (<code>:88</code>).
+      The legacy auto-crop is not ported, on purpose: upstream applied it
       only after a failed memory check, and it changes what the network sees (<code>pipeline.py:18-21</code>).</p>
+
+      <p><strong>The normalisation is nnU-Net's, not this repository's.</strong> For a plan whose scheme is
+      <code>CTNormalization</code>: clip to the plan's 0.5 and 99.5 percentiles, subtract the mean, divide by
+      <code>max(std, 1e-8)</code> (<code>nnunetv2/preprocessing/normalization/default_normalization_schemes.py:58-72</code>,
+      numbers from <code>foreground_intensity_properties_per_channel</code>). Only the <code>plans.json</code> of DentalSegmentator
+      can be read in the repositories (in the legacy one: <code>CTNormalization</code>, p0.5 &minus;110, p99.5 3067, mean 1274, std 558).
+      The plans of the three other bundles are downloaded with the models, so that this scheme applies to them is assumed, not checked.</p>
 
       <p class="code-back">Plain-language explanation and maths: <a href="BatchDentalSeg.html#visor-convert">atlas page</a>.</p>
 
       <h3 id="visor-inference">3.4 Inference: one call for the whole batch</h3>
 
       <p><code>predict_folder()</code> (<code>nnunet_runner.py:192-232</code>) is called once with the whole
-      input folder (<code>pipeline.py:302-306</code>), so the checkpoint is loaded once per run, not once per
-      scan. The predictor is built through nnU-Net's Python API, with the renamed keyword chosen by
+      input folder it receives (<code>pipeline.py:302-306</code>), so the checkpoint is loaded once per call, not once per
+      scan. A cohort larger than a server batch (25 files or 400&nbsp;MB, §4) reaches the tool as several such calls. The predictor is built through nnU-Net's Python API, with the renamed keyword chosen by
       introspection:</p>
 
       <pre><code>options = {                                                     # nnunet_runner.py:86-95
@@ -482,10 +493,15 @@ predictor.initialize_from_trained_model_folder(                 # :204-208
         container's <code>shm_size</code> is for (<code>VISOR-serve docker-compose.yml:225-229</code>).</li>
       </ul>
 
+      <p>Patch placement and weighting are nnU-Net's: the step is at most <code>tile_step_size</code> times the patch size and is
+      shrunk so that the patches end exactly on the edge of the image, hence an overlap of at least half for 0.5
+      (<code>nnunetv2/inference/sliding_window_prediction.py:30-54</code>); the Gaussian weight has a spread of one eighth of the
+      patch (<code>sliding_window_prediction.py:11-16</code>, called at <code>predict_from_raw_data.py:626</code>).</p>
+
       <p>Progress has only two measurable ends: reading counts scans from 0 to 10&nbsp;%, writing from 90 to
       100&nbsp;%, and in between one line says "segmenting N scan(s) in one pass"
       (<code>pipeline.py:269-274, 301, 313</code>; <code>progress.py:89-103</code>). If the inference call raises,
-      the scratch folder is removed and the whole batch fails (<code>pipeline.py:302-309</code>).</p>
+      the scratch folder is removed and the whole batch fails, with no report written (<code>pipeline.py:302-309</code>).</p>
 
       <p class="code-back">Plain-language explanation and maths: <a href="BatchDentalSeg.html#visor-inference">atlas page</a>.</p>
 
@@ -524,8 +540,10 @@ return labels.unsqueeze(0).cpu()                                 # :86</code></p
       <code>predict_from_files_sequential</code> is wrapped on the instance as well (<code>low_memory.py:100-151</code>).
       According to the module docstring, the arithmetic is the same as the stock path (0 differing voxels out of
       95 682 560 on a UniversalLab run) and the peak drops from about 30.6 to 1.25&nbsp;GiB of VRAM
-      (<code>low_memory.py:14-26</code>); those numbers were not reproduced here. Ties between classes are
-      broken toward the lower index in both cases (<code>one &gt; best</code>, strict), which matches an argmax.</p>
+      (<code>low_memory.py:14-26</code>); those numbers were not reproduced here. Ties between classes go to the lower index on the GPU path, because the running maximum is replaced only by a strictly higher score
+      (<code>one &gt; best</code>, <code>low_memory.py:75</code>). On nnU-Net's own path the label is <code>predicted_probabilities.argmax(0)</code>
+      (<code>nnunetv2/utilities/label_handling/label_handling.py:178</code>), which returns the first maximum by NumPy and PyTorch convention
+      (documented behaviour of <code>argmax</code>, not tested here).</p>
 
       <p class="code-back">Plain-language explanation and maths: <a href="BatchDentalSeg.html#visor-resampling">atlas page</a>.</p>
 
@@ -640,7 +658,8 @@ smoother.NormalizeCoordinatesOn()</code></pre>
       <h3 id="visor-report">3.8 Report and cleanup</h3>
 
       <p><code>BatchDentalSeg_report.json</code> (<code>pipeline.py:364-396</code>) is written at the root of
-      <code>output_dir</code> after the scratch folder is removed (<code>pipeline.py:392</code>):</p>
+      <code>output_dir</code> after the scratch folder is removed (<code>pipeline.py:392</code>). It is written only when the run reaches its end:
+      if the inference call raises, the folder is removed and the exception goes out before any report (<code>pipeline.py:302-309</code>):</p>
 
       <pre><code>{ "tool": "Batch_Dental_Seg", "model": ..., "model_description": ...,
   "labels": {"Upper Skull": 1, ...},        # the full table of the bundle used
@@ -712,7 +731,7 @@ smoother.NormalizeCoordinatesOn()</code></pre>
           <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
           <tbody>
             <tr><td>Discovery, conversion to NIfTI</td><td><span class="badge calcule">computed</span> SimpleITK read and write</td><td><code>pipeline.py:87-149</code></td></tr>
-            <tr><td>Preprocessing (transposition, resampling, CT normalisation)</td><td><span class="badge calcule">computed</span> deterministic, driven by the <a class="gterm" data-term="bds-v-bundle" href="BatchDentalSeg.html#visor-model" title="See the explanation">bundle</a>'s <code>plans.json</code></td><td>nnU-Net, in the tool's process or its workers</td></tr>
+            <tr><td>Preprocessing (transposition, crop to non-zero, CT normalisation, resampling, in this order)</td><td><span class="badge calcule">computed</span> deterministic, driven by the <a class="gterm" data-term="bds-v-bundle" href="BatchDentalSeg.html#visor-model" title="See the explanation">bundle</a>'s <code>plans.json</code></td><td>nnU-Net, in the tool's process or its workers</td></tr>
             <tr><td>Segmentation of every structure</td><td><span class="badge predit">predicted</span> one 3D multi-label nnU-Net network per bundle, fold 0</td><td><code>nnunet_runner.py:192-232</code></td></tr>
             <tr><td><a class="gterm" data-term="bds-v-window" href="BatchDentalSeg.html#visor-inference" title="See the explanation">Sliding window</a>, gaussian weighting, step 0.5</td><td><span class="badge calcule">computed</span></td><td>nnU-Net</td></tr>
             <tr><td>Output resampling and argmax</td><td><span class="badge calcule">computed</span> torch per class with a running argmax (GPU path) or scipy and nnU-Net's argmax</td><td><code>nnunet_runner.py:124-189</code>; <code>low_memory.py</code></td></tr>

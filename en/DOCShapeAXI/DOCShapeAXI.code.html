@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DOCShapeAXI, legacy, code · SADT Atlas</title>
+<title>DOCShapeAXI, legacy: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/carnet.css">
 <script src="../../assets/site.js"></script>
@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../DOCShapeAXI/DOCShapeAXI.html" data-gen-to="legacy" aria-current="true">Legacy</a>
-      <a href="../visor/DOCShapeAXI/DOCShapeAXI.html" data-gen-to="visor">VISOR</a>
+      <a href="../DOCShapeAXI/DOCShapeAXI.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../visor/DOCShapeAXI/DOCShapeAXI.code.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../guide/DOCShapeAXI.html">Guide</a>
@@ -197,10 +197,10 @@
         <table>
           <thead><tr><th>Called</th><th>When</th><th>How</th></tr></thead>
           <tbody>
-            <tr><td><span class="badge cli">DOCShapeAXI_CLI</span></td><td>on every task</td><td><code>conda run -n shapeaxi python -m DOCShapeAXI_CLI &lt;8 args&gt;</code></td></tr>
+            <tr><td><span class="badge cli">DOCShapeAXI_CLI</span></td><td>on every task</td><td><code>conda run -n shapeaxi python -m DOCShapeAXI_CLI &lt;8 args&gt;</code> (<code>DOCShapeAXI.py:689-697</code>)</td></tr>
             <tr><td><code>model_path.json</code> on <code>raw.githubusercontent.com</code></td><td>at CLI startup, if the <code>.ckpt</code> is missing</td><td><code>requests.get</code> then <code>urlretrieve</code></td></tr>
             <tr><td><code>shapeaxi</code> pip package</td><td>at all times</td><td><code>saxi_nets_lightning</code>, <code>saxi_dataset</code>, <code>saxi_transforms</code>, <code>saxi_gradcam</code>, <code>post_process</code>, <code>utils</code></td></tr>
-            <tr><td><span class="badge cli">DOCShapeAXI_utils.install_pytorch</span></td><td>if pytorch3d is missing</td><td><code>conda run -n shapeaxi python -m DOCShapeAXI_utils.install_pytorch &lt;pip&gt;</code></td></tr>
+            <tr><td><span class="badge cli">ADTLib.env.install_pytorch</span></td><td>if the pytorch3d probe fails (<code>check_if_pytorch3d</code>, <code>DOCShapeAXI.py:668-674</code>)</td><td><code>conda run -n shapeaxi python -m ADTLib.env.install_pytorch &lt;pip&gt;</code> (<code>DOCShapeAXI.py:676-687</code>); <code>DOCShapeAXI_utils/</code> holds only an <code>__init__.py</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -220,10 +220,10 @@
         <table>
           <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
           <tbody>
-            <tr><td><code>DOCShapeAXI/DOCShapeAXI.py</code></td><td>widget: conda, model choice, progress bar, ~180 lines of dark-theme styling</td><td>Slicer's Python</td></tr>
-            <tr><td><code>DOCShapeAXI_CLI.py</code></td><td><strong>prediction + explainability</strong>, 307 lines</td><td><code>shapeaxi</code> conda env, GPU if available</td></tr>
+            <tr><td><code>DOCShapeAXI/DOCShapeAXI.py</code></td><td>widget: conda, model choice, progress bar, 830 lines at 3c67957 (the dark theme now comes from <code>ADTLib.theming.apply_dark_mode</code>, <code>:29,182-184</code>)</td><td>Slicer's Python</td></tr>
+            <tr><td><code>DOCShapeAXI_CLI.py</code></td><td><strong>prediction + explainability</strong>, 310 lines at 3c67957</td><td><code>shapeaxi</code> conda env, GPU if available</td></tr>
             <tr><td><code>model_path.json</code></td><td>5 checkpoints and their URLs</td><td>–</td></tr>
-            <tr><td><code>install_pytorch.py</code></td><td>picks the pytorch3d wheel based on the installed torch, then <code>shapeaxi&gt;=2.0.2</code></td><td>conda env</td></tr>
+            <tr><td><code>ADT/ADTLib/env/install_pytorch.py</code></td><td>puts in torch (pinned, or an existing one that has a pytorch3d wheel), picks the pytorch3d wheel for it, adds <code>ocnn==2.2.1</code>, then <code>shapeaxi&gt;=2.0.2</code></td><td>conda env</td></tr>
           </tbody>
         </table>
       </div>
@@ -269,15 +269,17 @@
 
       <div id="f-scale-factor" class="callout bug">
         <div class="callout-title">Confirmed bug (shapeaxi package, as installed for the legacy module)</div>
-        <p><em>Dated: this was read in the shapeaxi package that the legacy module installs. The VISOR tool builds
+        <p><em>Dated: this was read in shapeaxi 1.0.10 (the installed copy in the Slicer 5.12.3 <code>shapeaxi</code> environment) and
+        in 1.1.1 (downloaded for this pass; apart from <code>__about__.py</code> the two packages are byte for byte the same), and the
+        transform is the same in 2.0.2 and 2.0.3. The VISOR tool builds
         its dataset the same way, passing <code>scale_factor</code> to <code>EvalTransform</code> on both passes
         (SADT-VISOR <code>tools/DOCShapeAXI/src/sadt_docshapeaxi/engine.py:25-28</code>), against a pinned
-        <code>shapeaxi==1.1.1</code> (<code>pyproject.toml:30</code>). Whether 1.1.1 also ignores the value was not
-        checked (<a href="../visor/DOCShapeAXI/DOCShapeAXI.html#visor-changes">DOCShapeAXI on VISOR</a>).</em>
+        <code>shapeaxi==1.1.1</code> (<code>pyproject.toml:30</code>). 1.1.1 ignores the value too: its <code>saxi_transforms.py</code>
+        is identical to 1.0.10's (<a href="../visor/DOCShapeAXI/DOCShapeAXI.html#visor-changes">DOCShapeAXI on VISOR</a>).</em>
         Worth knowing: <code>saxi_predict</code> reads <code>model.hparams.scale_factor</code> (0.0507 in
         the condyles checkpoint) and passes it to <code>EvalTransform(scale_factor)</code>
         (<code>DOCShapeAXI_CLI.py:209</code>), but
-        <code>UnitSurfTransform.__call__</code> calls <code>utils.GetUnitSurf(surf)</code> <strong>without
+        <code>UnitSurfTransform.__call__</code> (<code>saxi_transforms.py:48-57</code>) calls <code>utils.GetUnitSurf(surf)</code> <strong>without
         forwarding it</strong> when the input is a <code>vtkPolyData</code>. The scale factor learned at
         training time is therefore <strong>silently ignored at inference</strong>, replaced by a
         per-subject normalization. This is a bug in the <code>shapeaxi</code> package, not in the
@@ -309,8 +311,8 @@
 
       <h3>4.1 The decision table</h3>
 
-      <p><code>find_model_name()</code> / <code>find_nn_type()</code>
-      (<code>DOCShapeAXI.py:804</code>), the keyword tested is
+      <p><code>find_nn_type()</code> / <code>find_model_name()</code>
+      (<code>DOCShapeAXI.py:798-830</code>), the keyword tested is
       a <strong>token</strong> of the combo label (<code>self.data_type.split(' ')</code>):</p>
 
       <div class="table-wrap">
@@ -328,7 +330,7 @@
 
       <p>Only the <em>Airway</em> case chains <strong>three full CLI runs</strong>
       (binary, severity, regression); the other two only do one, in <code>severity</code>
-      (<code>DOCShapeAXI.py:627</code>).</p>
+      (<code>onApplyChangesButton</code>, <code>DOCShapeAXI.py:457-488</code>).</p>
 
       <div id="f-ckpt-download" class="callout warn">
         <div class="callout-title">Pitfall (legacy only)</div>
@@ -358,9 +360,10 @@
         <code>shapeaxi-ckpt-v1</code> release (<code>scripts/data-manifest.yml:597-614</code>) and the tool's catalogue keys on
         the same network classes (<code>catalog.py:24-25,50-71</code>). The values below were not measured again on the
         VISOR copies (<a href="../visor/DOCShapeAXI/DOCShapeAXI.html#visor-args">DOCShapeAXI on VISOR</a>).</em>
-        The values below (K=128, 256 heads, 42 views, image_size=224…) are
-        confirmed by the <code>hyper_parameters</code> and the <code>ico_verts</code> buffer of the
-        <code>condyles_4_class.ckpt</code> checkpoint itself, not just by reading the source code.</p>
+        The values below (K=128, 256 heads, 42 views, image_size=224…) were
+        confirmed by an earlier reading of the <code>hyper_parameters</code> and the <code>ico_verts</code> buffer of the
+        <code>condyles_4_class.ckpt</code> checkpoint. That reading was not repeated for this pass (no <code>.ckpt</code> is on the
+        machine); the same numbers are also the defaults in the code (<code>saxi_nets_lightning.py:2392-2405</code>, shapeaxi 1.0.10).</p>
       </div>
 
       <figure class="diagram">
@@ -441,7 +444,8 @@
       <p><strong>Branch B: multi-view.</strong></p>
       <ul>
         <li>cameras at the vertices of a <strong>subdivided icosahedron</strong> (<code>subdivision_level=2</code>,
-        <code>radius=1.35</code>). The checkpoint's <code>ico_verts</code> buffer has shape <code>(42, 3)</code>:
+        <code>radius=1.35</code>: the default of <code>--radius</code>, <code>saxi_nets_lightning.py:2396</code>; the radius in use is
+        <code>self.hparams.radius</code>, <code>:2371</code>, read from the checkpoint, and no checkpoint was available to re-read it). The checkpoint's <code>ico_verts</code> buffer has shape <code>(42, 3)</code>:
         <strong>42 views</strong> per subject;</li>
         <li>pytorch3d rendering: <code>FoVPerspectiveCameras</code>, <code>look_at_rotation</code> toward the origin,
         <code>AmbientLights</code> (no directional shading), <code>HardPhongShader</code>,
@@ -469,7 +473,7 @@ if args.nn == 'SaxiMHAFBClassification':
     x = torch.argmax(x, dim=1, keepdim=True)   # the class integer
 predictions.append(x)</code></pre>
 
-      <p><code>(DOCShapeAXI_CLI.py:227)</code></p>
+      <p><code>(DOCShapeAXI_CLI.py:230-235)</code></p>
 
       <ul>
         <li>classification: <strong>only the <code>argmax</code> is kept</strong>. The softmax probabilities
@@ -576,10 +580,12 @@ mv_cam = LayerGradCam(model, target_layer[-1], device_ids=[0])</code></pre>
       pytorch-grad-cam): <code>cv2.resize</code> to <strong>224×224</strong>, clipping at the <strong>1st and 99th
       <a class="gterm" data-term="dsx-leg-percentiles" href="DOCShapeAXI.html#explicabilite" title="See the explanation">percentiles</a></strong>, then an affine remap into <strong>[-1, 1]</strong>. Percentile clipping keeps
       one outlier pixel from swamping the whole dynamic range; the output is therefore
-      signed, not a probability.</p>
+      signed, not a probability. The remap divides by <code>max - min</code> of the clipped map with no guard
+      (<code>DOCShapeAXI_CLI.py:58</code>): a map whose values are all equal gives 0/0, so the surface would receive NaN values. VISOR adds
+      the guard (SADT-VISOR <code>pipeline.py:192-197</code>).</p>
 
-      <p><strong>d) Reprojection onto the mesh</strong> (<code>gradcam_process</code>, in <code>shapeaxi</code>), the
-      core of the mechanism:</p>
+      <p><strong>d) Reprojection onto the mesh</strong> (<code>gradcam_process</code>, in <code>shapeaxi</code>; read in 1.0.10
+      <code>saxi_gradcam.py:112-144</code>, identical in 1.1.1), the core of the mechanism:</p>
 
       <pre><code>P_faces = torch.zeros(1, F.shape[1])
 V_gcam  = -1 * torch.ones(V.shape[1])
@@ -591,16 +597,29 @@ V_gcam[V_gcam &lt; 0] = 0</code></pre>
 
       <ul>
         <li><code>PF</code> is the rasterizer's <code>pix_to_face</code>: for every pixel of every view,
-        the index of the visible triangle. The pixel's value is thus carried back onto
-        the <strong>face</strong>;</li>
-        <li>cross-view aggregation is a <strong>maximum</strong>, not an average: a region seen only
-        once and judged salient keeps its value;</li>
+        the index of the visible triangle, or <code>-1</code> on the background (<code>saxi_nets_lightning.py:2455-2456</code>).
+        The pixel's value is carried back onto the <strong>face</strong>;</li>
+        <li>faces start at <strong>0</strong> and the update is <code>maximum(old, new)</code>, so across the views the aggregation is a
+        <strong>maximum</strong>, not an average, and a negative value never survives: on the mesh the range is [0, 1], so a face's value is
+        <code>max(0, max over views)</code>, not <code>max s</code>. A region seen once and judged salient keeps its value;</li>
+        <li>inside <strong>one</strong> view, many pixels show the same face. <code>P_faces[:, pf] = ...</code> then assigns through a
+        repeated index, and PyTorch does not say which write is kept: it is not a maximum over the pixels. Tried on the CPU with torch 2.12.1
+        (indices <code>[0,0,0,1,-1,-1]</code>, values <code>[.9,.1,.5,.3,.8,.2]</code>): face 0 ended at 0.5, the last of its three pixels, not 0.9. Not tried on the GPU,
+        where the order is not guaranteed;</li>
+        <li>for the <code>-1</code> pixels, the same indexing writes onto the <strong>last face</strong> of the mesh
+        (Python's negative index), in every view; that face's value is whatever the background wrote. The same test showed the last
+        face overwritten (0.2). Only one face out of the whole mesh;</li>
         <li>the face-to-vertex step is crude: the value of each face is written onto
-        <strong>its first vertex</strong> (<code>F[0,:,0]</code>). Vertices never used as the first
-        point of a triangle stay at -1, then get <strong>reset to 0</strong>. The map is therefore
-        scattered with structural zeros;</li>
+        <strong>its first vertex</strong> (<code>F[0,:,0]</code>); a vertex that is the first vertex of several faces keeps one
+        of their values (repeated index again). Vertices never used as the first point of a triangle stay at -1, then
+        get <strong>reset to 0</strong> by the last line. The map is therefore scattered with structural zeros;</li>
         <li>faces that are never rasterized (interior, permanent occlusions) stay at 0.</li>
       </ul>
+
+      <p><strong>Version note.</strong> shapeaxi 2.0.2 and 2.0.3, what the installer fetches today (<code>shapeaxi&gt;=2.0.2</code>),
+      have the same function without the last line (<code>saxi_gradcam.py:31-62</code> in 2.0.2: no <code>V_gcam[V_gcam&lt;0]=0</code>), so the
+      vertices that are nobody's first vertex would stay at -1 there. This module cannot run on 2.x anyway (see the bug below), so the behaviour
+      described here is the 1.x one the command was written for.</p>
 
       <p><strong>e) Smoothing and writing.</strong></p>
 
@@ -608,9 +627,10 @@ V_gcam[V_gcam &lt; 0] = 0</code></pre>
 psp.MedianFilter(surf, mv_att_upscaled)
 utils.WriteSurf(surf, out_surf_path)</code></pre>
 
-      <p><code>MedianFilter</code> replaces every value with the median of its topological
-      neighbors (1 pass, in place): this is what partly recovers the holes left by the
-      "first vertex" carry-over. It modifies the <code>vtkDataArray</code> <strong>already added</strong> to
+      <p><code>MedianFilter</code> (<code>post_process.py:294-308</code>) replaces <strong>every</strong> vertex, the
+      filled ones as well as the empty ones, with the median of its topological neighbors, the vertex itself left out
+      (<code>utils.py:363-376</code>): it fills many of the holes left by the "first vertex" carry-over and also smooths
+      the values that were there (1 pass, in place; the median is taken from a copy, so the order of the vertices does not matter). It modifies the <code>vtkDataArray</code> <strong>already added</strong> to
       the mesh, so it is indeed the filtered version that gets written.</p>
 
       <p>The array name is fixed inside <code>gradcam_process</code>:</p>
@@ -656,7 +676,7 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
 
       <p>The log is a <strong>single-line file rewritten each time</strong> (<code>'w+'</code> for every subject);
       the widget watches its <code>mtime</code> and resets the progress bar to zero when the
-      <code>predict</code>/<code>explainability</code> field changes (<code>DOCShapeAXI.py:697</code>).</p>
+      <code>predict</code>/<code>explainability</code> field changes (<code>onProcessUpdate</code>, <code>DOCShapeAXI.py:524-546</code>).</p>
 
       <h2 id="predit-calcule">7. What is predicted vs. what is computed</h2>
 
@@ -698,21 +718,23 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
         <table>
           <thead><tr><th>Item</th><th>Value</th><th>Source</th></tr></thead>
           <tbody>
-            <tr><td>Conda env</td><td><code>shapeaxi</code>, <strong>shared</strong> with <a href="../ALI/ALI.html">ALI</a>/AREG/ASO/FlexReg</td><td><code>DOCShapeAXI.py:804</code></td></tr>
+            <tr><td>Conda env</td><td><code>shapeaxi</code>, <strong>shared</strong> with <a href="../ALI/ALI.html">ALI</a>/AREG/ASO/FlexReg</td><td><code>DOCShapeAXI.py:628</code></td></tr>
             <tr><td>Python</td><td><strong>3.12</strong></td><td><code>DOCShapeAXI.py:666</code></td></tr>
-            <tr><td>Env creation</td><td><code>torch&gt;=2.8,&lt;2.13</code>, <code>ocnn==2.2.1</code>, <code>SimpleITK</code></td><td>same</td></tr>
-            <tr><td>pytorch3d</td><td>wheel chosen from <code>torch.__version__</code> + CUDA, from <code>https://ImageMindAnalytics.github.io/pytorch3d-wheels/simple/</code></td><td><code>install_pytorch.py:10</code></td></tr>
-            <tr><td>shapeaxi</td><td><code>shapeaxi&gt;=2.0.2</code>, installed <strong>after</strong> pytorch3d</td><td><code>install_pytorch.py:186</code></td></tr>
-            <tr><td>Patch</td><td><code>patch_dentalmodelseg()</code> rewrites <code>saxi_nets.DentalModelSeg</code> → <code>saxi_nets_lightning.DentalModelSeg</code> in the installed package</td><td><code>install_pytorch.py:210</code></td></tr>
+            <tr><td>Env creation</td><td><code>SimpleITK</code> only: <code>condaCreateEnv(name_env, "3.12", ["SimpleITK"])</code>. The comment at <code>:659-665</code> says why torch, torchvision, ocnn, pytorch3d and shapeaxi are not listed here</td><td><code>DOCShapeAXI.py:666</code></td></tr>
+            <tr><td>torch</td><td>installed by the installer: <code>2.11.0+cu128</code> and torchvision <code>0.26.0+cu128</code> on Linux and Windows (<code>2.8.0</code> on macOS), unless the env already has a torch that has a pytorch3d wheel and lies in <code>[2.8, 2.13)</code>, which is kept</td><td><code>install_pytorch.py:66-73,83,193-272</code></td></tr>
+            <tr><td>ocnn</td><td><code>ocnn==2.2.1</code>, installed after pytorch3d</td><td><code>install_pytorch.py:88,275-282</code></td></tr>
+            <tr><td>pytorch3d</td><td>wheel chosen from <code>torch.__version__</code> + CUDA, from <code>https://ImageMindAnalytics.github.io/pytorch3d-wheels/simple/</code></td><td><code>install_pytorch.py:35,340</code></td></tr>
+            <tr><td>shapeaxi</td><td><code>shapeaxi&gt;=2.0.2</code>, installed <strong>after</strong> pytorch3d</td><td><code>install_pytorch.py:385-397</code></td></tr>
+            <tr><td>Patch</td><td><code>patch_dentalmodelseg()</code> rewrites <code>saxi_nets.DentalModelSeg</code> → <code>saxi_nets_lightning.DentalModelSeg</code> in the installed package (<code>STALE_CALL</code>, <code>FIXED_IMPORT</code>)</td><td><code>install_pytorch.py:404-445</code></td></tr>
             <tr><td>GPU</td><td>not mandatory (<code>torch.device('cuda' if …)</code>) but <code>LayerGradCam(..., device_ids=[0])</code> assumes GPU 0</td><td><code>DOCShapeAXI_CLI.py:151</code></td></tr>
           </tbody>
         </table>
       </div>
 
       <p>The install order is constrained: <code>shapeaxi</code> declares <code>pytorch3d</code>, which is absent
-      from PyPI, so pip fails if it is requested in a bare env, hence creating the env
-      with <code>torch</code> alone, then <code>install_pytorch</code> reading the torch version to pick
-      the wheel, then <code>shapeaxi</code>. <code>verify_gpu()</code> goes as far as running an actual <code>knn_points</code>
+      from PyPI, so pip fails if it is requested in a bare env. The env is therefore created with SimpleITK only, then
+      <code>install_pytorch.main</code> runs torch, the pytorch3d wheel chosen from the torch tag, <code>ocnn</code>, then
+      <code>shapeaxi</code>, then the patch (<code>install_pytorch.py:448-464</code>; each step stops the chain if it fails). <code>verify_gpu()</code> goes as far as running an actual <code>knn_points</code>
       on the GPU: a wheel that imports but does not contain the kernels for the
       detected architecture is caught right there, not partway through the pipeline.</p>
 
@@ -747,6 +769,9 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
           </table>
         </div>
 
+        <p>shapeaxi 1.1.1, which VISOR pins, is the 1.0.10 package again: the two differ only in <code>__about__.py</code>
+        (compared file by file for this pass), so the 1.0.10 column holds for 1.1.1.</p>
+
         <p>The CLI calls <code>model(X_pc, X_views)</code> and uses the return value as a tensor
         (<code>DOCShapeAXI_CLI.py:230</code>): on 2.0.2
         this is a <code>TypeError</code> (3 positional arguments). And the published checkpoints
@@ -768,11 +793,12 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
         <code>DOCShapeAXI_CLI.py:280</code>). If the folder
         does not exist, the download is <strong>skipped</strong> and the error surfaces later, at
         checkpoint loading. The CLI never creates <code>output_dir</code>.</li>
-        <li id="f-process-log"><strong><code>process.log</code> is written inside the module's own tree</strong>
-        (<code>os.path.dirname(__file__)</code>, <code>DOCShapeAXI.py:814</code>),
-        and the empty file <code>DOCShapeAXI/process.log</code> is
-        checked into the repository. On a read-only install (<code>/opt</code>,
-        <code>Program Files</code>), creating the <code>DOCShapeAXILogic</code> raises an exception.</li>
+        <li id="f-process-log"><strong><code>process.log</code> is written in Slicer's temporary folder</strong>
+        (<code>check_log_path</code>: <code>os.path.join(slicer.util.tempDirectory(), 'process.log')</code>,
+        <code>DOCShapeAXI.py:637-646</code>), emptied each time the logic is created. The comment at
+        <code>:638-640</code> records the earlier defect, a log next to the module that broke a read-only install, which is fixed at 3c67957.
+        The empty file <code>DOCShapeAXI/process.log</code> is still versioned but nothing uses it. The CLI receives the path as its
+        eighth argument (<code>DOCShapeAXI.py:794</code>) and rewrites the one line after each surface.</li>
       </ul>
 
       <div id="f-dead-code" class="callout">
@@ -783,7 +809,8 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
         line 80. What stays true is that the function is never called. Same for the classes
         <code>MultiHead</code> and <code>SelfAttention</code> defined near the top of the CLI
         (<code>:87</code>, <code>:96</code>),
-        never instantiated, and for the <code>subprocess</code> import.</p>
+        never instantiated. The earlier page also named a <code>subprocess</code> import in the CLI: there is none (the imports are
+        <code>:2-26</code>); <code>subprocess</code> is imported by the panel, <code>DOCShapeAXI.py:5</code>, and used there.</p>
       </div>
 
       <ul>
@@ -805,12 +832,11 @@ utils.WriteSurf(surf, out_surf_path)</code></pre>
         "Mandibular Condyle" to "Condyles" in the <code>.ui</code> breaks <code>find_model_name</code>,
         which would return <code>(None, None)</code> and, on the next call, a <code>TypeError</code> on
         <code>os.path.join(output_dir, None + '.ckpt')</code>.</li>
-        <li><code>check_input_parameters</code> (<code>DOCShapeAXI.py:469</code>)
-        tests the same condition twice, the <code>else</code> branch ("Unknown error") is
+        <li><code>check_input_parameters</code> (<code>DOCShapeAXI.py:296-320</code>)
+        tests the same condition twice (<code>:298-299</code>), the <code>else</code> branch ("Unknown error") is
         unreachable.</li>
         <li><code>count_num_subjects</code> only counts top-level <code>.vtk</code> files: consistent with
         <code>csv_edit</code>, but neither one is recursive.</li>
-        <li><code>DOCShapeAXI/__pycache__/DOCShapeAXI.cpython-312.pyc</code> is checked into version control.</li>
       </ul>
 
       <h2 id="litterature">10. Literature</h2>

@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../../AMASSS/AMASSS.html" data-gen-to="legacy">Legacy</a>
-      <a href="../../visor/AMASSS/AMASSS.html" data-gen-to="visor" aria-current="true">VISOR</a>
+      <a href="../../AMASSS/AMASSS.code.html" data-gen-to="legacy">Legacy</a>
+      <a href="../../visor/AMASSS/AMASSS.code.html" data-gen-to="visor" aria-current="true">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/AMASSS.html">Guide</a>
@@ -142,7 +142,7 @@
       not observed on a running server, and nothing here says that a given server is deployed.</p>
 
       <p>References name the repository first: <strong>SADT-VISOR</strong> (tool code,
-      <code>tool/vface</code> @ 6ba2a78), <strong>VISOR-serve</strong> (server, @ e9a7e5d),
+      <code>tools/AMASSS</code> @ 6ba2a78), <strong>VISOR-serve</strong> (server, @ e9a7e5d),
       <strong>AutomatedDentalToolsRemote</strong> (Slicer client, @ 19b95e8) and
       <strong>legacy</strong> (SlicerAutomatedDentalTools @ 3c67957). A bare file name such as
       <code>pipeline.py</code>, <code>catalog.py</code>, <code>layout.py</code>,
@@ -158,7 +158,7 @@
         <table>
           <thead><tr><th>Item</th><th>Value</th><th>Reference</th></tr></thead>
           <tbody>
-            <tr><td>State</td><td>Ported and implemented: the pipeline, a report and a test suite exist in SADT-VISOR. Not ported: DICOM input, small FOV, teeth, root canal and mandibular canal models, the <code>save_in_folder</code> option.</td><td><code>SADT-VISOR catalog.py:13-18</code></td></tr>
+            <tr><td>State</td><td>Ported and implemented: the pipeline, a report and a test suite exist in SADT-VISOR. Not ported: DICOM input, small FOV (no such argument in <code>run()</code>), teeth, root canal and mandibular canal models (left out of the catalogue on purpose). <code>save_in_folder</code> has no counterpart because a folder per scan is now always written (<code>pipeline.py:597-598</code>).</td><td><code>SADT-VISOR __init__.py:20-42</code>; <code>catalog.py:13-18</code>; <code>pipeline.py:597-598</code></td></tr>
             <tr><td>API name</td><td><code>AMASSS</code></td><td><code>SADT-VISOR tools/AMASSS/pyproject.toml:33-35</code></td></tr>
             <tr><td>Tool code</td><td>package <code>sadt_amasss</code>, own virtual environment (Python 3.11, torch 2.8.0, nnunetv2 2.8.1, SimpleITK 2.5.6, numpy 2.3.2, vtk 9.6.2)</td><td><code>tools/AMASSS/pyproject.toml:7-23</code></td></tr>
             <tr><td>Provenance</td><td>Ported from <code>AMASSS_CLI/</code> of SlicerAutomatedDentalTools at commit <code>21a62a8</code> (2026-05-22), by way of an earlier server-side tool</td><td><code>tools/AMASSS/README.md:7-12</code></td></tr>
@@ -456,8 +456,10 @@ sitk.WriteImage(image, destination)</code></pre>
       <p>The conversion is a real read and write for every format, <code>.nii.gz</code> included; the voxel type
       is left alone because nnU-Net's reader casts to float32 itself (<code>pipeline.py:177-190</code>). No
       intensity <a class="gterm" data-term="amasss-v-norm" href="AMASSS.html#visor-predictor" title="See the explanation">normalisation</a>, windowing or resampling is written in the package: all of it is nnU-Net's,
-      driven by each model's <code>plans.json</code> (resampling to the target spacing, then
-      <code>CTNormalization</code>), as in the legacy (<a href="../../AMASSS/AMASSS.html#entrees">legacy §3</a>).
+      driven by each model's <code>plans.json</code>, in this order: crop to the non-zero region,
+      <code>CTNormalization</code>, then resampling to the target spacing (nnU-Net 2.8.1 as locked in the tool's venv,
+      <code>nnunetv2/preprocessing/preprocessors/default_preprocessor.py:65, 82, 88</code>; the comment there says
+      normalisation must come before resampling), as in the legacy (<a href="../../AMASSS/AMASSS.html#entrees">legacy §3</a>).
       A scan that cannot be read is marked <code>failed</code> with <code>"Unreadable input: ..."</code> and logged
       by position ("scan 3 of 40"), not by name (<code>pipeline.py:413-419</code>); if none is readable the run
       stops with <code>ToolInputError</code> (<code>:422-424</code>). The index from <code>p_NNN</code> back to the file
@@ -617,6 +619,18 @@ torch.backends.cudnn.benchmark = False</code></pre>
       <code>tile_step_size</code> docstring records that 0.7 moves the mask (Dice 0.995 against 0.5), which is why
       it stays at nnU-Net's default (<code>__init__.py:72-74</code>).</p>
 
+      <p><strong>What belongs to nnU-Net, not to this repository.</strong> The formulas of the atlas page are nnU-Net's
+      (nnunetv2 2.8.1, <code>tools/AMASSS/.venv/lib/python3.11/site-packages/nnunetv2/</code>; the package is not
+      in the repository, so these are references to the installed library). Order of the preprocessing: crop, <a class="gterm" data-term="amasss-v-norm" href="AMASSS.html#visor-predictor" title="See the explanation">normalise</a>,
+      resample (<code>preprocessing/preprocessors/default_preprocessor.py:65, 82, 88</code>).
+      <code>CTNormalization</code>: clip to the 0.5 and 99.5 percentiles of the training foreground, subtract the mean,
+      divide by the standard deviation (<code>preprocessing/normalization/default_normalization_schemes.py:58-72</code>; the
+      nine plan files of the bundle give both percentiles). Sliding window: the step is <code>patch_size * tile_step_size</code>
+      at most and is shortened so that the last patch ends on the edge of the image, so with 0.5 the overlap is at
+      least half a patch (<code>inference/sliding_window_prediction.py:30-54</code>). Gaussian weights with a spread of one
+      eighth of the patch, the weighted logits added, then divided by the sum of the weights
+      (<code>inference/predict_from_raw_data.py:626-653</code>).</p>
+
       <p><code>predict_folder()</code> (<code>nnunet_runner.py:190-236</code>) loads fold 0 from an explicit path
       (<code>initialize_from_trained_model_folder(model_folder, use_folds=(0,), checkpoint_name="checkpoint_final.pth")</code>,
       no <code>nnUNet_results</code> variable), then:</p>
@@ -626,7 +640,7 @@ torch.backends.cudnn.benchmark = False</code></pre>
         because spawned workers would each need their own CUDA context (<code>:216-227</code>);</li>
         <li>on CPU, or with <code>gpu_resampling=False</code>: <code>predict_from_files</code> with two preprocessing and
         two export processes (<code>:228-236</code>). The legacy always used the sequential call
-        (<code>legacy AMASSS_CLI.py:232-237</code>).</li>
+        (<code>legacy AMASSS_CLI.py:233-238</code>).</li>
       </ul>
 
       <p><code>resolve_device()</code> falls back to CPU with a warning when CUDA is requested and no card is
@@ -794,8 +808,15 @@ if reduction &gt; 0:
       passed in, no longer parsed back out of the file name (<code>vtk_export.py:29-32, 179-205</code>); an unknown
       label in a <a class="gterm" data-term="amasss-v-merge" href="AMASSS.html#visor-outputs" title="See the explanation">merged volume</a> is skipped with a warning (<code>:244-249</code>). Meshes are in the image's physical
       frame (spacing and origin, <code>vtk_export.py:60-61</code>), with no LPS/RAS flip; the direction matrix is
-      not applied, as in the legacy (<a href="../../AMASSS/AMASSS.html#coeur">legacy §5.4</a>).
+      not applied, as in the legacy (<a href="../../AMASSS/AMASSS.html#coeur">legacy §5.4</a>). Smoothing comes before
+      decimation, and the module docstring records that decimating first was measured and refused because it gives a
+      different surface (<code>vtk_export.py:22-27</code>).
       <code>surface_smoothing</code> and <code>surface_decimation</code> are hidden technical arguments.</p>
+
+      <p><strong>The geometry of the 3D viewer on the atlas page.</strong> It was not produced by this package: it was
+      built by the atlas's own script <code>amasss_mesh.py</code> from an AMASSS prediction on the published test scan
+      (marching cubes, small connected components dropped, about 14&nbsp;000 triangles per structure). Colours and label values
+      are the catalogue's (<code>catalog.py:52-80</code>); the skin and the three registration masks are left out.</p>
 
       <p class="code-back">Plain-language explanation and maths: <a href="AMASSS.html#visor-surfaces">atlas page</a>.</p>
 
@@ -822,7 +843,10 @@ if reduction &gt; 0:
       a scan with no segmentation written can never count as processed (<code>:648-657</code>). The run raises only
       if every structure failed (<code>:484-488</code>) or no scan was processed (<code>:524-529</code>). The working
       folder, with the NIfTI copies and every <code>pred_&lt;CODE&gt;/</code>, is removed in a <code>finally</code>
-      block (<code>:362-366</code>), and the report is written after it (<code>:368-369</code>).</p>
+      block (<code>:362-366</code>). The report is written after that block (<code>:368-369</code>), so it exists only when
+      <code>segment()</code> returned: when <code>_run()</code> raises (every structure failed, no readable scan, no scan
+      processed, <code>:422-424, 484-488, 524-529</code>), the folder is still removed but the exception leaves before the
+      report is written, and no <code>AMASSS_report.json</code> exists.</p>
 
       <p class="code-back">Plain-language explanation and maths: <a href="AMASSS.html#visor-report">atlas page</a>.</p>
 
@@ -877,7 +901,7 @@ if reduction &gt; 0:
           <tbody>
             <tr><td>Argument checks, scan discovery, model lookup</td><td><span class="badge calcule">computed</span> file system and string rules</td><td><code>pipeline.py:299-336</code></td></tr>
             <tr><td>Conversion to NIfTI</td><td><span class="badge calcule">computed</span> SimpleITK read and write</td><td><code>pipeline.py:177-194</code></td></tr>
-            <tr><td>Preprocessing (resampling, <code>CTNormalization</code>)</td><td><span class="badge calcule">computed</span> deterministic, driven by each model's <code>plans.json</code>; resampler substituted on GPU</td><td>nnU-Net, in the tool process</td></tr>
+            <tr><td>Preprocessing (crop, <code>CTNormalization</code>, resampling, in that order)</td><td><span class="badge calcule">computed</span> deterministic, driven by each model's <code>plans.json</code>; resampler substituted on GPU</td><td>nnU-Net, in the tool process</td></tr>
             <tr><td>Segmentation of each structure</td><td><span class="badge predit">predicted</span> nnU-Net v2 3D network, one binary model per structure, fold 0</td><td>nnU-Net, <code>nnunet_runner.py:190-236</code></td></tr>
             <tr><td><a class="gterm" data-term="amasss-v-window" href="AMASSS.html#visor-predictor" title="See the explanation">Sliding window</a>, Gaussian weighting, step 0.5</td><td><span class="badge calcule">computed</span> deterministic</td><td>nnU-Net</td></tr>
             <tr><td>Binarization, label merge</td><td><span class="badge calcule">computed</span> <code>array &gt; 0</code>, <code>np.where</code> in a fixed order</td><td><code>pipeline.py:590, 625-633</code></td></tr>
@@ -937,7 +961,7 @@ if reduction &gt; 0:
           <tbody>
             <tr><td>Prediction engine</td><td>nnU-Net v2 through its Python API, fold 0, no mirroring, tile step 0.5 (<code>AMASSS_CLI.py:112-137, 204-238</code>)</td><td>Same settings (<code>nnunet_runner.py:75-117, 190-236</code>), plus <code>cudnn.benchmark = False</code> (<code>nnunet_runner.py:116</code>), which the legacy CLI never sets</td></tr>
             <tr><td>GPU memory failure</td><td>Automatic retry of the structure with scipy resampling (<code>AMASSS_CLI.py:240-251</code>)</td><td>No retry: the structure is recorded as failed (<code>nnunet_runner.py</code> has no handler; <code>pipeline.py:475-478</code>)</td></tr>
-            <tr><td>CPU path</td><td><code>predict_from_files_sequential</code> in every case (<code>AMASSS_CLI.py:232-237</code>)</td><td>CPU or <code>gpu_resampling=False</code>: <code>predict_from_files</code> with 2 + 2 worker processes (<code>nnunet_runner.py:228-236</code>)</td></tr>
+            <tr><td>CPU path</td><td><code>predict_from_files_sequential</code> in every case (<code>AMASSS_CLI.py:233-238</code>)</td><td>CPU or <code>gpu_resampling=False</code>: <code>predict_from_files</code> with 2 + 2 worker processes (<code>nnunet_runner.py:228-236</code>)</td></tr>
             <tr><td>Structures</td><td>One after the other (<code>AMASSS_CLI.py:861-862</code>)</td><td>Thread pool, width granted by the server (<code>pipeline.py:442-478</code>)</td></tr>
             <tr><td>Progress</td><td>Counted in scan × structure steps through <code>emit_fraction</code> (<code>AMASSS_CLI.py:672-677</code>)</td><td>Three weighted phases, structures counted on completion, written to <code>SADT_PROGRESS_FILE</code> (<code>pipeline.py:391-395, 468-471, 492</code>; <code>progress.py:60-103</code>)</td></tr>
             <tr><td>Input conversion</td><td>A <code>.nii.gz</code> is copied, others rewritten with SimpleITK (<code>AMASSS_CLI.py:555-570</code>)</td><td>Always read and rewritten with SimpleITK (<code>pipeline.py:177-194</code>)</td></tr>
@@ -1013,7 +1037,7 @@ if reduction &gt; 0:
         (<code>nnunet_runner.py:128-187</code>). The report records the value requested on a CUDA
         device; a <a class="gterm" data-term="amasss-v-bundle" href="AMASSS.html#visor-models" title="See the explanation">bundle</a> whose plans opt out is only mentioned in the log (<code>pipeline.py:534-538</code>).
         The argument is hidden in the panel. The legacy CLI does the same substitution, without a way to turn it
-        off (<code>legacy AMASSS_CLI.py:148-201, 239-240</code>).</p>
+        off (<code>legacy AMASSS_CLI.py:148-201, 240-241</code>).</p>
       </div>
 
       <div id="f-no-oom-retry" class="callout note">

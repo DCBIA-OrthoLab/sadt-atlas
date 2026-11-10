@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MRI2CBCT, legacy, code · SADT Atlas</title>
+<title>MRI2CBCT, legacy: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/carnet.css">
 <script src="../../assets/site.js"></script>
@@ -17,7 +17,7 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../MRI2CBCT/MRI2CBCT.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../MRI2CBCT/MRI2CBCT.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
       <a href="../visor/MRI2CBCT/MRI2CBCT.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
@@ -565,8 +565,8 @@
         <li><strong>CBCT mask</strong> (<code>cbct_surface</code>, <code>:150-157</code>): same threshold and sampling, with
         no component filter.</li>
         <li><strong>Surface points</strong> (<code>surface_points_normals</code>, <code>surface.py:10-30</code>): the
-        voxels of mask minus its erosion, subsampled to 20 000 points with a fixed random seed
-        (<code>NPTS</code>, <code>reg/pipeline.py:14</code>), world coordinates in RAS, normals from the gradient of the
+        voxels of mask minus its erosion, subsampled to at most 20 000 points (<code>NPTS</code>, <code>reg/pipeline.py:14</code>) with a fixed random seed,
+        and only when the surface has more voxels than that (<code>surface.py:21-22</code>), world coordinates in RAS, normals from the gradient of the
         mask smoothed with σ = 1.5 voxels.</li>
         <li><strong><a class="gterm" data-term="mri-side-cut" href="MRI2CBCT.html#recalage-surfaces" title="See the explanation">Side cut</a></strong> (<code>side_cut</code>, <code>ladder.py:94-102</code>): for a joint labelled L or R, the
         CBCT surface keeps the points up to <code>MARGIN = 5</code> mm past the median x of the whole surface on the
@@ -703,25 +703,24 @@
         <code>:166-167</code>).</figcaption>
       </figure>
 
-      <ol>
+      <ol start="0">
         <li><strong>Rung 0, the published registration</strong> (<code>:205-216</code>): 50 draws; if the best pose is not a
         FLIP the result is accepted as it is.</li>
-        <li><strong>More draws</strong> (<code>:221-227</code>): <code>EXTRA_DRAWS = 100</code> more, the best passing pose
+        <li><strong>Rung 1, more draws</strong> (<code>:221-227</code>): <code>EXTRA_DRAWS = 100</code> more, the best passing pose
         among all 150 is kept.</li>
-        <li><strong>Rotate 180°</strong> (<code>:229-242</code>): the flipped pose composed with a half-turn about each of
+        <li><strong>Rung 2, rotate 180°</strong> (<code>:229-242</code>): the flipped pose composed with a half-turn about each of
         the three axes (<code>rot180</code>, <code>:105-113</code>) around the MRI surface's centroid, each refined by
         point-to-plane ICP in parallel.</li>
-        <li><strong>The other side</strong> (<code>:244-254</code>), only for L or R: the CBCT is cut to the opposite
+        <li><strong>Rung 3, the other side</strong> (<code>:244-254</code>), only for L or R: the CBCT is cut to the opposite
         hemisphere and 50 draws are tried, because "the MRI side label may be wrong". If it passes, the joint
         is relabelled (<code>side L → R</code>) in the log and the summary.</li>
-        <li><strong>Mirror</strong> (<code>:256-267</code>): the MRI surface is reflected across the plane normal to the
+        <li><strong>Rung 4, mirror</strong> (<code>:256-267</code>): the MRI surface is reflected across the plane normal to the
         left-right index axis through its centroid (<code>mirror_matrix</code>, <code>:116-124</code>), and registered
         again; the reflection is composed into the reported transform. It "fixes a left-right handedness error
         in the file itself; a wrong mirror fits visibly badly". The QC is scored on the rigid part, because
         <code>qc_tag</code> cannot read a rotation off a reflection (<code>:260-261</code>).</li>
-        <li><strong>Unresolved</strong> (<code>:269-271</code>): the result is written with the suffix
-        <code>_FLAGGED</code>.</li>
       </ol>
+      <p><strong>Unresolved</strong>, not a rung (<code>:269-271</code>): the result is written with the suffix <code>_FLAGGED</code>.</p>
 
       <div class="callout ok" id="f-no-intensity">
         <div class="callout-title">Verified · not in VISOR</div>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CLIC, legacy, code · SADT Atlas</title>
+<title>CLIC, legacy: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/carnet.css">
 <script src="../../assets/site.js"></script>
@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../CLIC/CLIC.html" data-gen-to="legacy" aria-current="true">Legacy</a>
-      <a href="../visor/CLIC/CLIC.html" data-gen-to="visor">VISOR</a>
+      <a href="../CLIC/CLIC.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../visor/CLIC/CLIC.code.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../guide/CLIC.html">Guide</a>
@@ -230,22 +230,26 @@
       message.</p>
 
       <p>It always instantiates <code>CondaSetUpCall()</code> (<code>CLIC/CLIC.py:70</code>), never
-      <code>CondaSetUpCallWsl</code>: unlike <a href="../MedX/MedX.html">MedX</a>, <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a>, and the others, <strong>CLIC
-      has no WSL path</strong>. On Windows it will call SlicerConda's Unix path, and the
-      argument order of <code>condaRunFilePython</code> differs between the two classes
-      (<code>(file, args, env)</code> on the Unix side, <code>(file, env, args)</code> on the WSL side):
-      the args list would go out as the environment name. The module is effectively
-      Linux-only, despite the README.</p>
+      <code>CondaSetUpCallWsl</code>: unlike <a href="../DOCShapeAXI/DOCShapeAXI.html">DOCShapeAXI</a> and the modules that go through <code>init_conda()</code>
+      (<code>ADT/ADTLib/env/conda.py:46-59</code>, which returns <code>CondaSetUpCallWsl()</code> on Windows), <strong>CLIC
+      has no WSL path</strong>. That does not by itself make it Linux-only. The call at <code>CLIC/CLIC.py:269-273</code> is
+      <code>condaRunFilePython(file, [args], env)</code>, which is the argument order of the native class; the swapped order
+      <code>(file, env, args)</code> belongs to <code>CondaSetUpCallWsl</code> only. In SlicerConda at ba426f4
+      (<code>CondaSetUp/CondaSetUp.py</code>, 2026-10-16), the native <code>condaRunFilePython</code> (<code>:1746</code>) has a
+      <code>platform.system()=="Windows"</code> branch (<code>:1762</code>). The older SlicerConda that ships in the Slicer 5.12.3
+      extension runs <code>condaRunCommand</code> through <code>executable="/bin/bash"</code> (<code>:1586</code> of the installed
+      <code>CondaSetUp.py</code>), which Windows does not have. The repository does not pin a SlicerConda version, and nothing was run
+      on Windows, so whether CLIC works there is unproven in both directions.</p>
 
       <div class="callout warn" id="f-no-wsl">
         <div class="callout-title">Pitfall (legacy only)</div>
         <p><em>Legacy (3c67957); not present in VISOR: the VISOR panel is a thin client that
         sends the scans to a server and runs no conda environment on the workstation
         (Remote <code>CLICRemote/CLICRemote.py:44,53</code>; see <a href="../visor/CLIC/CLIC.html#visor-where">CLIC on VISOR</a>).</em>
-        No WSL path: <code>CondaSetUpCallWsl</code> is never instantiated. On Windows, the
-        argument order of <code>condaRunFilePython</code> expected by the Unix path (used by
-        mistake) is not that of the WSL path: the argument list would go out as the
-        environment name. CLIC is effectively Linux-only.</p>
+        No WSL path: <code>CondaSetUpCallWsl</code> is never instantiated, and <code>init_conda()</code> is not used.
+        The argument order at <code>CLIC/CLIC.py:269-273</code> matches the native class, so the earlier claim that the argument list
+        would go out as the environment name does not hold (that order belongs to the WSL class). Whether the native class works
+        on Windows depends on the SlicerConda version (see section 2); not tried on Windows, so &ldquo;Linux-only&rdquo; is not proven.</p>
       </div>
 
       <h2 id="entrees">3. Inputs and preprocessing</h2>
@@ -490,8 +494,8 @@ for mk, lb in zip((pr["masks"][keep] &gt; .5).squeeze(1).cpu().numpy(),
         overlap, the one processed <strong>last</strong> (hence the lowest score,
         since torchvision sorts by decreasing score) wins the pixel. A
         buccal/palatal conflict on the same voxel is settled by the lowest score;</li>
-        <li>nothing restricts the number of instances per slice, neither to one canine
-        nor to two.</li>
+        <li>the tool adds no limit of its own on the number of instances per slice, neither to one canine
+        nor to two (torchvision keeps at most 100 per slice, <code>box_detections_per_img</code>).</li>
       </ul>
 
       <p><strong>No 3D consistency is enforced.</strong> Each slice is classified independently;
@@ -534,10 +538,11 @@ nib.save(nib.Nifti1Image(seg.astype(np.int16), nii.affine, nii.header), out_path
         <li><code>Path.stem</code> on <code>X.nii.gz</code> is <strong><code>X.nii</code></strong>: the folder is called <code>X.nii</code> and
         the file <code>X.nii_seg.nii.gz</code>. Ugly but without functional consequence;</li>
         <li><code>affine</code> and <code>header</code> are <strong>taken from the input volume</strong>: the <a class="gterm" data-term="clic-legacy-label-map" href="CLIC.html#sorties" title="See the explanation">label map</a>
-        overlays without registration. The original <code>header</code> describes a floating-point
-        data type while the data is <code>int16</code>; <code>Nifti1Image</code> adjusts the header's
-        <code>dtype</code> on write;</li>
-        <li>the type is <code>int16</code> with values 0/1/2/3.</li>
+        overlays without registration. The array is <code>int16</code> in memory, but
+        <code>Nifti1Image(array, affine, header)</code> keeps the data type stored in the header it is given: the file is
+        written <strong>in the input scan's type</strong>, not as <code>int16</code> (checked with nibabel 5.4.2: a float32 input
+        gives a float32 label map, int16 gives int16, uint8 gives uint8);</li>
+        <li>the values are 0/1/2/3; in memory the type is <code>int16</code>, on disk it is the input's.</li>
       </ul>
 
       <div class="callout" id="f-output-naming">
@@ -590,7 +595,7 @@ nib.save(nib.Nifti1Image(seg.astype(np.int16), nii.affine, nii.header), out_path
             <tr><td><a class="gterm" data-term="clic-legacy-conda" href="CLIC.html#environnement" title="See the explanation">Conda</a> env</td><td><strong><code>clic_env</code></strong> (specific to CLIC)</td><td><code>CLIC/CLIC.py:111</code></td></tr>
             <tr><td>Python</td><td><strong>3.9</strong></td><td><code>CLIC/CLIC.py:160-161</code></td></tr>
             <tr><td>Creation</td><td><code>numpy&lt;2.0.0</code>, <code>scipy</code>, <code>nibabel</code>, <code>requests</code></td><td>same</td></tr>
-            <tr><td>Then, via pip</td><td><code>torch</code>, <code>torchvision</code>, <code>torchaudio</code> from the wheel channel that <code>select_channel()</code> picks for the GPU (cu118 or cu121 with torch 2.2.0, cu128 with 2.7.1 or 2.11.0; unpinned from the default index when no GPU is found). The earlier page said the cu118 build of torch 2.2.0 was hardcoded: at 3c67957 it no longer is</td><td><code>CLIC/CLIC.py:35,182-194</code>, <code>ADT/ADTLib/env/cuda.py:19-21</code></td></tr>
+            <tr><td>Then, via pip</td><td><code>torch</code>, <code>torchvision</code>, <code>torchaudio</code> from the wheel channel that <code>select_channel()</code> picks for the GPU (cu118 or cu121 with torch 2.2.0, cu128 with 2.7.1 (the docstring at <code>cuda.py:21</code> also names 2.11.0, but <code>CHANNELS</code> holds only 2.7.1); unpinned from the default index when no GPU is found). The earlier page said the cu118 build of torch 2.2.0 was hardcoded: at 3c67957 it no longer is</td><td><code>CLIC/CLIC.py:35,182-194</code>, <code>ADT/ADTLib/env/cuda.py:117-123</code></td></tr>
             <tr><td>Then</td><td><code>pip install 'numpy&lt;2.0'</code> a second time</td><td><code>CLIC/CLIC.py:209-213</code></td></tr>
             <tr><td>GPU</td><td>optional, automatic CPU fallback</td><td><code>CLIC/runner/clic_runner.py:64</code></td></tr>
           </tbody>
@@ -603,9 +608,12 @@ nib.save(nib.Nifti1Image(seg.astype(np.int16), nii.affine, nii.header), out_path
       is set and never read back.</p>
 
       <p>The second <code>pip install</code> passes <code>"'numpy&lt;2.0'"</code>: single quotes included
-      inside the string. Depending on how SlicerConda assembles the command
-      (<code>shell=True</code> with a string on the Unix side), the argument may arrive
-      correctly unquoted or not. Failure detection, meanwhile, looks for
+      inside the string. What happens depends on the SlicerConda version
+      (<code>ADT/ADTLib/env/conda.py:21-43</code> documents the two in circulation). Where <code>condaRunCommand</code> builds a bash line
+      (the older version, <code>shell=True</code>), bash strips the quotes. Where it passes an argv list (SlicerConda at ba426f4,
+      <code>CondaSetUp.py:1796-1815</code>), they reach pip literally, and pip rejects <code>'numpy&lt;2.0'</code> (run alone with the
+      pip of Slicer 5.12.3: &ldquo;Invalid requirement&rdquo;). The panel then sees &ldquo;error&rdquo; in the returned text and stops at
+      &ldquo;numpy downgrade failed&rdquo;; the full panel was not run. Failure detection, meanwhile, looks for
       <code>"error"</code> or <code>"failed"</code> in the returned output: any pip warning containing
       those words fails the preparation step.</p>
 

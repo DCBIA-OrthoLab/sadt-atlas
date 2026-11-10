@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DOCShapeAXI on VISOR, code · SADT Atlas</title>
+<title>DOCShapeAXI on VISOR: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../../assets/style.css">
 <link rel="stylesheet" href="../../../assets/themes/carnet.css">
 <script src="../../../assets/site.js"></script>
@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../../DOCShapeAXI/DOCShapeAXI.html" data-gen-to="legacy">Legacy</a>
-      <a href="../../visor/DOCShapeAXI/DOCShapeAXI.html" data-gen-to="visor" aria-current="true">VISOR</a>
+      <a href="../../DOCShapeAXI/DOCShapeAXI.code.html" data-gen-to="legacy">Legacy</a>
+      <a href="../../visor/DOCShapeAXI/DOCShapeAXI.code.html" data-gen-to="visor" aria-current="true">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/DOCShapeAXI.html">Guide</a>
@@ -138,7 +138,7 @@
       server (e9a7e5d), <em>Remote</em> the Slicer client (AutomatedDentalToolsRemote 19b95e8),
       <em>legacy</em> SlicerAutomatedDentalTools at 3c67957. A bare path such as <code>catalog.py:50</code> is in
       SADT-VISOR <code>tools/DOCShapeAXI/src/sadt_docshapeaxi/</code>. Everything was read in the code; nothing on this
-      page was run. Overview of the stack: <a href="../index.html">VISOR</a>.</p>
+      page was run, except the two checks named where they appear (the shapeaxi 1.0.10 against 1.1.1 file comparison, and a small CPU test of repeated indices). Overview of the stack: <a href="../index.html">VISOR</a>.</p>
 
       <h2 id="visor-status">1. Position in the chain</h2>
 
@@ -411,7 +411,8 @@ model.eval(); model.to(device)</code></pre>
 
       <p>The file list is a pandas DataFrame built in memory (legacy wrote a CSV into the output folder with mode <code>'a'</code>,
       <code>DOCShapeAXI_CLI.py:111-118</code>), fed to shapeaxi's <code>SaxiDataset</code> with <code>EvalTransform(scale_factor)</code>, the
-      scale factor being read from the checkpoint's hyperparameters (<code>engine.py:11-34</code>). Then, one surface at a time
+      scale factor being read from the checkpoint's hyperparameters (<code>engine.py:11-34</code>); shapeaxi 1.1.1 then ignores it (see the
+      <a href="#f-shapeaxi-fixed">check below</a>). Then, one surface at a time
       (<code>engine.py:37-64</code>):</p>
 
       <pre><code>mesh = model.create_mesh(vertices, faces, normals)
@@ -448,6 +449,14 @@ post_process.MedianFilter(surface, projected)</code></pre>
         (<code>pipeline.py:186-199</code>).</li>
         <li><strong>Which layer</strong>: the last block of the 2D EfficientNet branch, as in legacy (<code>DOCShapeAXI_CLI.py:150-151</code>): the map
         explains the multi-view branch, not the point-cloud branch.</li>
+        <li><strong>Projection</strong>: <code>gradcam_process</code> is shapeaxi's (<code>saxi_gradcam.py:112-144</code> in 1.0.10 and in 1.1.1, the same
+        code). Faces start at 0 and take <code>maximum(old, new)</code> view after view, so on the mesh a face holds <code>max(0, max over views)</code>
+        and the range is [0, 1]; the value goes to the face's first vertex, and vertices that are nobody's first vertex are reset to 0 (<code>:134</code>).
+        Inside one view, pixels showing the same face share an index and the write that stays is not defined (the last one on the CPU, not the maximum);
+        background pixels carry index -1 and write onto the last face. The CPU test and the details are on the
+        <a href="../../DOCShapeAXI/DOCShapeAXI.code.html#explicabilite">legacy code page, section 5d</a>; nothing was run on the GPU.</li>
+        <li><strong><a class="gterm" data-term="dsx-median" href="DOCShapeAXI.html#visor-explain" title="See the explanation">Median filter</a></strong>: <code>post_process.MedianFilter</code> (<code>post_process.py:294-308</code>) replaces every vertex, filled or empty,
+        by the median of its neighbours, itself excluded (<code>utils.py:363-376</code>), not only the empty ones.</li>
         <li><strong>Array names</strong>: the class index is always passed as <code>target_class</code>, which names the array
         (<code>engine.py:104-106,117-129</code>). Legacy set it only when <code>num_classes &gt; 1</code> (<code>DOCShapeAXI_CLI.py:171-174</code>), so the
         regression checkpoint now also gets a per-class name, <code>grad_cam_target_class_0</code>. Read in the code.</li>
@@ -490,7 +499,7 @@ post_process.MedianFilter(surface, projected)</code></pre>
             <tr><td><code>surfaces</code></td><td>path, required</td><td>–</td><td>yes</td><td>one <code>.vtk</code>, or a folder searched recursively (<code>pipeline.py:22,40-60</code>)</td></tr>
             <tr><td><code>model</code></td><td>path, required</td><td>–</td><td>yes (hosted names)</td><td>the checkpoint; <strong>its file name decides anatomy, task, class count and network</strong> (<code>catalog.py:50-71</code>); an unknown name is a <code>ValueError</code> listing the known ones (<code>:74-88</code>)</td></tr>
             <tr><td><code>output_dir</code></td><td>path</td><td>filled by the server</td><td>no</td><td>surfaces and report are written there</td></tr>
-            <tr><td><code>explain</code></td><td>bool</td><td>true</td><td>yes</td><td>compute Grad-CAM and write the surfaces; off, only the report is written, "several times faster" (<code>__init__.py:22,92-95</code>)</td></tr>
+            <tr><td><code>explain</code></td><td>bool</td><td>true</td><td>yes</td><td>compute Grad-CAM and write the surfaces; off, only the report is written; the docstring says "several times faster" (<code>__init__.py:36-38</code>), not measured</td></tr>
             <tr><td><code>output_suffix</code></td><td>str</td><td><code>"_pred"</code></td><td>yes</td><td>added to each written surface's stem (<code>__init__.py:118-133</code>)</td></tr>
             <tr><td><code>device</code></td><td>"cuda" or "cpu"</td><td>"cuda"</td><td>no (technical, VISOR-serve <code>server/registry/conventions.py:41-58</code>)</td><td>when the client sends none, the server fills in its own <code>DEVICE</code> setting (VISOR-serve <code>server/execution/dispatch.py:431-432</code>); the tool falls back to CPU with a warning if no card is visible (<code>pipeline.py:67-72</code>)</td></tr>
           </tbody>
@@ -570,7 +579,7 @@ post_process.MedianFilter(surface, projected)</code></pre>
             <tr><td>EfficientNet backbone</td><td>fetched by <code>from_pretrained</code> on first use</td><td>must be staged in the torch hub cache, otherwise <code>FileNotFoundError</code> (<code>pipeline.py:80-105,146</code>)</td></tr>
             <tr><td>Device</td><td><code>cuda</code> if available (<code>:267</code>)</td><td>argument with CPU fallback (<code>pipeline.py:67-72</code>)</td></tr>
             <tr><td>Checkpoint loading</td><td><code>load_from_checkpoint(path, strict=False)</code> (<code>:135,201</code>)</td><td>still <code>strict=False</code> (<code>pipeline.py:148</code>), with an allowlist of the classes the checkpoint may unpickle (<code>:108-127</code>)</td></tr>
-            <tr><td>Scale factor</td><td><code>EvalTransform(scale_factor)</code> for prediction (<code>:209</code>), <code>EvalTransform()</code> for Grad-CAM (<code>:144</code>)</td><td>both passes go through one dataset built with <code>EvalTransform(scale_factor)</code> (<code>engine.py:25-28</code>)</td></tr>
+            <tr><td>Scale factor</td><td><code>EvalTransform(scale_factor)</code> for prediction (<code>:209</code>), <code>EvalTransform()</code> for Grad-CAM (<code>:144</code>)</td><td>both passes go through one dataset built with <code>EvalTransform(scale_factor)</code> (<code>engine.py:25-28</code>); the value is dropped inside shapeaxi 1.1.1 (<code>saxi_transforms.py:48-57</code>), so both passes normalise per subject, as legacy did</td></tr>
             <tr><td>Classification output</td><td>softmax then argmax, not applied to regression (<code>:232-235</code>)</td><td>argmax unless regression (<code>engine.py:57-62</code>); written as <code>class</code> or <code>score</code></td></tr>
             <tr><td>Regression result</td><td>a <code>{task}_prediction</code> column in a CSV (<code>:243-248</code>)</td><td>a <code>score</code> key in the <a class="gterm" data-term="dsx-report" href="DOCShapeAXI.html#visor-io" title="See the explanation">JSON report</a></td></tr>
             <tr><td>Grad-CAM writes</td><td>the surface is written inside the per-class loop (<code>:172-186</code>)</td><td>written once after all classes (<code>engine.py:98-113</code>)</td></tr>
@@ -650,8 +659,10 @@ post_process.MedianFilter(surface, projected)</code></pre>
         <p>Legacy code is written for the shapeaxi 1.x API while its installer asks for 2.0.2 or later (legacy
         <code>ADT/ADTLib/env/install_pytorch.py:385</code>). VISOR pins <code>shapeaxi==1.1.1</code>, with the reason in the comment
         (<code>pyproject.toml:18-30</code>), and resolves the network classes from <code>saxi_nets_lightning</code>, where they live
-        (<code>pipeline.py:135-145</code>). The checkpoint is no longer copied into the output folder. Whether shapeaxi 1.1.1's
-        <code>EvalTransform</code> honours <code>scale_factor</code> (the legacy page found shapeaxi ignoring it) was not checked.</p>
+        (<code>pipeline.py:135-145</code>). The checkpoint is no longer copied into the output folder. shapeaxi 1.1.1's
+        <code>EvalTransform</code> does not honour <code>scale_factor</code> either: <code>UnitSurfTransform.__call__</code> never forwards it
+        (<code>saxi_transforms.py:48-57</code>), identical in 1.0.10 and 1.1.1 (the two packages differ only in <code>__about__.py</code>,
+        compared file by file for this pass; downloaded 1.1.1 from the package index).</p>
       </div>
 
       <h2 id="visor-literature">9. Literature</h2>

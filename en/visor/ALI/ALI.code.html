@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ALI on VISOR, code · SADT Atlas</title>
+<title>ALI on VISOR: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../../assets/style.css">
 <link rel="stylesheet" href="../../../assets/themes/carnet.css">
 <script src="../../../assets/site.js"></script>
@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../../ALI/ALI.html" data-gen-to="legacy">Legacy</a>
-      <a href="../../visor/ALI/ALI.html" data-gen-to="visor" aria-current="true">VISOR</a>
+      <a href="../../ALI/ALI.code.html" data-gen-to="legacy">Legacy</a>
+      <a href="../../visor/ALI/ALI.code.html" data-gen-to="visor" aria-current="true">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/ALI.html">Guide</a>
@@ -225,7 +225,7 @@
             <tr><td>Where the maths runs</td><td>CBCT: Slicer's Python through <code>slicer.cli.run</code> (<code>ALI/ALI_Method/CBCT.py:210</code>); IOS: <code>conda run</code> in the <code>shapeaxi</code> environment</td><td>Server only, in the engine's own venv. The client uploads the scan or folder (a folder is zipped by the panel), downloads a zip, unzips it and loads the <code>.mrk.json</code> files (Remote <code>ALIRemote/ALIRemote.py:1-7</code>, <code>:96-101</code>, <code>:142-159</code>)</td></tr>
             <tr><td>Weights</td><td>downloaded by the widget</td><td>hosted in <code>DATA/ALI/models</code>, shared by both tools (<code>data_dir = "ALI"</code>, VISOR-serve <code>deployment.toml:131</code>, <code>:153</code>); the panel does not ask for a model (<code>model</code> is hidden, <code>CB/layout.py:44</code>)</td></tr>
             <tr><td>Tooth labels for IOS</td><td>the widget or the CLI runs the segmentation itself</td><td>the labelled meshes run first, the others go through <code>Crown_Seg</code> and follow; without a supervisor the whole batch is refused (<code>IO/engine.py:130-153</code>, <code>IO/dispatch.py:486-492</code>)</td></tr>
-            <tr><td>Result</td><td>files written beside the scans</td><td>a zip: markups plus <code>run_report.json</code> (<code>CB/dispatch.py:35</code>, <code>:265</code>); the panel shows a summary read from the report (<code>ALIRemote.py:142-159</code>, but see <a href="#visor-findings">Findings</a>)</td></tr>
+            <tr><td>Result</td><td>files written beside the scans</td><td>a zip: markups plus <code>run_report.json</code> (<code>CB/dispatch.py:35</code>, <code>:265</code>); the panel shows a summary read from the report (<code>handleResult</code>, <code>ALIRemote.py:142-159</code>; the text is built in <code>_summarize</code>, <code>:197-219</code>; but see <a href="#visor-findings">Findings</a>)</td></tr>
           </tbody>
         </table>
       </div>
@@ -371,7 +371,7 @@ converted.append((destination, f"{key}.nii.gz"))      # CB/dispatch.py:152-164</
       <p>Per scan, in its own scratch folder <code>.ali_work/preprocessed/&lt;key&gt;</code> (<code>CB/engine.py:276-298</code>, <code>:816</code>):</p>
 
       <ol>
-        <li><strong>Histogram clamp</strong>, <code>correct_histogram</code> (<code>CB/preprocess.py:39-86</code>): a 1000-bin histogram, normalised cumulative, intensities clipped between the 1&nbsp;% and 99&nbsp;% points and inside <code>[-1500, 4000]</code>, written as <code>int16</code> with spacing, origin and direction kept. A constant volume is passed through with a warning instead of dividing by zero (<code>:59-64</code>). Same percentiles as the legacy call (<code>ALI_CBCT/ALI_CBCT.py:202</code>).</li>
+        <li><strong>Histogram clamp</strong>, <code>correct_histogram</code> (<code>CB/preprocess.py:39-86</code>): a 1000-bin histogram, normalised cumulative, intensities clipped between the 1&nbsp;% and 99&nbsp;% points (the first bin edge whose cumulative share passes the threshold, so the limits are approximate, <code>:66-77</code>) and inside <code>[-1500, 4000]</code>, written as <code>int16</code> with spacing, origin and direction kept. A constant volume is passed through with a warning instead of dividing by zero (<code>:59-64</code>). Same percentiles as the legacy call (<code>ALI_CBCT/ALI_CBCT.py:202</code>).</li>
         <li><strong>Isotropic resampling</strong>, <code>set_spacing</code> (<code>CB/preprocess.py:89-127</code>), once per spacing in <code>SCALE_SPACINGS = (1.0, 0.3)</code> (<code>CB/catalog.py:69</code>), into <code>&lt;stem&gt;_sp1.nii.gz</code> and <code>&lt;stem&gt;_sp0-3.nii.gz</code>. New size <code>size × spacing / wanted</code>, origin shifted so the physical centre stays put, <strong>linear interpolation always</strong>, direction copied from the input (<code>:115</code>, <code>:120</code>).</li>
       </ol>
 
@@ -445,7 +445,7 @@ return np.array([coordinates[2], coordinates[1], coordinates[0]])   # CB/environ
       <pre class="ascii"><code>&lt;bundle&gt;/…/&lt;LANDMARK&gt;/&lt;1 | 0-3&gt;/&lt;anything&gt;.pth
              ^ alias-folded       ^ scale key = str(spacing) with "." → "-"</code></pre>
 
-      <p>Three differences with the legacy <code>GetBrain</code>: a landmark needs a checkpoint at <strong>both</strong> scales or is dropped (<code>:219-224</code>); two bundles under one folder holding the same landmark are an <strong>error</strong>, not a silent overwrite (<code>:198-211</code>); aliases such as <code>UR3OI</code> → <code>UR3OIP</code> are folded (<code>CB/catalog.py:52-57</code>). Selection (<code>requested_landmarks</code>, <code>:227-273</code>): a non-empty <code>landmarks</code> list <strong>replaces</strong> the regions; otherwise every catalogue landmark of the ticked regions runs, plus any bundle landmark of those regions the catalogue does not know (reported as <code>landmarks_ungrouped</code>). Neither region nor landmark is an error (<code>CB/dispatch.py:224-232</code>). The local copy of <code>DATA/ALI/models</code> used for this page holds 22 landmark folders, not the full bundle.</p>
+      <p>Three differences with the legacy <code>GetBrain</code>: a landmark needs a checkpoint at <strong>both</strong> scales or is dropped (<code>:219-224</code>); two bundles under one folder holding the same landmark are an <strong>error</strong>, not a silent overwrite (<code>:198-211</code>); aliases such as <code>UR3OI</code> → <code>UR3OIP</code> are folded (<code>CB/catalog.py:52-57</code>). Selection (<code>requested_landmarks</code>, <code>:227-273</code>): a non-empty <code>landmarks</code> list <strong>replaces</strong> the regions; otherwise every catalogue landmark of the ticked regions runs, plus any bundle landmark of those regions the catalogue does not know (reported as <code>landmarks_ungrouped</code>). Naming neither a region nor a landmark is an error (<code>CB/dispatch.py:224-232</code>). The local copy of <code>DATA/ALI/models</code> used for this page holds 22 landmark folders, not the full bundle.</p>
 
       <h2 id="visor-ios">4. ALI_IOS: rendering, one tooth at a time</h2>
 
@@ -506,7 +506,7 @@ return np.array([coordinates[2], coordinates[1], coordinates[0]])   # CB/environ
 
           <rect class="d-box" x="395" y="170" width="170" height="74" rx="6"/>
           <text class="d-label" x="480" y="194" text-anchor="middle">Centroid → snap</text>
-          <text class="d-label-s" x="480" y="211" text-anchor="middle">nearest mesh point</text>
+          <text class="d-label-s" x="480" y="211" text-anchor="middle">nearest mesh vertex</text>
           <text class="d-label-s" x="480" y="226" text-anchor="middle">back to millimetres</text>
           <path class="d-arrow" d="M395 207 H377"/>
           <path class="d-arrow-head" d="M372 207 l7 -4 v8 z"/>
@@ -578,7 +578,7 @@ HardPhongShader(..., lights=PointLights(...))</code></pre>
         </table>
       </div>
 
-      <p>Radii from <code>CAMERA_RADIUS</code> (<code>IO/catalog.py:54</code>). The O table is copied "byte for byte INCLUDING their inconsistencies" (<code>IO/render.py:8-12</code>): two of its vectors are divided by the norm of another vector, so they are not unit length, kept because the shipped weights were trained on these views. For each direction, <code>render_views</code> (<code>:366-414</code>) places the <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">camera</a> at <code>centre + direction × radius</code>, renders <strong>once</strong> with its <code>R</code> and <code>T</code>, and keeps both the image (normal RGB plus depth, 4 channels) and the <code>pix_to_face</code> of that same rasterisation. The MG frame (<code>mg_frame</code>, <code>:211-250</code>) uses the arch tangent from the neighbouring teeth and an aim point offset by <code>MG_AIM_OFFSET</code> (<code>IO/catalog.py:96</code>).</p>
+      <p>Radii from <code>CAMERA_RADIUS</code> (<code>IO/catalog.py:54</code>). The O table is copied "byte for byte INCLUDING their inconsistencies" (<code>IO/render.py:8-12</code>): four of the five vectors of each jaw (all but the axis) are divided by the norm of another vector, so they are not unit length (0.913, 0.913, 0.791, 0.791; the file itself says &ldquo;several&rdquo;), kept because the shipped weights were trained on these views. Those four <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">cameras</a> stand at 0.913 or 0.791 times the radius from the tooth. For each direction, <code>render_views</code> (<code>:366-414</code>) places the camera at <code>centre + direction × radius</code>, renders <strong>once</strong> with its <code>R</code> and <code>T</code>, and keeps both the image (normal RGB plus depth, 4 channels) and the <code>pix_to_face</code> of that same rasterisation. The MG frame (<code>mg_frame</code>, <code>:211-250</code>) uses the arch tangent from the neighbouring teeth and an aim point offset by <code>MG_AIM_OFFSET</code> (<code>IO/catalog.py:96</code>).</p>
 
       <h3 id="ios-network">4.4 The network and the decoding</h3>
 
@@ -600,8 +600,8 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
       <ol>
         <li>The faces under the pixels of the class, background pixels (<code>-1</code>) dropped (<code>IO/engine.py:226</code>).</li>
         <li>O and C only: keep the faces that touch the tooth's own label (<code>faces_on_tooth</code>, <code>IO/surface.py:180-211</code>; called at <code>IO/engine.py:465</code>). MG keeps every face: its point lies on the gum.</li>
-        <li>The centroid of those faces' vertices, accumulated sequentially in float32 so the result is bit-identical to the legacy loop (<code>_landmark_position</code>, <code>IO/engine.py:229-278</code>).</li>
-        <li>Snapped onto the nearest mesh point with <code>vtkOctreePointLocator</code> (<code>:277</code>), then <code>upscale</code> back to the mesh's millimetres.</li>
+        <li>The mean of the vertices of those faces: the three corners of the triangle of <strong>each pixel</strong> are added, so a face hit by several pixels counts several times (the list of faces keeps its repeats, <code>IO/engine.py:224</code>, <code>:272-276</code>). The sum is accumulated sequentially in float32 so the result is bit-identical to the legacy loop (<code>_landmark_position</code>, <code>IO/engine.py:229-278</code>).</li>
+        <li>Snapped onto the nearest mesh <strong>vertex</strong> (<code>FindClosestPoint</code> returns a point id) with <code>vtkOctreePointLocator</code> (<code>:277</code>), then <code>upscale</code> back to the mesh's millimetres.</li>
       </ol>
 
       <h3 id="ios-mg">4.6 The Mucogingival path</h3>
@@ -611,7 +611,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
       <p>MG runs on the lower jaw only (<code>NETWORK_JAWS</code>, <code>IO/catalog.py:48</code>), off by default, on all 13 teeth 19 to 31 whatever the labels say (<code>IO/engine.py:324-332</code>). Three behaviours are fixed in code, with no option:</p>
 
       <ul>
-        <li><strong>missing teeth are always estimated</strong>: cameras aimed from a quadratic fit of the arch through the teeth present (<code>render.estimate_missing_teeth</code>, <code>IO/render.py:320-363</code>; <code>IO/engine.py:354-358</code>), the point noted "cameras aimed from an arch fit, tooth not segmented" (<code>:567-570</code>);</li>
+        <li><strong>missing teeth are estimated</strong> when at least 4 teeth are present and they span at least 4 numbers, otherwise nothing is estimated and the missing ones are skipped (<code>IO/render.py:347-348</code>): cameras aimed from a quadratic fit of the arch through the teeth present (<code>render.estimate_missing_teeth</code>, <code>IO/render.py:320-363</code>; <code>IO/engine.py:354-358</code>), the point noted "cameras aimed from an arch fit, tooth not segmented" (<code>:567-570</code>);</li>
         <li><strong>forced points</strong>: if class 1 wins no pixel, the 50 most likely pixels stand in for it, noted <code>forced (confidence 0.xyz)</code> (<code>MG_FORCE_TOPK</code>, <code>:472</code>, <code>:538-552</code>);</li>
         <li><strong>no last resort</strong>: if nothing lands on the mesh, no point is written (<code>:563-565</code>).</li>
       </ul>
@@ -669,7 +669,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
         </div>
       </div>
 
-      <p><strong>What the client does with it.</strong> <code>ALIRemote</code> draws the form from <code>GET /tools</code>, adds one check box, "Load the predicted landmarks into the scene" (<code>ALIRemote.py:131-136</code>), shows an input volume with the <code>CT-AAA</code> preset (<code>:107</code>), then on the result unzips the archive, reads <code>run_report.json</code>, loads every <code>.mrk.json</code> it finds and shows a summary (<code>handleResult</code>, <code>:142-159</code>).</p>
+      <p><strong>What the client does with it.</strong> <code>ALIRemote</code> draws the form from <code>GET /tools</code>, adds one check box, "Load the predicted landmarks into the scene" (<code>ALIRemote.py:131-136</code>), shows an input volume with the <code>CT-AAA</code> preset (<code>:107</code>), then on the result unzips the archive, reads <code>run_report.json</code>, loads every <code>.mrk.json</code> it finds and shows a summary (<code>handleResult</code>, <code>:142-159</code>; the text comes from <code>_summarize</code>, <code>:197-219</code>).</p>
 
       <p>Resources declared in <code>VISOR-serve deployment.toml</code>: both tools use <code>data_dir = "ALI"</code>; ALI_CBCT counts its width on the requested <strong>landmarks</strong> (<code>width_from = "landmarks"</code>, <code>:131-150</code>), ALI_IOS on nothing declared (<code>width_from = false</code>, <code>:152-160</code>). Neither declares a <code>timeout_seconds</code> nor a <code>max_upload_mb</code>: the global timeout is <code>0</code>, meaning none, and the global upload cap is 500 MB (VISOR-serve <code>config.py:77</code>, <code>:240</code>). ALI_CBCT caps its own agent width at 8 (<code>CB/engine.py:76</code>, <code>:322</code>), although a comment in <code>deployment.toml:118-122</code> says nothing inside the tool caps it.</p>
 
@@ -743,7 +743,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
             <tr><td>Face under each pixel</td><td>second rasterisation without <code>R</code> and <code>T</code> for O and C (<code>ALI_IOS_utils/agent.py:364</code>)</td><td>one rasterisation per view, with <code>R</code> and <code>T</code> (<code>IO/render.py:402-412</code>)</td></tr>
             <tr><td>UNet loading</td><td>reloaded for every tooth</td><td>once per (network, jaw) (<code>IO/engine.py:344-353</code>)</td></tr>
             <tr><td>Mucogingival extras</td><td>arch levelled (<code>LowerArchMatrix</code>, <code>ALI_IOS.py:817</code>), scan scaled on the first-molar distance (<code>ArchScale</code>, <code>:839</code>), arch labels unified (<code>UnifyArchLabels</code>, <code>:869</code>), second look at each tooth (<code>--refine</code>), smoothing, snap to surface, line completion, gap filling, patch picking, scan painting (<code>:1054-1116</code>, all on by default)</td><td>none of these: one pass per tooth, scale from the bounding box (<code>IO/surface.py:72</code>)</td></tr>
-            <tr><td>Missing teeth (MG)</td><td>off by default, "4 to 21 mm" error (<code>ALI_IOS.py:1045-1052</code>)</td><td>always estimated from an arch fit, noted and listed in <code>landmarks_degraded</code> (<code>IO/engine.py:354-358</code>, <code>:414-419</code>, <code>:567-575</code>)</td></tr>
+            <tr><td>Missing teeth (MG)</td><td>off by default, "4 to 21 mm" error (<code>ALI_IOS.py:1045-1052</code>)</td><td>estimated from an arch fit when at least 4 teeth spanning 4 numbers are present (<code>IO/render.py:347-348</code>), noted and listed in <code>landmarks_degraded</code> (<code>IO/engine.py:354-358</code>, <code>:414-419</code>, <code>:567-575</code>)</td></tr>
             <tr><td>Confidence note on MG points</td><td><code>confidence 0.xyz</code> written for a won point too (<code>ALI_IOS.py:553-554</code>, commit bd93a65)</td><td>only <code>forced (confidence …)</code> (<code>IO/engine.py:552</code>)</td></tr>
             <tr><td>Segmentation of unlabelled meshes</td><td>the ALI_IOS command line launches the <code>dentalmodelseg</code> executable itself (<code>ALI_IOS_utils/segmentation.py:72-109</code>)</td><td>separate tool <code>Crown_Seg</code> through <code>sup.run</code>, after a first pass on the labelled meshes (<code>IO/dispatch.py:229-237</code>, <code>:534-573</code>)</td></tr>
             <tr><td>IOS inputs and labels</td><td><code>.vtk .vtp .stl .obj .off</code>; labels <code>PredictedID</code>, <code>predictedId</code> or <code>Universal_ID</code> (<code>ALI_IOS.py:120</code>, <code>ALI_IOS_utils/surface.py:137</code>)</td><td><code>.vtk .stl</code>; labels <code>PredictedID</code>, <code>UniversalID</code> or <code>Universal_ID</code> (<code>IO/surface.py:19</code>, <code>:33-59</code>)</td></tr>

@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../AREG_IOS/AREG_IOS.html" data-gen-to="legacy" aria-current="true">Legacy</a>
-      <a href="../visor/AREG_IOS/AREG_IOS.html" data-gen-to="visor">VISOR</a>
+      <a href="../AREG_IOS/AREG_IOS.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../visor/AREG_IOS/AREG_IOS.code.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../guide/AREG_IOS.html">Guide</a>
@@ -208,9 +208,9 @@
         <table>
           <thead><tr><th>AREG mode</th><th>Steps stacked before AREG_IOS</th><th>Source</th></tr></thead>
           <tbody>
-            <tr><td><code>Auto_IOS</code> / Butterfly</td><td><code>CrownSegmentationcli</code> T1 and T2 → <code>PRE_ASO_IOS</code> T1 and T2</td><td><code>AREG/AREG_Method/IOS.py:604</code></td></tr>
+            <tr><td><code>Auto_IOS</code> / Butterfly</td><td><code>CrownSegmentationcli</code> T1 and T2 → <code>PRE_ASO_IOS</code> T1 and T2</td><td><code>AREG/AREG_Method/IOS.py:558-676</code></td></tr>
             <tr><td><code>Semi_IOS</code> / Butterfly</td><td>nothing: the scans must already carry <code>Universal_ID</code> and be oriented</td><td><code>AREG/AREG_Method/IOS.py:743</code></td></tr>
-            <tr><td><code>Auto_IOS</code> / MGL</td><td><code>CrownSegmentationcli</code> T1 and T2 → <code>ALI_IOS</code> T1 and T2</td><td><code>AREG/AREG_Method/IOS.py:41</code></td></tr>
+            <tr><td><code>Auto_IOS</code> / MGL</td><td><code>CrownSegmentationcli</code> T1 and T2 → <code>ALI_IOS</code> T1 and T2</td><td><code>AREG/AREG_Method/IOS.py:31,599-613</code></td></tr>
             <tr><td><code>Semi_IOS</code> / MGL</td><td>same: MGL also segments, since <a href="../ALI/ALI.html">ALI</a> doesn't place anything without tooth labels</td><td><code>AREG/AREG_Method/IOS.py:743</code></td></tr>
           </tbody>
         </table>
@@ -238,7 +238,7 @@
         <table>
           <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
           <tbody>
-            <tr><td><code>AREG_IOS/AREG_IOS.py</code></td><td>the CLI, 451 lines: <a class="gterm" data-term="areg-ios-l-butterfly" href="AREG_IOS.html#modele" title="See the explanation">Butterfly</a> loop, <code>RunMGL</code>, writing <code>.tfm</code> files</td><td>conda env <code>shapeaxi</code></td></tr>
+            <tr><td><code>AREG_IOS/AREG_IOS.py</code></td><td>the CLI, 484 lines: <a class="gterm" data-term="areg-ios-l-butterfly" href="AREG_IOS.html#modele" title="See the explanation">Butterfly</a> loop, <code>RunMGL</code>, writing <code>.tfm</code> files</td><td>conda env <code>shapeaxi</code></td></tr>
             <tr><td><code>AREG_IOS/AREG_IOS_utils/PredPatch.py</code></td><td>palatal patch inference + morphological post-processing</td><td>same, <strong>CUDA mandatory</strong></td></tr>
             <tr><td><code>AREG_IOS/AREG_IOS_utils/net.py</code></td><td><code>MonaiUNetHRes</code>: PyTorch3D rendering + <a class="gterm" href="../glossary.html#g-monai" title="See glossary">MONAI</a> UNet</td><td>same</td></tr>
             <tr><td><code>AREG_IOS/AREG_IOS_utils/dataset.py</code></td><td>T1/T2 pairing, canonical orientation, normalization, tensors</td><td>same</td></tr>
@@ -310,7 +310,7 @@
       <h3>3.2 Canonical orientation (Butterfly only)</h3>
 
       <p><code>DatasetPatch.__getitem__</code> (<code>AREG_IOS/AREG_IOS_utils/dataset.py:30</code>)
-      calls <code>orientation()</code> (<code>AREG_IOS/AREG_IOS_utils/orientation.py:33</code>)
+      calls <code>orientation()</code> (<code>AREG_IOS/AREG_IOS_utils/orientation.py:15</code>)
       with the target <code>[[-0.5,-0.5,0], [0,0,0], [0.5,-0.5,0]]</code> and the teeth
       <code>["3","8","9","14"]</code> = UR6, UR1, UL1, UL6.</p>
 
@@ -359,7 +359,7 @@
       <p>Despite its name, <code>CN</code> ("color normal") really is a color <strong>per vertex</strong>:
       <code>GetColorArray</code> (<code>AREG_IOS/AREG_IOS_utils/utils.py:24</code>) loops over
       the points, not the cells. The round trip through 0–255 integers quantizes
-      the normals to 8 bits; that's deliberate, training saw the same thing.</p>
+      the normals to 8 bits (<code>vtkUnsignedCharArray</code>, <code>utils.py:25-35</code>). Nothing in the code says why, and no comment claims that training saw the same rounding, so that is not asserted here. VISOR does not round: it passes <code>normals * 0.5 + 0.5</code> as floats (<code>SADT-VISOR ios/butterfly.py:175-184</code>).</p>
 
       <div id="f-raw-surface-array" class="callout">
         <div class="callout-title">Important point</div>
@@ -376,10 +376,10 @@
       <p class="code-back">Plain-language explanation and maths: <a href="AREG_IOS.html#modele">atlas page</a>.</p>
 
       <p>Weights file: a single <code>.ckpt</code> in the model folder, selected by
-      <code>getModel(..., extension="ckpt")</code> (<code>AREG/AREG_Method/IOS.py:271</code>).
+      <code>getModel(..., extension="ckpt")</code> (<code>AREG/AREG_Method/IOS.py:251</code>).
       Source: <code>AREG_model.zip</code>, release
       <a href="https://github.com/HUTIN1/AREG/releases/download/v1.0.0/AREG_model.zip">HUTIN1/AREG v1.0.0</a>
-      (<code>AREG/AREG_Method/IOS.py:272</code>). Loaded via
+      (<code>AREG/AREG_Method/IOS.py:259</code>). Loaded via
       <code>torch.load(path)["state_dict"]</code>: a PyTorch Lightning checkpoint.</p>
 
       <figure class="diagram">
@@ -531,10 +531,9 @@ V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
       <ol>
         <li><strong>The background mask.</strong> <code>x * (PF &gt;= 0)</code> zeroes out the logits of empty pixels.
         After softmax they become <code>(0.5, 0.5)</code>, not 0. So they contribute a
-        half-vote to both classes, which cancels out at the <code>argmax</code> but dilutes the
-        real votes. Faces of index <code>-1</code> (the background) write into
-        <code>P_faces[:, -1]</code>, i.e. <strong>the mesh's last face</strong>, which ends up
-        absorbing that noise.</li>
+        half-vote to <em>both</em> classes, the same amount on each, so the difference between the classes, and therefore the <code>argmax</code>, does not move. Faces of index <code>-1</code> (the background) write into
+        <code>P_faces[:, -1]</code>, i.e. <strong>the mesh's last face</strong>, which is the only face that collects
+        that extra equal half-vote.</li>
         <li><strong>The accumulation doesn't really accumulate.</strong> <code>P_faces[:, pf] += pred</code> is an
         <code>index_put_</code> without <code>accumulate=True</code>: when several pixels from the same view
         land on the same face (the general case, since a face covers several pixels),
@@ -550,7 +549,7 @@ V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
       <div id="f-vote-bugs" class="callout bug">
         <div class="callout-title">Confirmed bug</div>
         <p><strong>Legacy (3c67957); partly true in <a href="../visor/AREG_IOS/AREG_IOS.html">VISOR</a>.</strong> The background dilution is fixed: pixels that hit no face are masked and left out of the vote (<code>SADT-VISOR ios/butterfly.py:151-157</code>). The two other points remain: <code>face_votes[:, view_faces[hit]] += ...</code> does not accumulate when several pixels fall on the same face (observed with torch in the tool's environment: three duplicate indices add 1, not 3), and the vote is written on the first corner of each face only (<code>ios/butterfly.py:157,161-166</code>). Legacy: <code>AREG_IOS/AREG_IOS_utils/PredPatch.py:59-60@3c67957</code>.</p>
-        <p>The three points above are <strong>facts about the code</strong>, not conjectures: the background mask dilutes the real votes without changing the argmax outcome, the <code>index_put_</code> accumulation loses contributions without <code>accumulate=True</code>, and the vote only writes to <code>F[:,0]</code>, leaving the patch full of holes by construction.</p>
+        <p>The three points above are <strong>facts about the code</strong>, not conjectures: the background mask adds an equal half-vote to both classes of the last face, the <code>index_put_</code> accumulation loses contributions without <code>accumulate=True</code>, and the vote only writes to <code>F[:,0]</code>, leaving the patch full of holes by construction.</p>
       </div>
 
       <p>Then <code>torch.where(&gt;= 1, 1, 0)</code>, <code>numpy_to_vtk</code>, an array named <strong><code>Butterfly</code></strong>,
@@ -597,7 +596,7 @@ V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
       substitute is the mucogingival line. This mode is <strong>the CLI port of path C
       of <a href="../FlexReg/FlexReg.html">FlexReg</a></strong> (see FlexReg.md §5.3), and it involves
       <strong>no AREG network</strong> at all: the palatal <code>.ckpt</code> isn't even loaded
-      (<code>parameter_reg["model"] = "None"</code>, <code>AREG/AREG_Method/IOS.py:92</code>, and
+      (<code>parameter_reg["model"] = "None"</code>, <code>AREG/AREG_Method/IOS.py:83</code>, and
       <code>RunMGL</code> returns before <code>PredPatch</code>).</p>
 
       <figure class="diagram">
@@ -632,7 +631,7 @@ V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
 
           <rect class="d-box" x="790" y="50" width="150" height="60" rx="6"/>
           <text class="d-label" x="865" y="75" text-anchor="middle">Crown removal</text>
-          <text class="d-label-s" x="865" y="91" text-anchor="middle">labels 18–32</text>
+          <text class="d-label-s" x="865" y="91" text-anchor="middle">labels 17 to 32</text>
 
           <path class="d-arrow" d="M940 80 H960"/>
           <path class="d-arrow-head" d="M960 80 l-7 -4 v8 z"/>
@@ -646,7 +645,7 @@ V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
 
       <h3>5.1 The landmarks</h3>
 
-      <p><code>MGLProcess()</code> (<code>AREG/AREG_Method/IOS.py:41</code>) stacks two
+      <p><code>MGLProcess()</code> (<code>AREG/AREG_Method/IOS.py:31</code>) stacks two
       <a href="../ALI/ALI.html#ali-ios">ALI_IOS</a> calls (T1 then T2), unless the user has supplied a landmarks folder:</p>
 
       <pre><code>conda run -n shapeaxi python -m ALI_IOS \
@@ -656,19 +655,21 @@ V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
 
       <p>13 points, <code>image_size=224</code>, <code>blur_radius=0</code>, <code>faces_per_pixel=1</code>. Both
       timepoints write into <strong>the same temporary folder</strong>, and
-      <code>FindLandmarkFile()</code> (<code>AREG_IOS/AREG_IOS.py:88</code>) finds the
+      <code>FindLandmarkFile()</code> (<code>AREG_IOS/AREG_IOS.py:93</code>) finds the
       json by the scan's stem: first <code>&lt;stem&gt;_Lower_MG_Pred.json</code> (<a href="../ALI/ALI.html">ALI</a>'s
-      convention, <code>ALI_IOS/ALI_IOS.py:654</code>), otherwise any json in the
+      convention, <code>ALI_IOS/ALI_IOS.py:396</code>), otherwise any json in the
       folder that contains the stem.</p>
 
       <h3>5.2 DropDoubtfulLandmarks</h3>
 
-      <p><code>AREG_IOS/AREG_IOS_utils/mgl_patch.py:52</code>. ALI writes into the
+      <p><code>DropDoubtfulLandmarks</code> (<code>AREG_IOS/AREG_IOS_utils/mgl_patch.py:90</code>, <code>IsDoubtful</code> at <code>:76</code>). ALI writes into the
       markup's <code>description</code> field how it obtained a degraded point:
       "cameras aimed from an arch fit, tooth not segmented", "forced (confidence
       x.xxx)", "fallback (nothing predicted on the mesh)"
-      (<code>ALI_IOS/ALI_IOS.py:785</code>). Any point carrying a non-empty
-      <code>description</code> is dropped.</p>
+      (<code>ALI_IOS/ALI_IOS.py:550-552,576</code>). A point is dropped when its
+      description contains one of the marks <code>forced</code>, <code>fallback</code>, <code>arch fit</code>,
+      <code>off the aim</code> or <code>extrapolated</code> (<code>DOUBTFUL_MARKS</code>, <code>mgl_patch.py:65</code>), or states
+      <code>confidence x</code> with x below <code>MIN_CONFIDENCE = 0.785</code> (<code>:73-87</code>, the 5th percentile of the network's confidence on its training corpus, per the comment at <code>:66-72</code>). Any other description (for example a bare confidence above the floor) keeps the point.</p>
 
       <div id="f-doubtful-landmarks" class="callout ok">
         <div class="callout-title">Verified</div>
@@ -683,7 +684,7 @@ V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
 
       <h3>5.3 MGLPatch</h3>
 
-      <p><code>AREG_IOS/AREG_IOS_utils/mgl_patch.py:218</code>:</p>
+      <p><code>MGLPatch</code> (<code>AREG_IOS/AREG_IOS_utils/mgl_patch.py:330</code>) calls, in order (<code>OrderedMGLandmarks</code> <code>:202</code>, <code>SplineThroughLandmarks</code> <code>:224</code>, <code>SnapToSurface</code> <code>:246</code>, <code>GrowBand</code> <code>:280</code>, <code>_tooth_mask</code> <code>:310</code>):</p>
 
       <ol>
         <li><code>SplineThroughLandmarks</code>: an open <code>vtkParametricSpline</code>,
@@ -695,7 +696,7 @@ V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
         real Euclidean edge length, implemented with a binary heap (<code>heapq</code>), stopping at
         <code>radius</code> mm. <strong>Geodesic</strong> distance, not Euclidean: a buccal band
         can't leak through to the lingual side where the ridge is thinner than the radius;</li>
-        <li>crowns are removed: <code>LOWER_TOOTH_LABELS = range(18, 32)</code> on
+        <li>crowns are removed: <code>LOWER_TOOTH_LABELS = range(17, 33)</code>, that is labels 17 to 32 (<code>mgl_patch.py:55</code>; the comment at <code>:51-54</code> explains that 17 and 32, the third molars, belong with the rest) on
         <code>Universal_ID</code>, <code>PredictedID</code>, or <code>UniversalID</code> (whichever is found first). Without
         segmentation, a warning is issued and everything is kept;</li>
         <li>output array: <strong><code>Bottom_MGL</code></strong> (<code>MGL_ARRAY_NAME</code>), the same name as in
@@ -728,20 +729,27 @@ V_labels_prediction[F[0, :, 0]] = P_faces</code></pre>
 
       <h3>5.4 The MGL loop</h3>
 
-      <p><code>RunMGL()</code> (<code>AREG_IOS/AREG_IOS.py:100</code>): for each lower
+      <p><code>RunMGL()</code> (<code>AREG_IOS/AREG_IOS.py:116</code>): for each lower
       pair, patch on T1 <strong>and</strong> on T2, ICP, write both out. If no pair goes through,
       a <code>RuntimeError</code> is raised with the first error: a run that "succeeded"
       while leaving the output folder empty used to send users looking in the wrong
-      place.</p>
+      place (<code>AREG_IOS.py:178-186</code>).</p>
+
+      <p><strong>Legacy only (3c67957); not in <a href="../visor/AREG_IOS/AREG_IOS.html#visor-changes">VISOR</a>.</strong> Between the landmarks and the ICP, <code>RunMGL</code> does two more things
+      (<code>AREG_IOS.py:140-158</code>). <code>SharedLandmarks</code> (<code>mgl_patch.py:128</code>) restricts both time points to the landmark names
+      they both carry (below 3 common names nothing is trimmed), because two bands of different length would let the ICP slide the short one along the long one.
+      Then <code>AlignOnLandmarks(landmarks["T2"], landmarks["T1"])</code> (<code>mgl_patch.py:156</code>) computes a rigid fit (SVD, reflection repaired) of the T2
+      landmarks onto the T1 ones, and <code>TransformSurf</code> applies it to the T2 patch before <code>icp.run</code>. The comment explains why: a band is a strip along a curve, so sliding it
+      lengthwise costs the ICP almost nothing, and where it starts is where it stays. Below 3 paired landmarks it falls back to the identity and the ICP starts on the centroids only.
+      VISOR matches the centres and nothing else (<code>SADT-VISOR ios/icp.py:36-56</code>, <code>ios/pipeline.py:192-198</code>).</p>
 
       <h2 id="icp">6. The ICP</h2>
 
       <p class="code-back">Plain-language explanation and maths: <a href="AREG_IOS.html#icp">atlas page</a>.</p>
 
 
-      <p>Identical in both modes, only the array changes
-      (<code>AREG_IOS/AREG_IOS.py:180</code> and
-      <code>AREG_IOS/AREG_IOS.py:204</code>):</p>
+      <p>Identical in both modes, only the array changes (the lower arch adds the landmark start of 5.4 in front)
+      (<code>AREG_IOS/AREG_IOS.py:157</code> for the lower arch, <code>:248</code> for the palate):</p>
 
       <pre><code>option = vtkMeshTeeth(list_teeth=[1], property="Butterfly")   # or MGL_ARRAY_NAME
 icp = ICP([vtkICP()], option=option)
@@ -795,7 +803,7 @@ icp.StartByMatchingCentroidsOn()</code></pre>
       <pre><code>final_matrix = np.linalg.inv(areg_matrix @ np.linalg.inv(matrix_aso))</code></pre>
 
       <p><code>matrix_aso</code> is the orientation matrix written by PRE_ASO_IOS
-      (<code>ASO_IOS/PRE_ASO_IOS/PRE_ASO_IOS.py:422</code>). The final inversion
+      (<code>ASO_IOS/PRE_ASO_IOS/PRE_ASO_IOS.py:221,234</code>). The final inversion
       follows the ITK convention (<em>fixed → moving</em>). Unlike <a href="../FlexReg/FlexReg.html">FlexReg</a>, there's
       <strong>no conjugation by <code>diag(-1,-1,1,1)</code></strong>: surfaces are read and
       written as-is, no <a class="gterm" href="../glossary.html#g-ras" title="See glossary">RAS</a>/<a class="gterm" href="../glossary.html#g-lps" title="See glossary">LPS</a> flip happens anywhere in AREG_IOS.</p>
@@ -889,21 +897,15 @@ icp.StartByMatchingCentroidsOn()</code></pre>
       </div>
 
       <p><code>check_deps.ensure_compatible()</code>
-      (<code>AREG_IOS/AREG_IOS_utils/check_deps.py:171</code>) runs right at the
+      (<code>AREG_IOS/AREG_IOS_utils/check_deps.py:190</code>) runs right at the
       start of the CLI: it removes a broken torchvision <code>image.so</code>, and reinstalls
       torchvision via <code>pip</code> if the torch/torchvision pair isn't in its hardcoded
       compatibility table (2.1→0.16.0 … 2.8→0.23.0 at 3c67957).</p>
 
-      <div class="callout bug">
-        <div id="f-torchvision-table" class="callout bug">
+      <div id="f-torchvision-table" class="callout bug">
         <div class="callout-title">Confirmed bug (legacy, corrected for 3c67957)</div>
         <p><strong>The torchvision table stops at torch 2.8, while the environment accepts torch up to 2.12.</strong> At 3c67957 the table in <code>AREG_IOS/AREG_IOS_utils/check_deps.py:75-83</code> runs from 2.1 to 2.8 (2.7 gives 0.22.0, 2.8 gives 0.23.0), and <code>ADT/ADTLib/env/install_pytorch.py:83</code> sets the accepted range to <code>((2, 8), (2, 13))</code>. For torch 2.9 and above <code>get_compatible_torchvision</code> returns <code>None</code>, <code>is_compatible</code> defaults to <code>True</code> and nothing gets touched. That is the desirable behaviour, but by accident. An earlier version of this callout said the table stopped at 2.7: it did not, at this commit.</p>
         <p><strong>Legacy only.</strong> <a href="../visor/AREG_IOS/AREG_IOS.html">VISOR</a> has no runtime check: the environment pins torch 2.11 and torchvision 0.26 (<code>SADT-VISOR tools/AREG/AREG_IOS/pyproject.toml:12-18</code>).</p>
-      </div>
-        <p><strong>A table that stops at torch 2.7, while the env installs <code>torch>=2.8</code></strong>: for torch 2.8+,
-        <code>get_compatible_torchvision</code> returns <code>None</code>, <code>is_compatible</code> defaults to
-        <code>True</code>, and nothing gets touched. That's the desirable behavior, but by
-        accident.</p>
       </div>
 
       <h2 id="pieges">11. Pitfalls and fragile points</h2>
@@ -953,13 +955,13 @@ icp.StartByMatchingCentroidsOn()</code></pre>
       <div id="f-prior-transform" class="callout warn">
         <div class="callout-title">Pitfall</div>
         <p><strong>Legacy only (3c67957); not present in <a href="../visor/AREG_IOS/AREG_IOS.html">VISOR</a>.</strong> VISOR indexes the transforms ASO wrote by patient stem (<code>SADT-VISOR ios/dispatch.py:257-279</code>) and composes only the upper arch's transform of T2; there is no copy of T1's transform. A transform that is not found gives no prior, and the report says which map the <code>.tfm</code> holds (<code>ios/pipeline.py:240-244</code>).</p>
-        <p><strong>T1's <code>.tfm</code> often can't be found.</strong> AREG_IOS looks for
+        <p><strong>The <code>.tfm</code> of the T1, and of the T2, often can't be found.</strong> AREG_IOS looks for
         <code>&lt;patient_id_short&gt;_SegOr.tfm</code> where <code>patient_id_short = name_t2.split("_T2")[0].split("_")[0]</code>,
         while PRE_ASO_IOS named it after <code>PatientNumber()</code> =
         <code>basename.split('_U')[0].split('_L')[0]</code>
         (<code>ASO_IOS/ASO_IOS_utils/utils.py:167</code>). The two only agree if the
         arch marker comes before the timepoint (<code>P001_Upper_T1.vtk</code> ✔,
-        <code>P001_T1_Upper.vtk</code> ✘). The failure is a warning, not an error.</p>
+        <code>P001_T1_Upper.vtk</code> ✘). The failure is a warning, not an error. The same lookup serves the T2 (<code>aso_tfm_path_t2</code>, <code>AREG_IOS.py:274</code>): when that file is missing, <code>saveMatrixAsTfm</code> logs a warning and writes <strong>no composed T2 transform</strong> (<code>transformation.py:36-41</code>), while the registered surfaces are written as usual.</p>
       </div>
 
       <div id="f-islower-length" class="callout bug">

@@ -155,7 +155,7 @@
 
       <h2 id="situation">1. Position in the pipeline</h2>
 
-      <p>SurgMovPred is an isolated tool: nothing in the repository calls it and it calls nothing. Its input is a folder of spreadsheets and its output is another spreadsheet. The module is not wired into the Slicer scene: it is a launch interface on top of a pandas script. The module was removed from the working tree in September 2026 and restored in October, which the code page records.</p>
+      <p>SurgMovPred is an isolated tool: nothing in the repository calls it and it calls nothing. Its input is a folder of spreadsheets and its output is another spreadsheet. The module is not wired into the Slicer scene: it is a launch interface on top of a pandas script.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 1050 140" role="img" aria-label="Complete SurgMovPred pipeline, from the input spreadsheet to the output spreadsheet">
@@ -229,18 +229,18 @@
 
             <figure class="algo" data-scene="smp_scale" data-ms="5600">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: four measurements on different scales are moved onto one common axis centred on 0"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
-        <div class="algo-body"><p class="algo-lead">The 145 inputs do not share a scale: some are millimetres, some degrees, some ratios. Before prediction each input is re-expressed as how many standard deviations it lies from the average of the training data, using the mean and spread stored with the model.</p><div class="formula"><math display="block"><mrow><mi class="k1">z</mi><mo>=</mo><mfrac><mrow><mi class="k2">x</mi><mo>&#x2212;</mo><mi class="k3">&#x3BC;</mi></mrow><mi class="k4">&#x3C3;</mi></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>z</b>the value the model sees</li><li class="k2"><b>x</b>the measurement, in its own unit</li><li class="k3"><b>&mu;</b>average of that measurement in the training data</li><li class="k4"><b>&sigma;</b>standard deviation of that measurement in the training data</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">The 145 inputs do not share a scale: some are millimetres, some degrees, some ratios. Before prediction each input is re-expressed as how many standard deviations it lies from the average of the training data, using the mean and spread stored with the model. This is the standard definition of a standard <a class="gterm" data-term="smp-legacy-scaler" href="SurgMovPred.code.html#entree" title="See the code">scaler</a>; the code only calls the scaler stored in each model file.</p><p class="algo-tag">Illustration: the four measurements, their units and their positions are made up for the picture.</p><div class="formula"><math display="block"><mrow><mi class="k1">z</mi><mo>=</mo><mfrac><mrow><mi class="k2">x</mi><mo>&#x2212;</mo><mi class="k3">&#x3BC;</mi></mrow><mi class="k4">&#x3C3;</mi></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>z</b>the value the model sees</li><li class="k2"><b>x</b>the measurement, in its own unit</li><li class="k3"><b>&mu;</b>average of that measurement in the training data</li><li class="k4"><b>&sigma;</b>standard deviation of that measurement in the training data</li></ul></div>
       </figure>
 
 
-      <p>Each model carries its own <a class="gterm" data-term="smp-legacy-scaler" href="SurgMovPred.code.html#entree" title="See the code">scaler</a>, fitted on its training data. There is no imputation: a missing value stays missing and carries through to the output. The only leniency about column names is the <code>_T0</code> suffix: if the model expects <code>X_T0</code> and the table has <code>X</code>, it is accepted. Any other missing column makes the whole model be skipped, with a warning, and its column is absent from the result.</p>
+      <p>Each model carries its own scaler, fitted on its training data. There is no imputation: a blank cell stays blank through the scaling, and the model then refuses it. The error is caught and logged, and that <a class="gterm" data-term="smp-legacy-targets" href="SurgMovPred.code.html#modeles-cibles" title="See the code">target</a> disappears from the result for every patient, not only for the row with the blank. The only leniency about column names is the <code>_T0</code> suffix: if the model expects <code>X_T0</code> and the table has <code>X</code>, it is accepted. Any other missing column makes the whole model be skipped, with a warning, and its column is absent from the result.</p>
 
             <a class="deep-link" href="SurgMovPred.code.html#entree"><b>In the code</b><span>The reading function, the five cleaning rules, the identifier patterns and the scaler line</span></a>
 
 
       <h2 id="modeles">4. The models</h2>
 
-      <p>The weights are not in the repository: the panel can download one archive of 112 model folders (about 706 MB) from a GitHub release. Pointing the model selector at the top folder loads all 112 models; pointing at a sub-folder loads only that one. All 112 are held in memory at once (about 1.5 GB), even for a single patient.</p>
+      <p>The weights are not in the repository: the panel can download one archive of 112 model folders (about 740 MB) from a GitHub release. Pointing the model selector at the top folder loads all 112 models; pointing at a sub-folder loads only that one. All 112 are held in memory at once (about 1.5 GB), even for a single patient.</p>
 
             <a class="deep-link" href="SurgMovPred.code.html#modeles"><b>In the code</b><span>The download address, the recursive search and the folder hierarchy that does not exist</span></a>
 
@@ -254,7 +254,7 @@
 
       <h3 id="modeles-architecture">4.2 The architecture</h3>
 
-      <p>There is no neural network. Each target is predicted by a <a class="gterm" data-term="smp-legacy-stacking" href="SurgMovPred.code.html#modeles-architecture" title="See the code">stack of</a> three base regressors, whose estimates are combined by a linear regression.</p>
+      <p>There is no neural network. Each target is predicted by a <a class="gterm" data-term="smp-legacy-stacking" href="SurgMovPred.code.html#modeles-architecture" title="See the code">stack of</a> three base regressors, whose estimates are combined by a linear regression. The three are an ElasticNetCV (a linear model with a penalty chosen by cross-validation), a <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> (many small decision trees added one after the other) and a Gaussian process (a smooth curve fitted through the training points). Why these three were chosen is written nowhere in the repository: the training code is not there.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 850 260" role="img" aria-label="Stacking architecture: three base regressors combined by a linear meta-regression">
@@ -320,7 +320,7 @@
 
             <figure class="algo" data-scene="smp_stack" data-ms="6000">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: three base estimates are weighted and added into one final prediction"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
-        <div class="algo-body"><p class="algo-lead">Each target is predicted by a stack of models. Three different regressors each make their own estimate from the scaled inputs; a final linear regression weighs the three estimates and adds them. Bar heights here are only illustrative: the real weights are stored in the model files.</p><div class="formula"><math display="block"><mrow><mi class="k1">&#x177;</mi><mo>=</mo><msub><mi class="k2">&#x3B2;</mi><mn>0</mn></msub><mo>+</mo><munderover><mo>&#x2211;</mo><mrow><mi class="k3">k</mi><mo>=</mo><mn>1</mn></mrow><mn>3</mn></munderover><msub><mi class="k2">&#x3B2;</mi><mi class="k3">k</mi></msub><msub><mi class="k4">f</mi><mi class="k3">k</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k5">z</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>&ycirc;</b>the predicted movement for this target</li><li class="k2"><b>&beta;</b>weights of the final linear regression</li><li class="k3"><b>k</b>one of the three base models</li><li class="k4"><b>f<sub>k</sub></b>the estimate of base model k</li><li class="k5"><b>z</b>the scaled inputs</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">Each target is predicted by a stack of models. Three different regressors each make their own estimate from the scaled inputs; a final linear regression weighs the three estimates and adds them. The formula is the standard definition of a stacking model; the code only calls the stored model.</p><p class="algo-tag">Illustration: the bar heights and the weights are made up for the picture; the real weights are stored in the model files.</p><div class="formula"><math display="block"><mrow><mi class="k1">&#x177;</mi><mo>=</mo><msub><mi class="k2">&#x3B2;</mi><mn>0</mn></msub><mo>+</mo><munderover><mo>&#x2211;</mo><mrow><mi class="k3">k</mi><mo>=</mo><mn>1</mn></mrow><mn>3</mn></munderover><msub><mi class="k2">&#x3B2;</mi><mi class="k3">k</mi></msub><msub><mi class="k4">f</mi><mi class="k3">k</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k5">z</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k1"><b>&ycirc;</b>the predicted movement for this target</li><li class="k2"><b>&beta;</b>weights of the final linear regression</li><li class="k3"><b>k</b>one of the three base models</li><li class="k4"><b>f<sub>k</sub></b>the estimate of base model k</li><li class="k5"><b>z</b>the scaled inputs</li></ul></div>
       </figure>
 
 
@@ -329,7 +329,7 @@
 
       <h3 id="modeles-features">4.3 The 145 features</h3>
 
-      <p>The inputs fall in four families: positions of points relative to three reference planes (Frankfort horizontal, midsagittal and coronal), soft-tissue points, classic 2D cephalometric measurements, and <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> measurements given twice, as the state before the operation (<code>_T0</code>) and as the planned total movement (<code>_Total</code>). What the two sets mean exactly is documented nowhere in the repository; the reading that the model receives both the starting state and the planned outcome is an inference from the names.</p>
+      <p>The 145 inputs fall in four groups. 78 are positions of points measured against three reference planes (Frankfort horizontal, midsagittal and coronal); 24 of these are soft-tissue points, marked by an apostrophe in their names. 14 are other cephalometric measurements: angles, ratios and widths. The last 53 are <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">occlusal</a> measurements given twice: 28 as the state before the operation (names ending in <code>_T0</code>) and 25 as the planned total movement (ending in <code>_Total</code>), most of them in both sets. What the two sets mean exactly is documented nowhere in the repository; the reading that the model receives both the starting state and the planned outcome is an inference from the names.</p>
 
             <a class="deep-link" href="SurgMovPred.code.html#modeles-features"><b>In the code</b><span>The family table with examples and the columns that are read and then ignored</span></a>
 
@@ -340,7 +340,7 @@
 
             <figure class="algo" data-scene="smp_targets" data-ms="7000">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: 112 cells, one per target, are filled one after the other; a few are skipped"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
-        <div class="algo-body"><p class="algo-lead">There are 112 targets: 28 <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> points, each with 4 values (three signed directions and a total). Each has its own model file, and they are run one after the other. A target whose required columns are missing from the table is skipped with a warning (the two hollow cells show that case).</p><ul class="algo-legend"><li class="k1"><b>filled</b>a target that has been predicted</li><li class="k1"><b>hollow</b>a target skipped because an input column is missing</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">There are 112 targets: 28 <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> points, each with 4 values (three signed directions and a total). Each has its own model file, and they are run one after the other. A target whose required columns are missing from the table is skipped with a warning (the two hollow cells show that case).</p><p class="algo-tag">Illustration: the order of the cells and the positions of the two hollow cells are made up for the picture.</p><ul class="algo-legend"><li class="k1"><b>filled</b>a target that has been predicted</li><li class="k1"><b>hollow</b>a target skipped because an input column is missing</li></ul></div>
       </figure>
 
 
@@ -403,7 +403,7 @@
 
       <h2 id="environnement">8. Environment</h2>
 
-      <p>Everything runs in Slicer&rsquo;s own Python, with no conda, no graphics card and no torch. Every click on Apply checks and installs the needed Python packages, and forces a fixed <a class="gterm" data-term="smp-legacy-numpy-pin" href="SurgMovPred.code.html#f-numpy-pin" title="See the code">numpy version</a>; the code page explains why this is the most dangerous point of the module. On macOS an extra library is downloaded for <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a>.</p>
+      <p>Everything runs in Slicer&rsquo;s own Python, with no conda, no graphics card and no torch. Every click on Apply checks and installs the needed Python packages, and forces a fixed <a class="gterm" data-term="smp-legacy-numpy-pin" href="SurgMovPred.code.html#f-numpy-pin" title="See the code">numpy version</a>, whatever the other modules of the extension need; the code page gives the details. On macOS an extra library is downloaded for <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a>.</p>
 
             <a class="deep-link" href="SurgMovPred.code.html#environnement"><b>In the code</b><span>The package list, the numpy pin and the macOS step</span></a>
 
@@ -411,11 +411,11 @@
       <h2 id="pieges">9. Known issues</h2>
 
       <ul>
-        <li>The <a class="gterm" data-term="smp-legacy-numpy-pin" href="SurgMovPred.code.html#f-numpy-pin" title="See the code">numpy version</a> is replaced on every Apply under a live Slicer session, which can break scipy elsewhere in the extension. See <a href="SurgMovPred.code.html#f-numpy-pin">the bug</a>.</li>
-        <li>The test-files button downloads an archive and then ignores it unless another module&rsquo;s data is present. See <a href="SurgMovPred.code.html#pieges">the list</a>.</li>
+        <li>The <a class="gterm" data-term="smp-legacy-numpy-pin" href="SurgMovPred.code.html#f-numpy-pin" title="See the code">numpy version</a> is set to 2.4.0 on every Apply, in the same Python that other modules of the extension set to numpy 1.26.4. See <a href="SurgMovPred.code.html#f-numpy-pin">the details</a>.</li>
+        <li>The test-files button downloads a table archive and then ignores it unless another module&rsquo;s data is present; it also downloads the models. See <a href="SurgMovPred.code.html#pieges">the list</a>.</li>
         <li>ODS files are advertised but the reader package is not installed by the module. See <a href="SurgMovPred.code.html#pieges">the list</a>.</li>
         <li>A missing input column silently removes a <a class="gterm" data-term="smp-legacy-targets" href="SurgMovPred.code.html#modeles-cibles" title="See the code">target</a> from the result. See <a href="SurgMovPred.code.html#pieges">the list</a>.</li>
-        <li>Spreadsheets with different columns are concatenated blindly, and only the first Excel sheet is read. See <a href="SurgMovPred.code.html#pieges">the list</a>.</li>
+        <li>Spreadsheets with different columns are concatenated blindly (a blank cell then drops the whole target), and only the first Excel sheet is read. See <a href="SurgMovPred.code.html#pieges">the list</a>.</li>
         <li>Targets are predicted independently, so the points of one bone segment need not move consistently. See <a href="SurgMovPred.code.html#f-independent-targets">the pitfall</a>.</li>
         <li>No uncertainty is given, and nothing is applied to the scene. See <a href="SurgMovPred.code.html#f-no-reapplication">the pitfall</a>.</li>
       </ul>

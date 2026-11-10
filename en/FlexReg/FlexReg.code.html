@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FlexReg, legacy, code · SADT Atlas</title>
+<title>FlexReg, legacy: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/carnet.css">
 <script src="../../assets/site.js"></script>
@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../FlexReg/FlexReg.html" data-gen-to="legacy" aria-current="true">Legacy</a>
-      <a href="../visor/FlexReg/FlexReg.html" data-gen-to="visor">VISOR</a>
+      <a href="../FlexReg/FlexReg.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../visor/FlexReg/FlexReg.code.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../guide/FlexReg.html">Guide</a>
@@ -245,7 +245,7 @@
         <table>
           <thead><tr><th>File</th><th>Role</th><th>Where it runs</th></tr></thead>
           <tbody>
-            <tr><td><code>FlexReg/FlexReg.py</code></td><td>Slicer widget, 4400 lines: UI, joysticks, previews, full MGL path</td><td>Slicer's Python</td></tr>
+            <tr><td><code>FlexReg/FlexReg.py</code></td><td>Slicer widget, 4157 lines: UI, joysticks, previews, full MGL path</td><td>Slicer's Python</td></tr>
             <tr><td><code>FlexReg_CLI/FlexReg_CLI.py</code></td><td>the CLI: <a class="gterm" data-term="flexreg-butterfly-legacy" href="FlexReg.html#path-a" title="See the explanation">butterfly</a>, curve, delete, icp, icp_mgl</td><td>Slicer's Python via <code>slicer.cli.run</code>, <strong>CUDA required</strong></td></tr>
             <tr><td><code>FlexReg_Method/</code> (<code>FlexReg_CLI/FlexReg_Method</code>)</td><td>orientation, butterfly, geodesic dilation, ICP</td><td>same</td></tr>
             <tr><td><code>FlexReg_utils/</code> (<code>FlexReg/FlexReg_utils</code>)</td><td>butterfly preview (numpy, CPU), MGL patch (numpy/scipy), pytorch3d installation</td><td>Slicer's Python</td></tr>
@@ -508,7 +508,7 @@
       (<code>SetAndObserveSurfaceConstraintNode</code>) plus a midpoint,
       serialized into strings and passed to the CLI. <code>draw.py</code> interpolates
       linearly between consecutive points (step <code>0.2</code>, closed loop),
-      marks vertices within <code>1.1 mm</code>, then runs
+      marks vertices within <code>1.1 mm</code> (<code>torch.cdist</code> on the 3D points, <code>draw.py:34-35</code>: no projection onto XY, unlike the butterfly), then runs
       <strong>exactly the same <code>Dilation()</code></strong> from the
       midpoint. The only difference from the butterfly is how the outline is obtained.</p>
 
@@ -523,14 +523,14 @@
       <p>The palate provides a stable plateau on the upper arch; the mandible has
       none. The substitute chosen is the <strong><a class="gterm" data-term="flexreg-mucogingival-legacy" href="FlexReg.html#path-c" title="See the explanation">mucogingival line</a></strong>. This
       whole block is computed <strong>inside the widget</strong>, in numpy/scipy:
-      no GPU, no CLI (<code>mgl_patch.py</code>).</p>
+      no GPU, no CLI (<code>FlexReg/FlexReg_utils/mgl_patch.py</code>, called <code>mgl_patch.py</code> below; <code>AREG_IOS/AREG_IOS_utils/mgl_patch.py</code> is a separate file).</p>
 
       <p><strong>a) Cleaning up ALI's predictions.</strong>
       <code>DoubtfulLandmarks()</code> reads the <code>description</code> that <a href="../ALI/ALI.html">ALI</a> writes
       into the json when it forced a point (top-k pixels, fallback to the tooth,
       missing tooth). Per the code's comment, measured on 364 predictions:
       <strong>a 4.2 mm median deviation from the neighbors' curve, against 1.2 mm</strong>
-      for the rest. These points are discarded by default, and the spline bridges
+      for the rest. The marks tested are <code>forced</code>, <code>fallback</code>, <code>arch fit</code>, <code>off the aim</code> and <code>extrapolated</code>, plus any <code>confidence</code> under <code>MIN_CONFIDENCE = 0.785</code> (<code>mgl_patch.py:144-162</code>). These points are discarded by default, and the spline bridges
       the gap: unless fewer than 3 points would remain. Then <code>CanonicalLandmarks</code>
       (old annotation naming → canonical, detected by the presence of an
       <code>LL7MG</code> or <code>LR7MG</code>) and <code>RecentreNames</code> (the
@@ -552,8 +552,8 @@
         <li><code>vtkParametricSpline</code> running through them, <code>SAMPLES_PER_SEGMENT = 25</code>;</li>
         <li><strong>each sample is snapped onto the mesh</strong> (<code>vtkPointLocator</code>): an interpolated spline drifts off the surface in interdental concavities;</li>
         <li><strong>Dijkstra</strong> (<code>scipy.sparse.csgraph</code>) on the edge graph weighted by real length, multi-source from these vertices, <code>limit</code> = max height, <code>min_only=True</code>, <code>return_predecessors=True</code> → the band <strong>grows along the surface</strong>, never through it (a vestibular patch cannot come out on the lingual side, where the ridge is thin);</li>
-        <li>height <strong>interpolated linearly between landmarks</strong> (<code>np.interp</code>) and <strong>asymmetric</strong>: <code>heights</code> on the crown side, <code>heights_down</code> on the vestibular side, with the side decided by the sign of the apical component. The height used is that of the <em>seed</em> from which the vertex was reached, so two segments of different heights coexist without a step;</li>
-        <li>the crowns (<code>Universal_ID</code> 18–31, <code>LOWER_TOOTH_LABELS</code>) are <strong>removed</strong>: they move between T1 and T2;</li>
+        <li>height <strong>interpolated linearly between landmarks</strong> (<code>np.interp</code>) and <strong>asymmetric</strong>: <code>heights</code> on the crown side, <code>heights_down</code> on the vestibular side, with the side decided by the sign of the apical component. The height used is that of the <em>seed</em> from which the vertex was reached, so two segments of different heights coexist without a step. The side is the sign of the vertex minus its seed, projected on the apical axis (<code>below</code>, <code>mgl_patch.py:510-513</code>), and a vertex is kept if <code>distance &lt;= allowed</code> and <code>allowed &gt; 0</code> (<code>:513-516</code>), so a height of 0 keeps nothing, not even the curve. Both heights default to 2.5 mm (<code>mgl_patch.py:120</code>; sliders &ldquo;Upper extension&rdquo; and &ldquo;Lower extension&rdquo;, <code>FlexReg.py:1867-1868, 1966-1972</code>), so the band is symmetric only by default;</li>
+        <li>the crowns (<code>Universal_ID</code> 17–32, <code>LOWER_TOOTH_LABELS = range(17, 33)</code>, third molars included, <code>mgl_patch.py:130-134</code>) are <strong>removed</strong>: they move between T1 and T2;</li>
         <li>the landmarks themselves always stay in the patch.</li>
       </ol>
 

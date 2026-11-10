@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CLIC on VISOR, code · SADT Atlas</title>
+<title>CLIC on VISOR: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../../assets/style.css">
 <link rel="stylesheet" href="../../../assets/themes/carnet.css">
 <script src="../../../assets/site.js"></script>
@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../../CLIC/CLIC.html" data-gen-to="legacy">Legacy</a>
-      <a href="../../visor/CLIC/CLIC.html" data-gen-to="visor" aria-current="true">VISOR</a>
+      <a href="../../CLIC/CLIC.code.html" data-gen-to="legacy">Legacy</a>
+      <a href="../../visor/CLIC/CLIC.code.html" data-gen-to="visor" aria-current="true">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/CLIC.html">Guide</a>
@@ -221,7 +221,7 @@
 
       <p class="code-back">Plain-language explanation and maths: <a href="CLIC.html#visor-files">atlas page</a>.</p>
 
-      <p>The tool is the 110 computing lines of the legacy runner, rewritten and split; the Qt panel and the conda
+      <p>The tool is the computing part of the legacy runner (about 100 lines: <code>clic_runner.py</code> is 101 lines at 3c67957, while the README counts 110 for an earlier revision), rewritten and split; the Qt panel and the conda
       installer stayed behind (SADT-VISOR <code>tools/CLIC/README.md:24-29</code>). Line counts are at 6ba2a78.</p>
 
       <div class="table-wrap">
@@ -446,7 +446,7 @@ output  output_dir/site_A/P01_seg.nii.gz          # affine and header copied fro
 
       <p>A single file is its own root, so its result lands directly in <code>output_dir</code> (<code>__init__.py:163-165</code>).
       The <a class="gterm" data-term="clic-label-map" href="CLIC.html#visor-io" title="See the explanation">label map</a> keeps the input's affine and header (<code>nib.Nifti1Image(labels, image.affine, image.header)</code>,
-      <code>:231</code>), so scan and segmentation open aligned. Then <code>CLIC_report.json</code> is written next to the results
+      <code>:231</code>), so scan and segmentation open aligned. Reusing the header also means the file is written in the input scan's data type, as in legacy: <code>labels</code> is <code>int16</code> in memory (<code>pipeline.py:167</code>), but a float32 scan gives a float32 label map on disk (nibabel 5.4.2, checked on the legacy call, which has the same shape; the values are still 0 to 3). Then <code>CLIC_report.json</code> is written next to the results
       (<code>:201</code>), with this shape (keys from <code>__init__.py:133-155,188-189,233-249</code>):</p>
 
       <pre><code>{
@@ -497,7 +497,7 @@ output  output_dir/site_A/P01_seg.nii.gz          # affine and header copied fro
           <thead><tr><th>Argument</th><th>Published type</th><th>Default</th><th>Shown to the user</th><th>Meaning</th></tr></thead>
           <tbody>
             <tr><td><code>scans</code></td><td>path, required</td><td>–</td><td>yes</td><td>one <code>.nii</code>/<code>.nii.gz</code>, or a folder searched recursively; may be picked from the server's <code>DATA/CLIC/testfiles</code></td></tr>
-            <tr><td><code>output_dir</code></td><td>path</td><td>filled by the server</td><td>no</td><td>removed from the published schema and set to the job's <code>output/</code> (VISOR-serve <code>server/registry/conventions.py:36</code>)</td></tr>
+            <tr><td><code>output_dir</code></td><td>path</td><td>filled by the server</td><td>no</td><td>removed from the published schema (VISOR-serve <code>server/registry/conventions.py:36</code>) and set to the job's <code>output/</code> (<code>server/execution/dispatch.py:427-430</code>)</td></tr>
             <tr><td><code>model</code></td><td>path</td><td><code>""</code></td><td>no: hidden by the tool's layout (<code>layout.py:18</code>)</td><td>empty means "the one <code>.pth</code> of <code>DATA/CLIC/models</code>"; zero or several is a refusal (<code>__init__.py:40-73</code>)</td></tr>
             <tr><td><code>score_threshold</code></td><td>float</td><td>0.7</td><td>yes</td><td>detections below it are not painted (<code>pipeline.py:178</code>); recorded in the report</td></tr>
             <tr><td><code>output_suffix</code></td><td>str</td><td><code>"seg"</code></td><td>yes</td><td>output is <code>&lt;scan&gt;_&lt;suffix&gt;.nii.gz</code></td></tr>
@@ -583,12 +583,13 @@ output  output_dir/site_A/P01_seg.nii.gz          # affine and header copied fro
             <tr><td>Normalisation, replication, slice axis</td><td><code>clic_runner.py:44-46,79-83</code></td><td>identical (<code>pipeline.py:147-176</code>)</td></tr>
             <tr><td>Score threshold</td><td>0.7 in the code (<code>clic_runner.py:84</code>)</td><td>argument <code>score_threshold</code>, default 0.7; mask threshold still 0.5 (<code>pipeline.py:44,178-179</code>)</td></tr>
             <tr><td>Overlapping masks</td><td>last one wins (<code>clic_runner.py:85-87</code>)</td><td>identical (<code>pipeline.py:180-182</code>)</td></tr>
+            <tr><td>Output data type</td><td>input header reused, so the input's type on disk (<code>clic_runner.py:94</code>)</td><td>same: header reused (<code>__init__.py:231</code>)</td></tr>
             <tr><td>Output name</td><td><code>X.nii/X.nii_seg.nii.gz</code> (<code>clic_runner.py:91-93</code>)</td><td><code>&lt;relative dir&gt;/X_seg.nii.gz</code> (<code>__init__.py:223-231</code>)</td></tr>
             <tr><td>Class names and colours</td><td>only in the widget, coloured by creation order (legacy page, <a href="../../CLIC/CLIC.html#architecture">§4.1</a> and <a href="../../CLIC/CLIC.html#sorties">§6</a>)</td><td>table <code>Buccal 1, Bicortical 2, Palatal 3</code> in the tool and in the report, <code>null</code> with a note when the checkpoint has another class count (<code>catalogs.py:23-69</code>, <code>__init__.py:146-154</code>)</td></tr>
             <tr><td>One scan fails</td><td>one process per scan, started by the widget</td><td>loop inside the tool, failure recorded per scan; the run fails only if no scan was written (<code>__init__.py:173-199</code>)</td></tr>
             <tr><td>Progress</td><td><code>[PROGRESS]</code>/<code>[SEG]</code> markers through the logger (<code>clic_runner.py:49-51</code>), never recognised by the widget (<a href="../../CLIC/CLIC.html#pieges">legacy §9</a>)</td><td>JSON lines in the server's progress file, position only (<code>progress.py</code>, <code>__init__.py:170</code>)</td></tr>
             <tr><td>Model download</td><td>a download button in the widget (<code>CLIC/CLIC.py:137,324-348</code>)</td><td>none in the tool's sources; a test forbids <code>urllib</code>, <code>requests</code> and <code>http</code> strings there (<code>tests/test_device_and_contract.py:163-175</code>), but see <a href="#visor-findings">the first finding</a></td></tr>
-            <tr><td>Environment</td><td>conda <code>clic_env</code>, Python 3.9, torch 2.2.0 cu118 (legacy page, <a href="../../CLIC/CLIC.html#environnement">§8</a>)</td><td>uv venv, Python 3.11, torch 2.11.0 and torchvision 0.26.0 from the cu128 index, nibabel 5.3.2 (<code>pyproject.toml:6,13-19,43-51</code>)</td></tr>
+            <tr><td>Environment</td><td>conda <code>clic_env</code>, Python 3.9, torch from the wheel channel that <code>select_channel()</code> picks for the GPU (2.2.0 cu118 or cu121, or 2.7.1 cu128; legacy page, <a href="../../CLIC/CLIC.html#environnement">§8</a>)</td><td>uv venv, Python 3.11, torch 2.11.0 and torchvision 0.26.0 from the cu128 index, nibabel 5.3.2 (<code>pyproject.toml:6,13-19,43-51</code>)</td></tr>
             <tr><td>Non-3D volume</td><td>not checked</td><td>fails that scan with "expected a 3D volume" (<code>__init__.py:218-219</code>)</td></tr>
           </tbody>
         </table>

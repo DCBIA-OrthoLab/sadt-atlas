@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AREG_IOS on VISOR, code · SADT Atlas</title>
+<title>AREG_IOS on VISOR: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../../assets/style.css">
 <link rel="stylesheet" href="../../../assets/themes/carnet.css">
 <script src="../../../assets/site.js"></script>
@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../../AREG_IOS/AREG_IOS.html" data-gen-to="legacy">Legacy</a>
-      <a href="../../visor/AREG_IOS/AREG_IOS.html" data-gen-to="visor" aria-current="true">VISOR</a>
+      <a href="../../AREG_IOS/AREG_IOS.code.html" data-gen-to="legacy">Legacy</a>
+      <a href="../../visor/AREG_IOS/AREG_IOS.code.html" data-gen-to="visor" aria-current="true">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/AREG_IOS.html">Guide</a>
@@ -377,7 +377,7 @@ prior_transforms = _collect_transforms(t2, suffix="Or")    # upper arches only</
       <p>For each mesh (<code>ios/butterfly.py:109-141</code>):</p>
       <ol>
         <li><strong>Triangulate</strong> if the mesh holds anything but triangles, because the face tensor is read as <code>reshape(-1, 4)</code>, which reads wrong indices silently otherwise (<code>ios/postprocess.py:22-50</code>).</li>
-        <li><strong>Orient into the canonical frame</strong>: the centroids of teeth 3, 8, 9 and 14 (UR6, UR1, UL1, UL6 in Universal numbering) are aligned onto a fixed reference triangle (<code>ios/orientation.py:29-30,111-146</code>). This needs a tooth-label array, <code>Universal_ID</code>, <code>PredictedID</code> or <code>UniversalID</code> (<code>ios/surfaces.py:39,103-110</code>). If it fails, the prediction goes on with the mesh as it is and a note is kept for the report (<code>ios/butterfly.py:117-131</code>). The orientation is used for rendering only: the patch array is written on the original mesh.</li>
+        <li><strong>Orient into the canonical frame</strong>: the centroids of teeth 3, 8, 9 and 14 (UR6, UR1, UL1, UL6 in Universal numbering) are aligned onto a fixed reference triangle; the two incisors are averaged into one midpoint, so the triangle has three points (<code>ios/orientation.py:29-30,111-146</code>). This needs a tooth-label array, <code>Universal_ID</code>, <code>PredictedID</code> or <code>UniversalID</code> (<code>ios/surfaces.py:39,103-110</code>). If it fails, the prediction goes on with the mesh as it is and a note is kept for the report (<code>ios/butterfly.py:117-131</code>). The orientation is used for rendering only: the patch array is written on the original mesh.</li>
         <li><strong>Normalise</strong>: centre on the bounding box, scale into the unit sphere, compute point normals; the normals mapped to RGB (<code>n * 0.5 + 0.5</code>) are the only texture the network sees (<code>ios/surfaces.py:159-192</code>, <code>ios/butterfly.py:169-190</code>).</li>
         <li><strong>Render and segment</strong> seven views (below), then vote the per-pixel probabilities back onto faces and vertices.</li>
         <li><strong>Clean</strong>: islands of either class under 200 points are absorbed by their surround, then the patch is closed, dilation 2 then erosion 2 (<code>ios/postprocess.py:192-204</code>).</li>
@@ -418,7 +418,7 @@ return (vertex_labels &gt;= 1)</code></pre>
       <ol>
         <li>order the landmarks along the arch; at least 3 are needed, missing ones are noted (<code>ios/mgl.py:79-96</code>);</li>
         <li>with a height of 0: snap the landmarks themselves to their nearest vertices, and stop there, no curve and no band (<code>ios/mgl.py:204-207</code>);</li>
-        <li>otherwise: sample a B-spline through them at 300 points, snap each sample to its nearest vertex, and grow a band of <code>height</code> mm around those seeds by Dijkstra along the mesh edges, never through space, so the band cannot jump to the lingual side (<code>ios/mgl.py:99-163,208-210</code>);</li>
+        <li>otherwise: sample a parametric spline through them at 300 points (<code>vtkParametricSpline</code>, which passes through its points; only the docstring calls it a B-spline, <code>ios/mgl.py:99-115</code>), snap each sample to its nearest vertex, and grow a band around those seeds by Dijkstra, reaching <code>height</code> mm on each side (a half-height, <code>ios/mgl.py:59</code>), measured along the mesh edges, never through space, so the band cannot jump to the lingual side (<code>ios/mgl.py:99-163,208-210</code>);</li>
         <li>remove the vertices that carry a lower crown label, 18 to 31, if the mesh is labelled (<code>ios/mgl.py:72,166-179,212-216</code>);</li>
         <li>write the result as the point array <code>Bottom_MGL</code>; an empty band is an error for that patient (<code>ios/mgl.py:57,218-227</code>).</li>
       </ol>
@@ -428,7 +428,7 @@ return (vertex_labels &gt;= 1)</code></pre>
 
       <p class="code-back">Plain-language explanation and maths: <a href="AREG_IOS.html#icp">atlas page</a>.</p>
 
-      <p><code>patch_cloud</code> turns each painted mesh into a vertex-only cloud of the points whose array value is 1, and refuses an empty one (<code>ios/butterfly.py:193-224</code>). <code>icp.align</code> then runs the same vtk filter as the legacy:</p>
+      <p>The patch is predicted on each time point (<code>ios/pipeline.py:192-193</code>), then the ICP runs on the two patch clouds, T2 onto T1 (<code>ios/pipeline.py:195-198</code>). <code>patch_cloud</code> turns each painted mesh into a vertex-only cloud of the points whose array value is 1, and refuses an empty one (<code>ios/butterfly.py:193-224</code>). <code>icp.align</code> then runs the same vtk filter as the legacy:</p>
       <pre><code>icp = vtk.vtkIterativeClosestPointTransform()
 icp.SetSource(t2_patch); icp.SetTarget(t1_patch)
 icp.GetLandmarkTransform().SetModeToRigidBody()     # 6 degrees of freedom
@@ -580,10 +580,11 @@ AREG_report.json</code></pre>
             <tr><td><a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.html#mgl" title="See the explanation">Patch height</a></td><td>default 5.0 mm, widget clamped to [0, 20] (<code>mgl_patch.py:43</code>; <code>AREG/AREG.py:870-881</code>)</td><td>engine default 5.0 mm (<code>ios/mgl.py:59</code>) but the published default is 0.0, and there is no maximum</td></tr>
             <tr><td>Orientation in Fully-Automated mode</td><td>segmentation only for the mucogingival patch; for the palate <code>list_teeth "UR6,UR4,UL4,UL6"</code> and <code>occlusion "true"</code> when lower files exist (<code>AREG/AREG_Method/IOS.py:598-634</code>)</td><td>Crown_Seg then ASO for both patches, ASO called with its defaults for the teeth and the occlusion (<code>ios/tools.py:83-110</code>, <code>ios/dispatch.py:172-181</code>)</td></tr>
             <tr><td>Crown segmentation</td><td><code>CrownSegmentationcli</code> through conda, with a by-hand bypass for already segmented files</td><td>the Crown_Seg tool, <code>skip_segmented</code> at its default (<code>ios/tools.py:113-130</code>)</td></tr>
-            <tr><td>Palate network</td><td><code>torch.device("cuda")</code> hard-coded; background pixels voted into face 0; <code>RemoveIslands(...,33,500)</code> dead (<code>PredPatch.py:29,59-60,75</code>)</td><td>CUDA when the server has a card, otherwise CPU; background pixels left out; the dead call removed (<code>ios/butterfly.py:41-54,104-107,151-157</code>, <code>ios/postprocess.py:12-15</code>)</td></tr>
+            <tr><td>Palate network</td><td><code>torch.device("cuda")</code> hard-coded; background pixels voted into the last face (index &minus;1); <code>RemoveIslands(...,33,500)</code> dead (<code>PredPatch.py:29,59-60,75</code>)</td><td>CUDA when the server has a card, otherwise CPU; background pixels left out; the dead call removed (<code>ios/butterfly.py:41-54,104-107,151-157</code>, <code>ios/postprocess.py:12-15</code>)</td></tr>
             <tr><td>Checkpoint loading</td><td>one load per CLI call, first <code>.ckpt</code> found</td><td>one load per run, exactly one checkpoint required, <code>map_location</code> set (<code>ios/butterfly.py:60-107</code>, <code>ios/net.py:188-214</code>)</td></tr>
+            <tr><td>Normals as colours</td><td>point normals written to an unsigned 8-bit colour array, so each component is rounded to 256 levels (<code>AREG_IOS/AREG_IOS_utils/utils.py:24-35</code>)</td><td>the same mapping kept as floats, without the rounding step (<code>ios/butterfly.py:177-184</code>)</td></tr>
             <tr><td>Canonical orientation</td><td><code>vtkMeanTeeth</code>, failure logged (<code>dataset.py:43-48</code>)</td><td>centroids of teeth 3, 8, 9, 14, NaN handled, failure written as a note in the report (<code>ios/orientation.py:14-19,29</code>, <code>ios/butterfly.py:117-131</code>)</td></tr>
-            <tr><td>ICP</td><td>vtk rigid ICP, 1000 iterations, centroids first (<code>AREG_IOS/AREG_IOS_utils/ICP.py:79-103</code>)</td><td>the same (<code>ios/icp.py:29,36-56</code>)</td></tr>
+            <tr><td>ICP</td><td>vtk rigid ICP, 1000 iterations, centroids first (<code>AREG_IOS/AREG_IOS_utils/ICP.py:84-103</code>)</td><td>the same (<code>ios/icp.py:29,36-56</code>)</td></tr>
             <tr><td>Transforms</td><td>only in <code>Auto_IOS</code> palate mode, plus a copy for T1 (<code>AREG_IOS/AREG_IOS.py:264-289</code>)</td><td>always one <code>.tfm</code>; when ASO oriented the meshes, the transform of the upper arch of T2 is composed so that it refers to the meshes you sent (<code>ios/pipeline.py:226-233</code>, <code>ios/icp.py:88-112</code>)</td></tr>
             <tr><td>Output names</td><td>flat folder, <code>&lt;name&gt;&lt;suffix&gt;</code> plus the input extension, <code>.vtk</code> when vtk has no writer for it (<code>ADT/ADTLib/io/surface.py:192-217</code>)</td><td>relative folder kept, <code>&lt;stem&gt;_&lt;suffix&gt;</code> plus <code>.vtp</code> for a <code>.vtp</code> input, <code>.vtk</code> otherwise (<code>ios/pipeline.py:253-258</code>, <code>ios/surfaces.py:93-100</code>)</td></tr>
             <tr><td>Review pauses</td><td>pauses with manual adjustment in the widget</td><td>none: <code>stop_after</code> hidden (<code>ios/layout.py:40</code>)</td></tr>

@@ -135,7 +135,7 @@
         </div>
       </header>
 
-      <p>MedX is no longer in the legacy tree: it was removed on 2026-09-17 (commit 34d496f) and kept on the branch <code>archive/medx</code> (fbfa0fb). Everything below describes that archived code. There is no VISOR port; <a href="../visor/MedX/MedX.html">what is left of MedX in VISOR</a> is a stub.</p>
+      <p>MedX is no longer in the legacy tree: it was removed on 2026-09-17 (commit 34d496f) and kept on the branch <code>archive/medx</code>, whose last commit is fbfa0fb. Everything below describes that archived code; its build had already been switched off on 2026-03-18, when it was replaced by CNE. There is no VISOR port; <a href="../visor/MedX/MedX.html">what is left of MedX in VISOR</a> is a stub.</p>
 
       <h2 id="apercu">Overview: what goes in, what comes out</h2>
 
@@ -154,7 +154,7 @@
 
       <h2 id="situation">1. Where it sits in the chain</h2>
 
-      <p>MedX is self-contained: nothing in the repository calls it and it calls nothing. The two paths are independent, each with its own button and its own job. The dashboard reads what the summariser wrote, but nothing chains them: the operator reruns the dashboard by hand. Neither path calls a language model over the network; the only outbound traffic is downloading the weights from a GitHub release.</p>
+      <p>MedX is self-contained: no other module calls it and it calls no other module (the Agent&rsquo;s tool catalogue lists the two jobs, but only as a description). The two paths are independent, each with its own button and its own job. The dashboard reads what the summariser wrote, but nothing chains them: the operator reruns the dashboard by hand. Neither path calls a language model over the network; the only outbound traffic is downloading the weights from a GitHub release.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 750 170" role="img" aria-label="Overview: MedX's two independent paths, with no automatic chaining">
@@ -211,7 +211,7 @@
 
       <h3 id="regroupement">3.1 Grouping by patient</h3>
 
-      <p>The folder is read without descending into sub-folders. Everything before the first underscore in a file name is the <a class="gterm" data-term="medx-patient-id" href="MedX.code.html#regroupement" title="See the code">patient identifier</a>, and the notes of one patient are concatenated into one text before the model sees them. The progress bar, however, counts files recursively, so with sub-folders it never reaches 100 %.</p>
+      <p>The folder is read without descending into sub-folders. Everything before the first underscore in a file name is the <a class="gterm" data-term="medx-patient-id" href="MedX.code.html#regroupement" title="See the code">patient identifier</a>, and the notes of one patient are concatenated into one text before the model sees them. The progress bar, however, divides the number of patients finished by the number of files it finds in all sub-folders, so as soon as a patient has more than one note, or there are sub-folders, it cannot reach 100 %. Notes of one patient are joined with nothing between them.</p>
 
       <a class="deep-link" href="MedX.code.html#regroupement"><b>In the code</b><span>The grouping code and the progress mismatch</span></a>
 
@@ -223,14 +223,14 @@
 
       <h3 id="decoupage-chunks">3.3 Chunking: the most carefully engineered part</h3>
 
-      <p>The text is first split into paragraphs: at a blank line, at the start of a numbered or bulleted item, and at four section headers (clinical examination, clinical evaluation, radiographic examination, radiographic evaluation). A very short paragraph, under 150 characters, is not left alone but kept with the text next to it, so that list items stay with their heading.</p>
+      <p>The text is first split into paragraphs: at a blank line, at the start of a numbered or bulleted item, and at four section headers (clinical examination, clinical evaluation, radiographic examination, radiographic evaluation), which are cut out only when they are written in capitals. The pieces are then glued back together by two rules. A numbered or bulleted item always sticks to the piece before it. A paragraph under 150 characters swallows the piece that comes <em>after</em> it, so a short heading takes the text under it, and a short paragraph is joined to what follows, not to what came before. A section header always starts a new paragraph.</p>
 
       <figure class="algo" data-scene="medx_chunk" data-ms="7200">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: six blocks of text, two of them whole sections, are packed one after the other into three chunks of at most 3500 characters; a section that does not fit in the current chunk starts the next one"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
-        <div class="algo-body"><p class="algo-lead">Notes are cut into chunks of at most 3,500 characters, because the model reads at most 1,024 tokens at a time. A whole clinical section (a header and the paragraphs under it) goes into the chunk being built if it fits, and starts a new chunk if it does not.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">&#x2113;</mi><mtext>chunk</mtext></msub><mo>+</mo><msub><mi class="k2">&#x2113;</mi><mtext>block</mtext></msub><mo>+</mo><mn>1</mn><mo>&#x2264;</mo><mn>3500</mn></mrow></math></div><ul class="algo-legend"><li class="k1"><b>&ell;<sub>chunk</sub></b>characters already in the chunk being built</li><li class="k2"><b>&ell;<sub>block</sub></b>characters of the next paragraph, or of the whole section it opens (the tall blocks with a header)</li><li><b>3500</b>the chunk limit, the dashed line; the +1 is the separator</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">Notes are cut into chunks of at most 3,500 characters, because the model reads at most 1,024 tokens at a time. A whole clinical section (a header and the paragraphs under it) goes into the chunk being built if it fits, and starts a new chunk if it does not.</p><p class="algo-tag">Illustration: the six blocks and their sizes are made up for the picture; the 3,500 limit and the rule for sections are the code&rsquo;s.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">&#x2113;</mi><mtext>chunk</mtext></msub><mo>+</mo><msub><mi class="k2">&#x2113;</mi><mtext>block</mtext></msub><mo>+</mo><mn>1</mn><mo>&#x2264;</mo><mn>3500</mn></mrow></math></div><ul class="algo-legend"><li class="k1"><b>&ell;<sub>chunk</sub></b>characters already in the chunk being built</li><li class="k2"><b>&ell;<sub>block</sub></b>characters of the next paragraph, or of the whole section it opens (the tall blocks with a header)</li><li><b>3500</b>the chunk limit, the dashed line; the +1 is a one-character margin in the test</li></ul></div>
       </figure>
 
-      <p>When a section is too big for one chunk it is cut paragraph by paragraph, and a paragraph that is still too big is cut sentence by sentence. 3,500 characters is about 900 tokens, under the model&rsquo;s limit of 1,024; anything beyond that limit would be cut off.</p>
+      <p>When a section is too big for one chunk it is cut paragraph by paragraph, and a paragraph that is still too big is cut sentence by sentence. An ordinary paragraph that does not fit in what is left of the chunk is cut sentence by sentence straight away. 3,500 characters is roughly 850 to 950 tokens (an estimate made on the CNE test notes, not a measurement with the real tokenizer), plus about 20 for the instruction sentence, so under the model&rsquo;s limit of 1,024; anything beyond that limit is cut off without a warning.</p>
 
       <a class="deep-link" href="MedX.code.html#decoupage-chunks"><b>In the code</b><span>The two chunking functions, the regular expressions and the size arguments</span></a>
 
@@ -244,7 +244,7 @@
 
       <h3 id="poids">4.2 The weights</h3>
 
-      <p>The weights are a 1.51 GB archive from a GitHub release. Its configuration shows a fine-tune of <em>facebook/bart-large-cnn</em>, an encoder and decoder of 12 layers each (about 406 million parameters), able to read at most 1,024 positions, not a model trained from scratch. The download button of the widget does not actually download anything; the archive has to be fetched by hand (<a href="MedX.code.html#f-download-noop">details</a>).</p>
+      <p>The weights are a 1.51 GB archive from a GitHub release. Its configuration shows a fine-tune of <em>facebook/bart-large-cnn</em>, an encoder and decoder of 12 layers each (about 406 million parameters, from the size of the weights file), able to read at most 1,024 positions, not a model trained from scratch. The download button of the widget does not actually download anything; the archive has to be fetched by hand (<a href="MedX.code.html#f-download-noop">details</a>).</p>
 
       <a class="deep-link" href="MedX.code.html#poids"><b>In the code</b><span>The archive contents and the configuration fields</span></a>
 
@@ -364,13 +364,13 @@
 
       <figure class="algo" data-scene="medx_merge" data-ms="7000">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: four values of the same field arrive one after the other; the first fills the empty cell, the second is identical and is ignored, the third contains the first and replaces it, the fourth is different and is appended after a bar"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
-        <div class="algo-body"><p class="algo-lead">A field can come back in several <a class="gterm" data-term="medx-chunk" href="MedX.code.html#decoupage-chunks" title="See the code">chunks</a> of the same note. The values are <a class="gterm" data-term="medx-merge" href="MedX.code.html#resume-vers-dataframe" title="See the code">merged</a> one at a time: an empty cell takes the value; a value already there is ignored; a stored value that is contained in the new, longer one is replaced by it; anything else is appended after a bar.</p><ul class="algo-legend"><li class="k1"><b>same wording</b>short, then longer: the longer one wins</li><li class="k4"><b>different value</b>appended after a bar</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">A field can come back in several <a class="gterm" data-term="medx-chunk" href="MedX.code.html#decoupage-chunks" title="See the code">chunks</a> of the same note. The values are <a class="gterm" data-term="medx-merge" href="MedX.code.html#resume-vers-dataframe" title="See the code">merged</a> one at a time: an empty cell takes the value; a value already stored is ignored; a stored value that is contained in the new, longer one is replaced by it; a new value that is itself contained in a stored one is dropped (not shown in the animation); anything else is appended after a bar.</p><p class="algo-tag">Illustration: the shapes stand for values and are made up for the picture; the four rules are the code&rsquo;s.</p><ul class="algo-legend"><li class="k1"><b>same wording</b>short, then longer: the longer one wins</li><li class="k4"><b>different value</b>appended after a bar</li></ul></div>
       </figure>
 
 
       <figure class="algo" data-scene="medx_number" data-ms="6000">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: in the text 7 over 10 the number before the slash is kept; in the text 8 to 9 both numbers are found and their mean, 8.5, is kept"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
-        <div class="algo-body"><p class="algo-lead">Six fields become numbers. If the text has a slash, only the number before it is kept (&ldquo;7/10&rdquo; gives 7). Otherwise the mean of every number found is kept (&ldquo;8-9&rdquo; gives 8.5).</p><div class="formula"><math display="block"><mrow><mi class="k1">v</mi><mo>=</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mi class="k2">n</mi></mrow></mfrac><munderover><mo>&#x2211;</mo><mrow><mi class="k3">i</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi class="k2">n</mi></mrow></munderover><msub><mi class="k3">x</mi><mi class="k3">i</mi></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>v</b>the number kept</li><li class="k2"><b>n</b>how many numbers the text holds</li><li class="k3"><b>x<sub>i</sub></b>the i-th number found</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">Six fields become numbers. If the text has a slash, only the number before it is kept (&ldquo;7/10&rdquo; gives 7). Otherwise the mean of every number found is kept (&ldquo;8-9&rdquo; gives 8.5). The formula is the ordinary mean; the code only calls numpy&rsquo;s mean on the numbers it finds.</p><p class="algo-tag">Illustration: the drawing is made up; the archived function does return 7 and 8.5 for these two texts.</p><div class="formula"><math display="block"><mrow><mi class="k1">v</mi><mo>=</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mi class="k2">n</mi></mrow></mfrac><munderover><mo>&#x2211;</mo><mrow><mi class="k3">i</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi class="k2">n</mi></mrow></munderover><msub><mi class="k3">x</mi><mi class="k3">i</mi></msub></mrow></math></div><ul class="algo-legend"><li class="k1"><b>v</b>the number kept</li><li class="k2"><b>n</b>how many numbers the text holds</li><li class="k3"><b>x<sub>i</sub></b>the i-th number found</li></ul></div>
       </figure>
 
 
@@ -378,28 +378,30 @@
 
       <h3 id="agregateurs">5.2 The aggregators</h3>
 
-      <p>Each panel has one function, all of them pattern matching on free text followed by a count: age groups (12 to 19, 20 to 40, over 40), sleep disorder or not, tenderness, mean and spread of five pain scores, maximum mouth opening read from strings like &ldquo;33 mm&rdquo;, where headaches and joint pain are located (by lists of synonyms), six yes or no symptoms, five levels of muscle pain, and months since onset read from phrases like &ldquo;1 year and 9 months ago&rdquo;.</p>
+      <p>Each panel has one function, all of them pattern matching on free text followed by a count: age groups (labelled 12 to 19, 20 to 40 and over 40), sleep disorder or not, tenderness, mean and spread of five pain scores, maximum mouth opening read from strings like &ldquo;33 mm&rdquo; (or from any bare number), where headaches and joint pain are located (by lists of synonyms), six yes or no symptoms, five levels of muscle pain, and months since onset read from phrases like &ldquo;1 year and 9 months ago&rdquo;.</p>
 
       <figure class="algo" data-scene="medx_percent" data-ms="6000">
-        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: ten patients, four with a yes, three with a no and three with no value; the three missing ones count as no, and the bar fills to 40 per cent"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
-        <div class="algo-body"><p class="algo-lead">Each percentage is divided by the number of patients, never by the number of values that were filled in. A patient whose field is empty therefore counts as a no.</p><div class="formula"><math display="block"><mrow><mi class="k1">p</mi><mo>=</mo><mn>100</mn><mo>&#xd7;</mo><mfrac><mrow><msub><mi class="k2">n</mi><mtext>yes</mtext></msub></mrow><mrow><mi class="k3">N</mi></mrow></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p</b>the percentage shown</li><li class="k2"><b>n<sub>yes</sub></b>patients whose field says true (the filled dots)</li><li class="k3"><b>N</b>all patients, with or without a value</li></ul></div>
+        <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animation: ten patients, four with a yes, three with a no and three with no value; in the top bar the three missing ones count as no and the bar fills to 40 per cent; in the bottom bar they drop out and four out of seven fills it to 57 per cent"></svg><div class="algo-ctl"><button class="algo-play" type="button">Replay</button></div></div>
+        <div class="algo-body"><p class="algo-lead">Most panels divide by all the patients, never by the number of values that were filled in, so a patient whose field is empty counts as a no (top bar). The age pie is the exception: it divides by the patients whose age could be read, so an empty age drops out (bottom bar).</p><p class="algo-tag">Illustration: the ten patients are made up for the picture.</p><div class="formula"><math display="block"><mrow><mi class="k1">p</mi><mo>=</mo><mn>100</mn><mo>&#xd7;</mo><mfrac><mrow><msub><mi class="k2">n</mi><mtext>yes</mtext></msub></mrow><mrow><mi class="k3">N</mi></mrow></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>p</b>the percentage shown</li><li class="k2"><b>n<sub>yes</sub></b>patients whose field says true (the filled dots)</li><li class="k3"><b>N</b>the patients counted: all ten for the yes or no panels (top bar), only the seven with a value for the age pie (bottom bar)</li></ul></div>
       </figure>
 
-      <p>Two fragilities follow. Some functions compare the text to lowercase <code>true</code> while others lowercase it first, so a model writing <code>True</code> would silently zero the six yes or no symptoms (<a href="MedX.code.html#f-donuts-case">details</a>). And the disc displacement is computed but never drawn.</p>
+      <p>The other panels follow their own rules. The sleep pie counts every value except &ldquo;unknown&rdquo;, an empty field included, as a sleep disorder. The tenderness pie puts a patient in the &ldquo;unknown&rdquo; slice when none of the three fields is positive and they are not all &ldquo;false&rdquo;. The score bars and the mouth-opening bars are means over the values that exist.</p>
 
-      <a class="deep-link" href="MedX.code.html#agregateurs"><b>In the code</b><span>The function table, the case bug, the dead return and the dead computation</span></a>
+      <p>Two fragilities follow. Some functions compare the text to lowercase <code>true</code> while others lowercase it first, so a model writing <code>True</code> would silently zero five of the six yes or no donuts, the jaw one being the only one protected (<a href="MedX.code.html#f-donuts-case">details</a>). And the disc displacement is computed but never drawn.</p>
+
+      <a class="deep-link" href="MedX.code.html#agregateurs"><b>In the code</b><span>The function table, the case bug and the dead computation</span></a>
 
       <h3 id="figure">5.3 The figure</h3>
 
-      <p>One large figure (22 by 14 inches) in a 2 by 2 grid: pie charts for age, sleep disorder and tenderness at the top left, six donuts on the right, bar charts of scores with their spread and of maximum opening at the bottom, then muscle pain, joint pain areas, and age against how long the pain has lasted.</p>
+      <p>One large figure (22 by 14 inches) in a 2 by 2 grid: pie charts for age, sleep disorder and tenderness and two small donuts for migraine and headache at the top left, six donuts on the right, bar charts of scores with their spread, of maximum opening and of headache locations at the bottom left, then muscle pain, joint pain areas, and age against how long the pain has lasted at the bottom right.</p>
 
       <a class="deep-link" href="MedX.code.html#figure"><b>In the code</b><span>The grid specification and a self-assignment that does nothing</span></a>
 
       <h2 id="sorties">6. Post-processing and outputs</h2>
 
-      <p>The summariser writes one text file per patient and a log file that holds the number of patients done. The dashboard writes <code>dashboard.png</code>, a 56-column table <code>patient_data.csv</code>, and the same table a second time as <code>dashboard_full_dataframe.csv</code>. If the box is ticked, the picture is loaded into Slicer as if it were a volume, in the red slice view, for lack of an image viewer.</p>
+      <p>The summariser writes one text file per patient and a log file that holds the number of patients done. The dashboard writes <code>dashboard.png</code>, a 58-column table <code>patient_data.csv</code> (the <a class="gterm" data-term="medx-schema" href="MedX.code.html#resume-vers-dataframe" title="See the code">56 fields</a> plus two helper columns the figure code adds), and the 56-column table <code>dashboard_full_dataframe.csv</code>, written before those two columns exist. If the box is ticked, the picture is loaded into Slicer as if it were a volume, in the red slice view, for lack of an image viewer.</p>
 
-      <a class="deep-link" href="MedX.code.html#sorties"><b>In the code</b><span>The file table, the log path and the image-as-volume load</span></a>
+      <a class="deep-link" href="MedX.code.html#sorties"><b>In the code</b><span>The file table, the two CSV files, the log path and the image-as-volume load</span></a>
 
       <h2 id="predit-calcule">7. Predicted or calculated</h2>
 
@@ -433,8 +435,8 @@
         <li>Generation is not reproducible: <a class="gterm" data-term="medx-beam" href="MedX.code.html#f-beam-sample" title="See the code">beam search</a> and sampling together, no seed (<a href="MedX.code.html#f-beam-sample">details</a>).</li>
         <li>The patient is whatever comes before the first underscore, so two different patients, or one patient under two names, are easily mixed (<a href="MedX.code.html#pieges">all pitfalls</a>).</li>
         <li>Values containing a colon are lost at parsing (<a href="MedX.code.html#pieges">all pitfalls</a>).</li>
-        <li>The dashboard was developed on summaries from a Qwen 1.5B model, not on the <a class="gterm" data-term="bart" href="../glossary.html#g-bart" title="See glossary">BART</a> the module ships (<a href="MedX.code.html#pieges">all pitfalls</a>).</li>
-        <li>Two <a class="gterm" data-term="medx-aggregator" href="MedX.code.html#agregateurs" title="See the code">aggregators</a> contain dead code or a dead computation, and about 2 GB of installed packages are never used (<a href="MedX.code.html#f-migraine-dead-return">details</a>).</li>
+        <li>A comment in the dashboard code points to summaries from a Qwen 1.5B model, not to the <a class="gterm" data-term="bart" href="../glossary.html#g-bart" title="See glossary">BART</a> the module ships (<a href="MedX.code.html#pieges">all pitfalls</a>).</li>
+        <li>One of the <a class="gterm" data-term="medx-aggregator" href="MedX.code.html#agregateurs" title="See the code">aggregators</a> is computed and never drawn, and four installed packages are never imported (<a href="MedX.code.html#pieges">all pitfalls</a>).</li>
       </ul>
 
       <a class="deep-link" href="MedX.code.html#pieges"><b>In the code</b><span>Every pitfall, bug and piece of dead code with its line</span></a>

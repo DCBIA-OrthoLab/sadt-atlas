@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../BatchDentalSeg/BatchDentalSeg.html" data-gen-to="legacy" aria-current="true">Legacy</a>
-      <a href="../visor/BatchDentalSeg/BatchDentalSeg.html" data-gen-to="visor">VISOR</a>
+      <a href="../BatchDentalSeg/BatchDentalSeg.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../visor/BatchDentalSeg/BatchDentalSeg.code.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../guide/BatchDentalSeg.html">Guide</a>
@@ -248,10 +248,14 @@
 
       <p>The widget does not preprocess anything. <code>SegmentationLogic._prepareInferenceDir()</code> does a
       <code>slicer.util.exportNode(volumeNode, &lt;tmp&gt;/input/volume_0000.nii.gz)</code>, and <strong>all
-      of the preprocessing is nnU-Net's</strong>: transposition per
-      <code>transpose_forward</code>, resampling to the plan's <code>spacing</code>, <code>CTNormalization</code>
-      (clip to the 0.5% / 99.5% percentiles of the training set, then standardization
-      by its mean and standard deviation).</p>
+      of the preprocessing is nnU-Net's</strong>, in this order (nnunetv2 2.8.1, <code>preprocessing/preprocessors/default_preprocessor.py</code>,
+      read in VISOR's environment; the version a legacy install runs is not recorded): transposition per
+      <code>transpose_forward</code> (<code>:56</code>), crop to the non-zero region (<code>:65</code>), normalisation (<code>:82</code>, commented as
+      MUST come before resampling), then resampling to the plan's <code>spacing</code> (<code>:88</code>).
+      <code>CTNormalization</code> is nnU-Net's standard definition (<code>preprocessing/normalization/default_normalization_schemes.py:58-72</code>):
+      clip to the plan's 0.5% / 99.5% percentiles of the training set, subtract their mean, divide by <code>max(std, 1e-8)</code>.
+      The plan read here is DentalSegmentator's only (<code>plans.json</code>: p0.5 &minus;110, p99.5 3067, mean 1274, std 558); for the other three models
+      that the same scheme applies is assumed, not checked (§4.3).</p>
 
       <p>The only preprocessing written in this repository is the <strong><a class="gterm" data-term="bds-l-crop" href="BatchDentalSeg.html#coeur-crop" title="See the explanation">automatic crop</a></strong> (§5.2), and
       it is optional, reserved for replay after a memory failure.</p>
@@ -265,7 +269,7 @@
       <h3 id="modeles-combo">4.1 What the combo box selects</h3>
 
       <p><code>onApplyClickedForVolume()</code>
-      (<code>SegmentationWidget.py:1827</code>)
+      (<code>SegmentationWidget.py:1826</code>)
       is an <code>if/elif</code> with four near-identical branches. Each builds the same
       object:</p>
 
@@ -385,6 +389,12 @@
       an ensemble), <code>nProcessPreprocessing = nProcessSegmentationExport = 1</code>, forced to
       <code>0</code> on macOS (nnU-Net hangs on write there because of multiprocessing).</p>
 
+      <p>Patch placement and the Gaussian weights are nnU-Net's, not the module's: the step is at most <code>step_size</code> times the patch and is shrunk so
+      that the patches end on the edge of the image, hence an overlap of at least half for 0.5 (nnunetv2 2.8.1,
+      <code>inference/sliding_window_prediction.py:30-54</code>); the weights are Gaussian with a spread of one eighth of the patch
+      (<code>:11-16</code>, called at <code>inference/predict_from_raw_data.py:626</code>). The label of a voxel is the argmax over the labels
+      (<code>utilities/label_handling/label_handling.py:178</code>), which returns the first maximum on a tie (documented behaviour of NumPy and PyTorch).</p>
+
       <p>The only setting the UI offers is the device: <code>cuda</code> / <code>cpu</code> / <code>mps</code>. If
       unavailable, only <strong>one</strong> question is asked for the whole <a class="gterm" data-term="bds-l-queue" href="BatchDentalSeg.html#entrees-file" title="See the explanation">queue</a>
       (<code>_deviceFallbackAccepted</code>), and in <em>Unattended</em> mode the CPU fallback is
@@ -478,8 +488,8 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
 
           <rect class="d-box" x="210" y="60" width="185" height="80" rx="6"/>
           <text class="d-label" x="302" y="82" text-anchor="middle">nnU-Net preprocessing</text>
-          <text class="d-label-s" x="302" y="98" text-anchor="middle">transpose, resample,</text>
-          <text class="d-label-s" x="302" y="112" text-anchor="middle">CTNormalization</text>
+          <text class="d-label-s" x="302" y="98" text-anchor="middle">transpose, crop, CTNormalization,</text>
+          <text class="d-label-s" x="302" y="112" text-anchor="middle">then resample</text>
           <text class="d-label-s" x="302" y="127" text-anchor="middle">(driven by plans.json)</text>
 
           <path class="d-arrow" d="M395 100 H440"/>
@@ -609,7 +619,11 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
       cross one model's spacing with another model's label count.</p>
 
       <p>Budget = <code>free RAM × ramLimitSpinBox</code> (default <strong>85%</strong>). Above it, the scan is
-      marked <code>failed</code> with the reason, without ever starting nnU-Net.</p>
+      marked <code>failed</code> with the reason, without ever starting nnU-Net, unless the check box
+      <em>Skip scans too large for the free RAM</em> (<code>ramPreflightCheckBox</code>, checked by default,
+      <code>SegmentationWidget.py:446-447</code>) is cleared: the estimate is then only logged
+      (<code>SegmentationWidget.py:1248-1253</code>). The budget is applied to the memory available at that moment
+      (<code>vm.available</code>, <code>SegmentationWidget.py:1243-1244</code>), although the spin box is labelled &ldquo;% of system RAM&rdquo;.</p>
 
       <p><strong>b) Monitoring during execution</strong>: <code>_onMemCheck</code> samples every
       <code>_RAM_SAMPLE_MS = 3000</code> ms; it takes <code>_RAM_CONSECUTIVE_HITS = 2</code> consecutive
@@ -727,7 +741,7 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
         <table>
           <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
           <tbody>
-            <tr><td>Preprocessing (transposition, resampling, <code>CTNormalization</code>)</td><td><span class="badge calcule">computed</span> deterministic, driven by <code>plans.json</code></td><td><code>nnUNetv2_predict</code>, child process</td></tr>
+            <tr><td>Preprocessing (transposition, crop to non-zero, <code>CTNormalization</code>, resampling, in this order)</td><td><span class="badge calcule">computed</span> deterministic, driven by <code>plans.json</code></td><td><code>nnUNetv2_predict</code>, child process</td></tr>
             <tr><td>Segmentation</td><td><span class="badge predit">predicted</span> <code>PlainConvUNet</code> 3D network, 1 fold, no TTA</td><td>same</td></tr>
             <tr><td><a class="gterm" data-term="bds-l-crop" href="BatchDentalSeg.html#coeur-crop" title="See the explanation">Automatic crop</a></td><td><span class="badge calcule">computed</span> geometric (air threshold + bounding box)</td><td>widget, numpy</td></tr>
             <tr><td>Restoration onto the original grid</td><td><span class="badge calcule">computed</span> index offset, no interpolation</td><td>widget, numpy</td></tr>
@@ -881,8 +895,8 @@ foreground intensities: median 1317, mean 1274, s 558, p0.5 -110, p99.5 3067</co
         <code>Resources/ML</code> is not installed was wrong for that commit. The JSON files of the three other
         bundles are not listed.</p>
         <p>What holds: the a priori <a class="gterm" data-term="bds-l-memory" href="BatchDentalSeg.html#coeur-memoire" title="See the explanation">memory estimate</a> (§5.3) returns <code>None</code> when the plans or dataset
-        files cannot be read (<code>SegmentationWidget.py:1173-1203</code>), and the RAM check then lets the scan
-        through (<code>SegmentationWidget.py:1239-1241</code>).</p>
+        files cannot be read (<code>SegmentationWidget.py:1173-1204</code>), and the RAM check then lets the scan
+        through (<code>SegmentationWidget.py:1239-1242</code>).</p>
         <p><strong>Not present in VISOR:</strong> the Slicer client has no memory guard (the panel is 97 lines,
         <code>AutomatedDentalToolsRemote BATCHDENTALSEGRemote/BATCHDENTALSEGRemote.py:51-97</code>); admission is done by the server
         (<code>VISOR-serve server/execution/admission.py:1-12</code>).</p>

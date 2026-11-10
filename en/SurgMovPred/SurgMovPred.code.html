@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SurgMovPred, legacy, code · SADT Atlas</title>
+<title>SurgMovPred, legacy: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../assets/style.css">
 <link rel="stylesheet" href="../../assets/themes/carnet.css">
 <script src="../../assets/site.js"></script>
@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../SurgMovPred/SurgMovPred.html" data-gen-to="legacy" aria-current="true">Legacy</a>
-      <a href="../visor/SurgMovPred/SurgMovPred.html" data-gen-to="visor">VISOR</a>
+      <a href="../SurgMovPred/SurgMovPred.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../visor/SurgMovPred/SurgMovPred.code.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../guide/SurgMovPred.html">Guide</a>
@@ -287,7 +287,9 @@
       Excel workbook, only the <strong>first sheet</strong> is read: the official test file
       contains seven (<code>all_data</code>, <code>demographics</code>,
       <code>Invivo_ceph</code>, <code>surgical_mov</code>, <code>dolp_ceph_T0</code>, <code>dolp_ceph_T1</code>,
-      <code>dolp_ceph_total</code>), and it's <code>all_data</code> that sits in first position.</p>
+      <code>dolp_ceph_total</code>), and it's <code>all_data</code> that sits in first position.
+      A file that cannot be read is logged and skipped (<code>SurgMovPred_CLI.py:181-182</code>); the
+      run fails only if no file at all could be read (<code>:184-185</code>).</p>
 
       <p><strong>Column-name normalization</strong>, <code>clean_name()</code>
       (<code>SurgMovPred_CLI.py:41</code>), applied on input
@@ -316,8 +318,14 @@
       <p><strong>Value normalization.</strong> Each model package carries <strong>its own</strong>
       <code>StandardScaler</code> <span class="badge calcule">computed</span> (centering + <a class="gterm" data-term="smp-legacy-scaler" href="SurgMovPred.html#entree" title="See the explanation">scaling</a>,
       <code>with_mean=True</code>, <code>with_std=True</code>), applied right before prediction
-      (<code>SurgMovPred_CLI.py:239</code>). No imputation: a missing value propagates as
-      <code>NaN</code> all the way to the output.</p>
+      (<code>SurgMovPred_CLI.py:239</code>). No imputation: a missing value reaches the scaler as
+      <code>NaN</code> and leaves it as <code>NaN</code>, and <code>model.predict</code> then raises
+      (<code>SurgMovPred_CLI.py:243</code>), so the <a class="gterm" data-term="smp-legacy-targets" href="SurgMovPred.html#modeles-cibles" title="See the explanation">target</a> is dropped for <strong>all</strong> rows
+      (see the <a href="#f-nan-drops-target">note below</a>). Evidence: the packages hold an
+      <code>ElasticNetCV</code> (strings of the pickle), and a stand-in <a class="gterm" data-term="smp-legacy-stacking" href="SurgMovPred.html#modeles-architecture" title="See the explanation">stack of</a>
+      <code>ElasticNetCV</code> + <code>GaussianProcessRegressor</code> + <code>LinearRegression</code>,
+      run on a current scikit-learn, raised <code>ValueError: Input X contains NaN</code>. The real
+      packages were not run.</p>
 
       <p><strong>Tolerance on the <code>_T0</code> suffix</strong> (<code>SurgMovPred_CLI.py:225</code>):
       if the model expects <code>X_T0</code> and the column is named <code>X</code>, it is accepted.</p>
@@ -333,6 +341,17 @@
         tables without predictions (<code>pipeline.py:260</code>).</p>
       </div>
 
+      <div class="callout note" id="f-nan-drops-target">
+        <div class="callout-title">A blank cell removes the whole target</div>
+        <p>All rows go to <code>model.predict</code> in one call (<code>SurgMovPred_CLI.py:243</code>), so
+        one <code>NaN</code> in any row of the columns a model needs makes that call raise; the
+        <code>try/except</code> at <code>:245-246</code> logs it and the target gets no column, for every
+        patient. This also happens when spreadsheets with different columns are concatenated
+        (<code>:187</code>). VISOR runs the same code (<code>pipeline.py:243-250</code>). Evidence as in
+        section 3: the pickle holds an <code>ElasticNetCV</code>, and a stand-in stack raised on
+        <code>NaN</code>; the shipped packages were not run.</p>
+      </div>
+
       <h2 id="modeles">4. The models</h2>
 
       <p class="code-back">Plain-language explanation and maths: <a href="SurgMovPred.html#modeles">atlas page</a>.</p>
@@ -343,7 +362,7 @@
       <pre><code>https://github.com/DCBIA-OrthoLab/SlicerAutomatedDentalTools/releases/download/SurgMovPred/all_models.zip
   -&gt; Documents/SlicerDownloads/SurgMovPred/Models/all_models/</code></pre>
 
-      <p><strong>706 MB</strong>, 112 folders, one <code>stacking_package.pkl</code> of ~13 MB each.
+      <p><strong>About 740 MB</strong> (740 183 656 bytes, i.e. 706 MiB; the size is from the same release file in the VISOR data manifest, VISOR-serve <code>scripts/data-manifest.yml:96-98</code>), 112 folders, one <code>stacking_package.pkl</code> of ~13 MB each.
       <code>load_all_model_packages()</code> does a recursive <code>Path.glob("**/stacking_package.pkl")</code>
       and indexes by <code>package['target_name']</code>: pointing the selector at <code>all_models/</code>
       loads all 112 models, pointing at a subfolder loads only one. The CLI's help text and a comment
@@ -468,36 +487,44 @@
 
       <p class="code-back">Plain-language explanation and maths: <a href="SurgMovPred.html#modeles-features">atlas page</a>.</p>
 
-      <p>Four families, reconstructed from <code>features_names</code> and cross-checked
-      against the <code>all_data</code> sheet of the test file:</p>
+      <p>Four groups, counted by reading the 145 names in
+      <code>Mn_ALL_BPoint_Down_Pred/stacking_package.pkl</code> (strings of the pickle, nothing run) and
+      cross-checked against the <code>all_data</code> sheet of the test file:</p>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Family</th><th>Count</th><th>Examples</th></tr></thead>
+          <thead><tr><th>Group</th><th>Count</th><th>Examples</th></tr></thead>
           <tbody>
             <tr>
-              <td>Point positions relative to the three reference planes: <strong>FH</strong> (Frankfort horizontal), <strong>MSP</strong> (midsagittal plane), <strong>CP</strong> (coronal plane)</td>
-              <td>~76</td>
-              <td><code>SM_A_FH</code>, <code>SM_GoL_MSP</code>, <code>SM_PNS_CP</code>, <code>SM_CoR_FH</code></td>
+              <td>Point positions relative to the three reference planes: <strong>FH</strong> (Frankfort horizontal, 26), <strong>MSP</strong> (midsagittal plane, 30), <strong>CP</strong> (coronal plane, 22). 24 of them are soft-tissue points, marked by an apostrophe, and are part of this count.</td>
+              <td>78</td>
+              <td><code>SM_A_FH</code>, <code>SM_GoL_MSP</code>, <code>SM_PNS_CP</code>, <code>SM_N'_FH</code>, <code>SM_Sn'_MSP</code></td>
             </tr>
             <tr>
-              <td>Soft-tissue points, marked by the apostrophe</td>
-              <td>~20</td>
-              <td><code>SM_N'_FH</code>, <code>SM_Sn'_MSP</code>, <code>SM_ULip'_FH</code>, <code>SM_Pg'_MSP</code></td>
+              <td>Other cephalometric measurements: angles, ratios and widths</td>
+              <td>14</td>
+              <td><code>SNA</code>, <code>SM_ANB_signed</code>, <code>SM_Witts</code>, <code>LAFH</code>, <code>Jarabak's_ratio</code>, <code>UAFH_LAFH</code>, <code>FMA_MP_FH_Ang_2D</code>, <code>SM_Mx_Width</code></td>
             </tr>
             <tr>
-              <td>Classic 2D cephalometric measurements</td>
-              <td>~12</td>
-              <td><code>SNA</code>, <code>SM_ANB_signed</code>, <code>SM_Witts</code>, <code>LAFH</code>, <code>Jarabak's_ratio</code>, <code>UAFH_LAFH</code>, <code>FMA_MP_FH_Ang_2D</code>, <code>IMPA_L1_MP_Ang_2D</code>, <code>U1_to_SN_Ang_2D</code>, <code>SM_Mx_Width</code>, <code>SM_Mn_Width</code>, <code>OP_to_FH_Ang_2D</code></td>
+              <td>Occlusal and dental measurements, suffix <code>_T0</code></td>
+              <td>28</td>
+              <td><code>MxMn_Overjet_R_T0</code>, <code>MxMn_Molar_Relationship_L_T0</code></td>
             </tr>
             <tr>
-              <td>Occlusal/dental measurements, in two sets suffixed <code>_T0</code> and <code>_Total</code></td>
-              <td>2 × ~18</td>
-              <td><code>MxMn_Overjet_R_T0</code> / <code>MxMn_Overjet_R_Total</code>, <code>MxMn_Molar_Relationship_L_T0</code>, <code>Mn_Gonions_to_Midline_Distances_R_Total</code></td>
+              <td>Occlusal and dental measurements, suffix <code>_Total</code></td>
+              <td>25</td>
+              <td><code>MxMn_Overjet_R_Total</code>, <code>Mn_Gonions_to_Midline_Distances_R_Total</code></td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      <p>78 + 14 + 28 + 25 = 145. 24 base names exist in both the <code>_T0</code> and the <code>_Total</code> set;
+      4 exist only as <code>_T0</code> (the two molar relationships and the two left-side midline distances of
+      the lower canines and first molars) and 1 only as <code>_Total</code> (the left upper canine vertical distance).
+      VISOR's <code>layout.py:19-22</code> says 82 landmark-to-plane distances, 28 <code>_T0</code> and 25 <code>_Total</code>:
+      the 82 is the 78 above plus the four other <code>SM_</code> names (<code>SM_ANB_signed</code>, <code>SM_Witts</code>,
+      <code>SM_Mx_Width</code>, <code>SM_Mn_Width</code>), which this page counts among the 14.</p>
 
       <p>What exactly the two <code>_T0</code> / <code>_Total</code> sets mean is documented nowhere
       in the repository. The naming (<code>T0</code> = before, <code>Total</code> = total variation) and
@@ -584,6 +611,10 @@
       column. <a class="gterm" data-term="smp-legacy-column-names" href="SurgMovPred.html#entree" title="See the explanation">Column names</a> are the packages' raw <code>target_name</code>, so with <code>/</code> and
       <code>+</code> (<code>Mx_ALL_APoint_P-/A+_Pred</code>).</p>
 
+      <p>The panel's <code>helpText</code> says the module "writes one result table per input file"
+      (<code>SurgMovPred.py:235-237</code>). The CLI does not: it concatenates all input files first
+      (<code>SurgMovPred_CLI.py:187</code>) and writes one table (<code>:264-269</code>).</p>
+
       <div class="callout warn" id="f-no-reapplication">
         <div class="callout-title">Pitfall</div>
         <p><strong>There is no reapplication of the result whatsoever.</strong> Nothing builds a
@@ -667,17 +698,23 @@
         </table>
       </div>
 
-      <div class="callout bug" id="f-numpy-pin">
-        <div class="callout-title">Confirmed bug (legacy only)</div>
+      <div class="callout warn" id="f-numpy-pin">
+        <div class="callout-title">Unconditional numpy pin that other modules undo (legacy only)</div>
         <p>Legacy (3c67957); not present in <a href="../visor/SurgMovPred/SurgMovPred.html#visor-changes">VISOR</a>, where the tool has its own virtual environment
         pinned to numpy 2.2.6 and no install happens at run time
         (<code>VISOR:SADT-VISOR tools/Surg_Mov_Pred/pyproject.toml:14</code>; the 2.4.0 pin was
-        deliberately not adopted, <code>README.md:76-80</code>).</p>
-        <p><code>pip_install("numpy==2.4.0")</code> runs <strong>unconditionally, on every click of
-        Apply</strong>. Replacing numpy under a live Slicer session is exactly what breaks
-        scipy's import elsewhere in the extension (Slicer's scipy is compiled against its
-        numpy). By far the most dangerous point in the module, triggered by the main
-        button.</p>
+        deliberately not adopted, <code>VISOR:SADT-VISOR tools/Surg_Mov_Pred/README.md:76-80</code>).</p>
+        <p><code>onApplyButton</code> calls <code>check_dependencies()</code> first (<code>SurgMovPred.py:412</code>), and
+        that function runs <code>slicer.util.pip_install("numpy==2.4.0")</code> on every click, before
+        looking at what is installed (<code>SurgMovPred.py:171</code>). Other modules of the same
+        extension push numpy the other way: AMASSS installs 1.26.4 when numpy is missing or 2.x
+        (<code>AMASSS/AMASSS.py:53,74-76</code>), VFACE does the same when torch needs numpy 1.x
+        (<code>VFACE/VFACE.py:107,148-158</code>), and MRI2CBCT installs 1.26.4 whenever the version differs
+        (<code>MRI2CBCT/MRI2CBCT.py:625-626</code>, <code>MRI2CBCT_core/requirements.py:21</code>). In one Slicer
+        session, using SurgMovPred and one of those modules moves numpy between 2.4.0 and 1.26.4.</p>
+        <p>Not proved here: that this breaks scipy or another package. The code shows the conflict of pins,
+        not a failure; the VISOR README only says upstream pins 2.4.0 "because Slicer's shared interpreter needs it for
+        other reasons" (<code>VISOR:SADT-VISOR tools/Surg_Mov_Pred/README.md:78-79</code>).</p>
       </div>
 
       <p>Installation happens without conda, without GPU, without torch.</p>
@@ -692,26 +729,27 @@
       <p class="code-back">Plain-language explanation and maths: <a href="SurgMovPred.html#pieges">atlas page</a>.</p>
 
       <ul>
-        <li><strong><code>pip_install("numpy==2.4.0")</code> on every run.</strong> Replacing numpy
-        under a live Slicer session is exactly what breaks scipy's import elsewhere in
-        the extension (Slicer's scipy is compiled against its numpy). By far the most
-        dangerous point in the module, and it's triggered by the main button.</li>
-        <li><strong>Inoperative "test files" button</strong>: <code>DownloadTestFiles()</code>
+        <li><strong><code>pip_install("numpy==2.4.0")</code> on every run.</strong> Other modules of the
+        extension install numpy 1.26.4 (AMASSS, VFACE, MRI2CBCT), so the version can swing between the
+        two within one Slicer session. Whether that breaks anything was not tested
+        (<a href="#f-numpy-pin">details</a>).</li>
+        <li><strong>"Test files" button half-inoperative</strong>: <code>DownloadTestFiles()</code>
         (<code>SurgMovPred.py:763</code>) does download <code>TestFiles.zip</code>, but only fills in the
-        input/output fields <code>if os.path.exists(.../V_FACE/DefaultList)</code>, a copy-paste
+        input/output fields <code>if os.path.exists(.../V_FACE/DefaultList)</code> (<code>:773</code>), a copy-paste
         leftover from the VFACE module. Without <a href="../VFACE/VFACE.html">VFACE</a>'s test data, the archive is
-        downloaded and then ignored.</li>
+        downloaded and then ignored. The same button then calls <code>onDownloadDefaultModel()</code>
+        (<code>:780</code>), so it also downloads the 740 MB of models and fills the model field.</li>
         <li><strong><code>.ods</code> advertised, <code>odfpy</code> not installed</strong> by <code>check_dependencies</code>
-        (it is, however, installed by the Anonymizer module, which can mask the problem
+        (it is, however, installed by the Anonymizer module, <code>Medical_Data_Anonymizer_Module.py:411</code>, which can mask the problem
         on a machine where both have been used).</li>
         <li><strong>A missing feature = a model silently skipped.</strong> The log says
         "Model 'X' skipped: missing N input feature(s)", but the output file itself simply
         ends up with one fewer column. A poorly named spreadsheet can produce a
         <code>predictions_outputs.xlsx</code> with zero prediction columns and no failure.</li>
         <li><strong>Blind concatenation of the input files</strong>: two spreadsheets with
-        different columns give <code>NaN</code>, and <code>model.predict</code> on <code>NaN</code> raises,
-        the error is caught per <a class="gterm" data-term="smp-legacy-targets" href="SurgMovPred.html#modeles-cibles" title="See the explanation">target</a>, so the result comes out partial without much of
-        it being visible.</li>
+        different columns give <code>NaN</code> in the columns one of them lacks, and <code>model.predict</code> on
+        <code>NaN</code> raises; the error is caught per <a class="gterm" data-term="smp-legacy-targets" href="SurgMovPred.html#modeles-cibles" title="See the explanation">target</a>, so those targets vanish for every patient
+        (<a href="#f-nan-drops-target">note</a>) and the result comes out partial without much of it being visible.</li>
         <li><strong>Only one Excel sheet is read.</strong> A workbook whose first sheet isn't
         the data sheet produces an empty result.</li>
         <li><strong>1.5 GB of models loaded systematically</strong>, even for a single row to

@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../../AutoMatrix/AutoMatrix.html" data-gen-to="legacy">Legacy</a>
-      <a href="../../visor/AutoMatrix/AutoMatrix.html" data-gen-to="visor" aria-current="true">VISOR</a>
+      <a href="../../AutoMatrix/AutoMatrix.code.html" data-gen-to="legacy">Legacy</a>
+      <a href="../../visor/AutoMatrix/AutoMatrix.code.html" data-gen-to="visor" aria-current="true">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/AutoMatrix.html">Guide</a>
@@ -144,8 +144,9 @@
 
       <p class="code-back">Plain-language explanation and maths: <a href="AutoMatrix.html#visor-status">atlas page</a>.</p>
 
-      <p>AutoMatrix is the only tool of this group that another VISOR tool calls: VFACE drives it through the supervisor, once to mirror
-      the scans and once to move landmarks by each patient's registration transform. It calls nothing itself. Its inputs are typically
+      <p>AutoMatrix is the only tool of this group that another VISOR tool calls: VFACE drives it through the supervisor in two ways: the mirror call (on the scans of an asymmetry study,
+      <code>SADT-VISOR tools/VFACE/src/sadt_vface/dispatch.py:161</code>, and on its landmark folders, <code>:232</code>) and the call that moves
+      landmarks by each patient's registration transform (one call per region, <code>:253-261</code>). It calls nothing itself. Its inputs are typically
       the outputs of a registration (AREG, GreedyReg, FlexReg) or the hosted <a class="gterm" data-term="automatrix-mirror" href="AutoMatrix.html#visor-step-resample" title="See the explanation">mirror matrix</a>.</p>
 
       <div class="table-wrap">
@@ -157,7 +158,7 @@
             <tr><td>Server package</td><td><code>tools/AutoMatrix</code>, import <code>sadt_automatrix</code>: <code>__init__.py</code> (358 lines), <code>pipeline.py</code> (296), <code>layout.py</code> (59), <code>progress.py</code> (103). Own venv, Python &gt;=3.11,&lt;3.12, SimpleITK 2.5.6, numpy 2.3.2, <code>sadt-areg-common</code> (<code>SADT-VISOR AutoMatrix/pyproject.toml:5,9,10,16</code>). No weights, no network.</td></tr>
             <tr><td>Slicer panel</td><td>Module <code>AutoMatrixRemote</code> (235 lines), panel generated from <code>GET /tools</code>. It adds a check box <b>Use the mirror matrix</b> (<code>AutoMatrixRemote.py:132-134</code>): ticking it fills Transforms with the hosted test file <code>Mirror</code> and ticks "Same transform for every patient" (<code>:183-201</code>); it is greyed out when the server does not host that file (<code>:150-159</code>). Loads up to 12 results (<code>:91</code>), preset CT-AAA (<code>:97</code>), volumes and <code>.mrk.json</code> (<code>:105-110</code>), and a final status line (<code>:207-235</code>).</td></tr>
             <tr><td>Facade</td><td>None.</td></tr>
-            <tr><td>Called by</td><td>VFACE, through <code>sup.run</code>: the mirror call (<code>same_transform_for_every_patient=True</code>, <code>output_suffix="mir"</code>, no <code>reference</code>, <code>SADT-VISOR tools/VFACE/src/sadt_vface/tools.py:179-187</code>) and the call that moves landmarks by each patient's transform (<code>output_suffix="reg"</code>, <code>content="Automatic"</code>, <code>:205-212</code>).</td></tr>
+            <tr><td>Called by</td><td>VFACE, through <code>sup.run</code>: the mirror call (<code>same_transform_for_every_patient=True</code>, <code>output_suffix="mir"</code>, no <code>reference</code>, <code>SADT-VISOR tools/VFACE/src/sadt_vface/tools.py:179-187</code>) and the call that moves landmarks by each patient's transform (<code>output_suffix="reg"</code>, <code>content="Automatic"</code>, <code>:205-212</code>). The mirror call is made on scans (<code>content="Scan"</code>, <code>dispatch.py:161</code>) and on landmark folders (<code>content="Automatic"</code>, <code>:232</code>), once per frame; the registration call once per region (<code>:253-261</code>).</td></tr>
             <tr><td>Calls</td><td>Nothing: no <code>sup</code> parameter, no <code>sup.run</code>.</td></tr>
           </tbody>
         </table>
@@ -538,7 +539,7 @@ else:
             <tr><td>Several transforms</td><td>One output per transform, may overwrite (<code>:256-264</code>).</td><td>Name forced when a patient has more than one (<code>__init__.py:141</code>).</td></tr>
             <tr><td>Output name</td><td><code>args.suffix</code> concatenated, UI default <code>_apply</code> (<code>AutoMatrix.ui:325</code>); path built by <code>replace</code> and <code>split(extension_scan)[0]</code> (<code>:224-226,281</code>).</td><td>Default <code>Reg</code>, separator added by the tool (<code>__init__.py:36,301-303</code>); <code>relpath</code> and <code>Path</code> (<code>:323-325</code>).</td></tr>
             <tr><td>Unmatched files</td><td>Ignored without a word.</td><td>Reported (<code>__init__.py:105-106</code>); <code>ValueError</code> when nothing is written (<code>:164-182</code>).</td></tr>
-            <tr><td>Hidden files</td><td>Not filtered.</td><td>Names starting with a dot are skipped (<code>__init__.py:283</code>).</td></tr>
+            <tr><td>Hidden files</td><td>Not filtered by name in the module, but the search is <code>glob.iglob(".../**/*", recursive=True)</code> (<code>ADT/ADTLib/io/fs.py:59@3c67957</code>), and a <code>*</code> pattern does not return names that start with a dot.</td><td>Names starting with a dot are skipped (<code>__init__.py:283</code>).</td></tr>
             <tr><td>"From AReg" branch</td><td><code>suffix_map</code> and a missing argument (<code>:200-204,232-252</code>).</td><td>Removed (<code>README.md:16-45</code>).</td></tr>
             <tr><td>Progress</td><td><code>emit_event(PATIENT_DONE)</code> (<code>:27,287</code>).</td><td><code>progress.report(index, total, "patient")</code> (<code>__init__.py:117</code>).</td></tr>
           </tbody>
@@ -572,7 +573,7 @@ else:
 
       <div id="f-remote-docs" class="callout warn">
         <div class="callout-title">Documentation of the Remote module contradicts the code</div>
-        <p><code>AutomatedDentalToolsRemote AutoMatrixRemote/AutoMatrixRemote.py:16-19</code> says the server still applies a matrix whose name contains "mirror" in the scan's own space; the port does not (<code>SADT-VISOR AutoMatrix/README.md:89-92</code>, <code>tests/test_run_options.py:311-331</code>). <code>AutoMatrixRemote.py:12-15</code> says "nothing is hidden" while <code>reference</code> and <code>content</code> are hidden (<code>layout.py:28,43</code>). The client test builds its schema by hand with <code>hidden: False</code> everywhere and other section names (<code>test_automatrix_client.py:72-186</code>), so <code>test_nothing_is_marked_hidden</code> (<code>:255-257</code>) checks that copy, not the server's schema. The comment in <code>SADT-VISOR AutoMatrix/layout.py:22-27</code> says VFACE passes <code>"None"</code> at eight call sites; <code>SADT-VISOR tools/VFACE/src/sadt_vface/tools.py:179-187,205-212</code> passes no <code>reference</code>.</p>
+        <p><code>AutomatedDentalToolsRemote AutoMatrixRemote/AutoMatrixRemote.py:16-19</code> says the server still applies a matrix whose name contains "mirror" in the scan's own space; the port does not (<code>SADT-VISOR AutoMatrix/README.md:89-92</code>, <code>tests/test_run_options.py:311-331</code>). <code>AutoMatrixRemote.py:12-15</code> says "nothing is hidden" while <code>reference</code> and <code>content</code> are hidden (<code>layout.py:28,43</code>). The client test builds its schema by hand with <code>hidden: False</code> everywhere and other section names (<code>test_automatrix_client.py:72-186</code>), so <code>test_nothing_is_marked_hidden</code> (<code>:255-257</code>) checks that copy, not the server's schema. The comment in <code>SADT-VISOR AutoMatrix/layout.py:22-27</code> says VFACE passes <code>"None"</code> at all eight of its call sites; the two AutoMatrix wrappers of <code>SADT-VISOR tools/VFACE/src/sadt_vface/tools.py:179-187,205-212</code> pass no <code>reference</code> and are called from three places in <code>dispatch.py</code> (<code>:161,232,257</code>). Passing <code>"None"</code> and passing nothing come to the same, so this is a comment that cannot be matched to the count, not a proven contradiction.</p>
       </div>
 
       <div id="f-coordinate-system" class="callout warn">

@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../CNE/CNE.html" data-gen-to="legacy" aria-current="true">Legacy</a>
-      <a href="../visor/CNE/CNE.html" data-gen-to="visor">VISOR</a>
+      <a href="../CNE/CNE.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../visor/CNE/CNE.code.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../guide/CNE.html">Guide</a>
@@ -243,11 +243,13 @@
         </table>
       </div>
 
-      <p>The system <a class="gterm" data-term="cne-leg-instruction" href="CNE.html#inference" title="See the explanation">instruction</a> is copied verbatim from MedX:
+      <p>The system <a class="gterm" data-term="cne-leg-instruction" href="CNE.html#inference" title="See the explanation">instruction</a> is the same sentence as in MedX:
       <code>"Using the following note, extract structured key-value pairs about the patient's symptoms and diagnoses:"</code>
       (<code>CNE_CLI.py:24</code> against
       <code>MedX_Summarize.py:55</code>, on the <code>archive/medx</code> branch where MedX
-      now lives).</p>
+      now lives). MedX sent it as a prefix of the user message, followed by a blank line and the chunk
+      (<code>MedX_Summarize.py:55</code>); CNE sends it as a separate <code>system</code> message
+      (<code>CNE_CLI.py:196</code>).</p>
 
       <h2 id="fichiers">2. Files involved</h2>
 
@@ -318,7 +320,7 @@
         requests <code>n_gpu_layers=-1</code> with the comment "Use GPU if available"
         (<code>CNE_CLI.py:164</code>): with a CPU-only build this
         parameter has no effect. In practice inference runs on CPU, and a
-        7–8 B Q4-quantized model costs several tens of seconds per note there.</p>
+        7–8 B Q4-quantized model is slow there (the time per note was not measured for this page).</p>
       </div>
 
       <p>The CLI re-tests its three imports (llama_cpp, fitz, docx) at startup and calls <code>sys.exit(1)</code> if one is
@@ -371,8 +373,9 @@
       were split by patient. The Ortho card says the model takes the raw note <strong>with no
       system prompt</strong>, which matches the code (§6), and lists orthodontic features (wire
       size and material, ligation, elastics, overjet, overbite, ...) as its schema. Neither card
-      reports an evaluation. The TMJ card gives the file as 4.7 GB, while the download dialog
-      says 4.4 GB (<code>CNE.py:528</code>).</p>
+      reports an evaluation. The TMJ file is 4,683,073,408 bytes (HTTP HEAD, 2026-11-10): 4.7 GB
+      in decimal units and 4.4 in binary units (GiB), so the card and the TMJ download dialog (<code>CNE.py:528</code>)
+      describe the same file with two unit conventions. The Ortho dialog (<code>CNE.py:521</code>) uses decimal units.</p>
 
       <h2 id="entrees">5. Inputs and preprocessing</h2>
 
@@ -446,9 +449,8 @@ output = llm.create_chat_completion(messages=messages, max_tokens=500, temperatu
           <path class="d-arrow-head" d="M213 177 l-7 -4 v8 z"/>
 
           <rect class="d-box-a" x="220" y="142" width="230" height="70" rx="6"/>
-          <text class="d-label" x="335" y="167" text-anchor="middle">Llama-3.1-8B-Ortho.gguf</text>
+          <text class="d-label" x="335" y="167" text-anchor="middle">Meta-Llama-3.1-8B-Ortho.gguf</text>
           <text class="d-label-s" x="335" y="184" text-anchor="middle">n_ctx 2048, predicts</text>
-          <text class="d-label-s" x="335" y="200" text-anchor="middle">download: 404</text>
 
           <path class="d-arrow" d="M450 47 L500 100"/>
           <path class="d-arrow" d="M450 177 L500 120"/>
@@ -494,23 +496,26 @@ output = llm.create_chat_completion(messages=messages, max_tokens=500, temperatu
         2048 instead of 500 (<code>__init__.py:46-56</code>), and an answer cut off by the limit is a failure of
         that note instead of being written (<code>__init__.py:293-297</code>). Still true: nothing checks the
         note's length against the window, and nothing checks <code>max_tokens</code> against it either
-        (<code>extraction.py:146-153</code> only rejects a negative window); an overflow raises inside
-        llama.cpp and is caught per note (<code>__init__.py:200-212</code>; see
+        (<code>extraction.py:146-153</code> only rejects a negative window); a prompt that fills the window raises inside
+        llama.cpp and is caught per note (<code>__init__.py:200-212</code>), while a long note that still fits shortens the
+        answer, which VISOR then refuses as cut off (see
         <a href="../visor/CNE/CNE.html#visor-args">CNE on VISOR</a>).</em>
-        <strong>No guard on length.</strong> <code>n_ctx</code> is 6144 (TMJ) or 2048 (Ortho) and
-        <code>max_tokens=500</code> is taken out of that budget. A note exceeding the budget makes
-        llama.cpp raise; the exception is caught per file, logged, and the file
-        is added to <code>failed_files</code>. The Ortho budget is particularly tight:
-        ~1,500 tokens of usable note. The test note
-        <code>TMJ_note1.txt</code> is roughly
-        4,400 characters long, which passes in TMJ mode.</p>
+        <strong>No guard on length.</strong> <code>n_ctx</code> is 6144 (TMJ) or 2048 (Ortho)
+        and the call passes <code>max_tokens=500</code>. In llama-cpp-python (0.3.36, <code>llama.py:1343-1358</code>)
+        an error is raised only when the prompt alone reaches <code>n_ctx</code>; otherwise <code>max_tokens</code> is
+        cut down to <code>n_ctx</code> minus the prompt length and the answer simply stops there. So a long note does
+        not fail: it gets a shorter answer, the JSON is cut off, either <code>json.loads</code> fails
+        (<code>CNE_CLI.py:214</code>, handler <code>:224-226</code>) or no closing brace is found (<code>:221-222</code>), and the raw text is written. Only a prompt that fills the whole
+        window raises; that exception is caught per file, logged, and the file is added to <code>failed_files</code>.
+        With Ortho, a note of about 1,500 tokens or more leaves the answer under 500 tokens. The test note
+        <code>TMJ_note1.txt</code> is 4,731 bytes, which passes in TMJ mode.</p>
       </div>
 
       <ul>
         <li>Model loading is wrapped by redirecting <code>stderr</code> to
-        <code>/dev/null</code> via <code>os.dup2</code> (<code>CNE_CLI.py:159</code>), to
-        mask llama.cpp's chatter, which would otherwise pollute the error channel that
-        Slicer interprets as a CLI failure.</li>
+        <code>/dev/null</code> via <code>os.dup2</code> (<code>CNE_CLI.py:157-159</code>) around the <code>Llama(...)</code>
+        call, and restoring it afterwards (<code>:169-171</code>). The code gives no reason; the call also passes
+        <code>verbose=False</code> (<code>:166</code>). If <code>Llama(...)</code> raises, the restore lines are skipped.</li>
       </ul>
 
       <h2 id="post-traitement">7. Post-processing the response</h2>
@@ -583,7 +588,7 @@ for key, value in data.items():
         (<code>display_figure.py:23</code>) keeps only <code>Extraction_*.txt</code> files in the
         folder; the patient identifier is the note name minus the prefix.
         <code>process_summaries()</code> (<code>display_figure.py:135</code>) fills a dictionary of
-        54 keys seeded by <code>initialize_key_value_summary()</code>
+        56 keys (the patient id and 55 fields the model is expected to return) seeded by <code>initialize_key_value_summary()</code>
         (<code>dashboard_utils.py:332</code>) and converts six numeric fields.</li>
         <li><strong>Computed, not predicted.</strong> Each panel is a deterministic
         aggregation <span class="badge calcule">computed</span> in <code>dashboard_utils.py</code>
@@ -667,8 +672,8 @@ for key, value in data.items():
         an output folder already chosen by the user alone (<code>CNE.py:328-330</code>).
         <code>Resources/testfiles/</code> still holds only the two <code>input_</code> folders.</li>
         <li><strong>Non-recursive scan</strong> of the input folder (§5).</li>
-        <li><strong>No length limit</strong> before the call: a note that is too long fails
-        instead of being chunked, whereas <a href="../MedX/MedX.html">MedX</a> did chunk (§6). This is a functional
+        <li><strong>No length check</strong> before the call: a long note is not chunked. Its answer is shortened to what the window leaves
+        (cut-off JSON, raw text written), and a note that fills the window fails, whereas <a href="../MedX/MedX.html">MedX</a> did chunk (§6). This is a functional
         regression of the replacement.</li>
         <li><strong>Ortho mode sends no system <a class="gterm" data-term="cne-leg-instruction" href="CNE.html#inference" title="See the explanation">instruction</a></strong> (§6): if the model is not the
         one expected, there is no reason for the output to be JSON at all.</li>

@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../Agent/Agent.html" data-gen-to="legacy" aria-current="true">Legacy</a>
-      <a href="../visor/Agent/Agent.html" data-gen-to="visor">VISOR</a>
+      <a href="../Agent/Agent.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../visor/Agent/Agent.code.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../guide/Agent.html">Guide</a>
@@ -274,7 +274,7 @@
         <p>The module never passes a device directive. The Ollama binary decides, and the code draws an explicit
         consequence from that: on Linux, an Ollama installed via <strong>snap</strong> is sandboxed, does not see
         the NVIDIA GPU, and falls back to CPU, <strong>80–90 s per response</strong> for an 8B model, a figure
-        measured and hardcoded in the code (<code>Agent.py:1107</code>). The module detects <code>/snap/</code>
+        measured and hardcoded in the code (comment at <code>Agent.py:1101-1103</code>, repeated in the warning dialog). The module detects <code>/snap/</code>
         in the binary's <code>realpath</code> and warns about it, without being able to fix it (the snap server
         already holds port 11434, and removing it needs sudo).</p>
       </div>
@@ -331,7 +331,7 @@
         <p><strong>Legacy (3c67957); not present in the <a href="../visor/Agent/Agent.html#visor-changed">VISOR server tool</a>.</strong> The server ranker is BM25 and only narrows the list when it has a signal: with no overlap between the request and any tool, every tool is shown (<code>SADT-VISOR tools/Agent/src/sadt_agent/ranking.py:222-239</code>). The cross-encoder fallback is still true in the client copy (<code>AutomatedDentalToolsRemote Agent_CLIRemote/Agent_CLIRemote_utils/utils.py:94</code>; legacy <code>Agent_CLI/Agent_CLI_utils/utils.py:94</code>).</p>
         <p>If loading fails, the fallback is blunt: <code>scripts[:k]</code>, i.e. <strong>the first three tools
         in the <a class="gterm" data-term="agent-l-manifest" href="Agent.html#modules" title="See the explanation">manifest</a></strong> (ali_cbct, ali_ios, amasss_cli) regardless of the question
-        (<code>utils.py:90</code>). The operator is not informed.</p>
+        (<code>utils.py:94</code>). The only trace is a line printed to the CLI output (<code>utils.py:93</code>); the chat is not told.</p>
       </div>
 
       <h2 id="routage">4. Routing</h2>
@@ -482,7 +482,7 @@ Rules:
       <ol>
         <li>a chat bubble, "After reflection, I would like to run X";</li>
         <li><strong><code>QMessageBox.question</code></strong> listing <code>key=value</code> for each
-        parameter (<code>Agent.py:864</code>);</li>
+        parameter (<code>Agent.py:841</code>; the repair step asks again, <code>:938</code>);</li>
         <li>on Yes → <code>runToolWithRepair</code> → <code>subprocess.run(cli_args, capture_output=True)</code>.</li>
       </ol>
 
@@ -503,7 +503,7 @@ Rules:
       <p class="code-back">Plain-language explanation and maths: <a href="Agent.html#reparation">atlas page</a>.</p>
 
 
-      <p>On a nonzero return code, <code>runToolWithRepair</code> (<code>Agent.py:943</code>) asks the LLM to
+      <p>On a nonzero return code, <code>runToolWithRepair</code> (<code>Agent.py:880</code>) asks the LLM to
       fix the parameters, at most <code>MAX_REPAIR_ATTEMPTS = 2</code> times. <code>build_repair_prompt</code>
       (<code>utils.py:282</code>) sends the parameter definitions, the values used, the full command, and the
       <strong>last 2000 characters of stderr</strong>, and asks it to return only the parameters to change.</p>
@@ -703,7 +703,7 @@ Rules:
       <p class="code-back">Plain-language explanation and maths: <a href="Agent.html#environnement">atlas page</a>.</p>
 
 
-      <p><code>CheckDependencies</code> (<code>Agent.py:16</code>) runs a
+      <p><code>CheckDependencies</code> (<code>Agent.py:1018</code>) runs a
       <code>slicer.util.pip_install</code> inside Slicer's Python, <strong>in this order, which matters</strong>:</p>
 
       <div class="table-wrap"><table>
@@ -756,8 +756,8 @@ Rules:
         <li><strong>The history mixes UI prose with routing context</strong>: chat bubbles are sent back as-is
         as <code>assistant</code> turns to a <a class="gterm" data-term="agent-l-router" href="Agent.html#routage" title="See the explanation">router</a> constrained to JSON.</li>
         <li><strong><code>OnRetrieveButton</code> rebuilds the history by splitting on the emoji</strong>
-        <code>👨:</code> / <code>🤖:</code> (<code>Agent.py:1004</code>): a message containing these characters
-        desynchronizes the alternation.</li>
+        <code>👨:</code> / <code>🤖:</code> (<code>Agent.py:1003-1004</code>), only when a saved discussion file is reloaded: a message containing these characters
+        desynchronizes the alternation. The history sent to the CLI during a live chat is a list of turns, not text split on emoji (<code>Agent.py:736-743</code>).</li>
         <li><strong>Theme detection by pixel sampling</strong> (<code>widget.grab()</code>, luminance of pixel
         (5,5)), because <code>QPalette</code> returns light-theme colors even under a dark theme in Slicer
         (<code>Agent.py:649</code>). It works, but depends on the timing of the first render, hence the

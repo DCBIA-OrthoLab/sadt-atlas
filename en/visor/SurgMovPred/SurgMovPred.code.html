@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SurgMovPred on VISOR, code · SADT Atlas</title>
+<title>SurgMovPred on VISOR: the code · SADT Atlas</title>
 <link rel="stylesheet" href="../../../assets/style.css">
 <link rel="stylesheet" href="../../../assets/themes/carnet.css">
 <script src="../../../assets/site.js"></script>
@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../../SurgMovPred/SurgMovPred.html" data-gen-to="legacy">Legacy</a>
-      <a href="../../visor/SurgMovPred/SurgMovPred.html" data-gen-to="visor" aria-current="true">VISOR</a>
+      <a href="../../SurgMovPred/SurgMovPred.code.html" data-gen-to="legacy">Legacy</a>
+      <a href="../../visor/SurgMovPred/SurgMovPred.code.html" data-gen-to="visor" aria-current="true">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../../visor/guide/SurgMovPred.html">Guide</a>
@@ -366,7 +366,7 @@ for pkl_path in package_files:
     predictions[target_name] = pack["model"].predict(X_scaled)</code></pre>
 
       <p>The only tolerance is the missing <code>_T0</code> suffix; any other missing column removes that target from the output with a warning
-      (<code>pipeline.py:224-236</code>). An exception while predicting one target is logged and the loop goes on (<code>:249-250</code>). If no target
+      (<code>pipeline.py:224-236</code>). An exception while predicting one target is logged and the loop goes on (<code>:249-250</code>). A blank cell is not filled in: it leaves the <a class="gterm" data-term="smp-scaler" href="SurgMovPred.html#visor-predict" title="See the explanation">scaler</a> as <code>NaN</code> and the model raises on it, so that target is dropped for every row (the packages hold an <code>ElasticNetCV</code>; a stand-in stack on a current scikit-learn raised <code>ValueError: Input X contains NaN</code>; the shipped packages were not run). If no target
       at all was predicted the run raises <code>RuntimeError</code> instead of writing tables without predictions (<code>:252-264</code>). Legacy wrote
       those tables.</p>
 
@@ -440,7 +440,7 @@ columns:  &lt;unnamed index 0..n-1&gt;, IDPatient, &lt;one column per predicted 
             <tr><td>Python</td><td><code>&gt;=3.12,&lt;3.13</code> (CLIC, CNE and DOCShapeAXI target 3.11)</td><td><code>pyproject.toml:5-7</code></td></tr>
             <tr><td>Libraries</td><td><code>numpy==2.2.6</code>, <code>pandas==2.3.3</code>, <code>scikit-learn==1.7.2</code>, <code>joblib==1.5.3</code>, <code>lightgbm==4.7.0</code>, <code>openpyxl==3.1.5</code>, <code>odfpy==1.4.1</code></td><td><code>pyproject.toml:13-25</code></td></tr>
             <tr><td>No GPU stack</td><td>torch absent, asserted by a test</td><td><code>README.md:106-107</code></td></tr>
-            <tr><td>Models expected</td><td><code>DATA/Surg_Mov_Pred/models/</code>, from <code>all_models.zip</code> (740 183 656 bytes), extracted to one folder per target</td><td>VISOR-serve <code>scripts/data-manifest.yml:91-99</code></td></tr>
+            <tr><td>Models expected</td><td><code>DATA/Surg_Mov_Pred/models/</code>, from <code>all_models.zip</code> (740 183 656 bytes, 706 MiB), extracted to one folder per target</td><td>VISOR-serve <code>scripts/data-manifest.yml:91-99</code></td></tr>
             <tr><td>Resources and timeout</td><td>none declared; no timeout; threads capped by the server's admission rule</td><td>VISOR-serve <code>server/config.py:77</code>, <code>server/execution/admission.py:403-438</code></td></tr>
           </tbody>
         </table>
@@ -465,9 +465,10 @@ columns:  &lt;unnamed index 0..n-1&gt;, IDPatient, &lt;one column per predicted 
             <tr><td>Input form</td><td>a folder only</td><td>a file or a flat folder (<code>pipeline.py:132-159</code>)</td></tr>
             <tr><td><a class="gterm" data-term="smp-column-names" href="SurgMovPred.html#visor-input" title="See the explanation">Column name</a> that cannot be cleaned</td><td>returns <code>'f_unnamed'</code>, so two bad columns collide (<code>cli:63,66</code>)</td><td>raises a <code>ValueError</code> naming the column (<code>pipeline.py:57</code>)</td></tr>
             <tr><td>Order of the models</td><td><code>list(base_path.glob(...))</code>, filesystem order (<code>cli:121</code>)</td><td><code>sorted(model.glob(...))</code>, same column order on every run (<code>pipeline.py:173</code>)</td></tr>
-            <tr><td>Folder of tables</td><td><code>glob</code> then <code>list(set(all_files))</code>, no stable order (<code>cli:154-157</code>)</td><td>sorted list of files, searched flat (<code>pipeline.py:143-147</code>; <code>README.md:56-62</code>)</td></tr>
+            <tr><td>Folder of tables</td><td><code>glob</code> then <code>list(set(all_files))</code>, no stable order (<code>cli:154-157</code>)</td><td>sorted list of files, searched flat (<code>pipeline.py:143-147</code>; <code>README.md:56-62</code>); an extension in any case is accepted</td></tr>
+            <tr><td>Unreadable table in a folder</td><td>logged and <a class="gterm" data-term="smp-skipped" href="SurgMovPred.html#visor-predict" title="See the explanation">skipped</a>; error only if none could be read (<code>cli:181-185</code>)</td><td>no <code>try</code> around the read: the error stops the run (<code>pipeline.py:155</code>)</td></tr>
             <tr><td><code>_T0</code> tolerance</td><td><code>cli:219,225</code></td><td>identical (<code>pipeline.py:223-232</code>)</td></tr>
-            <tr><td>Model missing a feature</td><td><a class="gterm" data-term="smp-skipped" href="SurgMovPred.html#visor-predict" title="See the explanation">skipped</a> with a warning (<code>cli:231</code>)</td><td>same (<code>pipeline.py:235</code>)</td></tr>
+            <tr><td>Model missing a feature</td><td>skipped with a warning (<code>cli:231</code>)</td><td>same (<code>pipeline.py:235</code>)</td></tr>
             <tr><td>No model predicts</td><td>writes tables without predictions</td><td>raises <code>RuntimeError</code> (<code>pipeline.py:260</code>)</td></tr>
             <tr><td>Outputs</td><td>writes both files, returns only the xlsx path (<code>cli:268-272</code>)</td><td>returns both (<code>pipeline.py:287</code>)</td></tr>
             <tr><td>Environment</td><td><code>slicer.util.pip_install("numpy==2.4.0")</code> at every Apply (<code>SurgMovPred/SurgMovPred.py:171</code>)</td><td>own environment, numpy 2.2.6 (<code>pyproject.toml:14</code>); <code>odfpy</code> is declared, so <code>.ods</code> files can be read (<code>:24</code>)</td></tr>

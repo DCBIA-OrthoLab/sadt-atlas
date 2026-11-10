@@ -17,8 +17,8 @@
       <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
-      <a href="../AMASSS/AMASSS.html" data-gen-to="legacy" aria-current="true">Legacy</a>
-      <a href="../visor/AMASSS/AMASSS.html" data-gen-to="visor">VISOR</a>
+      <a href="../AMASSS/AMASSS.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
+      <a href="../visor/AMASSS/AMASSS.code.html" data-gen-to="visor">VISOR</a>
     </div>
     <div class="sec-switch" role="group">
       <a href="../guide/AMASSS.html">Guide</a>
@@ -151,20 +151,23 @@
           <thead><tr><th>Caller</th><th>File</th><th>Usage</th></tr></thead>
           <tbody>
             <tr><td>AMASSS widget</td><td><code>AMASSS.py:1659-1667</code></td><td>operator-driven segmentation</td></tr>
-            <tr><td><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a> (semi-auto, fully-auto, oriented)</td><td><code>CBCT.py:337</code>, <code>469</code>, <code>554</code></td><td>two distinct roles: registration <strong>masks</strong> (<code>merge=SEPARATE</code>, <code>genVtk=False</code>) before AREG, then deliverable <strong>segmentations</strong> afterwards</td></tr>
-            <tr><td><a href="../VFACE/VFACE.html">VFACE</a></td><td><code>createlistprocess.py:126</code></td><td>segmentation within the asymmetry-analysis chain</td></tr>
+            <tr><td><a href="../AREG_CBCT/AREG_CBCT.html">AREG_CBCT</a> (semi-auto, fully-auto, oriented)</td><td><code>AREG/AREG_Method/CBCT.py:337</code>, <code>469</code>, <code>554</code>, <code>842</code>, <code>920</code></td><td>two distinct roles: registration <strong>masks</strong> before AREG (<code>469</code>, <code>842</code>: <code>merge=SEPARATE</code>, <code>genVtk=False</code>), then deliverable <strong>segmentations</strong> afterwards (<code>337</code>, <code>554</code>, <code>920</code>: <code>genVtk=True</code>, merge as requested)</td></tr>
+            <tr><td><a href="../VFACE/VFACE.html">VFACE</a></td><td><code>VFACE/VFACE_utils/createlistprocess.py:123</code> (module loaded), <code>471</code>, <code>496</code> (the two calls)</td><td>registration masks (<code>merge=SEPARATE</code>, <code>genVtk=False</code>) within the asymmetry-analysis chain</td></tr>
+            <tr><td><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a></td><td><code>MRI2CBCT/MRI2CBCT_core/plan.py:87-92</code></td><td>one step <code>AMASSS_CLI</code> asking for the cranial base (<code>CB</code>) of the CBCT, <code>merge=MERGE</code>, <code>genVtk=False</code></td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>AMASSS calls nothing else: no conda subprocess, no other module.
-      Its only external dependency is the pip package <code>nnunetv2</code>, imported
-      <strong>lazily</strong> in the functions that use it.</p>
+      <p>AMASSS calls no other module and starts no conda subprocess. Its dependencies are
+      not only <code>nnunetv2</code> (imported <strong>lazily</strong> in the functions that use it):
+      the CLI imports <code>torch</code>, <code>cc3d</code>, <code>SimpleITK</code>, <code>vtk</code>,
+      <code>numpy</code> and the shared <code>ADTLib</code> at the top of the file
+      (<code>AMASSS_CLI.py:5-26</code>).</p>
 
       <p>An important distinction for AREG: the <code>CBMASK</code> / <code>MANDMASK</code> / <code>MAXMASK</code> codes
       are not post-processing steps applied to the <code>CB</code> / <code>MAND</code> / <code>MAX</code> segmentations,
-      they are <strong>separately trained models</strong>, on different data and at a different
-      resolution (§4).</p>
+      they are <strong>separately trained models</strong>, at a different
+      resolution and with a different training-set size (<code>numTraining</code> 50 against 76; §4.2).</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 760 200" role="img" aria-label="Overview of the AMASSS pipeline, from inputs to outputs">
@@ -187,7 +190,7 @@
           <rect class="d-box-n" x="378" y="30" width="184" height="140" rx="6"/>
           <text class="d-label" x="470" y="55" text-anchor="middle">nnU-Net v2</text>
           <text class="d-label-s" x="470" y="70" text-anchor="middle">PlainConvUNet</text>
-          <text class="d-label-s" x="470" y="88" text-anchor="middle">resampling + CTNormalization</text>
+          <text class="d-label-s" x="470" y="88" text-anchor="middle">CTNormalization + resampling</text>
           <text class="d-label-s" x="470" y="104" text-anchor="middle">1 binary network / structure</text>
           <text class="d-label-s" x="470" y="120" text-anchor="middle">sliding window, step 0.5</text>
           <text class="d-label-s" x="470" y="136" text-anchor="middle">gaussian, no mirror TTA</text>
@@ -277,7 +280,7 @@
 
       <p><code>PrepareScanForNnunet()</code> (<code>AMASSS_CLI.py:555</code>)
       copies each scan into a single folder <code>&lt;temp&gt;/nnunet_input/</code> under the name
-      <code>p_&lt;NNN&gt;_0000.nii.gz</code> (<code>NNN</code> = three-digit index, in discovery order).
+      <code>p_&lt;NNN&gt;_0000.nii.gz</code> (<code>NNN</code> = three-digit index in discovery order, <strong>counted from 001</strong>: <code>enumerate(..., start=1)</code>, <code>AMASSS_CLI.py:685, 848</code>; the VISOR port counts from 000).
       A <code>.nii.gz</code> is copied as-is; <strong>everything else is re-read and rewritten by
       SimpleITK</strong>. This is not cosmetic: the earlier version did a
       <code>shutil.copy</code> of an NRRD to a <code>.nii.gz</code> name, and nnU-Net's reader picks
@@ -295,10 +298,12 @@
       is called nowhere</strong>: dead code.</p>
 
       <p>All the effective preprocessing is nnU-Net's own, described by the <code>plans.json</code>
-      of each model (§4.2): resampling to the target spacing, then
+      of each model (§4.2), in this order: crop to the non-zero region,
       <code>CTNormalization</code> (clipping to the 0.5% / 99.5% percentiles of the
       foreground intensities of the training set, then centering-scaling by the mean and
-      standard deviation of that same set). The per-model values live in the <a class="gterm" data-term="amasss-l-bundle" href="AMASSS.html#modeles" title="See the explanation">bundle</a>'s
+      standard deviation of that same set), then resampling to the target spacing
+      (nnU-Net itself, <code>nnunetv2/preprocessing/preprocessors/default_preprocessor.py:65, 82, 88</code>, whose comment says <a class="gterm" data-term="amasss-l-norm" href="AMASSS.html#entrees" title="See the explanation">normalisation</a> must come before
+      resampling; <code>preprocessing/normalization/default_normalization_schemes.py:58-72</code>; nnU-Net 2.8.1, read in the VISOR tool's venv: the library is not in this repository). The per-model values live in the <a class="gterm" data-term="amasss-l-bundle" href="AMASSS.html#modeles" title="See the explanation">bundle</a>'s
       <code>plans.json</code>, not in the repository.</p>
 
       <h2 id="modeles">4. The models</h2>
@@ -322,12 +327,12 @@
       (about 2 GB), once, into <code>&lt;Documents&gt;/&lt;Slicer&gt;Downloads/AMASSS/Models</code>, and fills in the
       model folder (<code>AMASSS.py:240-243, 681-695</code>). The code comment records that the earlier
       link pointed at the release web page and only opened a browser tab. The same archive is the one
-      AREG (<code>CBCT.py:124</code>,
-      <code>617</code>) and <a href="../VFACE/VFACE.html">VFACE</a>
-      (<code>VFACE.py:927</code>) do download automatically. <a href="../ALI/ALI.html">ALI</a> still goes
+      AREG (<code>AREG_Method/CBCT.py:120</code>,
+      <code>619</code>), <a href="../VFACE/VFACE.html">VFACE</a>
+      (<code>VFACE.py:988</code>) and MRI2CBCT (<code>MRI2CBCT_core/requirements.py:33</code>) do download automatically. <a href="../ALI/ALI.html">ALI</a> still goes
       through a personal repository, <a href="https://github.com/lucanchling/AMASSS_CBCT/releases/tag/v1.0.2">lucanchling/AMASSS_CBCT v1.0.2</a>
       (<code>AMASSS_Models.zip</code> + <code>Masks_Models.zip</code>,
-      <code>CBCT.py:120</code>). The README still points to
+      <code>ALI_Method/CBCT.py:93-94</code>, the URL being <code>AMASSS_CBCT_UPSTREAM</code>, <code>ADT/ADTLib/model_registry.py:77</code>). The README still points to
       <code>ALL_NEW_MODELS.zip</code> and a commented-out line to <code>ALL_MODELS.zip</code>: relics of
       the monai era, these archives held raw <code>.pth</code> files.</p>
 
@@ -429,6 +434,12 @@ norm_op = InstanceNorm3d (eps 1e-5, affine)   conv_bias = True</code></pre>
         </table>
       </div>
 
+      <p><strong>The 3D viewer on the atlas page.</strong> Its geometry is not produced by AMASSS_CLI at run time: it was
+      built by the atlas's own script <code>amasss_mesh.py</code> from an AMASSS prediction on the published test scan
+      (marching cubes, small connected components dropped, about 14&nbsp;000 triangles per structure). Colours are
+      <code>LABEL_COLORS</code> and label values are <code>LABELS["LARGE"]</code> (<code>AMASSS_CLI.py:41-45</code>); the skin and the three
+      registration masks are left out.</p>
+
       <p>Codes <strong>with no model in the bundle</strong>: <code>RC</code> (root canal), <code>TEETH</code>, <code>MCAN</code>.
       The last two are disabled in the UI (<code>UNAVAILABLE_MODELS</code>); <code>RC</code> is not: it is
       even in <code>DEFAULT_SELECT</code> (<code>AMASSS.py:258</code>), checked
@@ -446,8 +457,8 @@ norm_op = InstanceNorm3d (eps 1e-5, affine)   conv_bias = True</code></pre>
       CLI chooses is the step size.</p>
 
       <p><code>BuildPredictor()</code> (<code>AMASSS_CLI.py:112</code>) sets
-      <code>tile_step_size = 0.5</code> (50% overlap, hard-coded in the signature),
-      <code>use_gaussian = True</code> (gaussian weighting of the patches),
+      <code>tile_step_size = 0.5</code> (the step is at most half a patch, so at least 50% overlap: nnU-Net shortens it so that the last patch ends on the edge of the image, <code>nnunetv2/inference/sliding_window_prediction.py:30-54</code>; hard-coded in the signature),
+      <code>use_gaussian = True</code> (gaussian weighting of the patches, spread one eighth of the patch, weighted logits divided by the sum of the weights: <code>nnunetv2/inference/predict_from_raw_data.py:626-653</code>),
       <code>use_mirroring = False</code> (the equivalent of <code>--disable_tta</code>: no mirror
       augmentation at test time), <code>device</code> from <code>ResolveDevice()</code>, and <code>verbose</code> /
       <code>verbose_preprocessing</code> / <code>allow_tqdm</code> set to <code>False</code>. The <code>perform_everything_on_device</code>
@@ -527,8 +538,9 @@ configuration[f"{key}_kwargs"] = {"is_seg": False, "device": torch.device(device
         <code>["SKIN","CV","UAW","CB","MAX","MAND","CAN","RC","CBMASK","MANDMASK","MAXMASK"]</code>.
         <strong>This is a priority order</strong>: the last structure written overwrites the
         previous ones on shared voxels. <code>"CAN"</code> does not exist in any dictionary
-        (the canal code is <code>MCAN</code>), a dead entry; <code>.get(struct, 1)</code> would fall back
-        an unknown code to label 1.</li>
+        (the canal code is <code>MCAN</code>), a dead entry. <code>"RC"</code> is a known code with no model and no entry in
+        <code>LABELS["LARGE"]</code>: <code>.get(struct, 1)</code> (<code>AMASSS_CLI.py:612</code>) would fall back
+        an unlabelled code to label 1, the mandible&rsquo;s. Neither can match a prediction in practice, since neither has a model.</li>
       </ul>
 
       <figure class="diagram">
@@ -611,8 +623,7 @@ configuration[f"{key}_kwargs"] = {"is_seg": False, "device": torch.device(device
       <code>&lt;temp&gt;/temp.nrrd</code> of the binary mask, <code>vtkNrrdReader</code> →
       <code>vtkDiscreteMarchingCubes</code> with <code>GenerateValues(1, 1, 1)</code> (a single contour of
       value 1, hence going through a binary mask rather than the label map) →
-      <code>vtkSmoothPolyDataFilter</code> for <code>vtk_smooth</code> iterations (5 everywhere in the
-      repository) → <code>vtkUnsignedCharArray</code> "Colors", <strong>one constant color per cell</strong>
+      <code>vtkSmoothPolyDataFilter</code> for <code>vtk_smooth</code> iterations (5 by default: the widget has a slider, <code>AMASSS.py:337, 858-863, 978</code>; AREG, VFACE and MRI2CBCT pass 5, <code>AREG_Method/CBCT.py:346</code>, <code>createlistprocess.py:463</code>, <code>plan.py:91</code>) → <code>vtkUnsignedCharArray</code> "Colors", <strong>one constant color per cell</strong>
       taken from <code>LABEL_COLORS</code>.</p>
 
       <p>Two modes, chosen on the <code>_MERGED</code> suffix of the file name: in <strong>merged</strong>
@@ -680,7 +691,7 @@ configuration[f"{key}_kwargs"] = {"is_seg": False, "device": torch.device(device
         <table>
           <thead><tr><th>Block</th><th>Nature</th><th>Where</th></tr></thead>
           <tbody>
-            <tr><td>Preprocessing (resampling, <code>CTNormalization</code>)</td><td><span class="badge calcule">computed</span> deterministic, driven by <code>plans.json</code></td><td>nnU-Net, in-process</td></tr>
+            <tr><td>Preprocessing (crop, <code>CTNormalization</code>, resampling, in that order)</td><td><span class="badge calcule">computed</span> deterministic, driven by <code>plans.json</code></td><td>nnU-Net, in-process</td></tr>
             <tr><td>Segmentation of each structure</td><td><span class="badge predit">predicted</span> 3D <code>PlainConvUNet</code> network, one per structure, binary</td><td>nnU-Net, in-process, GPU if available</td></tr>
             <tr><td><a class="gterm" data-term="amasss-l-window" href="AMASSS.html#modeles" title="See the explanation">Sliding window</a>, gaussian, step 0.5</td><td><span class="badge calcule">computed</span> deterministic</td><td>nnU-Net</td></tr>
             <tr><td>Output resampling</td><td><span class="badge calcule">computed</span> deterministic, torch (GPU) or scipy</td><td>nnU-Net, resampler substituted by AMASSS</td></tr>
