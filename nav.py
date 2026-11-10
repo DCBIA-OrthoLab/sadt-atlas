@@ -150,7 +150,9 @@ UI = {
         "guide":     "Guide",
         "atlas":     "Atlas",
         "guide_hint":"how to use the tools",
-        "atlas_hint":"how it works in the code",
+        "atlas_hint":"how it works, step by step",
+        "code":      "Code",
+        "code_hint": "for developers: files, lines, arguments",
         "cross":     "Cross-cutting",
         "shared":    "Shared code",
         "findings":  "Findings",
@@ -268,6 +270,10 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     dans les autres langues (à l'accueil, faute de le connaître)."""
     up = "../" * (depth - 1)          # vers la racine de la langue
     ui, fl = UI[lang], FILES[lang]
+    on_code = section == "code"       # page code d'un outil : on reste dans l'atlas, la bascule en marque la 3e case
+    hint_key = section
+    if on_code:
+        section = "atlas"
 
     def rel_of(tool):
         return f"guide/{tool}.html" if section == "guide" else f"{tool}/{tool}.html"
@@ -332,6 +338,11 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     else:
         sw = (("guide", f"guide/{current}.html" if on_tool else "guide/index.html"),
               ("atlas", f"{current}/{current}.html" if on_tool else "index.html"))
+    # 3e case, « Code », anglais seulement et seulement si la page code de cet outil existe
+    if lang == "en" and T:
+        code_rel = f"visor/{T}/{T}.code.html" if on_visor else f"{T}/{T}.code.html"
+        if os.path.exists(os.path.join(ROOT, lang, code_rel)):
+            sw = tuple(sw) + (("code", code_rel),)
     # bascule Legacy / VISOR (anglais seulement) : AU-DESSUS de Guide / Atlas. Elle mene a la
     # page de l'autre generation pour le meme outil et la meme section.
     mode0 = "visor" if on_visor else "legacy"
@@ -356,7 +367,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         out.append('    </div>')
     out.append('    <div class="sec-switch" role="group">')
     for key, r in sw:
-        on = ' aria-current="true"' if key == section else ""
+        on = ' aria-current="true"' if (key == "code" and on_code) or (key == section and not on_code and key != "code") else ""
         # Même règle que link() : la contrepartie n'existe pas forcément dans
         # cette langue. Y pointer quand même donnait un lien mort: sur les
         # pages thaïes dont le guide manque, c'était le seul lien cassé de la
@@ -373,7 +384,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     # La phrase d'orientation ne se repete pas dans chaque segment : elle suit
     # le controle, et ne decrit que la section ou l'on est. Deux legendes dans
     # deux cases bordees se lisaient comme deux objets, pas comme un choix.
-    out.append(f'    <p class="sec-hint">{esc(ui[section + "_hint"])}</p>')
+    out.append(f'    <p class="sec-hint">{esc(ui[hint_key + "_hint"])}</p>')
 
     if lang == "en":
         out.append(f'    <div class="gen-wrap" data-gen="{mode0}">')

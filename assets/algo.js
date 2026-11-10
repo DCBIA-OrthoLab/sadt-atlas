@@ -32,6 +32,9 @@
   }
 
   var SCENES = {};
+  /* Socle public : un fichier assets/algo-<Module>.js ajoute ses scenes sans toucher a celui-ci,
+     SCENES[nom] = function (svg, fig) { ...; return function draw(t) {...}; } */
+  window.Algo = { scenes: SCENES, E: E, clamp: clamp, ease: ease, seg: seg, lerp: lerp, txt: txt };
 
   /* 1. Ecretage de l'histogramme : les queues sont ramenees sur les percentiles */
   SCENES.clamp = function (svg) {

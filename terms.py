@@ -42,6 +42,11 @@ def ids_of(path):
 
 def load():
     reg = json.load(open(REG, encoding="utf8"))
+    tdir = os.path.join(ROOT, "assets", "terms")
+    if os.path.isdir(tdir):                          # un fichier par module, sans conflit d'ecriture
+        for f in sorted(os.listdir(tdir)):
+            if f.endswith(".json"):
+                reg["terms"].update(json.load(open(os.path.join(tdir, f), encoding="utf8")))
     terms = []
     for key, t in reg["terms"].items():
         flags = re.I if t.get("nocase") else 0
@@ -70,7 +75,15 @@ def check_targets(reg, langs):
 
 
 def pages(reg, lang):
+    scopes = []
     for sc in reg.get("scope", []):
+        if sc == "@tools":                       # chaque dossier <Outil>/ qui contient <Outil>.html
+            base = os.path.join(ROOT, lang)
+            scopes += sorted(d for d in os.listdir(base)
+                             if os.path.isfile(os.path.join(base, d, d + ".html")))
+        else:
+            scopes.append(sc)
+    for sc in scopes:
         for dp, dirs, fs in os.walk(os.path.join(ROOT, lang, sc)):
             dirs.sort()
             for f in sorted(fs):
