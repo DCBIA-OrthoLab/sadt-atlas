@@ -1158,14 +1158,13 @@ def write_guide_index(lang):
     _w, _b = guide_callouts(lang)
     about = GUIDE_ABOUT[lang].format(n=len(nav.TOOLS), warn=_w, bug=_b)
     cards = []
-    if lang == "en":
-        # VISOR : anglais seulement pour l'instant (les autres langues n'ont pas la page).
-        cards.append('      <h2 id="visor">VISOR: run the tools on a server</h2>')
-        cards.append('      <p>The tool pages below describe the legacy Slicer modules, and each ends with a '
-                     '<em>With VISOR</em> section. This page covers the new way of running them.</p>')
+    if True:
+        loc = nav.LOC[lang]
+        cards.append(f'      <h2 id="visor">{nav.esc(loc["g_h2"])}</h2>')
+        cards.append(f'      <p>{loc["g_p"]}</p>')
         cards.append('      <div class="card-grid">')
-        cards.append('        <a class="card" href="visor.html"><span class="card-name">Using VISOR</span>'
-                     '<span class="card-desc">Connect Slicer to a VISOR server, run a tool, review and download the results</span></a>')
+        cards.append(f'        <a class="card" href="visor.html"><span class="card-name">{nav.esc(loc["g_card"])}</span>'
+                     f'<span class="card-desc">{nav.esc(loc["g_desc"])}</span></a>')
         cards.append("      </div>")
     for cat, labels in nav.CATS.items():
         tools = [t for t, c in nav.TOOLS if c == cat]
