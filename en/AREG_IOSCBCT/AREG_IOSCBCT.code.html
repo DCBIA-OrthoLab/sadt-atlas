@@ -14,7 +14,7 @@
   <nav class="sidebar">
     <a class="brand" href="../index.html">SADT Atlas<small>SlicerAutomatedDentalTools, tool by tool</small></a>
     <div class="lang-switch">
-      <span class="cur">EN</span><span class="none" title="Français: not translated yet">FR</span><span class="none" title="Português: not translated yet">PT</span><span class="none" title="한국어: not translated yet">KO</span><span class="none" title="ไทย: not translated yet">TH</span><span class="none" title="Español: not translated yet">ES</span><span class="none" title="Italiano: not translated yet">IT</span>
+      <span class="cur">EN</span><a href="../../fr/AREG_IOSCBCT/AREG_IOSCBCT.code.html" hreflang="fr" title="Français">FR</a><a href="../../pt/AREG_IOSCBCT/AREG_IOSCBCT.code.html" hreflang="pt" title="Português">PT</a><a href="../../ko/AREG_IOSCBCT/AREG_IOSCBCT.code.html" hreflang="ko" title="한국어">KO</a><a href="../../th/AREG_IOSCBCT/AREG_IOSCBCT.code.html" hreflang="th" title="ไทย">TH</a><a href="../../es/AREG_IOSCBCT/AREG_IOSCBCT.code.html" hreflang="es" title="Español">ES</a><a href="../../it/AREG_IOSCBCT/AREG_IOSCBCT.code.html" hreflang="it" title="Italiano">IT</a>
     </div>
     <div class="sec-switch gen-switch" role="group" aria-label="Generation">
       <a href="../AREG_IOSCBCT/AREG_IOSCBCT.code.html" data-gen-to="legacy" aria-current="true">Legacy</a>
@@ -367,8 +367,8 @@
 
       <p>Short answer: <strong>shared landmarks for the pre-alignment, then
       ICP onto a surface extracted from the CBCT by thresholding</strong>. There is <strong>no</strong> tooth
-      segmentation on the CBCT side, and the IOS-side segmentation only serves to let <a href="../ALI/ALI.html#ali-ios">ALI_IOS</a> aim its cameras
-      tooth by tooth.</p>
+      segmentation on the CBCT side, and the IOS-side segmentation lets <a href="../ALI/ALI.html#ali-ios">ALI_IOS</a> aim its cameras
+      tooth by tooth, and its tooth labels (<code>Universal_ID</code>) also pick the crowns that drive the ICP (<code>AREG_IOSCBCT.py:545-576,750-754</code>, see 4.4).</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 720 260" role="img" aria-label="Landmark pre-alignment then ICP onto a thresholded isosurface">
@@ -409,7 +409,7 @@
           <text class="d-mono"  x="20"  y="228">independently</text>
         </svg>
         <figcaption>The landmark pre-alignment is what makes the ICP usable: combined with the 1 mm
-        window, it eliminates everything that is not right under the occlusal surface.</figcaption>
+        window, it starts the ICP near the right place; the opposite arch is then rejected by the <a class="gterm" data-term="areg-ioscbct-normals-legacy" href="AREG_IOSCBCT.html#icp" title="See the explanation">normals</a> test (<code>AREG_IOSCBCT.py:656-664</code>) and the rest of the skull by the 25&nbsp;mm crop.</figcaption>
       </figure>
 
       <h3 id="surface-cbct">4.1 The CBCT surface</h3>
@@ -506,7 +506,7 @@ landmark_transform.SetModeToRigidBody()                # 6 dof, no scaling</code
         <p>An earlier version of this section described a point-to-point ICP (Kabsch/SVD on centroids), up to 2000 iterations, stopping on a change of 1e-8 in RMSE and fitness, on the whole IOS mesh against the whole isosurface. Read against 3c67957, none of that holds: the step is point-to-plane (<code>_point_to_plane_step</code>, <code>AREG_IOSCBCT.py:579</code>), the cap is <code>ICP_MAX_ITERATIONS = 300</code> (<code>:188</code>; the comment above it says 2000 was the old cap), the stop test is on the shift of the points (<code>:180-181</code>), the moving points are the crowns and the target is cropped around the arch (<code>:545</code>, <code>:485</code>). The Procrustes step is only the fallback (<code>:609</code>).</p>
       </div>
 
-      <p><code>run_icp_point_to_plane()</code> (<code>AREG_IOSCBCT.py:719</code>) is called once per arch with <code>max_dist=1.0</code> (the default of <code>1.5</code> is never used), on a copy of the CBCT surface cropped around that arch's landmarks (<code>:1239-1255</code>). It runs <code>_icp_run()</code> (<code>:627</code>) once per reading of the CBCT <a class="gterm" data-term="areg-ioscbct-normals-legacy" href="AREG_IOSCBCT.html#icp" title="See the explanation">normals</a> and keeps the better one.</p>
+      <p><code>run_icp_point_to_plane()</code> (<code>AREG_IOSCBCT.py:719</code>) is called once per arch with <code>max_dist=1.0</code> (the default of <code>1.5</code> is never used), on a copy of the CBCT surface cropped around that arch's landmarks (<code>:1239-1255</code>). It runs <code>_icp_run()</code> (<code>:627</code>) once per reading of the CBCT normals and keeps the better one.</p>
 
       <div class="table-wrap"><table>
         <thead><tr><th>Parameter</th><th>Value</th><th>Effect</th></tr></thead>

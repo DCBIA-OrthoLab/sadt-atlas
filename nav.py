@@ -251,6 +251,97 @@ FILES = {
 }
 
 
+# Libelles propres a VISOR et a la page Code, par langue. L'anglais reprend les constantes
+# ci-dessus ; les autres langues traduisent les memes elements.
+LOC = {
+    "en": {
+        "code": "Code", "code_hint": "for developers: files, lines, arguments",
+        "atlas_hint": "how it works, step by step",
+        "visor_pages": [l for _, l in VISOR_PAGES], "visor_guide": VISOR_GUIDE[1],
+        "arch": "Architecture (Atlas)", "not_ported": "Not ported to VISOR", "generation": "Generation",
+        "g_h2": "VISOR: run the tools on a server",
+        "g_p": "The tool pages below describe the legacy Slicer modules, and each ends with a <em>With VISOR</em> section. This page covers the new way of running them.",
+        "g_card": "Using VISOR",
+        "g_desc": "Connect Slicer to a VISOR server, run a tool, review and download the results",
+    },
+    "fr": {
+        "code": "Code", "code_hint": "pour les développeurs : fichiers, lignes, arguments",
+        "atlas_hint": "comment ça marche, pas à pas",
+        "visor_pages": ["Vue d'ensemble", "Architecture", "Une exécution, pas à pas", "Packaging et déploiement",
+                        "Sécurité et confidentialité", "Tests et provenance"],
+        "visor_guide": "Utiliser VISOR", "arch": "Architecture (Atlas)", "not_ported": "Non porté sur VISOR",
+        "generation": "Génération",
+        "g_h2": "VISOR : lancer les outils sur un serveur",
+        "g_p": "Les fiches d'outils ci-dessous décrivent les modules Slicer legacy, et chacune se termine par une section <em>Avec VISOR</em>. Cette page présente la nouvelle façon de les lancer.",
+        "g_card": "Utiliser VISOR",
+        "g_desc": "Connecter Slicer à un serveur VISOR, lancer un outil, relire et télécharger les résultats",
+    },
+    "es": {
+        "code": "Código", "code_hint": "para desarrolladores: archivos, líneas, argumentos",
+        "atlas_hint": "cómo funciona, paso a paso",
+        "visor_pages": ["Visión general", "Arquitectura", "Una ejecución, paso a paso", "Empaquetado y despliegue",
+                        "Seguridad y privacidad", "Pruebas y procedencia"],
+        "visor_guide": "Uso de VISOR", "arch": "Arquitectura (Atlas)", "not_ported": "No portado a VISOR",
+        "generation": "Generación",
+        "g_h2": "VISOR: ejecutar las herramientas en un servidor",
+        "g_p": "Las fichas de herramientas de abajo describen los módulos legacy de Slicer, y cada una termina con una sección <em>Con VISOR</em>. Esta página presenta la nueva forma de ejecutarlas.",
+        "g_card": "Uso de VISOR",
+        "g_desc": "Conectar Slicer a un servidor VISOR, ejecutar una herramienta, revisar y descargar los resultados",
+    },
+    "it": {
+        "code": "Codice", "code_hint": "per sviluppatori: file, righe, argomenti",
+        "atlas_hint": "come funziona, passo per passo",
+        "visor_pages": ["Panoramica", "Architettura", "Un'esecuzione, passo per passo", "Pacchettizzazione e distribuzione",
+                        "Sicurezza e privacy", "Test e provenienza"],
+        "visor_guide": "Uso di VISOR", "arch": "Architettura (Atlas)", "not_ported": "Non portato su VISOR",
+        "generation": "Generazione",
+        "g_h2": "VISOR: eseguire gli strumenti su un server",
+        "g_p": "Le schede degli strumenti qui sotto descrivono i moduli Slicer legacy, e ciascuna termina con una sezione <em>Con VISOR</em>. Questa pagina presenta il nuovo modo di eseguirli.",
+        "g_card": "Uso di VISOR",
+        "g_desc": "Collegare Slicer a un server VISOR, eseguire uno strumento, rivedere e scaricare i risultati",
+    },
+    "pt": {
+        "code": "Código", "code_hint": "para desenvolvedores: arquivos, linhas, argumentos",
+        "atlas_hint": "como funciona, passo a passo",
+        "visor_pages": ["Visão geral", "Arquitetura", "Uma execução, passo a passo", "Empacotamento e implantação",
+                        "Segurança e privacidade", "Testes e procedência"],
+        "visor_guide": "Usando o VISOR", "arch": "Arquitetura (Atlas)", "not_ported": "Não portado para o VISOR",
+        "generation": "Geração",
+        "g_h2": "VISOR: executar as ferramentas em um servidor",
+        "g_p": "As fichas das ferramentas abaixo descrevem os módulos legacy do Slicer, e cada uma termina com uma seção <em>Com o VISOR</em>. Esta página apresenta a nova forma de executá-las.",
+        "g_card": "Usando o VISOR",
+        "g_desc": "Conectar o Slicer a um servidor VISOR, executar uma ferramenta, revisar e baixar os resultados",
+    },
+    "ko": {
+        "code": "코드", "code_hint": "개발자용: 파일, 줄, 인자",
+        "atlas_hint": "단계별 동작 원리",
+        "visor_pages": ["개요", "아키텍처", "실행 한 번, 단계별", "패키징과 배포", "보안과 개인정보", "테스트와 출처"],
+        "visor_guide": "VISOR 사용하기", "arch": "아키텍처 (Atlas)", "not_ported": "VISOR로 이식되지 않음",
+        "generation": "세대",
+        "g_h2": "VISOR: 서버에서 도구 실행하기",
+        "g_p": "아래 도구 페이지는 레거시 Slicer 모듈을 설명하며, 각 페이지는 <em>VISOR 사용</em> 절로 끝납니다. 이 페이지는 도구를 실행하는 새로운 방법을 다룹니다.",
+        "g_card": "VISOR 사용하기",
+        "g_desc": "Slicer를 VISOR 서버에 연결하고, 도구를 실행하고, 결과를 검토하고 내려받습니다",
+    },
+    "th": {
+        "code": "โค้ด", "code_hint": "สำหรับนักพัฒนา: ไฟล์ บรรทัด อาร์กิวเมนต์",
+        "atlas_hint": "การทำงานทีละขั้น",
+        "visor_pages": ["ภาพรวม", "สถาปัตยกรรม", "การรันหนึ่งครั้งทีละขั้น", "การแพ็กเกจและการปรับใช้",
+                        "ความปลอดภัยและความเป็นส่วนตัว", "การทดสอบและที่มา"],
+        "visor_guide": "การใช้ VISOR", "arch": "สถาปัตยกรรม (Atlas)", "not_ported": "ยังไม่พอร์ตไปยัง VISOR",
+        "generation": "รุ่น",
+        "g_h2": "VISOR: เรียกใช้เครื่องมือบนเซิร์ฟเวอร์",
+        "g_p": "หน้าเครื่องมือด้านล่างอธิบายโมดูล Slicer แบบ legacy และแต่ละหน้าจบด้วยหัวข้อ <em>ด้วย VISOR</em> หน้านี้อธิบายวิธีใหม่ในการเรียกใช้",
+        "g_card": "การใช้ VISOR",
+        "g_desc": "เชื่อมต่อ Slicer กับเซิร์ฟเวอร์ VISOR เรียกใช้เครื่องมือ ตรวจทานและดาวน์โหลดผลลัพธ์",
+    },
+}
+for _l, _loc in LOC.items():
+    UI[_l]["code"] = _loc["code"]
+    UI[_l]["code_hint"] = _loc["code_hint"]
+    UI[_l]["atlas_hint"] = _loc["atlas_hint"]
+
+
 def esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -327,9 +418,9 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     # Quatre pages par outil : legacy ou VISOR, Guide ou Atlas.
     on_tool = current in {t for t, _ in TOOLS}
     cur_s = str(current)
-    on_visor = lang == "en" and (cur_s == VISOR_GUIDE[0] or cur_s.startswith("visor/"))
+    on_visor = (cur_s == VISOR_GUIDE[0] or cur_s.startswith("visor/"))
     vt = cur_s[6:] if on_visor and cur_s.startswith("visor/") and cur_s[6:] in VISOR_TOOLS else None
-    on_shared = lang == "en" and current in SHARED   # autres langues : inchange
+    on_shared = current in SHARED
     T = current if (on_tool or on_shared) else vt      # l'outil de la page, s'il y en a un
     if vt:
         sw = (("guide", f"visor/guide/{vt}.html" if vt in {t for t, _ in TOOLS} else f"guide/{VISOR_GUIDE[0]}.html"),
@@ -340,14 +431,15 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         sw = (("guide", f"guide/{current}.html" if on_tool else "guide/index.html"),
               ("atlas", f"{current}/{current}.html" if (on_tool or on_shared) else "index.html"))
     # 3e case, « Code », anglais seulement et seulement si la page code de cet outil existe
-    if lang == "en" and T:
+    if T:
         code_rel = f"visor/{T}/{T}.code.html" if on_visor else f"{T}/{T}.code.html"
         if os.path.exists(os.path.join(ROOT, lang, code_rel)):
             sw = tuple(sw) + (("code", code_rel),)
     # bascule Legacy / VISOR (anglais seulement) : AU-DESSUS de Guide / Atlas. Elle mene a la
     # page de l'autre generation pour le meme outil et la meme section.
     mode0 = "visor" if on_visor else "legacy"
-    if lang == "en":
+    loc = LOC[lang]
+    if True:
         tools_all = {t for t, _ in TOOLS}
         if T and T in tools_all:
             lg = f"guide/{T}.html" if section == "guide" else f"{T}/{T}.html"
@@ -370,7 +462,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
         cur_attr = ' aria-current="true"'
         on_lg = cur_attr if mode0 == "legacy" else ""
         on_vi = cur_attr if mode0 == "visor" else ""
-        out.append('    <div class="sec-switch gen-switch" role="group" aria-label="Generation">')
+        out.append(f'    <div class="sec-switch gen-switch" role="group" aria-label="{esc(loc["generation"])}">')
         out.append(f'      <a href="{up}{lg}" data-gen-to="legacy"{on_lg}>Legacy</a>')
         out.append(f'      <a href="{up}{vi}" data-gen-to="visor"{on_vi}>VISOR</a>')
         out.append('    </div>')
@@ -395,7 +487,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
     # deux cases bordees se lisaient comme deux objets, pas comme un choix.
     out.append(f'    <p class="sec-hint">{esc(ui[hint_key + "_hint"])}</p>')
 
-    if lang == "en":
+    if True:
         out.append(f'    <div class="gen-wrap" data-gen="{mode0}">')
         out.append('    <div class="gen-legacy">')
     for cat, labels in CATS.items():
@@ -415,18 +507,18 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
             out.append(link(t, cur))
         out.append("    </ul></div>")
 
-    if lang == "en":
+    if True:
         out.append("    </div>")   # gen-legacy
         out.append('    <div class="gen-visor">')
         out.append('    <div class="nav-group"><h4>VISOR</h4><ul>')
         if section == "atlas":
-            for slug, label in VISOR_PAGES:
+            for (slug, _en), label in zip(VISOR_PAGES, loc["visor_pages"]):
                 cur = ' aria-current="page"' if current == f"visor/{slug}" else ""
                 out.append(f'      <li><a href="{up}visor/{slug}.html"{cur}>{esc(label)}</a></li>')
         else:
             cur = ' aria-current="page"' if current == VISOR_GUIDE[0] else ""
-            out.append(f'      <li><a href="{up}guide/{VISOR_GUIDE[0]}.html"{cur}>{esc(VISOR_GUIDE[1])}</a></li>')
-            out.append(f'      <li><a href="{up}visor/index.html">Architecture (Atlas)</a></li>')
+            out.append(f'      <li><a href="{up}guide/{VISOR_GUIDE[0]}.html"{cur}>{esc(loc["visor_guide"])}</a></li>')
+            out.append(f'      <li><a href="{up}visor/index.html">{esc(loc["arch"])}</a></li>')
         out.append("    </ul></div>")
         for cat, labels in CATS.items():
             tools = [t for t, c in TOOLS if c == cat and t not in VISOR_NOT_PORTED]
@@ -441,7 +533,7 @@ def sidebar(lang, section, current=None, depth=1, rel=None):
                 cur = ' aria-current="page"' if vt == "Crown_Seg" else ""
                 out.append(f'      <li><a href="{up}visor/Crown_Seg/Crown_Seg.html"{cur}>Crown_Seg</a></li>')
             out.append("    </ul></div>")
-        out.append('    <div class="nav-group"><h4>Not ported to VISOR</h4><ul>')
+        out.append(f'    <div class="nav-group"><h4>{esc(loc["not_ported"])}</h4><ul>')
         for t in VISOR_NOT_PORTED:
             cur = ' aria-current="page"' if t == vt else ""
             out.append(f'      <li><a href="{vhref(t)}"{cur}>{t}</a></li>')
