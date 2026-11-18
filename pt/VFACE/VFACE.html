@@ -127,22 +127,22 @@
         <img class="tool-icon" src="../../assets/screens/VFACE/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Análise</div>
         <h1>VFACE</h1>
-        <p class="lede">O VFACE decide se um rosto é esqueleticamente assimétrico a partir de um scan <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> apenas. Ele não aprende nem segmenta nada por conta própria: encadeia seis outros módulos para registrar o scan sobre a sua própria imagem espelhada, mede a diferença e classifica a assimetria com três modelos <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a>. Esta página explica como, passo a passo, com a matemática. Arquivos, linhas e armadilhas estão na <a href="VFACE.code.html">página de código</a>.</p>
+        <p class="lede">O VFACE decide se um rosto é esqueleticamente assimétrico a partir de um scan <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="Ver o glossário">CBCT</a> apenas. Ele não aprende nem segmenta nada por conta própria: encadeia seis outros módulos para registrar o scan sobre a sua própria imagem espelhada, mede a diferença e classifica a assimetria com três modelos <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="Ver o glossário">LightGBM</a>. Esta página explica como, passo a passo, com a matemática. Arquivos, linhas e armadilhas estão na <a href="VFACE.code.html">página de código</a>.</p>
         <div class="meta-row">
-          <a class="badge paper" href="https://doi.org/10.1117/12.3087010" target="_blank" rel="noopener" title="The paper describes unsupervised clustering; the code ships 3 supervised LightGBM models.">SPIE Medical Imaging 2026</a> <a class="badge neutral" href="VFACE.code.html">Código (desenvolvedores)</a> <span class="badge cli">vface_cli</span> <span class="badge neutral">ambiente conda: nenhum (Python do Slicer)</span> <a class="badge neutral" href="SOURCES.html">Bibliografia</a> <a class="badge neutral" href="../visor/VFACE/VFACE.html">VISOR</a>
+          <a class="badge paper" href="https://doi.org/10.1117/12.3087010" target="_blank" rel="noopener" title="O artigo descreve um clustering não supervisionado; o código inclui 3 modelos LightGBM supervisionados.">SPIE Medical Imaging 2026</a> <a class="badge neutral" href="VFACE.code.html">Código (desenvolvedores)</a> <span class="badge cli">vface_cli</span> <span class="badge neutral">ambiente conda: nenhum (Python do Slicer)</span> <a class="badge neutral" href="SOURCES.html">Bibliografia</a> <a class="badge neutral" href="../visor/VFACE/VFACE.html">VISOR</a>
         </div>
       </header>
 
             <figure class="shot">
         <img src="../../assets/data/VFACE/vface_workflow.jpg" loading="lazy"
              alt="O fluxo do VFACE: orientação pelo ASO, landmarks pelo ALI_CBCT, espelhamento pelo AutoMatrix, segmentação pelo BatchDentalSeg, registro pelo AReg e, por fim, classificação da assimetria.">
-        <figcaption>O fluxo como o laboratório o apresenta: o ASO orienta o scan, o ALI_CBCT coloca os <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a>, o AutoMatrix constrói o reflexo, o BatchDentalSeg segmenta, o AReg registra o paciente sobre o seu espelho, e a classificação sai no final. Os módulos que o código de fato chama estão listados no resto desta página: eles não correspondem exatamente a este diagrama. <span class="src">Diagrama do laboratório: <a href="../../assets/data/VFACE/vface_workflow-full.png" download>PNG em alta resolução, 1.9&nbsp;MB</a> · <a href="../../assets/data/VFACE/vface_workflow.pptx" download>fonte PowerPoint, 2.0&nbsp;MB</a></span></figcaption>
+        <figcaption>O fluxo como o laboratório o apresenta: o ASO orienta o scan, o ALI_CBCT coloca os <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmarks</a>, o AutoMatrix constrói o reflexo, o BatchDentalSeg segmenta, o AReg registra o paciente sobre o seu espelho, e a classificação sai no final. Os módulos que o código de fato chama estão listados no resto desta página: eles não correspondem exatamente a este diagrama. <span class="src">Diagrama do laboratório: <a href="../../assets/data/VFACE/vface_workflow-full.png" download>PNG em alta resolução, 1.9&nbsp;MB</a> · <a href="../../assets/data/VFACE/vface_workflow.pptx" download>fonte PowerPoint, 2.0&nbsp;MB</a></span></figcaption>
       </figure>
 
 
       <p>Classificação automática da assimetria facial esquelética em CBCT. O VFACE não aprende nada e não segmenta nada por conta própria: é um <strong>orquestrador</strong> que encadeia seis outros módulos do repositório, extrai deles medidas lineares e angulares, e termina com três classificadores LightGBM. É o módulo de nível mais alto da cadeia: a árvore de chamadas é aqui a informação central.</p>
 
-      <p>O princípio clínico cabe em uma frase: <strong>o T2 é a imagem espelhada do próprio paciente</strong>. Não há segundo scan. O scan é orientado, espelhado em torno do <a class="gterm" data-term="vface-leg-plane" href="VFACE.code.html#entrees" title="See the code">plano mediossagital</a>, registrado sobre o original, e tudo o que é medido é uma diferença entre o paciente e o seu próprio reflexo.</p>
+      <p>O princípio clínico cabe em uma frase: <strong>o T2 é a imagem espelhada do próprio paciente</strong>. Não há segundo scan. O scan é orientado, espelhado em torno do <a class="gterm" data-term="vface-leg-plane" href="VFACE.code.html#entrees" title="Ver o código">plano mediossagital</a>, registrado sobre o original, e tudo o que é medido é uma diferença entre o paciente e o seu próprio reflexo.</p>
 
       <p>Esta página descreve o módulo legado do Slicer (SlicerAutomatedDentalTools em 3c67957, 2026-10-26). O port para o VISOR, que roda a mesma ferramenta em um servidor, está em <a href="../visor/VFACE/VFACE.html">sua página do VISOR</a>; ele existe apenas em branches de feature e nunca foi executado com seus seis módulos chamados reais.</p>
 
@@ -152,9 +152,9 @@
         <table>
           <thead><tr><th></th><th>VFACE</th></tr></thead>
           <tbody>
-            <tr><td>Entrada</td><td>uma pasta de scans <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> (T1), um por paciente; nenhuma segmentação e nenhum <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> é necessário</td></tr>
+            <tr><td>Entrada</td><td>uma pasta de scans <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="Ver o glossário">CBCT</a> (T1), um por paciente; nenhuma segmentação e nenhum <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmark</a> é necessário</td></tr>
             <tr><td>Ideia</td><td>orientar cada scan, espelhá-lo, registrar o espelho de volta região por região, medir as diferenças entre landmarks e seus homólogos espelhados, e deixar três pequenos modelos lerem essas medidas</td></tr>
-            <tr><td>Saída</td><td>tabelas Excel de medidas e variáveis, uma classificação por paciente (assimétrico ou não, mandíbula, maxila), <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">mapas de calor</a> opcionais sobre as superfícies ósseas</td></tr>
+            <tr><td>Saída</td><td>tabelas Excel de medidas e variáveis, uma classificação por paciente (assimétrico ou não, mandíbula, maxila), <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="Ver o glossário">mapas de calor</a> opcionais sobre as superfícies ósseas</td></tr>
           </tbody>
         </table>
       </div>
@@ -169,17 +169,17 @@
           <tbody>
             <tr><td><a href="../MRI2CBCT/MRI2CBCT.html">MRI2CBCT</a> resample</td><td>reamostragem isotrópica de 0.3 mm e recentralização</td></tr>
             <tr><td><a href="../ASO/ASO.html">ASO</a>, etapa de centralização</td><td>centralização geométrica, grava uma transformação</td></tr>
-            <tr><td>ALI-CBCT</td><td><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> (orientação, depois medidas)</td></tr>
+            <tr><td>ALI-CBCT</td><td><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmarks</a> (orientação, depois medidas)</td></tr>
             <tr><td>ASO, etapa de orientação</td><td>orientação sobre um caso gold standard</td></tr>
             <tr><td><a href="../AMASSS/AMASSS.html#modeles">AMASSS</a></td><td>máscaras ósseas da base do crânio, da mandíbula e da maxila</td></tr>
             <tr><td><a href="../AutoMatrix/AutoMatrix.html">AutoMatrix</a></td><td>aplica o espelho e as matrizes de registro</td></tr>
-            <tr><td>AREG-CBCT</td><td>registro rígido por <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a> <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a></td></tr>
-            <tr><td>O classificador do VFACE</td><td>classificação <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a></td></tr>
+            <tr><td>AREG-CBCT</td><td>registro rígido por <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="Ver o glossário">Elastix</a> <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="Ver o glossário">voxel</a></td></tr>
+            <tr><td>O classificador do VFACE</td><td>classificação <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="Ver o glossário">LightGBM</a></td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>Três etapas são simples funções Python executadas na thread principal do Slicer, e não comandos separados: as medidas, as superfícies ósseas (<a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>) e os <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">mapas de calor</a>, além da derivação de landmarks e do pós-processamento.</p>
+      <p>Três etapas são simples funções Python executadas na thread principal do Slicer, e não comandos separados: as medidas, as superfícies ósseas (<a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a>) e os <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="Ver o glossário">mapas de calor</a>, além da derivação de landmarks e do pós-processamento.</p>
 
             <figure class="diagram">
         <svg viewBox="0 0 860 230" role="img" aria-label="Orquestração: o VFACE chama sucessivamente AMASSS_CLI, ALI_CBCT, AREG_CBCT, Automatrix_CLI e depois VFACE_CLI">
@@ -249,14 +249,14 @@
       <h3 id="arbre-appels">A árvore de chamadas, no modo &ldquo;Full pipeline&rdquo; + &ldquo;Asymmetry Assessment&rdquo; + &ldquo;Quantitative + Visualization&rdquo;</h3>
 
             <div class="pipe">
-        <p class="pipe-seed">T1: um <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> bruto, nada mais</p>
+        <p class="pipe-seed">T1: um <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="Ver o glossário">CBCT</a> bruto, nada mais</p>
 
         <section class="pipe-phase" data-kind="prep">
           <h4>Preparação</h4>
           <ol>
             <li><span class="pipe-act">reamostrar a 0.3&nbsp;mm isotrópico, centralizado</span></li>
             <li><span class="pipe-act"><a class="pipe-mod" href="../ASO/ASO.html#pre-aso-cbct">PRE_ASO</a> &times;2, para a maxila e a base do crânio</span></li>
-            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> coloca 6 landmarks maxilares, depois <a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> orienta sobre o plano <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">oclusal</a> + mediossagital</span></li>
+            <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> coloca 6 landmarks maxilares, depois <a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> orienta sobre o plano <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="Ver o glossário">oclusal</a> + mediossagital</span></li>
             <li><span class="pipe-act"><a class="pipe-mod" href="../ALI/ALI.html#ali-cbct">ALI</a> coloca 7 landmarks da base do crânio, depois <a class="pipe-mod" href="../ASO/ASO.html#semi-aso-cbct">SEMI_ASO</a> orienta sobre Frankfurt + mediossagital</span></li>
             <li><span class="pipe-act"><a class="pipe-mod" href="../AMASSS/AMASSS.html#modeles">AMASSS</a> segmenta <code>CBMASK</code> e <code>MANDMASK</code> no scan CB, <code>MAXMASK</code> no scan MAX</span></li>
           </ol>
@@ -311,7 +311,7 @@
             <tr><td>Onde começar</td><td>Full pipeline / File already Oriented / File already Registered</td><td>pula o bloco de reamostragem e orientação, ou todo o bloco a montante até o registro</td></tr>
             <tr><td>Tipo de análise</td><td>Asymmetry assessment / Longitudinal studies</td><td>espelho e classificação, ou um T2 real e <strong>nenhuma</strong> classificação</td></tr>
             <tr><td>Modo</td><td>Quantitative / Visualization / both</td><td>habilita o bloco de medidas, o bloco de mapas de calor, ou ambos</td></tr>
-            <tr><td>Tipo de registro</td><td>AREG / <a class="gterm" data-term="vface-leg-cmfreg" href="VFACE.code.html#f-cmfreg" title="See the code">CMFReg</a></td><td><strong>nenhum efeito real</strong>: o CMFReg apenas acrescenta uma pasta de máscaras espelhadas que ninguém lê</td></tr>
+            <tr><td>Tipo de registro</td><td>AREG / <a class="gterm" data-term="vface-leg-cmfreg" href="VFACE.code.html#f-cmfreg" title="Ver o código">CMFReg</a></td><td><strong>nenhum efeito real</strong>: o CMFReg apenas acrescenta uma pasta de máscaras espelhadas que ninguém lê</td></tr>
           </tbody>
         </table>
       </div>
@@ -323,20 +323,20 @@
 
       <h2 id="fichiers">2. Arquivos envolvidos</h2>
 
-      <p>O módulo é um painel de 3 664 linhas (interface, <a class="gterm" data-term="vface-leg-pauses" href="VFACE.code.html#pauses" title="See the code">pausas</a> de revisão, navegação no lote, execução sequencial, limpeza), um arquivo de 2 722 linhas que é o <strong>plano do pipeline</strong> junto com a derivação de <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a>, o pós-processamento e os <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">mapas de calor</a>, uma cópia embutida do módulo de medidas AQ3DC, a lógica de segmentação, um arquivo de 946 linhas com <strong>as fórmulas de medida</strong>, o catálogo de revisão, um worker para os mapas de calor e o comando classificador de 293 linhas. Não há ambiente conda: tudo roda no Python do próprio Slicer, e apenas joblib e lightgbm são instalados além dele. A tabela completa está na página de código.</p>
+      <p>O módulo é um painel de 3 664 linhas (interface, <a class="gterm" data-term="vface-leg-pauses" href="VFACE.code.html#pauses" title="Ver o código">pausas</a> de revisão, navegação no lote, execução sequencial, limpeza), um arquivo de 2 722 linhas que é o <strong>plano do pipeline</strong> junto com a derivação de <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmarks</a>, o pós-processamento e os <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="Ver o glossário">mapas de calor</a>, uma cópia embutida do módulo de medidas AQ3DC, a lógica de segmentação, um arquivo de 946 linhas com <strong>as fórmulas de medida</strong>, o catálogo de revisão, um worker para os mapas de calor e o comando classificador de 293 linhas. Não há ambiente conda: tudo roda no Python do próprio Slicer, e apenas joblib e lightgbm são instalados além dele. A tabela completa está na página de código.</p>
 
             <a class="deep-link" href="VFACE.code.html#fichiers"><b>No código</b><span>A tabela de arquivos com as contagens de linhas, a verificação de dependências e a configuração CUDA</span></a>
 
 
       <h2 id="entrees">3. Entradas e pré-processamento</h2>
 
-      <p><strong>Entrada</strong>: uma pasta de CBCTs T1, uma por paciente, em um formato de volume comum. Nenhuma segmentação, nenhum <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a>: o VFACE parte do volume bruto. Uma pasta vazia é recusada. A <strong>identidade do paciente</strong> é lida no nome do arquivo, cortando-o em palavras de decoração conhecidas; apenas os instantes T1 e T2 são reconhecidos, de modo que um terceiro instante quebraria silenciosamente o pareamento.</p>
+      <p><strong>Entrada</strong>: uma pasta de CBCTs T1, uma por paciente, em um formato de volume comum. Nenhuma segmentação, nenhum <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmark</a>: o VFACE parte do volume bruto. Uma pasta vazia é recusada. A <strong>identidade do paciente</strong> é lida no nome do arquivo, cortando-o em palavras de decoração conhecidas; apenas os instantes T1 e T2 são reconhecidos, de modo que um terceiro instante quebraria silenciosamente o pareamento.</p>
 
       <p><strong>Reamostragem e centralização.</strong></p>
 
             <figure class="algo" data-scene="vface_resample" data-ms="5200">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animação: uma grade mantém o mesmo número de células, mas as células encolhem, de modo que a caixa que elas cobrem encolhe em torno do seu centro"></svg><div class="algo-ctl"><button class="algo-play" type="button">Repetir</button></div></div>
-        <div class="algo-body"><p class="algo-lead">O scan é reamostrado em <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxels</a> cúbicos de 0.3&nbsp;mm. O número de voxels ao longo de cada eixo é mantido e apenas seu tamanho muda, de modo que um espaçamento mais fino torna o campo de visão <em>menor</em>, encolhendo em torno do centro. O espaço vazio criado nas bordas é preenchido com o valor mais escuro do próprio scan, e não com zero.</p><p class="algo-tag">Ilustração: a grade, o número de voxels e o fator de encolhimento são inventados; a regra (mesmo número de voxels, voxels menores, o campo encolhe em torno do centro, o valor mais escuro preenche as bordas) vem do código.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">o</mi><mi>out</mi></msub><mo>=</mo><msub><mi class="k1">o</mi><mi>in</mi></msub><mo>&#x2212;</mo><mfrac><mrow><mi class="">N</mi><mo>&#xd7;</mo><msub><mi class="">s</mi><mi>out</mi></msub><mo>&#x2212;</mo><mi class="">N</mi><mo>&#xd7;</mo><msub><mi class="">s</mi><mi>in</mi></msub></mrow><mn>2</mn></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>o</b>o canto (origem) do volume, ao longo de um eixo</li><li class=""><b>N</b>número de voxels ao longo desse eixo, inalterado</li><li class=""><b>s</b>tamanho do voxel: 0.3&nbsp;mm na saída, o espaçamento do próprio scan na entrada</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">O scan é reamostrado em <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="Ver o glossário">voxels</a> cúbicos de 0.3&nbsp;mm. O número de voxels ao longo de cada eixo é mantido e apenas seu tamanho muda, de modo que um espaçamento mais fino torna o campo de visão <em>menor</em>, encolhendo em torno do centro. O espaço vazio criado nas bordas é preenchido com o valor mais escuro do próprio scan, e não com zero.</p><p class="algo-tag">Ilustração: a grade, o número de voxels e o fator de encolhimento são inventados; a regra (mesmo número de voxels, voxels menores, o campo encolhe em torno do centro, o valor mais escuro preenche as bordas) vem do código.</p><div class="formula"><math display="block"><mrow><msub><mi class="k1">o</mi><mi>out</mi></msub><mo>=</mo><msub><mi class="k1">o</mi><mi>in</mi></msub><mo>&#x2212;</mo><mfrac><mrow><mi class="">N</mi><mo>&#xd7;</mo><msub><mi class="">s</mi><mi>out</mi></msub><mo>&#x2212;</mo><mi class="">N</mi><mo>&#xd7;</mo><msub><mi class="">s</mi><mi>in</mi></msub></mrow><mn>2</mn></mfrac></mrow></math></div><ul class="algo-legend"><li class="k1"><b>o</b>o canto (origem) do volume, ao longo de um eixo</li><li class=""><b>N</b>número de voxels ao longo desse eixo, inalterado</li><li class=""><b>s</b>tamanho do voxel: 0.3&nbsp;mm na saída, o espaçamento do próprio scan na entrada</li></ul></div>
       </figure>
 
 
@@ -379,7 +379,7 @@
           <text class="d-label-s" x="380" y="200" text-anchor="middle">a diferença T1 ↔ T2 = a assimetria</text>
 </a>
         </svg>
-        <figcaption>Não há segundo scan: o &ldquo;T2&rdquo; é o reflexo do T1 em torno do <a class="gterm" data-term="vface-leg-plane" href="VFACE.code.html#entrees" title="See the code">plano mediossagital</a>, registrado sobre o T1 e depois comparado a ele.</figcaption>
+        <figcaption>Não há segundo scan: o &ldquo;T2&rdquo; é o reflexo do T1 em torno do <a class="gterm" data-term="vface-leg-plane" href="VFACE.code.html#entrees" title="Ver o código">plano mediossagital</a>, registrado sobre o T1 e depois comparado a ele.</figcaption>
       </figure>
 
 
@@ -389,7 +389,7 @@
         <table>
           <thead><tr><th>Referencial</th><th>Landmarks pedidos ao ALI</th><th>Gold standard</th></tr></thead>
           <tbody>
-            <tr><td>Maxila (MAX)</td><td>ANS, IF, PNS, UL6O, UR1O, UR6O</td><td>Plano <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="See glossary">oclusal</a> e mediossagital</td></tr>
+            <tr><td>Maxila (MAX)</td><td>ANS, IF, PNS, UL6O, UR1O, UR6O</td><td>Plano <a class="gterm" data-term="occlusal" href="../glossary.html#g-occlusal" title="Ver o glossário">oclusal</a> e mediossagital</td></tr>
             <tr><td>Base do crânio (CB)</td><td>Ba, LPo, N, RPo, S, LOr, ROr</td><td>Horizontal de Frankfurt e plano mediossagital</td></tr>
           </tbody>
         </table>
@@ -401,9 +401,9 @@
       </figure>
 
 
-      <p>A orientação faz uma inicialização com três landmarks e depois um <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> rígido dos landmarks do paciente sobre os do gold standard, e grava a inversa de (orientação após a centralização) como uma transformação. Depois disso, o <strong>plano mediossagital fica em x&nbsp;=&nbsp;0</strong>.</p>
+      <p>A orientação faz uma inicialização com três landmarks e depois um <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="Ver o glossário">ICP</a> rígido dos landmarks do paciente sobre os do gold standard, e grava a inversa de (orientação após a centralização) como uma transformação. Depois disso, o <strong>plano mediossagital fica em x&nbsp;=&nbsp;0</strong>.</p>
 
-      <p><strong>O espelho.</strong> A matriz de espelho distribuída com a release do AutoMatrix é uma reflexão pura ao longo do eixo x em <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>, sem translação: simetria em relação ao plano mediossagital. O AutoMatrix a aplica a volumes por reamostragem e a arquivos de landmarks transformando seus pontos.</p>
+      <p><strong>O espelho.</strong> A matriz de espelho distribuída com a release do AutoMatrix é uma reflexão pura ao longo do eixo x em <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="Ver o glossário">LPS</a>, sem translação: simetria em relação ao plano mediossagital. O AutoMatrix a aplica a volumes por reamostragem e a arquivos de landmarks transformando seus pontos.</p>
 
             <figure class="algo" data-scene="vface_mirror" data-ms="5600">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animação: o contorno da cabeça é invertido em torno de um plano vertical, e um landmark à direita cai perto do landmark correspondente à esquerda"></svg><div class="algo-ctl"><button class="algo-play" type="button">Repetir</button></div></div>
@@ -436,19 +436,19 @@
         </ol>
         <span class="v3d-i18n" hidden> <i data-k="orient">o semi_aso_cbct gira o paciente até o plano mediossagital ficar em x = 0</i> <i data-k="lm">landmarks preditos pelo ALI</i> <i data-k="masks">o AMASSS segmenta o osso sobre o qual os mapas serão medidos</i> <i data-k="mirror">refletir através de x = 0</i> <i data-k="plane">o plano que toda a cadeia a montante existe para estabelecer</i> <i data-k="register">matriz própria do AREG: somente esta estrutura</i> <i data-k="map">ModelDistance, o mapa próprio do VFACE</i> <i data-k="absmed">mediana de |d|</i> <i data-k="pairs">pares contralaterais</i> <i data-k="median">mediana</i> </span>
         <figcaption>
-        <strong>A geometria e todos os números vêm de uma execução do VFACE</strong> no conjunto de teste publicado da ferramenta; nenhum dado de paciente está envolvido. Os passos 0 a 5 seguem a cadeia. <strong>O espelho</strong> é uma reflexão em torno de x&nbsp;=&nbsp;0; uma reflexão não pode ser interpolada por rotações (seu determinante teria de passar de &minus;1 a +1 sem se anular), então o plano se desenha no meio da inversão. <strong>Os três <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">mapas de calor</a> não dizem a mesma coisa.</strong> Sobreposto à <strong>base do crânio</strong>, o rosto inteiro está deslocado lateralmente: distância mediana de 7.0&nbsp;mm, 46&nbsp;% dos vértices além de 8&nbsp;mm. Sobreposto à <strong>maxila</strong>, o crânio superior encontra seu próprio espelho a 1.0&nbsp;mm; na <strong>mandíbula</strong>, a 0.45&nbsp;mm. Sobrepor <em>a</em> uma estrutura torna essa estrutura simétrica por construção: isso não é uma falha da medida, é <em>a</em> medida. <strong>O sentido das matrizes de registro foi medido, não presumido.</strong> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">O Elastix</a> grava o mapeamento do fixo para o móvel, de modo que é a <em>inversa</em> que leva o espelho sobre o T1: a distância média entre superfícies cai de 2.88&nbsp;mm para 1.73&nbsp;mm com a inversa, e sobe para 4.57 com a matriz como foi gravada. Cada mapa tem sua própria escala, definida em seu percentil 95 (base do crânio &plusmn;25&nbsp;mm, maxila &plusmn;5, mandíbula &plusmn;2.5), então compare-os pelos números, e não pela cor. Azul é negativo, vermelho positivo, cinza claro zero. <strong>O que é calculado e o que não é.</strong> O plano x&nbsp;=&nbsp;0 não é ajustado ao paciente: o que se calcula é a orientação que leva o paciente até ele (uma rotação de 2.67&deg; aqui). As superfícies são decimadas para cerca de 40&nbsp;000 triângulos para o navegador, a partir de uma superfície mesclada de 2.77&nbsp;milhões. No passo&nbsp;4 os landmarks permanecem na tela para que se veja o registro aproximá-los. Como o espelho troca esquerda e direita, cada ponto espelhado é pareado com seu homólogo do outro lado (gônio direito contra gônio esquerdo): parear cada rótulo consigo mesmo dá 51&nbsp;mm de absurdo, o pareamento por homólogo 4.70&nbsp;mm antes do registro. Depois do registro, a distância mediana é de 1.57&nbsp;mm na base do crânio, 2.16 na mandíbula, e <strong>12.84 na maxila contra 12.79 antes: essa não converge de forma alguma</strong>. <strong>Um defeito encontrado na saída publicada.</strong> As posições dos landmarks registrados são recalculadas a partir da matriz verificada em vez de lidas da pasta de saída, porque essa pasta difere em 20&nbsp;mm para a base do crânio: seus pontos estão deslocados como um bloco rígido em cerca de 23&nbsp;mm e se afastam do alvo.
+        <strong>A geometria e todos os números vêm de uma execução do VFACE</strong> no conjunto de teste publicado da ferramenta; nenhum dado de paciente está envolvido. Os passos 0 a 5 seguem a cadeia. <strong>O espelho</strong> é uma reflexão em torno de x&nbsp;=&nbsp;0; uma reflexão não pode ser interpolada por rotações (seu determinante teria de passar de &minus;1 a +1 sem se anular), então o plano se desenha no meio da inversão. <strong>Os três <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="Ver o glossário">mapas de calor</a> não dizem a mesma coisa.</strong> Sobreposto à <strong>base do crânio</strong>, o rosto inteiro está deslocado lateralmente: distância mediana de 7.0&nbsp;mm, 46&nbsp;% dos vértices além de 8&nbsp;mm. Sobreposto à <strong>maxila</strong>, o crânio superior encontra seu próprio espelho a 1.0&nbsp;mm; na <strong>mandíbula</strong>, a 0.45&nbsp;mm. Sobrepor <em>a</em> uma estrutura torna essa estrutura simétrica por construção: isso não é uma falha da medida, é <em>a</em> medida. <strong>O sentido das matrizes de registro foi medido, não presumido.</strong> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="Ver o glossário">O Elastix</a> grava o mapeamento do fixo para o móvel, de modo que é a <em>inversa</em> que leva o espelho sobre o T1: a distância média entre superfícies cai de 2.88&nbsp;mm para 1.73&nbsp;mm com a inversa, e sobe para 4.57 com a matriz como foi gravada. Cada mapa tem sua própria escala, definida em seu percentil 95 (base do crânio &plusmn;25&nbsp;mm, maxila &plusmn;5, mandíbula &plusmn;2.5), então compare-os pelos números, e não pela cor. Azul é negativo, vermelho positivo, cinza claro zero. <strong>O que é calculado e o que não é.</strong> O plano x&nbsp;=&nbsp;0 não é ajustado ao paciente: o que se calcula é a orientação que leva o paciente até ele (uma rotação de 2.67&deg; aqui). As superfícies são decimadas para cerca de 40&nbsp;000 triângulos para o navegador, a partir de uma superfície mesclada de 2.77&nbsp;milhões. No passo&nbsp;4 os landmarks permanecem na tela para que se veja o registro aproximá-los. Como o espelho troca esquerda e direita, cada ponto espelhado é pareado com seu homólogo do outro lado (gônio direito contra gônio esquerdo): parear cada rótulo consigo mesmo dá 51&nbsp;mm de absurdo, o pareamento por homólogo 4.70&nbsp;mm antes do registro. Depois do registro, a distância mediana é de 1.57&nbsp;mm na base do crânio, 2.16 na mandíbula, e <strong>12.84 na maxila contra 12.79 antes: essa não converge de forma alguma</strong>. <strong>Um defeito encontrado na saída publicada.</strong> As posições dos landmarks registrados são recalculadas a partir da matriz verificada em vez de lidas da pasta de saída, porque essa pasta difere em 20&nbsp;mm para a base do crânio: seus pontos estão deslocados como um bloco rígido em cerca de 23&nbsp;mm e se afastam do alvo.
         </figcaption>
       </figure>
 
 
-      <p><strong>Sistema de coordenadas</strong>: tudo está em <strong>LPS</strong>. O ALI grava seus landmarks em LPS, a derivação de landmarks também, e as medidas leem as posições sem conversão; os sinais dos componentes das medidas decorrem disso. As únicas inversões de <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="See glossary">RAS</a> para LPS estão na revisão manual e nas exportações VTK da segmentação.</p>
+      <p><strong>Sistema de coordenadas</strong>: tudo está em <strong>LPS</strong>. O ALI grava seus landmarks em LPS, a derivação de landmarks também, e as medidas leem as posições sem conversão; os sinais dos componentes das medidas decorrem disso. As únicas inversões de <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="Ver o glossário">RAS</a> para LPS estão na revisão manual e nas exportações VTK da segmentação.</p>
 
             <a class="deep-link" href="VFACE.code.html#entrees"><b>No código</b><span>Os formatos de entrada, os cortes da identidade do paciente, os parâmetros de reamostragem, a matriz de espelho e as inversões de coordenadas</span></a>
 
 
       <h2 id="modeles">4. Os modelos chamados</h2>
 
-      <p>O VFACE contém apenas um modelo próprio, os classificadores <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a>. Os outros pertencem aos módulos a montante, baixados quando o painel é aberto.</p>
+      <p>O VFACE contém apenas um modelo próprio, os classificadores <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="Ver o glossário">LightGBM</a>. Os outros pertencem aos módulos a montante, baixados quando o painel é aberto.</p>
 
       <div class="table-wrap">
         <table>
@@ -456,7 +456,7 @@
           <tbody>
             <tr><td>ALI-CBCT</td><td>agentes de aprendizado por reforço, uma DenseNet</td></tr>
             <tr><td><a href="../AMASSS/AMASSS.html#modeles">AMASSS</a></td><td>UNet 3D, saída em mapa de rótulos</td></tr>
-            <tr><td>DentalSegmentator</td><td><a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> 3d_fullres</td></tr>
+            <tr><td>DentalSegmentator</td><td><a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a> 3d_fullres</td></tr>
             <tr><td>Modelos de simetria, mandíbula e maxila</td><td><strong>LightGBM</strong>, salvos como arquivos joblib</td></tr>
           </tbody>
         </table>
@@ -464,7 +464,7 @@
 
       <h3 id="ali-cbct">4.1 ALI-CBCT</h3>
 
-      <p><span class="badge predit">rede</span> Um agente por <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> se move dentro de uma vizinhança de 64 voxels, em duas escalas (1&nbsp;mm e depois 0.3&nbsp;mm), com seis movimentos possíveis. Os landmarks pedidos para as medidas são a <strong><a class="gterm" data-term="vface-leg-dedup" href="VFACE.code.html#ali-cbct" title="See the code">união sem duplicatas</a></strong> dos pontos nomeados nas listas da mandíbula e da base do crânio, de modo que um landmark compartilhado pelas duas não aciona dois agentes. Como um agente caminha é explicado na <a href="../ALI/ALI.html">página do ALI</a>.</p>
+      <p><span class="badge predit">rede</span> Um agente por <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmark</a> se move dentro de uma vizinhança de 64 voxels, em duas escalas (1&nbsp;mm e depois 0.3&nbsp;mm), com seis movimentos possíveis. Os landmarks pedidos para as medidas são a <strong><a class="gterm" data-term="vface-leg-dedup" href="VFACE.code.html#ali-cbct" title="Ver o código">união sem duplicatas</a></strong> dos pontos nomeados nas listas da mandíbula e da base do crânio, de modo que um landmark compartilhado pelas duas não aciona dois agentes. Como um agente caminha é explicado na <a href="../ALI/ALI.html">página do ALI</a>.</p>
 
             <a class="deep-link" href="VFACE.code.html#ali-cbct"><b>No código</b><span>As configurações do agente, os arquivos de grupos de saída e a linha de deduplicação</span></a>
 
@@ -478,14 +478,14 @@
 
       <h3 id="bds-surfaces">4.3 BDS / DentalSegmentator: as superfícies</h3>
 
-      <p><span class="badge predit">rede</span> O nnU-Net produz um mapa de rótulos de 5 classes (crânio superior, mandíbula, dentes superiores e inferiores, canal mandibular) que é convertido em superfícies por <a class="gterm" data-term="marching-cubes" href="../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a>, suavização e decimação, e depois gravado em <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>. Essas superfícies servem apenas aos <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">mapas de calor</a>. Os pesos do modelo (cerca de 220&nbsp;MB) são baixados no primeiro uso, e três outros modelos oferecidos pelo código nunca são selecionados pelo VFACE.</p>
+      <p><span class="badge predit">rede</span> O nnU-Net produz um mapa de rótulos de 5 classes (crânio superior, mandíbula, dentes superiores e inferiores, canal mandibular) que é convertido em superfícies por <a class="gterm" data-term="marching-cubes" href="../glossary.html#g-marching-cubes" title="Ver o glossário">marching cubes</a>, suavização e decimação, e depois gravado em <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="Ver o glossário">LPS</a>. Essas superfícies servem apenas aos <a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="Ver o glossário">mapas de calor</a>. Os pesos do modelo (cerca de 220&nbsp;MB) são baixados no primeiro uso, e três outros modelos oferecidos pelo código nunca são selecionados pelo VFACE.</p>
 
             <a class="deep-link" href="VFACE.code.html#bds-surfaces"><b>No código</b><span>A cadeia de marching cubes com seus parâmetros, a verificação dos pesos e os modelos não usados</span></a>
 
 
       <h3 id="areg-cbct">4.4 O registro: AREG-CBCT</h3>
 
-      <p><span class="badge calcule">calculado</span> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a>, sem aprendizado. O scan original é mascarado com a máscara AMASSS correspondente, e então um registro rígido é executado em três resoluções com uma métrica de informação mútua, uma thread para garantir o determinismo. É feito uma vez por região.</p>
+      <p><span class="badge calcule">calculado</span> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="Ver o glossário">Elastix</a>, sem aprendizado. O scan original é mascarado com a máscara AMASSS correspondente, e então um registro rígido é executado em três resoluções com uma métrica de informação mútua, uma thread para garantir o determinismo. É feito uma vez por região.</p>
 
             <figure class="algo" data-scene="vface_register" data-ms="7200">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animação: o contorno espelhado é movido rigidamente para coincidir com a parte superior do crânio, depois movido de novo para coincidir com a mandíbula; a cada vez a região que ele acompanha fica alinhada e a outra não"></svg><div class="algo-ctl"><button class="algo-play" type="button">Repetir</button></div></div>
@@ -502,7 +502,7 @@
 
       <h3 id="huit-types">5.1 Os tipos de medida (sete linhas, dez strings exatas)</h3>
 
-      <p>Todos são construídos a partir da coluna <em>type of measurement</em> da lista Excel, associados por texto exato. As posições estão em <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a>.</p>
+      <p>Todos são construídos a partir da coluna <em>type of measurement</em> da lista Excel, associados por texto exato. As posições estão em <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="Ver o glossário">LPS</a>.</p>
 
       <div class="table-wrap">
         <table>
@@ -521,7 +521,7 @@
 
             <figure class="algo" data-scene="vface_dist" data-ms="5200">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animação: uma seta é traçada de um landmark a outro, e depois suas partes horizontal e vertical são mostradas"></svg><div class="algo-ctl"><button class="algo-play" type="button">Repetir</button></div></div>
-        <div class="algo-body"><p class="algo-lead">Uma medida compara dois pontos, em geral um <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmark</a> e seu homólogo na imagem espelhada após o registro. A diferença entre eles é um vetor. Ele é lido em três direções (direita-esquerda, frente-trás, cima-baixo), e seu comprimento é a distância 3D. Neste sistema de coordenadas, as componentes direita-esquerda e frente-trás são os negativos de x e y.</p><p class="algo-tag">Ilustração: dois pontos inventados em um plano; o vetor real é tridimensional.</p><div class="formula"><math display="block"><mrow><mi class="k1">d</mi><mo>=</mo><msub><mi class="k3">p</mi><mn>2</mn></msub><mo>&#x2212;</mo><msub><mi class="k2">p</mi><mn>1</mn></msub></mrow></math></div><div class="formula"><math display="block"><mrow><mo stretchy="true" fence="true">(</mo><mi>lr</mi><mo>,</mo><mi>ap</mi><mo>,</mo><mi>si</mi><mo stretchy="true" fence="true">)</mo><mo>=</mo><mo stretchy="true" fence="true">(</mo><mo>&#x2212;</mo><msub><mi class="k1">d</mi><mi>x</mi></msub><mo>,</mo><mo>&#x2212;</mo><msub><mi class="k1">d</mi><mi>y</mi></msub><mo>,</mo><msub><mi class="k1">d</mi><mi>z</mi></msub><mo stretchy="true" fence="true">)</mo><mo>,</mo><mi>D</mi><mo>=</mo><mrow><mo>&#x2225;</mo><mi class="k1">d</mi><mo>&#x2225;</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k2"><b>p<sub>1</sub></b>o primeiro landmark</li><li class="k3"><b>p<sub>2</sub></b>o segundo landmark (seu homólogo)</li><li class="k1"><b>d</b>o vetor entre eles</li><li class=""><b>lr, ap, si</b>suas partes direita-esquerda, frente-trás e cima-baixo</li><li class=""><b>D</b>a distância 3D</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">Uma medida compara dois pontos, em geral um <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmark</a> e seu homólogo na imagem espelhada após o registro. A diferença entre eles é um vetor. Ele é lido em três direções (direita-esquerda, frente-trás, cima-baixo), e seu comprimento é a distância 3D. Neste sistema de coordenadas, as componentes direita-esquerda e frente-trás são os negativos de x e y.</p><p class="algo-tag">Ilustração: dois pontos inventados em um plano; o vetor real é tridimensional.</p><div class="formula"><math display="block"><mrow><mi class="k1">d</mi><mo>=</mo><msub><mi class="k3">p</mi><mn>2</mn></msub><mo>&#x2212;</mo><msub><mi class="k2">p</mi><mn>1</mn></msub></mrow></math></div><div class="formula"><math display="block"><mrow><mo stretchy="true" fence="true">(</mo><mi>lr</mi><mo>,</mo><mi>ap</mi><mo>,</mo><mi>si</mi><mo stretchy="true" fence="true">)</mo><mo>=</mo><mo stretchy="true" fence="true">(</mo><mo>&#x2212;</mo><msub><mi class="k1">d</mi><mi>x</mi></msub><mo>,</mo><mo>&#x2212;</mo><msub><mi class="k1">d</mi><mi>y</mi></msub><mo>,</mo><msub><mi class="k1">d</mi><mi>z</mi></msub><mo stretchy="true" fence="true">)</mo><mo>,</mo><mi>D</mi><mo>=</mo><mrow><mo>&#x2225;</mo><mi class="k1">d</mi><mo>&#x2225;</mo></mrow></mrow></math></div><ul class="algo-legend"><li class="k2"><b>p<sub>1</sub></b>o primeiro landmark</li><li class="k3"><b>p<sub>2</sub></b>o segundo landmark (seu homólogo)</li><li class="k1"><b>d</b>o vetor entre eles</li><li class=""><b>lr, ap, si</b>suas partes direita-esquerda, frente-trás e cima-baixo</li><li class=""><b>D</b>a distância 3D</li></ul></div>
       </figure>
 
 
@@ -538,7 +538,7 @@
 
       <h3 id="liste-defaut">5.2 A lista padrão</h3>
 
-      <p>As listas de medidas padrão são baixadas separadamente; o nome do arquivo decide o papel de cada uma (base do crânio, mandíbula, maxila, <a class="gterm" data-term="vface-leg-template" href="VFACE.code.html#reorganize-postprocess" title="See the code">modelo de variáveis</a>).</p>
+      <p>As listas de medidas padrão são baixadas separadamente; o nome do arquivo decide o papel de cada uma (base do crânio, mandíbula, maxila, <a class="gterm" data-term="vface-leg-template" href="VFACE.code.html#reorganize-postprocess" title="Ver o código">modelo de variáveis</a>).</p>
 
       <div class="table-wrap">
         <table>
@@ -581,7 +581,7 @@
 
       <h2 id="classifieur">6. O classificador</h2>
 
-      <p>Três arquivos joblib são carregados. São modelos <strong><a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">classificadores </a>LightGBM</strong>, não uma rede e não uma árvore de regras escrita à mão. Os hiperparâmetros e o número de árvores foram confirmados ao desserializar os arquivos.</p>
+      <p>Três arquivos joblib são carregados. São modelos <strong><a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="Ver o glossário">classificadores </a>LightGBM</strong>, não uma rede e não uma árvore de regras escrita à mão. Os hiperparâmetros e o número de árvores foram confirmados ao desserializar os arquivos.</p>
 
       <div class="table-wrap">
         <table>
@@ -665,21 +665,21 @@
 
       <h3 id="pauses">7.1 As pausas</h3>
 
-      <p>Uma etapa do plano pode pedir que o painel pare no seu fim, carregue os resultados na cena e espere. Existem três tipos de pausa: <strong>somente visualização</strong> (carregado e exibido, nada regravado); <strong><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> editáveis</strong> (destravados e exibidos, e regravados apenas se um ponto se moveu); e <strong>registro ajustável</strong> (o scan registrado se sobrepõe ao original com meia opacidade e alças de interação, e a correção é composta na transformação do próprio registro, porque o AutoMatrix a jusante só consegue aplicar uma única matriz). O bloco de quantificação é colocado antes do bloco de visualização, para que a única pausa editável realmente útil não chegue depois de cinco segmentações <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>.</p>
+      <p>Uma etapa do plano pode pedir que o painel pare no seu fim, carregue os resultados na cena e espere. Existem três tipos de pausa: <strong>somente visualização</strong> (carregado e exibido, nada regravado); <strong><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmarks</a> editáveis</strong> (destravados e exibidos, e regravados apenas se um ponto se moveu); e <strong>registro ajustável</strong> (o scan registrado se sobrepõe ao original com meia opacidade e alças de interação, e a correção é composta na transformação do próprio registro, porque o AutoMatrix a jusante só consegue aplicar uma única matriz). O bloco de quantificação é colocado antes do bloco de visualização, para que a única pausa editável realmente útil não chegue depois de cinco segmentações <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a>.</p>
 
             <a class="deep-link" href="VFACE.code.html#pauses"><b>No código</b><span>O catálogo de pausas com sua disponibilidade, e a restrição do laço de eventos do Qt</span></a>
 
 
       <h3 id="batch-existe">7.2 Navegação no lote: o que existe</h3>
 
-      <p>O port da revisão a partir do AREG foi feito. O painel oferece paciente anterior e seguinte (salvando antes a edição atual), a posição no lote, a marcação, e um <strong><a class="gterm" data-term="vface-leg-rollback" href="VFACE.code.html#batch-existe" title="See the code">retrocesso seletivo</a></strong> que volta até a etapa corrigível mais próxima e reexecuta as etapas intermediárias apenas para os pacientes marcados. No VISOR, o sistema de pausa e revisão não foi portado.</p>
+      <p>O port da revisão a partir do AREG foi feito. O painel oferece paciente anterior e seguinte (salvando antes a edição atual), a posição no lote, a marcação, e um <strong><a class="gterm" data-term="vface-leg-rollback" href="VFACE.code.html#batch-existe" title="Ver o código">retrocesso seletivo</a></strong> que volta até a etapa corrigível mais próxima e reexecuta as etapas intermediárias apenas para os pacientes marcados. No VISOR, o sistema de pausa e revisão não foi portado.</p>
 
             <a class="deep-link" href="VFACE.code.html#batch-existe"><b>No código</b><span>As funções da navegação e a lógica do retrocesso</span></a>
 
 
       <h3 id="batch-manque">7.3 Navegação no lote: o que realmente falta</h3>
 
-      <p>Apenas algumas etapas podem ser restringidas aos pacientes marcados. Para as outras, um retrocesso reexecuta o lote inteiro: por exemplo as duas execuções do AMASSS, o registro <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a> da maxila e da mandíbula, ou as cinco execuções de superfícies ósseas. Restringir as etapas de medida e classificação seria prejudicial, pois elas gravam uma tabela agregada reconstruída do zero; a correção adequada é acrescentar as chaves de scan, e não todas as chaves de pasta (<a href="VFACE.code.html#f-batch-missing">detalhes</a>).</p>
+      <p>Apenas algumas etapas podem ser restringidas aos pacientes marcados. Para as outras, um retrocesso reexecuta o lote inteiro: por exemplo as duas execuções do AMASSS, o registro <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="Ver o glossário">Elastix</a> da maxila e da mandíbula, ou as cinco execuções de superfícies ósseas. Restringir as etapas de medida e classificação seria prejudicial, pois elas gravam uma tabela agregada reconstruída do zero; a correção adequada é acrescentar as chaves de scan, e não todas as chaves de pasta (<a href="VFACE.code.html#f-batch-missing">detalhes</a>).</p>
 
             <a class="deep-link" href="VFACE.code.html#batch-manque"><b>No código</b><span>A lista das chaves de entrada restringíveis e os dois limites menores</span></a>
 
@@ -690,7 +690,7 @@
         <table>
           <thead><tr><th>Pasta dentro da pasta de saída</th><th>Conteúdo</th><th>Mantida após a limpeza</th></tr></thead>
           <tbody>
-            <tr><td>Scans reamostrados, centralizados e orientados</td><td>volumes com suas transformações e <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a></td><td>não</td></tr>
+            <tr><td>Scans reamostrados, centralizados e orientados</td><td>volumes com suas transformações e <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmarks</a></td><td>não</td></tr>
             <tr><td>Máscaras, espelho, scans registrados</td><td>máscaras AMASSS, o segundo scan, os scans e matrizes registrados</td><td>não</td></tr>
             <tr><td>Landmarks (T1, espelhados, espelhados e registrados)</td><td>os arquivos de landmarks em cada etapa</td><td>não</td></tr>
             <tr><td><code>Measurements</code></td><td>uma tabela por região e a tabela pós-processada</td><td><strong>sim</strong> se Quantitative</td></tr>
@@ -718,16 +718,16 @@
           <thead><tr><th>Bloco</th><th>Natureza</th><th>Onde</th></tr></thead>
           <tbody>
             <tr><td>Reamostragem, centralização</td><td><span class="badge calcule">calculado</span> geométrico</td><td>MRI2CBCT, ASO</td></tr>
-            <tr><td><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">Landmarks</a> (orientação e medidas)</td><td><span class="badge predit">predito</span> agentes de RL</td><td>ALI-CBCT</td></tr>
-            <tr><td>Orientação sobre o gold standard</td><td><span class="badge calcule">calculado</span> <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="See glossary">ICP</a> rígido sobre landmarks</td><td>ASO</td></tr>
+            <tr><td><a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">Landmarks</a> (orientação e medidas)</td><td><span class="badge predit">predito</span> agentes de RL</td><td>ALI-CBCT</td></tr>
+            <tr><td>Orientação sobre o gold standard</td><td><span class="badge calcule">calculado</span> <a class="gterm" data-term="icp" href="../glossary.html#g-icp" title="Ver o glossário">ICP</a> rígido sobre landmarks</td><td>ASO</td></tr>
             <tr><td>Máscaras ósseas</td><td><span class="badge predit">predito</span> UNet 3D</td><td>AMASSS</td></tr>
             <tr><td>Espelho</td><td><span class="badge calcule">calculado</span> uma matriz fixa</td><td>AutoMatrix</td></tr>
-            <tr><td>Registro</td><td><span class="badge calcule">calculado</span> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="See glossary">Elastix</a> rígido, informação mútua</td><td>AREG</td></tr>
+            <tr><td>Registro</td><td><span class="badge calcule">calculado</span> <a class="gterm" data-term="elastix" href="../glossary.html#g-elastix" title="Ver o glossário">Elastix</a> rígido, informação mútua</td><td>AREG</td></tr>
             <tr><td>Landmarks maxilares</td><td><span class="badge calcule">calculado</span> composição de duas transformações</td><td>o painel</td></tr>
-            <tr><td>Superfícies ósseas</td><td><span class="badge predit">predito</span> <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a></td><td>o painel, CUDA</td></tr>
+            <tr><td>Superfícies ósseas</td><td><span class="badge predit">predito</span> <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a></td><td>o painel, CUDA</td></tr>
             <tr><td>Medidas lineares e angulares</td><td><span class="badge calcule">calculado</span> geométrico</td><td>o painel</td></tr>
-            <tr><td><a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="See glossary">Mapas de calor</a></td><td><span class="badge calcule">calculado</span> um filtro de distância com sinal</td><td>subprocesso</td></tr>
-            <tr><td>Classificação</td><td><span class="badge predit">predito</span> <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a>, três modelos</td><td>VFACE</td></tr>
+            <tr><td><a class="gterm" data-term="heatmap" href="../glossary.html#g-heatmap" title="Ver o glossário">Mapas de calor</a></td><td><span class="badge calcule">calculado</span> um filtro de distância com sinal</td><td>subprocesso</td></tr>
+            <tr><td>Classificação</td><td><span class="badge predit">predito</span> <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="Ver o glossário">LightGBM</a>, três modelos</td><td>VFACE</td></tr>
           </tbody>
         </table>
       </div>
@@ -737,8 +737,8 @@
       <p>Cada ponto é verificado no código e descrito, com sua evidência, na página do código.</p>
 
       <ul>
-        <li><strong>A derivação dos <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="See glossary">landmarks</a> maxilares falha fora de &ldquo;Full pipeline&rdquo;.</strong> Os arquivos de transformação não são copiados, de modo que a tabela da maxila fica vazia e faltam cinco variáveis em quatorze. <a href="VFACE.code.html#f-derive-outside-full">Evidência</a>.</li>
-        <li><strong><a class="gterm" data-term="vface-leg-cmfreg" href="VFACE.code.html#f-cmfreg" title="See the code">CMFReg</a> não muda o registro.</strong> <a href="VFACE.code.html#f-cmfreg-noop">Evidência</a>.</li>
+        <li><strong>A derivação dos <a class="gterm" data-term="landmark" href="../glossary.html#g-landmark" title="Ver o glossário">landmarks</a> maxilares falha fora de &ldquo;Full pipeline&rdquo;.</strong> Os arquivos de transformação não são copiados, de modo que a tabela da maxila fica vazia e faltam cinco variáveis em quatorze. <a href="VFACE.code.html#f-derive-outside-full">Evidência</a>.</li>
+        <li><strong><a class="gterm" data-term="vface-leg-cmfreg" href="VFACE.code.html#f-cmfreg" title="Ver o código">CMFReg</a> não muda o registro.</strong> <a href="VFACE.code.html#f-cmfreg-noop">Evidência</a>.</li>
         <li><strong>Sufixos T1 e T2 fixados no código.</strong> Um terceiro instante quebra silenciosamente o pareamento. <a href="VFACE.code.html#f-timepoint-suffix">Evidência</a>.</li>
         <li><strong>Seleção de máscara por palavra-chave.</strong> A máscara da base do crânio só vence a da mandíbula pela ordem alfabética. <a href="VFACE.code.html#f-mask-keyword-li">Evidência</a>.</li>
         <li><strong>Um rótulo de landmark repetido mantém apenas sua primeira linha.</strong> <a href="VFACE.code.html#f-index-first-row">Evidência</a>.</li>
@@ -748,9 +748,9 @@
 
       <h2 id="litterature">11. Literatura</h2>
 
-      <p>O trabalho publicado correspondente é &ldquo;Automated classification of skeletal facial asymmetry in <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> using a reproducible 3D Slicer workflow for patient-specific decision support&rdquo;, SPIE Medical Imaging 2026, vol. 13929, art. 139292J, <a href="https://doi.org/10.1117/12.3087010">doi:10.1117/12.3087010</a> (<a href="https://spie.org/medical-imaging/presentation/Automated-classification-of-skeletal-facial-asymmetry-in-CBCT-using-a/13929-89">página do SPIE</a>). O resumo público descreve 170 pacientes de Classe III e a mesma cadeia a montante: pré-processamento padronizado, espelhamento, registro por <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a>, extração de medidas anatômicas.</p>
+      <p>O trabalho publicado correspondente é &ldquo;Automated classification of skeletal facial asymmetry in <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="Ver o glossário">CBCT</a> using a reproducible 3D Slicer workflow for patient-specific decision support&rdquo;, SPIE Medical Imaging 2026, vol. 13929, art. 139292J, <a href="https://doi.org/10.1117/12.3087010">doi:10.1117/12.3087010</a> (<a href="https://spie.org/medical-imaging/presentation/Automated-classification-of-skeletal-facial-asymmetry-in-CBCT-using-a/13929-89">página do SPIE</a>). O resumo público descreve 170 pacientes de Classe III e a mesma cadeia a montante: pré-processamento padronizado, espelhamento, registro por <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="Ver o glossário">voxel</a>, extração de medidas anatômicas.</p>
 
-      <p>O código diverge do artigo na última etapa. O resumo descreve uma abordagem <strong>não supervisionada</strong> (redução de dimensionalidade, depois agrupamento espectral); o módulo distribui <strong>três classificadores <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="See glossary">LightGBM</a> binários supervisionados</strong> treinados com 14 variáveis fixas, e nada no repositório liga seus rótulos de treinamento aos clusters do artigo. <a href="VFACE.code.html#f-paper-divergence">Detalhes</a>.</p>
+      <p>O código diverge do artigo na última etapa. O resumo descreve uma abordagem <strong>não supervisionada</strong> (redução de dimensionalidade, depois agrupamento espectral); o módulo distribui <strong>três classificadores <a class="gterm" data-term="lightgbm" href="../glossary.html#g-lightgbm" title="Ver o glossário">LightGBM</a> binários supervisionados</strong> treinados com 14 variáveis fixas, e nada no repositório liga seus rótulos de treinamento aos clusters do artigo. <a href="VFACE.code.html#f-paper-divergence">Detalhes</a>.</p>
 
       <footer class="footer">
         <a href="../index.html">← Todas as páginas</a> · <a href="VFACE.code.html">Página de código desta ferramenta</a> · <a href="../visor/VFACE/VFACE.html">Página do VISOR desta ferramenta</a> · <a href="SOURCES.html">Bibliografia</a>

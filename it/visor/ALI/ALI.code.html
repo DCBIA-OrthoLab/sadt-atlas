@@ -137,13 +137,13 @@
         <li><code>legacy</code> = SlicerAutomatedDentalTools 3c67957; un percorso legacy come <code>ALI_CBCT_utils/agent.py</code> si trova sotto <code>ALI_CBCT/</code>, e <code>ALI_IOS_utils/</code> sotto <code>ALI_IOS/</code>.</li>
       </ul>
 
-      <p>In un paragrafo: lo strumento che l&rsquo;utente sceglie è una <strong><a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">facade</a></strong> chiamata <code>ALI</code> con due modalità. La modalità <code>CBCT</code> esegue <code>ALI_CBCT</code>, un agente di apprendimento per rinforzo per ogni landmark che percorre un volume voxel per voxel a 1 mm poi a 0,3 mm (<a href="#visor-cbct">sezione 3</a>). La modalità <code>IOS</code> esegue <code>ALI_IOS</code>, che renderizza ogni dente di una mesh intraorale etichettata da <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">telecamere</a> fisse, segmenta i render con una UNet 2D e proietta la maschera sulla mesh (<a href="#visor-ios">sezione 4</a>). Entrambe scrivono un <code>.mrk.json</code> per scansione più un <code>run_report.json</code>. Le reti e i loro pesi sono quelli legacy; ciò che è cambiato è attorno a essi, e diverse correzioni legacy successive (la riorientazione <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a>, le protezioni del budget di passi, l&rsquo;intero stack di raffinamento Mucogingival) non sono mai state portate (<a href="#visor-changes">sezione 8</a>).</p>
+      <p>In un paragrafo: lo strumento che l&rsquo;utente sceglie è una <strong><a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="Vedi la spiegazione">facade</a></strong> chiamata <code>ALI</code> con due modalità. La modalità <code>CBCT</code> esegue <code>ALI_CBCT</code>, un agente di apprendimento per rinforzo per ogni landmark che percorre un volume voxel per voxel a 1 mm poi a 0,3 mm (<a href="#visor-cbct">sezione 3</a>). La modalità <code>IOS</code> esegue <code>ALI_IOS</code>, che renderizza ogni dente di una mesh intraorale etichettata da <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="Vedi la spiegazione">telecamere</a> fisse, segmenta i render con una UNet 2D e proietta la maschera sulla mesh (<a href="#visor-ios">sezione 4</a>). Entrambe scrivono un <code>.mrk.json</code> per scansione più un <code>run_report.json</code>. Le reti e i loro pesi sono quelli legacy; ciò che è cambiato è attorno a essi, e diverse correzioni legacy successive (la riorientazione <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="Vedi la spiegazione">DICOM</a>, le protezioni del budget di passi, l&rsquo;intero stack di raffinamento Mucogingival) non sono mai state portate (<a href="#visor-changes">sezione 8</a>).</p>
 
       <h2 id="visor-status">1. Stato e posizione nella catena</h2>
 
       <p class="code-back">Spiegazione in linguaggio semplice e matematica: <a href="ALI.html#visor-status">pagina dell&rsquo;atlante</a>.</p>
 
-      <p><span class="badge neutral">implementato e testato</span> Il port consiste in due strumenti server, non uno: <code>ALI_CBCT</code> e <code>ALI_IOS</code>, separati da un unico strumento <code>ALI</code> il 2026-08-17 (commit SADT-VISOR 2ac7d9d). Lo strumento che l&rsquo;utente vede è la <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">facade</a> <code>ALI</code>: non ha codice proprio, solo <code>dispatch = { "CBCT" = "ALI_CBCT", "IOS" = "ALI_IOS" }</code> (VISOR-serve <code>deployment.toml:205-210</code>). All&rsquo;avvio il server costruisce il suo modulo di compilazione dai due bersagli: prima una scelta obbligatoria <code>mode</code>, poi ogni argomento di entrambi, ciascuno con un <code>visible_when</code> su <code>mode</code> se solo uno dei bersagli lo ha (VISOR-serve <code>registry/facade.py:98</code>, <code>:155-166</code>, <code>:236-245</code>). Il pannello Slicer è il modulo <code>ALIRemote</code>, il cui <code>TOOL_NAME</code> è <code>"ALI"</code>, quindi parla con la facade (Remote <code>ALIRemote/ALIRemote.py:92</code>). Gli altri strumenti del server non passano per la facade: chiamano per nome il motore di cui hanno bisogno attraverso il supervisor, <code>sup.run</code>.</p>
+      <p><span class="badge neutral">implementato e testato</span> Il port consiste in due strumenti server, non uno: <code>ALI_CBCT</code> e <code>ALI_IOS</code>, separati da un unico strumento <code>ALI</code> il 2026-08-17 (commit SADT-VISOR 2ac7d9d). Lo strumento che l&rsquo;utente vede è la <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="Vedi la spiegazione">facade</a> <code>ALI</code>: non ha codice proprio, solo <code>dispatch = { "CBCT" = "ALI_CBCT", "IOS" = "ALI_IOS" }</code> (VISOR-serve <code>deployment.toml:205-210</code>). All&rsquo;avvio il server costruisce il suo modulo di compilazione dai due bersagli: prima una scelta obbligatoria <code>mode</code>, poi ogni argomento di entrambi, ciascuno con un <code>visible_when</code> su <code>mode</code> se solo uno dei bersagli lo ha (VISOR-serve <code>registry/facade.py:98</code>, <code>:155-166</code>, <code>:236-245</code>). Il pannello Slicer è il modulo <code>ALIRemote</code>, il cui <code>TOOL_NAME</code> è <code>"ALI"</code>, quindi parla con la facade (Remote <code>ALIRemote/ALIRemote.py:92</code>). Gli altri strumenti del server non passano per la facade: chiamano per nome il motore di cui hanno bisogno attraverso il supervisor, <code>sup.run</code>.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 900 280" role="img" aria-label="Il pannello ALIRemote in Slicer invia una richiesta alla facade di ALI, che esegue ALI_CBCT o ALI_IOS a seconda della modalità. ASO, VFACE e AREG_IOSCBCT chiamano ALI_CBCT tramite il supervisore; AREG_IOS e AREG_IOSCBCT chiamano ALI_IOS. ALI_IOS chiama Crown_Seg per le mesh senza etichette dei denti.">
@@ -235,7 +235,7 @@
           <thead><tr><th>File</th><th>Righe</th><th>Ruolo</th></tr></thead>
           <tbody>
             <tr><td><code>ALI_CBCT/src/sadt_ali_cbct/__init__.py</code></td><td>173</td><td><code>run()</code>, la firma pubblicata; <code>PREDICTION_ID = "Pred"</code>, <code>OUTPUT_SUFFIXES</code></td></tr>
-            <tr><td><code>CB/dispatch.py</code></td><td>274</td><td><code>detect()</code> (che cosa contiene l&rsquo;input, conversione <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a>), <code>identify()</code> (cartella di lavoro, chiamata al motore, <code>run_report.json</code>)</td></tr>
+            <tr><td><code>CB/dispatch.py</code></td><td>274</td><td><code>detect()</code> (che cosa contiene l&rsquo;input, conversione <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="Vedi la spiegazione">DICOM</a>), <code>identify()</code> (cartella di lavoro, chiamata al motore, <code>run_report.json</code>)</td></tr>
             <tr><td><code>CB/engine.py</code></td><td>922</td><td>scoperta dei pesi, selezione dei landmark, preprocessing per scansione, pool di processi, scrittura dei markups, rapporto</td></tr>
             <tr><td><code>CB/agent.py</code></td><td>297</td><td>l&rsquo;agente: mosse, respawn, convergenza, <code>Focus</code>, budget di passi</td></tr>
             <tr><td><code>CB/brain.py</code></td><td>157</td><td>DenseNet3D + testa decisionale, una rete per scala, <code>weights_only=True</code></td></tr>
@@ -246,7 +246,7 @@
             <tr><td><code>ALI_IOS/src/sadt_ali_ios/__init__.py</code></td><td>177</td><td><code>run()</code>, la firma pubblicata</td></tr>
             <tr><td><code>IO/dispatch.py</code></td><td>641</td><td>rilevamento dell&rsquo;input, suddivisione etichettate / non etichettate, la chiamata a <code>Crown_Seg</code>, due passaggi del motore, unione dei rapporti, filtro sui landmark richiesti</td></tr>
             <tr><td><code>IO/engine.py</code></td><td>711</td><td>scoperta dei pesi, costruzione della UNet, predizione per mesh e per dente, percorso MG, da pixel a punto, rapporto</td></tr>
-            <tr><td><code>IO/render.py</code></td><td>414</td><td>tabelle delle <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">telecamere</a>, renderer pytorch3d, riferimento della telecamera MG, adattamento dell&rsquo;arcata per i denti mancanti</td></tr>
+            <tr><td><code>IO/render.py</code></td><td>414</td><td>tabelle delle <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="Vedi la spiegazione">telecamere</a>, renderer pytorch3d, riferimento della telecamera MG, adattamento dell&rsquo;arcata per i denti mancanti</td></tr>
             <tr><td><code>IO/surface.py</code></td><td>211</td><td>lettura di <code>.vtk</code>/<code>.stl</code>, array delle etichette, scalatura alla sfera unitaria, normali come colori, facce di un dente</td></tr>
             <tr><td><code>IO/catalog.py</code></td><td>297</td><td>153 landmark, reti, raggi delle telecamere, nomi MG e scarti di puntamento</td></tr>
             <tr><td><code>IO/layout.py</code>, <code>progress.py</code>, <code>torch_helpers.py</code>, <code>errors.py</code></td><td>78, 103, 49, 21</td><td>modulo, avanzamento, import pigro di torch, errori</td></tr>
@@ -257,7 +257,7 @@
         </table>
       </div>
 
-      <p>Fuori da SADT-VISOR: VISOR-serve <code>deployment.toml:86-160</code> (cartella dei dati e regole di larghezza di entrambi i motori, con le misure di tempo nei commenti) e <code>:205-210</code> (la <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">facade</a>), <code>registry/facade.py</code> (301 righe, composizione dello schema della facade); sul client, <code>ALIRemote/ALIRemote.py</code> (252 righe) con il suo test <code>ALIRemote/Testing/Python/test_ali_client.py</code>.</p>
+      <p>Fuori da SADT-VISOR: VISOR-serve <code>deployment.toml:86-160</code> (cartella dei dati e regole di larghezza di entrambi i motori, con le misure di tempo nei commenti) e <code>:205-210</code> (la <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="Vedi la spiegazione">facade</a>), <code>registry/facade.py</code> (301 righe, composizione dello schema della facade); sul client, <code>ALIRemote/ALIRemote.py</code> (252 righe) con il suo test <code>ALIRemote/Testing/Python/test_ali_client.py</code>.</p>
 
       <h2 id="visor-cbct">3. ALI_CBCT: agenti dentro il volume</h2>
 
@@ -307,7 +307,7 @@
           <text class="d-label-s" x="868" y="226" text-anchor="middle">la migliore di 6 mosse, 1 voxel</text>
           <path class="d-arrow" d="M820 244 V262 H916 V250"/>
           <path class="d-arrow-head" d="M916 245 l-4 7 h8 z"/>
-          <text class="d-label-xs" x="868" y="276" text-anchor="middle">passo successivo, finché non gira in cerchio</text>
+          <text class="d-label-xs" x="868" y="276" text-anchor="middle">passo successivo, finché non cicla</text>
           <path class="d-arrow" d="M783 207 H765"/>
           <path class="d-arrow-head" d="M760 207 l7 -4 v8 z"/>
 
@@ -350,7 +350,7 @@
 
       <p><code>detect()</code> (<code>CB/dispatch.py:80-135</code>) decide che cosa è stato inviato. Un singolo file deve terminare con uno tra <code>.nii .nii.gz .nrrd .nrrd.gz .gipl .gipl.gz</code> (<code>CM/discovery.py:22</code>); una superficie viene rifiutata per nome («run ALI_IOS on surfaces», <code>:102-106</code>). Una cartella viene percorsa ricorsivamente; una cartella che mescola volumi e superfici viene rifiutata anziché elaborata a metà (<code>:115-125</code>). Ogni scansione è identificata dal suo <strong>percorso relativo all&rsquo;input</strong> (<code>CM/discovery.py:33-45</code>), quindi due pazienti chiamati <code>scan.nii.gz</code> in sottocartelle diverse non entrano più in collisione. Uno <code>.zip</code> non arriva mai a questo codice: il server lo estrae prima di <code>run()</code> (<code>:89-91</code>).</p>
 
-      <p><a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a> è <strong>rilevato, non dichiarato</strong>. Ogni directory che contiene file ma nessun volume o superficie viene sottoposta a GDCM (<code>_dicom_directories</code>, <code>CB/dispatch.py:60-77</code>; <code>CB/preprocess.py:130-143</code>), e ogni serie trovata viene scritta come un NIfTI sotto la cartella temporanea del lavoro, mai nell&rsquo;input:</p>
+      <p><a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="Vedi la spiegazione">DICOM</a> è <strong>rilevato, non dichiarato</strong>. Ogni directory che contiene file ma nessun volume o superficie viene sottoposta a GDCM (<code>_dicom_directories</code>, <code>CB/dispatch.py:60-77</code>; <code>CB/preprocess.py:130-143</code>), e ogni serie trovata viene scritta come un NIfTI sotto la cartella temporanea del lavoro, mai nell&rsquo;input:</p>
 
       <pre><code>destination_root = os.path.join(work_dir, "dicom_converted")
 key = scan_key(directory, root)
@@ -409,7 +409,7 @@ return self._rescale(crop(self.data[scale_key]["image"])).type(torch.float32)
         <li><strong>Limiti</strong>: una mossa viene mantenuta solo se ogni coordinata resta in <code>[0, size)</code> del volume senza padding (<code>:135-141</code>). Altrimenti la memoria breve viene svuotata e l&rsquo;agente rinasce: in un punto qualsiasi del volume alla scala 0, entro 10 voxel da dove la scala era iniziata alla scala 1, estratto da un generatore inizializzato dal seed dell&rsquo;esecuzione e dal nome del landmark (<code>:148-177</code>, <code>rng_for</code> <code>:54-68</code>). Tre uscite e il landmark non viene trovato (<code>_MAX_ATTEMPTS = 3</code>, <code>:45</code>, <code>:294-295</code>).</li>
         <li><strong>Convergenza</strong>: la nuova posizione viene confrontata con le ultime 10 posizioni <em>prima</em> di essere memorizzata (<code>:179-185</code>, <code>:213-217</code>). Girare in cerchio significa essere arrivati.</li>
         <li><strong>Cambio di scala</strong>: posizione moltiplicata per il rapporto di spaziatura (1/0,3), tentativi azzerati; ogni scala ha la propria memoria (<code>:114</code>, <code>:187-199</code>).</li>
-        <li><strong><a class="gterm" data-term="ali-focus" href="ALI.html#cbct-search" title="See the explanation">Focus</a></strong> alla scala fine: sei riavvii a 4 voxel lungo ±x, ±y, ±z, ciascuno percorso finché non gira in cerchio; la risposta è la media dei sei approdi, ed è ciò che la rende sub-voxel (<code>:219-246</code>).</li>
+        <li><strong><a class="gterm" data-term="ali-focus" href="ALI.html#cbct-search" title="Vedi la spiegazione">Focus</a></strong> alla scala fine: sei riavvii a 4 voxel lungo ±x, ±y, ±z, ciascuno percorso finché non gira in cerchio; la risposta è la media dei sei approdi, ed è ciò che la rende sub-voxel (<code>:219-246</code>).</li>
       </ol>
 
       <p><strong>Il budget è contato in passi, non in secondi</strong>: 900 passaggi in avanti per landmark per impostazione predefinita, oppure <code>search_steps</code> (<code>CB/engine.py:55</code>, <code>:81-92</code>). Lo stesso contatore alimenta la ricerca e i sei percorsi <code>Focus</code>; esaurirlo solleva <code>NotFound</code>, registrato per scansione in <code>landmarks_failed</code> (<code>CB/agent.py:238-243</code>, <code>:283-287</code>; <code>CB/engine.py:399-404</code>). Il commento del motore sul perché: un orologio da parete faceva dipendere l&rsquo;esito da quanto fosse occupata la scheda, «four agents wide dropped C4» (<code>CB/agent.py:257-270</code>).</p>
@@ -466,7 +466,7 @@ return np.array([coordinates[2], coordinates[1], coordinates[0]])   # CB/environ
 
           <rect class="d-box" x="395" y="40" width="170" height="74" rx="6"/>
           <text class="d-label" x="480" y="64" text-anchor="middle">Sfera unitaria</text>
-          <text class="d-label-s" x="480" y="81" text-anchor="middle">centro del riquadro di delimitazione</text>
+          <text class="d-label-s" x="480" y="81" text-anchor="middle">centro del riquadro delimitante</text>
           <text class="d-label-s" x="480" y="96" text-anchor="middle">normali come RGB</text>
           <path class="d-arrow" d="M565 77 H583"/>
           <path class="d-arrow-head" d="M588 77 l-7 -4 v8 z"/>
@@ -474,7 +474,7 @@ return np.array([coordinates[2], coordinates[1], coordinates[0]])   # CB/environ
           <rect class="d-box" x="589" y="40" width="170" height="74" rx="6"/>
           <text class="d-label" x="674" y="64" text-anchor="middle">Telecamere per dente</text>
           <text class="d-label-s" x="674" y="81" text-anchor="middle">O 5, C 12, tabella fissa</text>
-          <text class="d-label-s" x="674" y="96" text-anchor="middle">MG 3, puntate verso il lato vestibolare</text>
+          <text class="d-label-s" x="674" y="96" text-anchor="middle">MG 3, rivolte al lato vestibolare</text>
           <path class="d-arrow" d="M759 77 H777"/>
           <path class="d-arrow-head" d="M782 77 l-7 -4 v8 z"/>
 
@@ -565,7 +565,7 @@ HardPhongShader(..., lights=PointLights(...))</code></pre>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Rete</th><th>Raggio (<a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="See the explanation">sfera unitaria</a>)</th><th>Viste per dente</th><th>Direzioni</th></tr></thead>
+          <thead><tr><th>Rete</th><th>Raggio (<a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="Vedi la spiegazione">sfera unitaria</a>)</th><th>Viste per dente</th><th>Direzioni</th></tr></thead>
           <tbody>
             <tr><td><code>O</code> (occlusal)</td><td>0.2</td><td>5</td><td>tabella fissa: asse occlusale più quattro inclinazioni, per arcata (<code>IO/render.py:39-54</code>)</td></tr>
             <tr><td><code>C</code> (cervical)</td><td>0.3</td><td>12</td><td>tabella fissa: attorno alla corona, orizzontali e inclinate di 0.5 (<code>:56-73</code>)</td></tr>
@@ -574,7 +574,7 @@ HardPhongShader(..., lights=PointLights(...))</code></pre>
         </table>
       </div>
 
-      <p>Raggi da <code>CAMERA_RADIUS</code> (<code>IO/catalog.py:54</code>). La tabella O è copiata "byte for byte INCLUDING their inconsistencies" (<code>IO/render.py:8-12</code>): quattro dei cinque vettori di ciascuna arcata (tutti tranne l'asse) sono divisi per la norma di un altro vettore, quindi non hanno lunghezza unitaria (0.913, 0.913, 0.791, 0.791; il file stesso dice &ldquo;several&rdquo;), mantenuti perché i pesi distribuiti sono stati addestrati su queste viste. Quelle quattro <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">camere</a> si trovano a 0.913 o 0.791 volte il raggio dal dente. Per ogni direzione, <code>render_views</code> (<code>:366-414</code>) colloca la camera in <code>centre + direction × radius</code>, esegue il rendering <strong>una volta</strong> con i suoi <code>R</code> e <code>T</code>, e conserva sia l'immagine (RGB delle normali più profondità, 4 canali) sia il <code>pix_to_face</code> della stessa rasterizzazione. Il frame MG (<code>mg_frame</code>, <code>:211-250</code>) usa la tangente dell'arcata ricavata dai denti vicini e un punto di mira spostato di <code>MG_AIM_OFFSET</code> (<code>IO/catalog.py:96</code>).</p>
+      <p>Raggi da <code>CAMERA_RADIUS</code> (<code>IO/catalog.py:54</code>). La tabella O è copiata "byte for byte INCLUDING their inconsistencies" (<code>IO/render.py:8-12</code>): quattro dei cinque vettori di ciascuna arcata (tutti tranne l'asse) sono divisi per la norma di un altro vettore, quindi non hanno lunghezza unitaria (0.913, 0.913, 0.791, 0.791; il file stesso dice &ldquo;several&rdquo;), mantenuti perché i pesi distribuiti sono stati addestrati su queste viste. Quelle quattro <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="Vedi la spiegazione">camere</a> si trovano a 0.913 o 0.791 volte il raggio dal dente. Per ogni direzione, <code>render_views</code> (<code>:366-414</code>) colloca la camera in <code>centre + direction × radius</code>, esegue il rendering <strong>una volta</strong> con i suoi <code>R</code> e <code>T</code>, e conserva sia l'immagine (RGB delle normali più profondità, 4 canali) sia il <code>pix_to_face</code> della stessa rasterizzazione. Il frame MG (<code>mg_frame</code>, <code>:211-250</code>) usa la tangente dell'arcata ricavata dai denti vicini e un punto di mira spostato di <code>MG_AIM_OFFSET</code> (<code>IO/catalog.py:96</code>).</p>
 
       <h3 id="ios-network">4.4 La rete e la decodifica</h3>
 
@@ -624,7 +624,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
 
       <p class="code-back">Spiegazione in linguaggio semplice e matematica: <a href="ALI.html#visor-args">pagina atlante</a>.</p>
 
-      <p>Firme: <code>CB/__init__.py:62-104</code> e <code>IO/__init__.py:64-120</code>. "Hidden" significa che l'argomento esiste nello schema pubblicato ma il pannello non lo disegna; la <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">facade</a> conserva la descrizione del primo target per un argomento condiviso dai due strumenti, quindi <code>input</code> mantiene la dicitura CBCT ("Scan or Folder") anche in modalità IOS (VISOR-serve <code>registry/facade.py:146-147</code>, per lettura).</p>
+      <p>Firme: <code>CB/__init__.py:62-104</code> e <code>IO/__init__.py:64-120</code>. "Hidden" significa che l'argomento esiste nello schema pubblicato ma il pannello non lo disegna; la <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="Vedi la spiegazione">facade</a> conserva la descrizione del primo target per un argomento condiviso dai due strumenti, quindi <code>input</code> mantiene la dicitura CBCT ("Scan or Folder") anche in modalità IOS (VISOR-serve <code>registry/facade.py:146-147</code>, per lettura).</p>
 
       <div class="table-wrap">
         <table>
@@ -650,7 +650,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
         <div class="io-card">
           <h3>Ingressi</h3>
           <ul>
-            <li>CBCT: <code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>, una cartella (ricorsiva) o una cartella di serie <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a> (convertita dal server, <code>CB/dispatch.py:60-77</code>, <code>:139-166</code>); <code>.zip</code> viene prima decompresso dal server</li>
+            <li>CBCT: <code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>, una cartella (ricorsiva) o una cartella di serie <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="Vedi la spiegazione">DICOM</a> (convertita dal server, <code>CB/dispatch.py:60-77</code>, <code>:139-166</code>); <code>.zip</code> viene prima decompresso dal server</li>
             <li>IOS: <code>.vtk</code> e <code>.stl</code> (il legacy accettava anche <code>.vtp .obj .off</code>, <code>ALI_IOS.py:120</code>); etichette dei denti in <code>PredictedID</code>, <code>UniversalID</code> o <code>Universal_ID</code> (<code>IO/surface.py:19</code>)</li>
             <li>Una cartella che mescola volumi e superfici viene rifiutata esplicitamente</li>
           </ul>
@@ -677,13 +677,13 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
         <table>
           <thead><tr><th>Blocco</th><th>Natura</th><th>Dove</th></tr></thead>
           <tbody>
-            <tr><td>Rilevamento dell'input, conversione <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a></td><td><span class="badge calcule">calcolato</span> GDCM, SimpleITK</td><td><code>CB/dispatch.py</code></td></tr>
+            <tr><td>Rilevamento dell'input, conversione <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="Vedi la spiegazione">DICOM</a></td><td><span class="badge calcule">calcolato</span> GDCM, SimpleITK</td><td><code>CB/dispatch.py</code></td></tr>
             <tr><td>Taglio dell'istogramma, ricampionamento</td><td><span class="badge calcule">calcolato</span> SimpleITK, itk</td><td><code>CB/preprocess.py</code></td></tr>
             <tr><td>Direzione di movimento dell'agente</td><td><span class="badge predit">predetto</span> DenseNet3D + MLP, 6 classi</td><td><code>CB/brain.py</code></td></tr>
             <tr><td>Convergenza, cambio di scala, <code>Focus</code>, respawn</td><td><span class="badge calcule">calcolato</span> memoria di 10 posizioni, media, generatore con seed</td><td><code>CB/agent.py</code></td></tr>
             <tr><td>Da voxel a millimetri</td><td><span class="badge calcule">calcolato</span> <code>abs(origin / spacing)</code></td><td><code>CB/environment.py</code></td></tr>
             <tr><td>Segmentazione delle corone (mesh senza etichette)</td><td><span class="badge predit">predetto</span> da un altro strumento, <code>Crown_Seg</code></td><td><code>IO/dispatch.py</code> → <a href="../Crown_Seg/Crown_Seg.html">Crown_Seg</a></td></tr>
-            <tr><td><a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="See the explanation">Sfera unitaria</a>, posizionamento delle <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">camere</a>, frame MG, fit dell'arcata</td><td><span class="badge calcule">calcolato</span> geometria, prior <code>MG_AIM_OFFSET</code></td><td><code>IO/surface.py</code>, <code>IO/render.py</code></td></tr>
+            <tr><td><a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="Vedi la spiegazione">Sfera unitaria</a>, posizionamento delle <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="Vedi la spiegazione">camere</a>, frame MG, fit dell'arcata</td><td><span class="badge calcule">calcolato</span> geometria, prior <code>MG_AIM_OFFSET</code></td><td><code>IO/surface.py</code>, <code>IO/render.py</code></td></tr>
             <tr><td>Mappa delle classi per pixel</td><td><span class="badge predit">predetto</span> UNet 2D di monai</td><td><code>IO/engine.py</code></td></tr>
             <tr><td>Pixel → faccia → centroide → aggancio</td><td><span class="badge calcule">calcolato</span> <code>pix_to_face</code>, locator a octree</td><td><code>IO/engine.py</code></td></tr>
             <tr><td>Punto MG forzato</td><td><span class="badge calcule">calcolato</span> primi 50 delle probabilità predette</td><td><code>IO/engine.py</code></td></tr>
@@ -754,7 +754,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
       <p class="code-back">Spiegazione in linguaggio semplice e matematica: <a href="ALI.html#visor-findings">pagina atlante</a>.</p>
 
       <div id="f-dicom-key" class="callout bug">
-        <div class="callout-title">Bug confermato · una cartella di serie <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a> produce un file di output nascosto</div>
+        <div class="callout-title">Bug confermato · una cartella di serie <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="Vedi la spiegazione">DICOM</a> produce un file di output nascosto</div>
         <p>Selezionando come input la cartella di <strong>una</strong> serie DICOM (il caso che il pannello invita a fare), la chiave della scansione diventa <code>"."</code>: <code>_dicom_directories</code> include la radice stessa (<code>CB/dispatch.py:70-77</code>), <code>scan_key</code> è <code>os.path.relpath(root, root)</code> (<code>CM/discovery.py:43</code>), il file convertito si chiama <code>..nii.gz</code> (<code>CB/dispatch.py:156</code>, <code>:164</code>) e <code>scan_stem("..nii.gz")</code> è <code>"."</code> (<code>CB/engine.py:152-158</code>). L'output è <code>._lm_Pred.mrk.json</code>, un file nascosto. Eseguito per questa pagina: <code>scan_key</code> e <code>scan_stem</code> restituiscono esattamente questi valori. Un'esecuzione completa su una serie reale non è stata ripetuta qui. Gli strumenti a valle che abbinano i file per prefisso del nome non accoppieranno un file simile a una scansione.</p>
       </div>
 
@@ -770,7 +770,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
 
       <div id="f-panel-summary" class="callout bug">
         <div class="callout-title">Bug confermato · il pannello di Slicer riporta "0 scan(s), 0 landmark(s) written"</div>
-        <p><code>ALIRemote._summarize</code> legge <code>report.get("scans")</code> (Remote <code>ALIRemote/ALIRemote.py:216</code>), ma entrambi i motori scrivono i record per scansione sotto <code>cases</code> (<code>CB/engine.py:708</code>, <code>IO/engine.py:704</code>). Nulla in mezzo rinomina la chiave (l'unione dei report in <code>ServerToolsCore/ServerToolsCoreLib/base_widget.py:119</code> è generica). Il messaggio di fine esecuzione dice quindi sempre nessuna scansione e nessun landmark, e non elenca mai i landmark che non sono convergiti (<code>ALIRemote.py:216-232</code>). Eseguito per questa pagina: <code>_summarize</code>, estratto dal modulo e alimentato con un report con un caso che contiene due landmark trovati e uno fallito, stampa "0 scan(s), 0 landmark(s) written." e nessun fallimento. I file dei risultati si caricano invece correttamente (<code>_findMarkupFiles</code> percorre la cartella). Due residui collegati: <code>configureFields</code> cerca un campo <code>prediction_ID</code> che la <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">facade</a> non pubblica più (<code>ALIRemote.py:129</code>), e la fixture dei test del client dichiara ancora <code>cbct_regions</code> e <code>prediction_ID</code> e nessun <code>mode</code> (<code>ALIRemote/Testing/Python/test_ali_client.py:101</code>, <code>:409</code>).</p>
+        <p><code>ALIRemote._summarize</code> legge <code>report.get("scans")</code> (Remote <code>ALIRemote/ALIRemote.py:216</code>), ma entrambi i motori scrivono i record per scansione sotto <code>cases</code> (<code>CB/engine.py:708</code>, <code>IO/engine.py:704</code>). Nulla in mezzo rinomina la chiave (l'unione dei report in <code>ServerToolsCore/ServerToolsCoreLib/base_widget.py:119</code> è generica). Il messaggio di fine esecuzione dice quindi sempre nessuna scansione e nessun landmark, e non elenca mai i landmark che non sono convergiti (<code>ALIRemote.py:216-232</code>). Eseguito per questa pagina: <code>_summarize</code>, estratto dal modulo e alimentato con un report con un caso che contiene due landmark trovati e uno fallito, stampa "0 scan(s), 0 landmark(s) written." e nessun fallimento. I file dei risultati si caricano invece correttamente (<code>_findMarkupFiles</code> percorre la cartella). Due residui collegati: <code>configureFields</code> cerca un campo <code>prediction_ID</code> che la <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="Vedi la spiegazione">facade</a> non pubblica più (<code>ALIRemote.py:129</code>), e la fixture dei test del client dichiara ancora <code>cbct_regions</code> e <code>prediction_ID</code> e nessun <code>mode</code> (<code>ALIRemote/Testing/Python/test_ali_client.py:101</code>, <code>:409</code>).</p>
       </div>
 
       <div id="f-mg-stack" class="callout warn">
@@ -785,7 +785,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
 
       <div id="f-description" class="callout note">
         <div class="callout-title">Nota · solo i punti Mucogingival portano una description</div>
-        <p>I punti O e C, e ogni punto di ALI_CBCT, hanno una <code>description</code> vuota qualunque sia la loro qualità: le note sono compilate solo dal percorso MG (<code>IO/engine.py:567-575</code>, scritte da <code>:426</code>) e ALI_CBCT non ne passa alcuna (<code>CB/engine.py:921</code>). Il campo <code>landmarks_degraded</code> del <a class="gterm" data-term="ali-run-report" href="ALI.html#cbct-output" title="See the explanation">report di esecuzione</a> (<code>IO/engine.py:414-419</code>) è l'altro posto in cui viene registrato un dubbio su MG.</p>
+        <p>I punti O e C, e ogni punto di ALI_CBCT, hanno una <code>description</code> vuota qualunque sia la loro qualità: le note sono compilate solo dal percorso MG (<code>IO/engine.py:567-575</code>, scritte da <code>:426</code>) e ALI_CBCT non ne passa alcuna (<code>CB/engine.py:921</code>). Il campo <code>landmarks_degraded</code> del <a class="gterm" data-term="ali-run-report" href="ALI.html#cbct-output" title="Vedi la spiegazione">report di esecuzione</a> (<code>IO/engine.py:414-419</code>) è l'altro posto in cui viene registrato un dubbio su MG.</p>
       </div>
 
       <div id="f-ios-report-noise" class="callout note">
@@ -799,7 +799,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
       </div>
 
       <div id="f-o-table" class="callout ok">
-        <div class="callout-title">Verificato · la tabella delle <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">camere</a> O è riprodotta di proposito</div>
+        <div class="callout-title">Verificato · la tabella delle <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="Vedi la spiegazione">camere</a> O è riprodotta di proposito</div>
         <p>Due direzioni O sono divise per la norma di un vettore diverso (<code>np.array([0.5, 0.0, 1.0]) / _norm([0.5, 0.5, 1.0])</code>), quindi hanno lunghezza 0.913 o 0.791 invece di 1 (calcolato: 1.118/1.2247 e 1.118/1.414). Il port le mantiene di proposito, perché i pesi sono stati addestrati su queste viste (<code>IO/render.py:8-12</code>, tabella <code>:39-54</code>; legacy <code>ALI_IOS_utils/model.py:66-77</code>).</p>
       </div>
 
@@ -810,7 +810,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
 
       <h2 id="visor-literature">10. Letteratura</h2>
 
-      <p>Le reti sono quelle pubblicate: ALI_CBCT segue Gillot et al. 2023 (agenti su un volume multi-scala, scale 1&nbsp;mm e 0.3&nbsp;mm, <code>CB/catalog.py:69</code>), ALI_IOS l'articolo CLIP 2022 per il modello O (<a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="See the explanation">sfera unitaria</a>, cinque viste per dente, segmentazione a patch, <code>IO/surface.py:72</code>, <code>IO/render.py:39-54</code>). Il percorso Mucogingival non è pubblicato, come sul lato legacy. La bibliografia è quella dello strumento stesso: <a href="../../ALI/SOURCES.html">fonti di ALI</a>; la pagina legacy discute ciascun articolo rispetto al codice nella <a href="../../ALI/ALI.html#litterature">sua sezione 8</a>.</p>
+      <p>Le reti sono quelle pubblicate: ALI_CBCT segue Gillot et al. 2023 (agenti su un volume multi-scala, scale 1&nbsp;mm e 0.3&nbsp;mm, <code>CB/catalog.py:69</code>), ALI_IOS l'articolo CLIP 2022 per il modello O (<a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="Vedi la spiegazione">sfera unitaria</a>, cinque viste per dente, segmentazione a patch, <code>IO/surface.py:72</code>, <code>IO/render.py:39-54</code>). Il percorso Mucogingival non è pubblicato, come sul lato legacy. La bibliografia è quella dello strumento stesso: <a href="../../ALI/SOURCES.html">fonti di ALI</a>; la pagina legacy discute ciascun articolo rispetto al codice nella <a href="../../ALI/ALI.html#litterature">sua sezione 8</a>.</p>
 
       <footer class="footer">
         <a href="../../index.html">← Tutte le pagine</a> · <a href="ALI.html">Pagina atlante (spiegazione)</a> · <a href="../../ALI/ALI.html">Pagina legacy di questo strumento</a> · <a href="../guide/ALI.html">Guida con VISOR</a> · <a href="../index.html">Panoramica di VISOR</a>

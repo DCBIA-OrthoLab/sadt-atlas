@@ -123,21 +123,21 @@
         <img class="tool-icon" src="../../assets/screens/AMASSS/icon.png" alt="" width="160" height="160">
         <div class="breadcrumb"><a href="../index.html">SADT Atlas</a> › Segmentação</div>
         <h1>AMASSS</h1>
-        <p class="lede">O AMASSS recorta uma tomografia da cabeça em estruturas anatômicas, com uma rede por estrutura, um <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> de cada vez. Esta página explica como se desenrola uma execução no módulo Slicer legacy, passo a passo, com a matemática das partes que são cálculo e não aprendizado: como o exame é normalizado, como os patches da rede são combinados, como as máscaras são fundidas e as superfícies construídas. Quando o código faz algo que vale a pena verificar, um link leva à <a href="AMASSS.code.html">página do código</a>.</p>
+        <p class="lede">O AMASSS recorta uma tomografia da cabeça em estruturas anatômicas, com uma rede por estrutura, um <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="Ver o glossário">voxel</a> de cada vez. Esta página explica como se desenrola uma execução no módulo Slicer legacy, passo a passo, com a matemática das partes que são cálculo e não aprendizado: como o exame é normalizado, como os patches da rede são combinados, como as máscaras são fundidas e as superfícies construídas. Quando o código faz algo que vale a pena verificar, um link leva à <a href="AMASSS.code.html">página do código</a>.</p>
         <div class="meta-row">
-          <a class="badge neutral" href="AMASSS.code.html">Código (desenvolvedores)</a> <a class="badge paper" href="https://doi.org/10.1371/journal.pone.0275033" target="_blank" rel="noopener" title="The paper describes a MONAI UNETR; the code runs nnU-Net v2.">Gillot 2022 · PLOS ONE</a> <span class="badge cli">AMASSS_CLI</span> <span class="badge neutral">Python do Slicer, sem conda</span> <a class="badge neutral" href="../visor/AMASSS/AMASSS.html">VISOR</a> <a class="badge neutral" href="SOURCES.html">Bibliografia</a>
+          <a class="badge neutral" href="AMASSS.code.html">Código (desenvolvedores)</a> <a class="badge paper" href="https://doi.org/10.1371/journal.pone.0275033" target="_blank" rel="noopener" title="O artigo descreve um MONAI UNETR; o código executa nnU-Net v2.">Gillot 2022 · PLOS ONE</a> <span class="badge cli">AMASSS_CLI</span> <span class="badge neutral">Python do Slicer, sem conda</span> <a class="badge neutral" href="../visor/AMASSS/AMASSS.html">VISOR</a> <a class="badge neutral" href="SOURCES.html">Bibliografia</a>
         </div>
       </header>
 
       <h2 id="apercu">Visão geral: o que entra, o que sai</h2>
 
-      <p>O AMASSS recebe uma tomografia 3D da cabeça (<a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>) e a recorta em estruturas anatômicas: mandíbula, maxila, base do crânio, via aérea superior, vértebras cervicais, pele e três máscaras de registro. Usa uma rede por estrutura: cada rede responde a uma pergunta para cada <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a>, &ldquo;este voxel faz parte da minha estrutura?&rdquo;. O módulo é um widget do Slicer que inicia um programa de linha de comando no próprio Python do Slicer.</p>
+      <p>O AMASSS recebe uma tomografia 3D da cabeça (<a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="Ver o glossário">CBCT</a>) e a recorta em estruturas anatômicas: mandíbula, maxila, base do crânio, via aérea superior, vértebras cervicais, pele e três máscaras de registro. Usa uma rede por estrutura: cada rede responde a uma pergunta para cada <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="Ver o glossário">voxel</a>, &ldquo;este voxel faz parte da minha estrutura?&rdquo;. O módulo é um widget do Slicer que inicia um programa de linha de comando no próprio Python do Slicer.</p>
 
       <div class="table-wrap">
         <table>
           <thead><tr><th>Entrada</th><th>O que acontece</th><th>Saída</th></tr></thead>
           <tbody>
-            <tr><td>um exame (<code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>...) ou uma pasta deles, e as estruturas desejadas</td><td>cada exame é convertido, cada estrutura é prevista pela sua própria rede, uma estrutura após a outra, e as máscaras são montadas</td><td>uma máscara binária por estrutura e/ou um <a class="gterm" data-term="amasss-l-merge" href="AMASSS.code.html#coeur" title="See the code">mapa de rótulos fundido</a> por exame, superfícies 3D opcionais (<code>.vtk</code>)</td></tr>
+            <tr><td>um exame (<code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>...) ou uma pasta deles, e as estruturas desejadas</td><td>cada exame é convertido, cada estrutura é prevista pela sua própria rede, uma estrutura após a outra, e as máscaras são montadas</td><td>uma máscara binária por estrutura e/ou um <a class="gterm" data-term="amasss-l-merge" href="AMASSS.code.html#coeur" title="Ver o código">mapa de rótulos fundido</a> por exame, superfícies 3D opcionais (<code>.vtk</code>)</td></tr>
           </tbody>
         </table>
       </div>
@@ -146,7 +146,7 @@
 
       <h2 id="situation">1. Onde ele fica na cadeia</h2>
 
-      <p>O AMASSS é ao mesmo tempo um módulo em si e uma peça de construção: o <strong>AREG_CBCT</strong> o usa duas vezes, primeiro para as máscaras de registro (um arquivo por estrutura) e depois para as segmentações entregues, o <strong>VFACE</strong> o usa em sua cadeia de análise de assimetria, e o <strong>MRI2CBCT</strong> o usa uma vez, para a base do crânio da <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a>. Todos executam o mesmo programa de linha de comando. O AMASSS não chama nenhum outro módulo. Além do <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> (importado apenas quando necessário), o programa importa torch, SimpleITK, VTK, cc3d, NumPy e a biblioteca auxiliar compartilhada do ADT.</p>
+      <p>O AMASSS é ao mesmo tempo um módulo em si e uma peça de construção: o <strong>AREG_CBCT</strong> o usa duas vezes, primeiro para as máscaras de registro (um arquivo por estrutura) e depois para as segmentações entregues, o <strong>VFACE</strong> o usa em sua cadeia de análise de assimetria, e o <strong>MRI2CBCT</strong> o usa uma vez, para a base do crânio da <a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="Ver o glossário">CBCT</a>. Todos executam o mesmo programa de linha de comando. O AMASSS não chama nenhum outro módulo. Além do <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a> (importado apenas quando necessário), o programa importa torch, SimpleITK, VTK, cc3d, NumPy e a biblioteca auxiliar compartilhada do ADT.</p>
 
       <p>Uma distinção importante para o AREG: as três estruturas de máscara (<code>CBMASK</code>, <code>MANDMASK</code>, <code>MAXMASK</code>) não são um pós-processamento da base do crânio, da mandíbula e da maxila. São modelos treinados separadamente, com resolução diferente (0,3 mm em vez de 0,4 mm) e com conjunto de treino de tamanho diferente (50 contra 76 nas descrições dos modelos).</p>
 
@@ -179,7 +179,7 @@
           <text class="d-label-s" x="470" y="88" text-anchor="middle">normalização + reamostragem</text>
           <text class="d-label-s" x="470" y="104" text-anchor="middle">1 rede binária / estrutura</text>
           <text class="d-label-s" x="470" y="120" text-anchor="middle">janela deslizante, passo 0.5</text>
-          <text class="d-label-s" x="470" y="136" text-anchor="middle">gaussiana, sem TTA por espelhamento</text>
+          <text class="d-label-s" x="470" y="136" text-anchor="middle">gaussiana, sem TTA espelhado</text>
           <text class="d-label-s" x="470" y="152" text-anchor="middle">reamostragem da saída</text>
           </a>
 
@@ -190,7 +190,7 @@
           <a class="d-link" href="#coeur">
           <rect class="d-box" x="605" y="78" width="150" height="44" rx="6"/>
           <text class="d-label" x="680" y="96" text-anchor="middle">Montagem + fusão</text>
-          <text class="d-label-s" x="680" y="110" text-anchor="middle">máscaras binárias, rótulos, superfícies</text>
+          <text class="d-label-s" x="680" y="110" text-anchor="middle">másc. bin., rótulos, superf.</text>
           </a>
         </svg>
         <figcaption>Entrada CBCT, depois conversão, depois inferência do nnU-Net (uma estrutura é uma rede binária), depois montagem e saídas. Tudo roda no Python do Slicer, sem conda.</figcaption>
@@ -212,7 +212,7 @@
 
       <h3>3.2 Conversão</h3>
 
-      <p>Cada exame é copiado para uma pasta com um nome numerado (<code>p_001</code>, <code>p_002</code>...), na ordem de descoberta. Um <code>.nii.gz</code> é copiado como está; todo o resto é relido e regravado, porque o <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> escolhe seu leitor pela extensão do arquivo. O tipo do <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxel</a> é deixado como está, já que o nnU-Net converte para float por conta própria.</p>
+      <p>Cada exame é copiado para uma pasta com um nome numerado (<code>p_001</code>, <code>p_002</code>...), na ordem de descoberta. Um <code>.nii.gz</code> é copiado como está; todo o resto é relido e regravado, porque o <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a> escolhe seu leitor pela extensão do arquivo. O tipo do <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="Ver o glossário">voxel</a> é deixado como está, já que o nnU-Net converte para float por conta própria.</p>
 
       <h3>3.3 O que o AMASSS não faz mais</h3>
 
@@ -229,13 +229,13 @@
 
       <h3>4.1 O bundle e sua descoberta</h3>
 
-      <p>Para cada estrutura pedida, o programa procura, dentro da pasta de modelos, uma pasta de modelo com um <a class="gterm" data-term="checkpoint" href="../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> treinado de um único fold. Uma estrutura sem checkpoint é declarada indisponível e a execução segue com as outras. O botão &ldquo;Download latest models&rdquo; baixa o arquivo (cerca de 2 GB) uma única vez; o mesmo arquivo é o que o AREG e o VFACE baixam automaticamente.</p>
+      <p>Para cada estrutura pedida, o programa procura, dentro da pasta de modelos, uma pasta de modelo com um <a class="gterm" data-term="checkpoint" href="../glossary.html#g-checkpoint" title="Ver o glossário">checkpoint</a> treinado de um único fold. Uma estrutura sem checkpoint é declarada indisponível e a execução segue com as outras. O botão &ldquo;Download latest models&rdquo; baixa o arquivo (cerca de 2 GB) uma única vez; o mesmo arquivo é o que o AREG e o VFACE baixam automaticamente.</p>
 
       <h3>4.2 O que o bundle contém de fato</h3>
 
-      <p>Nove pastas, uma por estrutura, cada uma com um único fold treinado. Dividem-se em duas famílias: modelos de campo inteiro (mandíbula, maxila, base do crânio, vértebra cervical, via aérea superior, pele) a 0,4 mm isotrópico com patches de 128 voxels, e as três máscaras de registro a 0,3 mm com um patch diferente, não cúbico (112 &times; 160 &times; 128 <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxels</a>). As nove compartilham uma só arquitetura: uma U-Net 3D puramente convolucional configurada pelo <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>, com seis estágios e sem blocos residuais.</p>
+      <p>Nove pastas, uma por estrutura, cada uma com um único fold treinado. Dividem-se em duas famílias: modelos de campo inteiro (mandíbula, maxila, base do crânio, vértebra cervical, via aérea superior, pele) a 0,4 mm isotrópico com patches de 128 voxels, e as três máscaras de registro a 0,3 mm com um patch diferente, não cúbico (112 &times; 160 &times; 128 <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="Ver o glossário">voxels</a>). As nove compartilham uma só arquitetura: uma U-Net 3D puramente convolucional configurada pelo <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a>, com seis estágios e sem blocos residuais.</p>
 
-      <p>Cada modelo é binário: conhece apenas o fundo e uma estrutura. O valor final de uma estrutura em um <a class="gterm" data-term="amasss-l-merge" href="AMASSS.code.html#coeur" title="See the code">volume fundido</a> é atribuído pelo programa, não pelo modelo.</p>
+      <p>Cada modelo é binário: conhece apenas o fundo e uma estrutura. O valor final de uma estrutura em um <a class="gterm" data-term="amasss-l-merge" href="AMASSS.code.html#coeur" title="Ver o código">volume fundido</a> é atribuído pelo programa, não pelo modelo.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 720 210" role="img" aria-label="Descoberta do bundle de modelos e inferência por estrutura">
@@ -272,7 +272,7 @@
           <rect class="d-box" x="470" y="95" width="160" height="90" rx="6"/>
           <text class="d-label" x="550" y="118" text-anchor="middle">Laço por</text>
           <text class="d-label" x="550" y="134" text-anchor="middle">estrutura</text>
-          <text class="d-label-s" x="550" y="152" text-anchor="middle">uma passagem por todos os exames</text>
+          <text class="d-label-s" x="550" y="152" text-anchor="middle">uma passada por todos exames</text>
           <text class="d-label-s" x="550" y="166" text-anchor="middle">modelo carregado S vezes</text>
           </a>
         </svg>
@@ -303,7 +303,7 @@
       <figure class="viewer3d" data-amasss-3d>
         <div class="v3d-stage">
           <button class="v3d-reset" type="button">Redefinir a vista</button>
-          <span class="v3d-state"><a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="See glossary">CBCT</a> bruta: apenas limiar</span> <span class="v3d-hint">Arraste para girar &middot; role para aproximar &middot; clique em uma estrutura</span>
+          <span class="v3d-state"><a class="gterm" data-term="cbct" href="../glossary.html#g-cbct" title="Ver o glossário">CBCT</a> bruta: apenas limiar</span> <span class="v3d-hint">Arraste para girar &middot; role para aproximar &middot; clique em uma estrutura</span>
         </div>
         <ol class="v3d-parts">
           <li data-part="MAND" style="--sw:#d8654f" tabindex="0">
@@ -334,7 +334,7 @@
 
       <h3>4.4 Inferência</h3>
 
-      <p>O programa não escreve uma <a class="gterm" data-term="amasss-l-window" href="AMASSS.code.html#modeles" title="See the code">janela deslizante</a> própria: o nnU-Net cuida dela a partir do tamanho de patch do plano de cada modelo. Os únicos parâmetros que o programa escolhe são um passo de 0,5 (o passo é no máximo metade de um patch, de modo que os patches se sobrepõem em pelo menos metade), ponderação gaussiana ativada e espelhamento no momento do teste desativado.</p>
+      <p>O programa não escreve uma <a class="gterm" data-term="amasss-l-window" href="AMASSS.code.html#modeles" title="Ver o código">janela deslizante</a> própria: o nnU-Net cuida dela a partir do tamanho de patch do plano de cada modelo. Os únicos parâmetros que o programa escolhe são um passo de 0,5 (o passo é no máximo metade de um patch, de modo que os patches se sobrepõem em pelo menos metade), ponderação gaussiana ativada e espelhamento no momento do teste desativado.</p>
 
       <figure class="algo" data-scene="amasss_window" data-ms="6200">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animação: três janelas sobrepostas deslizam ao longo de um exame, cada uma com um peso em forma de sino; os pesos somam um total irregular, que a divisão uniformiza"></svg><div class="algo-ctl"><button class="algo-play" type="button">Repetir</button></div></div>
@@ -358,14 +358,14 @@
 
       <figure class="algo" data-scene="amasss_interp" data-ms="5600">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animação: uma curva suave por seis amostras é substituída por segmentos retos entre as mesmas amostras"></svg><div class="algo-ctl"><button class="algo-play" type="button">Repetir</button></div></div>
-        <div class="algo-body"><p class="algo-lead">Na placa gráfica, o exame de entrada é reamostrado com interpolação <strong>linear</strong>: cada nova amostra é uma média ponderada de suas vizinhas (duas ao longo de uma linha, oito em 3D). O reamostrador do próprio <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> usa um spline cúbico, então os valores diferem um pouco: a curva cúbica passa pelas mesmas amostras, mas se curva entre elas.</p><p class="algo-tag">Ilustração: seis amostras inventadas. A curva suave é uma interpolação cúbica genérica, não o spline exato do nnU-Net (um spline de ordem 3), que também passa pelas amostras.</p><div class="formula"><math display="block"><mrow><mi class="k1">v</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" fence="true">(</mo><mn>1</mn><mo>&#x2212;</mo><mi class="k3">u</mi><mo stretchy="true" fence="true">)</mo></mrow><msub><mi class="k4">v</mi><mi class="k5">j</mi></msub><mo>+</mo><mi class="k3">u</mi><msub><mi class="k4">v</mi><mrow><mi class="k5">j</mi><mo>+</mo><mn>1</mn></mrow></msub></mrow></math></div><div class="formula"><math display="block"><mrow><mi class="k3">u</mi><mo>=</mo><mi class="k2">x</mi><mo>&#x2212;</mo><mi class="k5">j</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>v(x)</b>o valor interpolado na posição x</li><li class="k2"><b>x</b>uma posição entre duas amostras</li><li class="k3"><b>u</b>a que distância x está da amostra anterior</li><li class="k4"><b>v<sub>j</sub></b>o valor da amostra j</li><li class="k5"><b>j</b>a amostra imediatamente anterior a x</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">Na placa gráfica, o exame de entrada é reamostrado com interpolação <strong>linear</strong>: cada nova amostra é uma média ponderada de suas vizinhas (duas ao longo de uma linha, oito em 3D). O reamostrador do próprio <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a> usa um spline cúbico, então os valores diferem um pouco: a curva cúbica passa pelas mesmas amostras, mas se curva entre elas.</p><p class="algo-tag">Ilustração: seis amostras inventadas. A curva suave é uma interpolação cúbica genérica, não o spline exato do nnU-Net (um spline de ordem 3), que também passa pelas amostras.</p><div class="formula"><math display="block"><mrow><mi class="k1">v</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" fence="true">(</mo><mn>1</mn><mo>&#x2212;</mo><mi class="k3">u</mi><mo stretchy="true" fence="true">)</mo></mrow><msub><mi class="k4">v</mi><mi class="k5">j</mi></msub><mo>+</mo><mi class="k3">u</mi><msub><mi class="k4">v</mi><mrow><mi class="k5">j</mi><mo>+</mo><mn>1</mn></mrow></msub></mrow></math></div><div class="formula"><math display="block"><mrow><mi class="k3">u</mi><mo>=</mo><mi class="k2">x</mi><mo>&#x2212;</mo><mi class="k5">j</mi></mrow></math></div><ul class="algo-legend"><li class="k1"><b>v(x)</b>o valor interpolado na posição x</li><li class="k2"><b>x</b>uma posição entre duas amostras</li><li class="k3"><b>u</b>a que distância x está da amostra anterior</li><li class="k4"><b>v<sub>j</sub></b>o valor da amostra j</li><li class="k5"><b>j</b>a amostra imediatamente anterior a x</li></ul></div>
       </figure>
 
       <a class="deep-link" href="AMASSS.code.html#coeur"><b>No código</b><span>A substituição do reamostrador, suas salvaguardas e o recurso de memória</span></a>
 
       <h3>5.2 Montagem e gravação</h3>
 
-      <p>Para cada exame, a previsão de cada estrutura é relida e transformada em uma máscara binária (qualquer valor acima de zero). Depois as máscaras são gravadas uma por estrutura, fundidas, ou ambos. Um <a class="gterm" data-term="amasss-l-merge" href="AMASSS.code.html#coeur" title="See the code">mapa fundido</a> exige pelo menos duas estruturas. A ordem é uma ordem de prioridade: a última estrutura gravada sobrescreve as anteriores nos <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="See glossary">voxels</a> compartilhados. A lista inclui dois códigos que não correspondem a nada, <code>CAN</code> (não existe em nenhum dicionário) e <code>RC</code> (canal radicular: sem modelo e sem rótulo na tabela, então cairia no rótulo da mandíbula); ambos são entradas mortas.</p>
+      <p>Para cada exame, a previsão de cada estrutura é relida e transformada em uma máscara binária (qualquer valor acima de zero). Depois as máscaras são gravadas uma por estrutura, fundidas, ou ambos. Um <a class="gterm" data-term="amasss-l-merge" href="AMASSS.code.html#coeur" title="Ver o código">mapa fundido</a> exige pelo menos duas estruturas. A ordem é uma ordem de prioridade: a última estrutura gravada sobrescreve as anteriores nos <a class="gterm" data-term="voxel" href="../glossary.html#g-voxel" title="Ver o glossário">voxels</a> compartilhados. A lista inclui dois códigos que não correspondem a nada, <code>CAN</code> (não existe em nenhum dicionário) e <code>RC</code> (canal radicular: sem modelo e sem rótulo na tabela, então cairia no rótulo da mandíbula); ambos são entradas mortas.</p>
 
       <figure class="algo" data-scene="amasss_merge" data-ms="6400">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animação: três máscaras binárias são pintadas uma após a outra na mesma grade; a última pintada vence onde se sobrepõem"></svg><div class="algo-ctl"><button class="algo-play" type="button">Repetir</button></div></div>
@@ -414,7 +414,7 @@
           <text class="d-label" x="485" y="105" text-anchor="middle">MERGE</text>
           <text class="d-label-s" x="485" y="120" text-anchor="middle">pintar com seu rótulo</text>
           <text class="d-label-s" x="485" y="134" text-anchor="middle">ordem = prioridade</text>
-          <text class="d-label-s" x="485" y="148" text-anchor="middle">a última sobrescreve o resto</text>
+          <text class="d-label-s" x="485" y="148" text-anchor="middle">a última vence o resto</text>
           </a>
 
           <path class="d-arrow" d="M550 40 H595 M550 125 H595"/>
@@ -445,7 +445,7 @@
         <div class="algo-body"><p class="algo-lead">Uma superfície é construída a partir de cada máscara binária: o contorno da região onde a máscara vale 1 (o filtro recebe o valor único 1), depois suavizado por um número de iterações (5 por padrão: o widget tem um controle deslizante, e o AREG, o VFACE e o MRI2CBCT passam 5). Não há decimação, então os triângulos ficam tão numerosos quanto os voxels os fazem.</p><p class="algo-tag">Definição padrão de uma superfície de contorno; o código chama vtkDiscreteMarchingCubes com o valor 1 e depois um filtro de suavização. Ilustração: um contorno 2D inventado, desenhado antes e depois da suavização.</p><div class="formula"><math display="block"><mrow><mi class="k1">S</mi><mo>=</mo><mo>&#x2202;</mo><mo>{</mo><mi class="k2">x</mi><mo>:</mo><mi class="k3">m</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">x</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><mn>1</mn><mo>}</mo></mrow></math></div><ul class="algo-legend"><li class="k1"><b>S</b>a superfície: a fronteira da região onde m vale 1</li><li class="k2"><b>x</b>um ponto do exame</li><li class="k3"><b>m</b>a máscara binária (0 fora, 1 dentro)</li></ul></div>
       </figure>
 
-      <p>Dois modos: fundido, um arquivo com todos os rótulos anexados, e separado, um arquivo por estrutura. Cada célula recebe uma cor constante, a da estrutura. As malhas são gravadas nas coordenadas da própria imagem, sem inversão entre <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="See glossary">LPS</a> e <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="See glossary">RAS</a>.</p>
+      <p>Dois modos: fundido, um arquivo com todos os rótulos anexados, e separado, um arquivo por estrutura. Cada célula recebe uma cor constante, a da estrutura. As malhas são gravadas nas coordenadas da própria imagem, sem inversão entre <a class="gterm" data-term="lps" href="../glossary.html#g-lps" title="Ver o glossário">LPS</a> e <a class="gterm" data-term="ras" href="../glossary.html#g-ras" title="Ver o glossário">RAS</a>.</p>
 
       <a class="deep-link" href="AMASSS.code.html#coeur"><b>No código</b><span>A função de superfície, a suavização e os dois modos</span></a>
 
@@ -465,10 +465,10 @@
           <tbody>
             <tr><td>Pré-processamento (recorte, normalização, reamostragem)</td><td><span class="badge calcule">calculado</span> determinístico, conduzido pelo plano de cada modelo</td></tr>
             <tr><td>Segmentação de cada estrutura</td><td><span class="badge predit">predito</span> U-Net 3D, uma rede binária por estrutura</td></tr>
-            <tr><td><a class="gterm" data-term="amasss-l-window" href="AMASSS.code.html#modeles" title="See the code">Janela deslizante</a>, ponderação, passo 0,5</td><td><span class="badge calcule">calculado</span> determinístico</td></tr>
+            <tr><td><a class="gterm" data-term="amasss-l-window" href="AMASSS.code.html#modeles" title="Ver o código">Janela deslizante</a>, ponderação, passo 0,5</td><td><span class="badge calcule">calculado</span> determinístico</td></tr>
             <tr><td>Reamostragem da saída</td><td><span class="badge calcule">calculado</span> torch (GPU) ou o reamostrador mais lento</td></tr>
             <tr><td>Binarização, fusão de rótulos</td><td><span class="badge calcule">calculado</span> geometria trivial</td></tr>
-            <tr><td>Superfícies</td><td><span class="badge calcule">calculado</span> <a class="gterm" data-term="marching-cubes" href="../glossary.html#g-marching-cubes" title="See glossary">marching cubes</a> e suavização</td></tr>
+            <tr><td>Superfícies</td><td><span class="badge calcule">calculado</span> <a class="gterm" data-term="marching-cubes" href="../glossary.html#g-marching-cubes" title="Ver o glossário">marching cubes</a> e suavização</td></tr>
             <tr><td>Limpeza morfológica</td><td>removido do pipeline (código morto)</td></tr>
           </tbody>
         </table>
@@ -478,7 +478,7 @@
 
       <h2 id="environnement">8. Ambiente</h2>
 
-      <p>Tudo roda no Python do Slicer. As bibliotecas são instaladas quando você pressiona Predict, após uma confirmação. As versões são em sua maioria livres; o NumPy é fixado em 1.26.4, porque a build do torch usada aqui é compilada contra o NumPy 1.x e o NumPy 2 quebra sua importação. Sem WSL, sem conda: ao contrário dos módulos <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="See glossary">IOS</a> (FlexReg, AREG_IOS, ALI_IOS), o AMASSS não usa nenhum ambiente externo. A tabela de versões está na página do código.</p>
+      <p>Tudo roda no Python do Slicer. As bibliotecas são instaladas quando você pressiona Predict, após uma confirmação. As versões são em sua maioria livres; o NumPy é fixado em 1.26.4, porque a build do torch usada aqui é compilada contra o NumPy 1.x e o NumPy 2 quebra sua importação. Sem WSL, sem conda: ao contrário dos módulos <a class="gterm" data-term="ios" href="../glossary.html#g-ios" title="Ver o glossário">IOS</a> (FlexReg, AREG_IOS, ALI_IOS), o AMASSS não usa nenhum ambiente externo. A tabela de versões está na página do código.</p>
 
       <a class="deep-link" href="AMASSS.code.html#environnement"><b>No código</b><span>Bibliotecas fixadas e não fixadas, com o motivo de cada uma</span></a>
 
@@ -496,14 +496,14 @@
         <li><strong>O widget e o programa contam os exames de forma diferente</strong> (extensões, nomes ignorados). <a href="AMASSS.code.html#f-count-mismatch">Evidência</a>.</li>
         <li><strong>A limpeza do widget remove um caminho relativo à pasta de trabalho do Slicer</strong>, sem relação com a pasta temporária. <a href="AMASSS.code.html#f-widget-cleanup">Evidência</a>.</li>
         <li><strong>Código morto</strong>: várias funções e partes do widget não fazem nada. <a href="AMASSS.code.html#f-dead-code">Evidência</a>.</li>
-        <li><strong>O artigo e o código divergem:</strong> o artigo descreve um <a class="gterm" data-term="monai" href="../glossary.html#g-monai" title="See glossary">MONAI</a> <a class="gterm" data-term="unetr" href="../glossary.html#g-unetr" title="See glossary">UNETR</a>, o código executa o <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a>. <a href="AMASSS.code.html#f-paper-divergence">Evidência</a>.</li>
+        <li><strong>O artigo e o código divergem:</strong> o artigo descreve um <a class="gterm" data-term="monai" href="../glossary.html#g-monai" title="Ver o glossário">MONAI</a> <a class="gterm" data-term="unetr" href="../glossary.html#g-unetr" title="Ver o glossário">UNETR</a>, o código executa o <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a>. <a href="AMASSS.code.html#f-paper-divergence">Evidência</a>.</li>
       </ul>
 
       <a class="deep-link" href="AMASSS.code.html#pieges"><b>No código</b><span>Todas as armadilhas com arquivo e linha</span></a>
 
       <h2 id="litterature">10. Literatura</h2>
 
-      <p>O artigo da PLOS ONE de 2022 (Gillot et al.) descreve um modelo <a class="gterm" data-term="monai" href="../glossary.html#g-monai" title="See glossary">MONAI</a> <a class="gterm" data-term="unetr" href="../glossary.html#g-unetr" title="See glossary">UNETR</a> com recorte de 128 voxels, um codificador transformer e um decodificador convolucional. O código que roda hoje é uma rede <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="See glossary">nnU-Net</a> v2 puramente convolucional, no legacy e no VISOR. A comparação está na <a href="AMASSS.code.html#litterature">página do código</a>; as referências estão em <a href="SOURCES.html">SOURCES.md</a>.</p>
+      <p>O artigo da PLOS ONE de 2022 (Gillot et al.) descreve um modelo <a class="gterm" data-term="monai" href="../glossary.html#g-monai" title="Ver o glossário">MONAI</a> <a class="gterm" data-term="unetr" href="../glossary.html#g-unetr" title="Ver o glossário">UNETR</a> com recorte de 128 voxels, um codificador transformer e um decodificador convolucional. O código que roda hoje é uma rede <a class="gterm" data-term="nnunet" href="../glossary.html#g-nnunet" title="Ver o glossário">nnU-Net</a> v2 puramente convolucional, no legacy e no VISOR. A comparação está na <a href="AMASSS.code.html#litterature">página do código</a>; as referências estão em <a href="SOURCES.html">SOURCES.md</a>.</p>
 
       <footer class="footer">
         <a href="../index.html">← Todas as fichas</a> · <a href="AMASSS.code.html">Página de código desta ferramenta</a> · <a href="SOURCES.html">Bibliografia desta ferramenta</a>
