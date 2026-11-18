@@ -203,11 +203,11 @@
             <tr><td><code>MedX/MedX.py</code></td><td>widget, 1282 righe: pulsanti, barra di avanzamento, download, la chiamata a conda; il foglio di stile scuro e la maggior parte degli helper conda sono importati da <code>ADTLib</code> (<code>theming.py</code>, <code>env/conda.py</code>)</td><td>Python di Slicer</td></tr>
             <tr><td><code>MedX_Method/summarize.py</code>, <code>dashboard.py</code></td><td>validazione dei percorsi, costruzione del dizionario dei parametri</td><td>uguale</td></tr>
             <tr><td><code>MedX_Method/Method.py</code>, <code>Progress.py</code></td><td><code>Method.py</code> (48 righe) aggiunge i metodi astratti di MedX all'<code>ADTMethod</code> condiviso (<code>ADT/ADTLib/method.py:28</code>); <code>Progress.py</code> (52 righe) è la visualizzazione dell'avanzamento <code>DisplayMedX</code></td><td>uguale</td></tr>
-            <tr><td><code>MedX_Summarize.py</code></td><td>ciclo di inferenza <a class="gterm" href="../glossary.html#g-bart" title="See glossary">BART</a></td><td>ambiente conda <code>summaries</code></td></tr>
+            <tr><td><code>MedX_Summarize.py</code></td><td>ciclo di inferenza <a class="gterm" href="../glossary.html#g-bart" title="Vedi il glossario">BART</a></td><td>ambiente conda <code>summaries</code></td></tr>
             <tr><td><code>MedX_CLI_utils/utils.py</code></td><td>lettura di pdf/docx, suddivisione in chunk, caricamento del modello (258 righe)</td><td>uguale</td></tr>
             <tr><td><code>MedX_Dashboard.py</code></td><td>punto di ingresso del dashboard</td><td>Python di Slicer</td></tr>
             <tr><td><code>display_figure.py</code></td><td>analisi dei riassunti → DataFrame → figura matplotlib (680 righe)</td><td>uguale</td></tr>
-            <tr><td><code>dashboard_utils.py</code></td><td>i 56 campi attesi, e un <a class="gterm" data-term="medx-aggregator" href="MedX.html#agregateurs" title="See the explanation">aggregatore</a> per pannello</td><td>uguale</td></tr>
+            <tr><td><code>dashboard_utils.py</code></td><td>i 56 campi attesi, e un <a class="gterm" data-term="medx-aggregator" href="MedX.html#agregateurs" title="Vedi la spiegazione">aggregatore</a> per pannello</td><td>uguale</td></tr>
           </tbody>
         </table>
       </div>
@@ -226,7 +226,7 @@
 
       <p class="code-back">Spiegazione in linguaggio semplice e matematica: <a href="MedX.html#regroupement">pagina dell'atlante</a>.</p>
 
-      <p><code>process_notes()</code> (<code>MedX_Summarize.py:72</code>) percorre la cartella in modo non ricorsivo (<code>os.listdir</code>, riga 75, nessuna ricorsione), conserva solo <code>.pdf</code>, <code>.docx</code>, <code>.txt</code> (:76), e raggruppa per <strong><code>file_name.split("_")[0]</code></strong> (:78). Tutto ciò che precede il primo trattino basso è l'<a class="gterm" data-term="medx-patient-id" href="MedX.html#regroupement" title="See the explanation">identificativo del paziente</a>; più note dello stesso paziente vengono <strong>concatenate</strong> in un unico testo prima dell'inferenza (<code>combined_text +=</code>, :89-94), senza alcun separatore aggiunto tra di esse.</p>
+      <p><code>process_notes()</code> (<code>MedX_Summarize.py:72</code>) percorre la cartella in modo non ricorsivo (<code>os.listdir</code>, riga 75, nessuna ricorsione), conserva solo <code>.pdf</code>, <code>.docx</code>, <code>.txt</code> (:76), e raggruppa per <strong><code>file_name.split("_")[0]</code></strong> (:78). Tutto ciò che precede il primo trattino basso è l'<a class="gterm" data-term="medx-patient-id" href="MedX.html#regroupement" title="Vedi la spiegazione">identificativo del paziente</a>; più note dello stesso paziente vengono <strong>concatenate</strong> in un unico testo prima dell'inferenza (<code>combined_text +=</code>, :89-94), senza alcun separatore aggiunto tra di esse.</p>
 
       <p>Il conteggio della barra di avanzamento, però, viene da <code>NumberScan</code> (<code>MedX_Method/summarize.py:26-29</code>), che chiama <code>search()</code>: <code>ADTMethod.search</code> (<code>ADT/ADTLib/method.py:66</code>) delega a <code>ADTLib/io/fs.py:27</code>, che è <strong>ricorsivo</strong> (<code>glob.iglob(..., recursive=True)</code>, <code>fs.py:51</code>). Su un albero con sottocartelle, il denominatore conta più file di quanti la CLI ne elabori davvero. E la sua unità è il file, mentre il numero che la CLI scrive nel log è il numero di pazienti terminati (<code>log_f.write(str(idx + 1))</code>, <code>MedX_Summarize.py:103-104</code>).</p>
 
@@ -269,7 +269,7 @@
       <ol>
         <li>divisione (<code>utils.py:88</code>) su un doppio a capo, l'inizio di un elenco numerato (<code>\n(?=\d+\.\s)</code>), un punto elenco (<code>-</code>, <code>*</code>) o un'intestazione di sezione. Questa divisione <strong>distingue maiuscole e minuscole</strong>: solo le intestazioni scritte in maiuscolo vengono ritagliate (il punto fermo facoltativo dopo l'intestazione viene scartato), mentre il test di sezione di <code>create_chunks_from_paragraphs</code> confronta in minuscolo (<code>:151</code>, <code>:157</code>);</li>
         <li>i pezzi vengono reincollati (<code>utils.py:93-111</code>). Un pezzo che è esattamente un'intestazione apre sempre un nuovo paragrafo, anche dopo uno breve. Un pezzo che comincia come una voce di elenco (<code>^\d+\.\s|^[\-*]\s</code>) viene accodato al paragrafo che lo precede, qualunque sia la sua dimensione. E quando il paragrafo in costruzione è <strong>sotto i 150 caratteri, il pezzo successivo gli viene accodato</strong> (<code>elif ... or (current_paragraph and len(current_paragraph) &lt; 150)</code>, <code>:104-106</code>): il paragrafo breve assorbe quello che segue, non viene ripiegato su quello precedente;</li>
-        <li>un'intera sezione (intestazione + i paragrafi che seguono fino all'intestazione successiva) è trattata come un blocco <strong>indivisibile finché sta</strong> nel <a class="gterm" data-term="medx-chunk" href="MedX.html#decoupage-chunks" title="See the explanation">chunk</a> (<code>utils.py:151-165</code>): è l'invariante della suddivisione, una sezione clinica non deve essere divisa tra due prompt;</li>
+        <li>un'intera sezione (intestazione + i paragrafi che seguono fino all'intestazione successiva) è trattata come un blocco <strong>indivisibile finché sta</strong> nel <a class="gterm" data-term="medx-chunk" href="MedX.html#decoupage-chunks" title="Vedi la spiegazione">chunk</a> (<code>utils.py:151-165</code>): è l'invariante della suddivisione, una sezione clinica non deve essere divisa tra due prompt;</li>
         <li>se una sezione non ci sta, va in un nuovo chunk quando è abbastanza piccola da sola (<code>:172-173</code>); altrimenti viene tagliata paragrafo per paragrafo (<code>:176-184</code>), poi frase per frase (<code>:186-194</code>, <code>re.split(r'(?&lt;=[.!?])\s+')</code> a <code>:126</code>). Un paragrafo ordinario che non ci sta in ciò che resta del chunk salta il livello dei paragrafi e viene versato subito frase per frase (<code>:198-209</code>).</li>
       </ol>
 
@@ -290,7 +290,7 @@
       <pre><code>tokenizer = BartTokenizer.from_pretrained(model_path)
 model = BartForConditionalGeneration.from_pretrained(model_path)</code></pre>
 
-      <p>Nient'altro. Nessun <code>peft</code>, nessuna <a class="gterm" href="../glossary.html#g-quantification" title="See glossary">quantizzazione</a>, nonostante <code>peft</code> e <code>bitsandbytes</code> figurino tra i pacchetti installati nell'ambiente (<code>MedX.py:640-648</code>): quei due, più <code>evaluate</code> e <code>scikit-learn</code>, non sono mai importati da nessuna parte sotto <code>MedX/</code> o <code>MedX_CLI/</code> (verificato con grep); sembrano resti dell'addestramento.</p>
+      <p>Nient'altro. Nessun <code>peft</code>, nessuna <a class="gterm" href="../glossary.html#g-quantification" title="Vedi il glossario">quantizzazione</a>, nonostante <code>peft</code> e <code>bitsandbytes</code> figurino tra i pacchetti installati nell'ambiente (<code>MedX.py:640-648</code>): quei due, più <code>evaluate</code> e <code>scikit-learn</code>, non sono mai importati da nessuna parte sotto <code>MedX/</code> o <code>MedX_CLI/</code> (verificato con grep); sembrano resti dell'addestramento.</p>
 
       <h3 id="poids">4.2 I pesi</h3>
 
@@ -331,7 +331,7 @@ model = BartForConditionalGeneration.from_pretrained(model_path)</code></pre>
 
       <p class="code-back">Spiegazione in linguaggio semplice e matematica: <a href="MedX.html#prompt-generation">pagina dell'atlante</a>.</p>
 
-      <p>Una chiamata di generazione <strong>per <a class="gterm" data-term="medx-chunk" href="MedX.html#decoupage-chunks" title="See the explanation">chunk</a></strong> (<code>MedX_Summarize.py:54-65</code>, le impostazioni di generazione a <code>:42-52</code>):</p>
+      <p>Una chiamata di generazione <strong>per <a class="gterm" data-term="medx-chunk" href="MedX.html#decoupage-chunks" title="Vedi la spiegazione">chunk</a></strong> (<code>MedX_Summarize.py:54-65</code>, le impostazioni di generazione a <code>:42-52</code>):</p>
 
       <pre><code>prompt = f"Using the following note, extract structured key-value pairs about the patient's symptoms and diagnoses:\n\n{chunk}"
 inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
@@ -357,7 +357,7 @@ summary_ids = model.generate(inputs["input_ids"], generation_config=generation_c
       <div id="f-beam-sample" class="callout warn">
         <div class="callout-title">Insidia · codice archiviato</div>
         <p><strong>Codice archiviato (<code>archive/medx</code> a fbfa0fb, rimosso dall'albero legacy il 2026-09-17); assente in <a href="../visor/MedX/MedX.html">VISOR</a>.</strong> Non esiste codice VISOR per MedX con cui confrontarlo: nulla sotto <code>SADT-VISOR tools/</code> e nessun modulo in <code>AutomatedDentalToolsRemote</code>.</p>
-        <p><a class="gterm" data-term="medx-beam" href="MedX.html#prompt-generation" title="See the explanation">Beam search</a> <strong>e</strong> campionamento allo stesso tempo (<code>num_beams=4</code> + <code>do_sample=True</code>) → <code>transformers</code> ripiega su <em>beam sample</em>: l'output non è deterministico, due esecuzioni sulla stessa nota non producono lo stesso riassunto. Non è impostato alcun seed.</p>
+        <p><a class="gterm" data-term="medx-beam" href="MedX.html#prompt-generation" title="Vedi la spiegazione">Beam search</a> <strong>e</strong> campionamento allo stesso tempo (<code>num_beams=4</code> + <code>do_sample=True</code>) → <code>transformers</code> ripiega su <em>beam sample</em>: l'output non è deterministico, due esecuzioni sulla stessa nota non producono lo stesso riassunto. Non è impostato alcun seed.</p>
       </div>
 
       <p>BART non è un modello addestrato a seguire istruzioni: la frase di istruzione è semplicemente anteposta al testo sorgente. Ha effetto solo se il fine-tune è stato fatto con lo stesso prefisso: cosa che non si può verificare dal repository.</p>
@@ -421,7 +421,7 @@ summary_ids = model.generate(inputs["input_ids"], generation_config=generation_c
 
       <p><code>update_dictionary()</code> (<code>display_figure.py:60</code>) percorre il riassunto riga per riga, <code>line.split(":")</code> (:69-70): una riga che non produce esattamente due pezzi viene saltata (quindi qualsiasi valore contenente un <code>:</code> va perso). I caratteri <code>;</code> nel valore diventano <code>,</code> (:74). Una chiave fuori dalle 56 è ignorata (:80-81), e <code>patient_id</code> non viene mai sovrascritto (:77-78).</p>
 
-      <p>L'unione di valori successivi (lo stesso campo che ricorre in più <a class="gterm" data-term="medx-chunk" href="MedX.html#decoupage-chunks" title="See the explanation">chunk</a>) è la parte sottile:</p>
+      <p>L'unione di valori successivi (lo stesso campo che ricorre in più <a class="gterm" data-term="medx-chunk" href="MedX.html#decoupage-chunks" title="Vedi la spiegazione">chunk</a>) è la parte sottile:</p>
 
       <ul>
         <li>valore esistente vuoto → sostituito (:94-96);</li>
@@ -451,7 +451,7 @@ summary_ids = model.generate(inputs["input_ids"], generation_config=generation_c
             <tr><td><code>set_left_stick_data</code> (<code>:73</code>)</td><td>media ± deviazione standard dei 5 punteggi clinici numerici (pandas salta i valori mancanti)</td></tr>
             <tr><td><code>set_middle_stick_data</code> (<code>:84</code>)</td><td><code>(\d+)\s*mm</code> su <code>maximum_opening</code> e <code>maximum_opening_without_pain</code>, poi il primo numero isolato se non c'è <code>mm</code>; vuoto, <code>unknown</code>, <code>none</code>, <code>nan</code> danno NaN</td></tr>
             <tr><td><code>set_right_stick_data</code> (<code>:112</code>)</td><td>sede della cefalea per sinonimo (<code>frontal/forehead/temple</code>, <code>temporal/side of head</code>, …), corrispondenza a parola intera; un paziente può contare in più sedi; su tutti i pazienti</td></tr>
-            <tr><td><code>set_joint_pain_data</code> (<code>:137</code>)</td><td><a class="gterm" href="../glossary.html#g-tmj" title="See glossary">TMJ</a> / Neck / Shoulder / Back, TMJ testata per prima con le varianti sinistra/destra; le altre aree vengono considerate solo quando il test TMJ fallisce; su tutti i pazienti</td></tr>
+            <tr><td><code>set_joint_pain_data</code> (<code>:137</code>)</td><td><a class="gterm" href="../glossary.html#g-tmj" title="Vedi il glossario">TMJ</a> / Neck / Shoulder / Back, TMJ testata per prima con le varianti sinistra/destra; le altre aree vengono considerate solo quando il test TMJ fallisce; su tutti i pazienti</td></tr>
             <tr><td><code>set_upper_donuts_data</code> (<code>:163</code>)</td><td>6 booleani (<code>earache</code>, <code>tinnitus</code>, <code>vertigo</code>, <code>hearing_loss</code>, mandibola, salute mentale), su tutti i pazienti</td></tr>
             <tr><td><code>set_muscle_pain_data</code> (<code>:291</code>)</td><td>5 livelli, su tutti i pazienti, l'ordine dei test conta: "mild to moderate" e "moderate to severe" sono testati <strong>prima</strong> di "mild" e "moderate"</td></tr>
             <tr><td><code>extract_months_from_pain_onset</code> (<code>:183</code>)</td><td>"1 year and 9 months ago" → 21 mesi; un campo vuoto dà 0 mesi, e quello 0 entra nella media dell'ultimo pannello</td></tr>
@@ -460,7 +460,7 @@ summary_ids = model.generate(inputs["input_ids"], generation_config=generation_c
         </table>
       </div>
 
-      <p>Due fragilità di fondo in questi <a class="gterm" data-term="medx-aggregator" href="MedX.html#agregateurs" title="See the explanation">aggregatori</a>:</p>
+      <p>Due fragilità di fondo in questi <a class="gterm" data-term="medx-aggregator" href="MedX.html#agregateurs" title="Vedi la spiegazione">aggregatori</a>:</p>
 
       <ul>
         <li><code>set_upper_donuts_data</code> confronta <code>df[metric] == "true"</code> (minuscolo, <code>dashboard_utils.py:168</code>, <code>:176-178</code>) mentre <code>set_disc_displacement_data</code>, <code>set_muscle_pain_data</code>, <code>set_tenderness_data</code> e <code>set_migraine_data</code> applicano prima <code>.lower()</code>, e così fa anche la riga della mandibola della stessa funzione (<code>:172</code>). Un modello che scrivesse <code>True</code> porterebbe in silenzio a 0% cinque dei sei donut.</li>
@@ -532,10 +532,10 @@ summary_ids = model.generate(inputs["input_ids"], generation_config=generation_c
         <table>
           <thead><tr><th>Percorso</th><th>File</th><th>Contenuto</th></tr></thead>
           <tbody>
-            <tr><td>Riassunto</td><td><code>&lt;output&gt;/&lt;patient_id&gt;_summary.txt</code></td><td>testo libero, <a class="gterm" data-term="medx-chunk" href="MedX.html#decoupage-chunks" title="See the explanation">chunk</a> separati da 100 trattini</td></tr>
+            <tr><td>Riassunto</td><td><code>&lt;output&gt;/&lt;patient_id&gt;_summary.txt</code></td><td>testo libero, <a class="gterm" data-term="medx-chunk" href="MedX.html#decoupage-chunks" title="Vedi la spiegazione">chunk</a> separati da 100 trattini</td></tr>
             <tr><td>Riassunto</td><td><code>&lt;log_path&gt;</code></td><td>un intero: il numero di pazienti elaborati</td></tr>
             <tr><td>Dashboard</td><td><code>&lt;output&gt;/dashboard.png</code></td><td>il pannello da 22×14 pollici</td></tr>
-            <tr><td>Dashboard</td><td><code>&lt;output&gt;/patient_data.csv</code></td><td>il DataFrame, <strong>58 colonne</strong>: i <a class="gterm" data-term="medx-schema" href="MedX.html#resume-vers-dataframe" title="See the explanation">56 campi</a> più <code>pain_onset_months</code> e <code>age_bin</code>, che <code>set_pain_onset_data</code> aggiunge sul posto (<code>dashboard_utils.py:205,208</code>) prima che <code>show_dashboard</code> scriva il file (<code>display_figure.py:671</code>)</td></tr>
+            <tr><td>Dashboard</td><td><code>&lt;output&gt;/patient_data.csv</code></td><td>il DataFrame, <strong>58 colonne</strong>: i <a class="gterm" data-term="medx-schema" href="MedX.html#resume-vers-dataframe" title="Vedi la spiegazione">56 campi</a> più <code>pain_onset_months</code> e <code>age_bin</code>, che <code>set_pain_onset_data</code> aggiunge sul posto (<code>dashboard_utils.py:205,208</code>) prima che <code>show_dashboard</code> scriva il file (<code>display_figure.py:671</code>)</td></tr>
             <tr><td>Dashboard</td><td><code>&lt;output&gt;/dashboard_full_dataframe.csv</code></td><td>il DataFrame a 56 colonne, scritto da <code>generate_dashboard_figure</code> (<code>display_figure.py:178-179</code>) <strong>prima</strong> che quelle due colonne esistano; quindi i due file CSV differiscono di due colonne (verificato eseguendo il codice archiviato)</td></tr>
           </tbody>
         </table>
