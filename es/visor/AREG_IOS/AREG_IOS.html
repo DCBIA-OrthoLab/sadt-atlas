@@ -125,14 +125,14 @@
         <h1>AREG_IOS en VISOR</h1>
         <p class="lede">AREG_IOS coloca dos escaneos intraorales del mismo paciente, tomados en momentos distintos, en la misma posición, usando una parte de la boca que el tratamiento no mueve. Esta página explica cómo, paso a paso, con las matemáticas: qué entra, qué le hace cada paso y qué sale. Cuando el código hace algo que merece comprobarse, un enlace lleva a <a href="AREG_IOS.code.html">la página del código</a>. El módulo legacy está en <a href="../../AREG_IOS/AREG_IOS.html">su propia página</a>.</p>
         <div class="meta-row">
-          <span class="badge neutral">VISOR</span> <a class="badge neutral" href="AREG_IOS.code.html">Código (desarrolladores)</a> <span class="badge cli">AREG_IOS</span> <span class="badge neutral">accesible como AREG, modo <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a></span> <span class="badge neutral">torch 2.11, pytorch3d, GPU o CPU</span> <a class="badge neutral" href="../../AREG_IOS/AREG_IOS.html">Página legacy</a> <a class="badge neutral" href="../guide/AREG_IOS.html">Guía (VISOR)</a> <a class="badge neutral" href="../../AREG_IOS/SOURCES.html">Bibliografía</a>
+          <span class="badge neutral">VISOR</span> <a class="badge neutral" href="AREG_IOS.code.html">Código (desarrolladores)</a> <span class="badge cli">AREG_IOS</span> <span class="badge neutral">accesible como AREG, modo <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="Ver el glosario">IOS</a></span> <span class="badge neutral">torch 2.11, pytorch3d, GPU o CPU</span> <a class="badge neutral" href="../../AREG_IOS/AREG_IOS.html">Página legacy</a> <a class="badge neutral" href="../guide/AREG_IOS.html">Guía (VISOR)</a> <a class="badge neutral" href="../../AREG_IOS/SOURCES.html">Bibliografía</a>
         </div>
       </header>
 
 
       <h2 id="visor-overview">Visión general: qué entra, qué sale</h2>
 
-      <p>Los dientes de un paciente se escanean dos veces con un escáner intraoral: al principio (T1) y más tarde (T2). Para compararlos hay que poner las dos mallas en la misma posición, y eso solo puede hacerse sobre una parte de la boca que el tratamiento no mueve. AREG_IOS elige un <strong>parche</strong> así y halla el <strong>movimiento rígido</strong> (una rotación y una traslación) que hace coincidir el parche de T2 con el de T1. En la arcada superior el parche es el paladar, encontrado por una red; en la inferior, que no tiene tal meseta, es una banda a lo largo de la línea mucogingival, construida a partir de 13 <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>.</p>
+      <p>Los dientes de un paciente se escanean dos veces con un escáner intraoral: al principio (T1) y más tarde (T2). Para compararlos hay que poner las dos mallas en la misma posición, y eso solo puede hacerse sobre una parte de la boca que el tratamiento no mueve. AREG_IOS elige un <strong>parche</strong> así y halla el <strong>movimiento rígido</strong> (una rotación y una traslación) que hace coincidir el parche de T2 con el de T1. En la arcada superior el parche es el paladar, encontrado por una red; en la inferior, que no tiene tal meseta, es una banda a lo largo de la línea mucogingival, construida a partir de 13 <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="Ver el glosario">landmarks</a>.</p>
 
       <div class="table-wrap">
         <table>
@@ -140,7 +140,7 @@
           <tbody>
             <tr><td>Entrada</td><td>una malla intraoral T1 y otra T2 por paciente (<code>.vtk</code>, <code>.vtp</code>, <code>.stl</code>, <code>.obj</code>), cada una con su mandíbula indicada en el nombre del archivo; en modo Semiautomático, mallas que ya llevan un número de diente en cada vértice y que ya están orientadas</td></tr>
             <tr><td>Parche</td><td>Paladar (arcada superior, la inferior la sigue) o Mucogingival (solo la arcada inferior)</td></tr>
-            <tr><td>Método</td><td>marcar el parche en cada malla y luego <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> rígido entre los dos parches (<a href="#icp">apartado 3.5</a>)</td></tr>
+            <tr><td>Método</td><td>marcar el parche en cada malla y luego <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="Ver el glosario">ICP</a> rígido entre los dos parches (<a href="#icp">apartado 3.5</a>)</td></tr>
             <tr><td>Salida</td><td>el T1 y el T2 movido sobre él, ambos con el parche como array de 0/1, un archivo de transformación (<code>.tfm</code>, una transformación de Slicer) y un informe (<code>AREG_report.json</code>)</td></tr>
           </tbody>
         </table>
@@ -150,7 +150,7 @@
 
       <h2 id="visor-status">1. Posición en la cadena</h2>
 
-      <p>Un cliente nunca nombra <code>AREG_IOS</code>. El módulo de Slicer envía una solicitud a la herramienta del servidor <strong>AREG</strong> con el modo &ldquo;<a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a>&rdquo;, y el servidor se la pasa a este motor. El motor se encarga del emparejamiento, de la red palatina, de la <a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="See the code">banda mucogingival</a> y del <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a>. En modo Totalmente automático pide a Crown_Seg las etiquetas de los dientes y a ASO la orientación; para el parche mucogingival sin <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> pide a ALI_IOS. Nadie llama de vuelta a AREG_IOS.</p>
+      <p>Un cliente nunca nombra <code>AREG_IOS</code>. El módulo de Slicer envía una solicitud a la herramienta del servidor <strong>AREG</strong> con el modo &ldquo;<a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="Ver el glosario">IOS</a>&rdquo;, y el servidor se la pasa a este motor. El motor se encarga del emparejamiento, de la red palatina, de la <a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="Ver el código">banda mucogingival</a> y del <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="Ver el glosario">ICP</a>. En modo Totalmente automático pide a Crown_Seg las etiquetas de los dientes y a ASO la orientación; para el parche mucogingival sin <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="Ver el glosario">landmarks</a> pide a ALI_IOS. Nadie llama de vuelta a AREG_IOS.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 960 300" role="img" aria-label="Quién llama a quién. El módulo AREG Remote de Slicer envía una sola solicitud a la fachada AREG con el modo IOS. El servidor ejecuta el motor AREG_IOS. En modo Totalmente automático llama a Crown_Seg y luego a ASO para cada tiempo; para el parche mucogingival sin landmarks llama a ALI_IOS. Cada herramienta se ejecuta en su propio entorno.">
@@ -163,7 +163,7 @@
           <rect class="d-box" x="12" y="60" width="156" height="78" rx="6"/>
           <text class="d-label" x="90" y="84" text-anchor="middle">AREG Remote</text>
           <text class="d-label-s" x="90" y="104" text-anchor="middle">panel a partir del esquema</text>
-          <text class="d-label-xs" x="90" y="122" text-anchor="middle">formulario construido a partir del esquema</text>
+          <text class="d-label-xs" x="90" y="122" text-anchor="middle">formulario generado del esquema</text>
           </a><path class="d-arrow" d="M168 99 H213"/>
           <path class="d-arrow-head" d="M220 99 l-7 -4 v8 z"/>
           <a class="d-link" href="#visor-status">
@@ -219,7 +219,7 @@
 
       <h2 id="files">2. Archivos implicados</h2>
 
-      <p>El motor está dividido por funciones: el formulario publicado, un despachador que comprueba cada regla y dirige la ejecución, las tres llamadas a otras herramientas, el pipeline (emparejamiento, las dos formas de pintar un parche, escritura), la red con sus cámaras y su renderizador, el predictor del paladar, la orientación, la limpieza del parche sobre el grafo de la malla, la <a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="See the code">banda mucogingival</a>, la lectura de los archivos de <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a>, el <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> con la escritura de la transformación, y la lectura y escritura de mallas. Las bibliotecas pesadas (torch, monai, pytorch3d) solo se importan dentro de funciones, de modo que el formulario puede publicarse en una máquina que no las tenga.</p>
+      <p>El motor está dividido por funciones: el formulario publicado, un despachador que comprueba cada regla y dirige la ejecución, las tres llamadas a otras herramientas, el pipeline (emparejamiento, las dos formas de pintar un parche, escritura), la red con sus cámaras y su renderizador, el predictor del paladar, la orientación, la limpieza del parche sobre el grafo de la malla, la <a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="Ver el código">banda mucogingival</a>, la lectura de los archivos de <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="Ver el glosario">landmarks</a>, el <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="Ver el glosario">ICP</a> con la escritura de la transformación, y la lectura y escritura de mallas. Las bibliotecas pesadas (torch, monai, pytorch3d) solo se importan dentro de funciones, de modo que el formulario puede publicarse en una máquina que no las tenga.</p>
 
       <a class="deep-link" href="AREG_IOS.code.html#files"><b>En el código</b><span>La tabla de archivos con el número de líneas y los papeles</span></a>
 
@@ -234,8 +234,8 @@
             <tr><td>Forma</td><td>publica el esquema; los campos del otro parche permanecen ocultos</td><td>construye el panel; se pueden elegir cohortes de prueba</td></tr>
             <tr><td>Emparejamiento</td><td>una carpeta por tiempo, buscada de forma recursiva; la mandíbula se lee del nombre del archivo</td><td>envía las carpetas</td></tr>
             <tr><td>Etiquetas y orientación</td><td>Totalmente automático: Crown_Seg en T1 y en T2, luego ASO en T1 y en T2</td><td>nada</td></tr>
-            <tr><td>Parche</td><td>paladar: red en el motor; mucogingival: <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">landmarks</a> enviados, o pedidos a ALI_IOS, y luego la banda</td><td>nada</td></tr>
-            <tr><td><a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> y escritura</td><td>ICP, mallas, transformación, informe</td><td>descomprime el archivo; carga opcional en la escena</td></tr>
+            <tr><td>Parche</td><td>paladar: red en el motor; mucogingival: <a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="Ver el glosario">landmarks</a> enviados, o pedidos a ALI_IOS, y luego la banda</td><td>nada</td></tr>
+            <tr><td><a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="Ver el glosario">ICP</a> y escritura</td><td>ICP, mallas, transformación, informe</td><td>descomprime el archivo; carga opcional en la escena</td></tr>
           </tbody>
         </table>
       </div>
@@ -321,17 +321,17 @@
 
       <h3 id="upstream">3.2 Etiquetas y orientación: las llamadas a otras herramientas</h3>
 
-      <p>Antes de leer cualquier malla, el motor rechaza lo que no puede funcionar: un parche desconocido, el paladar sin <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a>, el parche mucogingival sin landmarks y sin manera de pedírselos a ALI_IOS, una altura negativa, o Totalmente automático sin las otras herramientas o sin una referencia.</p>
+      <p>Antes de leer cualquier malla, el motor rechaza lo que no puede funcionar: un parche desconocido, el paladar sin <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="Ver el glosario">checkpoint</a>, el parche mucogingival sin landmarks y sin manera de pedírselos a ALI_IOS, una altura negativa, o Totalmente automático sin las otras herramientas o sin una referencia.</p>
 
       <p>En modo <strong>Totalmente automático</strong> los dos tiempos pasan por dos herramientas, en este orden: <strong>Crown_Seg</strong> pone un número de diente en cada vértice de T1 y luego de T2 (una malla que ya los tiene pasa sin tocarse), y después <strong>ASO</strong> orienta cada mandíbula de T1 y luego de T2 sobre una referencia. Las transformaciones de ASO para las arcadas superiores de T2 se conservan, porque se componen en la transformación que se escribe al final, de modo que se refiera a la malla que enviaste. En modo <strong>Semiautomático</strong> nada de esto ocurre: las mallas deben llevar ya las etiquetas y estar orientadas.</p>
 
-      <p>Para el parche mucogingival sin carpeta de landmarks, se pide a <strong>ALI_IOS</strong>, para T1 y para T2, solo su red Mucogingival, lo que evita que ejecute además sus pasadas <a class="gterm" data-term="occlusal" href="../../glossary.html#g-occlusal" title="See glossary">oclusal</a> y cervical.</p>
+      <p>Para el parche mucogingival sin carpeta de landmarks, se pide a <strong>ALI_IOS</strong>, para T1 y para T2, solo su red Mucogingival, lo que evita que ejecute además sus pasadas <a class="gterm" data-term="occlusal" href="../../glossary.html#g-occlusal" title="Ver el glosario">oclusal</a> y cervical.</p>
 
       <a class="deep-link" href="AREG_IOS.code.html#upstream"><b>En el código</b><span>Las cuatro llamadas supervisadas con sus argumentos</span></a>
 
       <h3 id="palate">3.3 El parche palatino: la red dentro del motor</h3>
 
-      <p>La red se carga una vez por ejecución. Para cada malla, el motor recorre cinco pasos: orientar la malla en un <a class="gterm" data-term="areg-ios-standard-frame" href="AREG_IOS.code.html#palate" title="See the code">marco estándar</a>, escalarla dentro de la esfera unidad y convertir las normales de la superficie en colores, renderizar siete vistas y dejar que una red etiquete cada píxel, dejar que los píxeles voten por los triángulos que muestran, y luego limpiar el resultado. La malla se triangula primero si contiene otra cosa, porque la lista de caras se lee como triángulos.</p>
+      <p>La red se carga una vez por ejecución. Para cada malla, el motor recorre cinco pasos: orientar la malla en un <a class="gterm" data-term="areg-ios-standard-frame" href="AREG_IOS.code.html#palate" title="Ver el código">marco estándar</a>, escalarla dentro de la esfera unidad y convertir las normales de la superficie en colores, renderizar siete vistas y dejar que una red etiquete cada píxel, dejar que los píxeles voten por los triángulos que muestran, y luego limpiar el resultado. La malla se triangula primero si contiene otra cosa, porque la lista de caras se lee como triángulos.</p>
 
       <p><strong>Marco estándar.</strong> El centroide (centro) de cada uno de los dos primeros molares superiores y el punto medio de los dos incisivos centrales superiores (dientes 3, 8, 9 y 14 en la numeración Universal, los números estándar de dientes del 1 al 32) son tres puntos; se llevan a un triángulo de referencia fijo mediante dos rotaciones y una traslación. Este marco solo se usa para renderizar: el parche se escribe en la malla tal como la enviaste. Si faltan las etiquetas de los dientes, la predicción continúa sin el marco estándar y el informe lleva una nota.</p>
 
@@ -346,7 +346,7 @@
         <table>
           <thead><tr><th>Elemento</th><th>Valor en VISOR</th></tr></thead>
           <tbody>
-            <tr><td>Red</td><td>una UNet 2D (<a class="gterm" data-term="monai" href="../../glossary.html#g-monai" title="See glossary">MONAI</a>), 4 canales de entrada y 2 de salida (fondo o parche), aplicada a cada vista</td></tr>
+            <tr><td>Red</td><td>una UNet 2D (<a class="gterm" data-term="monai" href="../../glossary.html#g-monai" title="Ver el glosario">MONAI</a>), 4 canales de entrada y 2 de salida (fondo o parche), aplicada a cada vista</td></tr>
             <tr><td>Vistas</td><td>siete cámaras agrupadas a altura 0.9: una justo encima del origen, cuatro desplazadas 0.2 a lo largo de los dos ejes horizontales, dos en diagonales; todas miran al origen</td></tr>
             <tr><td>Imagen</td><td>320 &times; 320 píxeles, un triángulo conservado por píxel, una luz ambiental simple</td></tr>
             <tr><td>Código de entrenamiento</td><td>eliminado: solo hay inferencia</td></tr>
@@ -376,7 +376,7 @@
 
       <figure class="algo" data-scene="areg_ios_band" data-ms="6400">
         <div class="algo-stage"><svg viewBox="0 0 320 196" role="img" aria-label="Animación: se traza una curva por los landmarks, se ajusta a los vértices de la malla y una banda crece a lo largo de la malla desde esos vértices"></svg><div class="algo-ctl"><button class="algo-play" type="button">Repetir</button></div></div>
-        <div class="algo-body"><p class="algo-lead">La arcada inferior no tiene una meseta plana, así que el parche es una banda a lo largo de la línea de la encía. Se traza una curva suave por los 13 landmarks, se ajusta a los vértices más cercanos, y la banda es todo lo que está dentro de una distancia dada de ellos, medida a lo largo de la superficie y no a través del aire.</p><p class="algo-tag">Ilustración: 6 landmarks en lugar de 13, sobre una cuadrícula plana; los números son inventados para el dibujo. No se dibuja la eliminación de las coronas.</p><div class="formula"><math display="block"><mrow><mi class="k1">d</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><munder><mo>min</mo><mrow><mi class="k3">s</mi><mo>&#x2208;</mo><mi>seeds</mi></mrow></munder><msub><mi>dist</mi><mi>mesh</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">s</mi><mo>,</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi>band</mi><mo>=</mo><mo>{</mo><mi class="k2">v</mi><mo>:</mo><mi class="k1">d</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2264;</mo><mi class="k4">h</mi><mo>}</mo></mrow></math></div><ul class="algo-legend"><li class="k1"><b>d(v)</b>distancia del vértice v a la semilla más cercana, caminando por las aristas de la malla</li><li class="k2"><b>v</b>un vértice de la malla</li><li class="k3"><b>s</b>una semilla: un vértice bajo la curva</li><li class="k4"><b>h</b>la <a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="See the code">altura del parche</a>, en milímetros (hasta dónde llega la banda a cada lado de la curva, de modo que la banda es aproximadamente el doble de ancha)</li></ul></div>
+        <div class="algo-body"><p class="algo-lead">La arcada inferior no tiene una meseta plana, así que el parche es una banda a lo largo de la línea de la encía. Se traza una curva suave por los 13 landmarks, se ajusta a los vértices más cercanos, y la banda es todo lo que está dentro de una distancia dada de ellos, medida a lo largo de la superficie y no a través del aire.</p><p class="algo-tag">Ilustración: 6 landmarks en lugar de 13, sobre una cuadrícula plana; los números son inventados para el dibujo. No se dibuja la eliminación de las coronas.</p><div class="formula"><math display="block"><mrow><mi class="k1">d</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>=</mo><munder><mo>min</mo><mrow><mi class="k3">s</mi><mo>&#x2208;</mo><mi>seeds</mi></mrow></munder><msub><mi>dist</mi><mi>mesh</mi></msub><mrow><mo stretchy="true" fence="true">(</mo><mi class="k3">s</mi><mo>,</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow></mrow></math></div><div class="formula"><math display="block"><mrow><mi>band</mi><mo>=</mo><mo>{</mo><mi class="k2">v</mi><mo>:</mo><mi class="k1">d</mi><mrow><mo stretchy="true" fence="true">(</mo><mi class="k2">v</mi><mo stretchy="true" fence="true">)</mo></mrow><mo>&#x2264;</mo><mi class="k4">h</mi><mo>}</mo></mrow></math></div><ul class="algo-legend"><li class="k1"><b>d(v)</b>distancia del vértice v a la semilla más cercana, caminando por las aristas de la malla</li><li class="k2"><b>v</b>un vértice de la malla</li><li class="k3"><b>s</b>una semilla: un vértice bajo la curva</li><li class="k4"><b>h</b>la <a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="Ver el código">altura del parche</a>, en milímetros (hasta dónde llega la banda a cada lado de la curva, de modo que la banda es aproximadamente el doble de ancha)</li></ul></div>
       </figure>
 
       <p>Una altura de <strong>0</strong> no construye ni curva ni banda: el parche son solo los 13 landmarks ajustados a la malla (<a href="AREG_IOS.code.html#f-patch-height-zero">y este es el valor por defecto del panel</a>). Cada tiempo construye su banda con sus propios landmarks. Tres pasos del módulo legacy no están en el port: descartar los landmarks que ALI marcó como dudosos, restringir ambas bandas a los landmarks encontrados en los dos tiempos, y arrancar el ICP desde los landmarks emparejados (<a href="AREG_IOS.code.html#f-mgl-port-behind">detalles</a>). El resultado es el array de puntos <code>Bottom_MGL</code>.</p>
@@ -391,7 +391,7 @@
         </div>
         <ol class="v3d-chips v3d-steps">
           <li data-step="0">1. los dos puntos temporales, aún separados</li>
-          <li data-step="1">2. el parche <a class="gterm" data-term="areg-ios-butterfly" href="AREG_IOS.code.html#palate" title="See the code">Butterfly</a>, predicho en el paladar</li>
+          <li data-step="1">2. el parche <a class="gterm" data-term="areg-ios-butterfly" href="AREG_IOS.code.html#palate" title="Ver el código">Butterfly</a>, predicho en el paladar</li>
           <li data-step="2">3. ICP rígido, solo sobre el parche</li>
           <li data-step="3">4. distancia media registrada en el parche</li>
         </ol>
@@ -399,7 +399,7 @@
           <button class="v3d-go" type="button">Registrar de nuevo</button>
         </div>
         <span class="v3d-i18n" hidden> <i data-k="pair">los dos puntos temporales, aún separados</i> <i data-k="patch">el parche Butterfly, predicho en el paladar, </i> <i data-k="icp">ICP rígido, solo sobre el parche</i> <i data-k="done">registrado, distancia media en el parche</i> </span>
-        <figcaption>T1 en azul, T2 en naranja, el parche en verde. La geometría procede del conjunto de prueba publicado de AREG_IOS (sin datos de pacientes) y de la salida que el módulo <em>legacy</em> escribió sobre él: el array Butterfly, <strong>9529 de 75867 vértices</strong> (los recuentos y las distancias son los de las mallas de prueba publicadas completas, no se recalcularon aquí; las mallas dibujadas están simplificadas), y el movimiento rígido, recuperado por <a class="gterm" data-term="kabsch" href="../../glossary.html#g-kabsch" title="See glossary">Kabsch</a> (un mejor ajuste de dos conjuntos de puntos correspondientes) a partir de la entrada y del T2 registrado (error residual 0.00003&nbsp;mm); distancia sobre el parche 0.38&nbsp;&rarr;&nbsp;0.18&nbsp;mm. Los pasos mostrados son los del modo paladar de VISOR, en este orden: el parche se predice en cada tiempo, y el ICP se ejecuta solo sobre las nubes de puntos del parche, T2 sobre T1, rígido, 1000 iteraciones, con los centroides emparejados primero. VISOR carga el mismo checkpoint publicado (el modelo AREG, versión v1.0.0) pero vota sin los píxeles de fondo, así que su parche <strong>no está demostrado como idéntico</strong>; la escena no se volvió a ejecutar con el motor de VISOR. No se muestran: los pasos de Crown_Seg y ASO del modo Totalmente automático, que se ejecutan antes, ni la <a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="See the code">banda mucogingival</a>, que sustituye al paso 2 en la arcada inferior.</figcaption>
+        <figcaption>T1 en azul, T2 en naranja, el parche en verde. La geometría procede del conjunto de prueba publicado de AREG_IOS (sin datos de pacientes) y de la salida que el módulo <em>legacy</em> escribió sobre él: el array Butterfly, <strong>9529 de 75867 vértices</strong> (los recuentos y las distancias son los de las mallas de prueba publicadas completas, no se recalcularon aquí; las mallas dibujadas están simplificadas), y el movimiento rígido, recuperado por <a class="gterm" data-term="kabsch" href="../../glossary.html#g-kabsch" title="Ver el glosario">Kabsch</a> (un mejor ajuste de dos conjuntos de puntos correspondientes) a partir de la entrada y del T2 registrado (error residual 0.00003&nbsp;mm); distancia sobre el parche 0.38&nbsp;&rarr;&nbsp;0.18&nbsp;mm. Los pasos mostrados son los del modo paladar de VISOR, en este orden: el parche se predice en cada tiempo, y el ICP se ejecuta solo sobre las nubes de puntos del parche, T2 sobre T1, rígido, 1000 iteraciones, con los centroides emparejados primero. VISOR carga el mismo checkpoint publicado (el modelo AREG, versión v1.0.0) pero vota sin los píxeles de fondo, así que su parche <strong>no está demostrado como idéntico</strong>; la escena no se volvió a ejecutar con el motor de VISOR. No se muestran: los pasos de Crown_Seg y ASO del modo Totalmente automático, que se ejecutan antes, ni la <a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="Ver el código">banda mucogingival</a>, que sustituye al paso 2 en la arcada inferior.</figcaption>
       </figure>
 
       <p>Los vértices etiquetados con 1 en cada malla forman una nube de puntos propia (una nube vacía es un error). La nube de T2 se mueve sobre la de T1 con el ICP del toolkit de visualización: cuerpo rígido (seis grados de libertad), como máximo 1000 iteraciones, empezando por emparejar los dos centros.</p>
@@ -432,14 +432,14 @@
             <tr><td>T1 (línea de base), T2 (seguimiento)</td><td>las dos carpetas o archivos; se ofrecen cohortes de prueba</td></tr>
             <tr><td>Automation</td><td>Totalmente automático (el valor por defecto), o Semiautomático para mallas que ya llevan etiquetas y orientación</td></tr>
             <tr><td>Parche de registro</td><td>Paladar (arcada superior, la inferior la sigue; el valor por defecto) o Mucogingival (solo la arcada inferior)</td></tr>
-            <tr><td><a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">Landmarks</a> mucogingivales</td><td>tus propios 13 landmarks por escaneo inferior; si se dejan vacíos, ALI_IOS los coloca</td></tr>
-            <tr><td><a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="See the code">Altura del parche</a> (mm)</td><td>solo mucogingival; <strong>0 significa sin banda</strong>, y 0 es el valor por defecto; no hay máximo</td></tr>
+            <tr><td><a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="Ver el glosario">Landmarks</a> mucogingivales</td><td>tus propios 13 landmarks por escaneo inferior; si se dejan vacíos, ALI_IOS los coloca</td></tr>
+            <tr><td><a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="Ver el código">Altura del parche</a> (mm)</td><td>solo mucogingival; <strong>0 significa sin banda</strong>, y 0 es el valor por defecto; no hay máximo</td></tr>
             <tr><td>Output suffix</td><td>se añade a los nombres de salida; <code>Reg</code> por defecto; no se admite ningún separador de ruta</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>Los campos ocultos contienen la referencia de orientación, el <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> del paladar, el modelo de Crown_Seg y el modelo mucogingival; vacío significa el paquete que tiene el servidor.</p>
+      <p>Los campos ocultos contienen la referencia de orientación, el <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="Ver el glosario">checkpoint</a> del paladar, el modelo de Crown_Seg y el modelo mucogingival; vacío significa el paquete que tiene el servidor.</p>
 
       <a class="deep-link" href="AREG_IOS.code.html#visor-args"><b>En el código</b><span>La tabla completa de argumentos con tipos, valores por defecto y la regla aplicada a cada uno</span></a>
 
@@ -450,13 +450,13 @@
           <thead><tr><th>Bloque</th><th>Naturaleza</th><th>Dónde se ejecuta</th></tr></thead>
           <tbody>
             <tr><td>Etiquetas de dientes (Crown_Seg)</td><td><span class="badge predit">predicho</span> red, véase <a href="../Crown_Seg/Crown_Seg.html">Crown_Seg en VISOR</a></td><td>herramienta aparte, totalmente automático</td></tr>
-            <tr><td>Orientación (ASO, <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a>)</td><td><span class="badge calcule">calculado</span> a partir de los centroides de los dientes sobre la referencia, véase <a href="../ASO/ASO.html">ASO en VISOR</a></td><td>herramienta aparte, totalmente automático</td></tr>
-            <tr><td><a class="gterm" data-term="areg-ios-standard-frame" href="AREG_IOS.code.html#palate" title="See the code">Marco estándar</a> para renderizar</td><td><span class="badge calcule">calculado</span> cuatro centroides de dientes</td><td>motor</td></tr>
+            <tr><td>Orientación (ASO, <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="Ver el glosario">IOS</a>)</td><td><span class="badge calcule">calculado</span> a partir de los centroides de los dientes sobre la referencia, véase <a href="../ASO/ASO.html">ASO en VISOR</a></td><td>herramienta aparte, totalmente automático</td></tr>
+            <tr><td><a class="gterm" data-term="areg-ios-standard-frame" href="AREG_IOS.code.html#palate" title="Ver el código">Marco estándar</a> para renderizar</td><td><span class="badge calcule">calculado</span> cuatro centroides de dientes</td><td>motor</td></tr>
             <tr><td><strong>Parche palatino</strong></td><td><span class="badge predit">predicho</span> UNet 2D sobre siete renderizados, devuelto por voto a la malla</td><td>motor, GPU si la hay</td></tr>
             <tr><td>Limpieza del parche</td><td><span class="badge calcule">calculado</span> islas, dilatación, erosión</td><td>motor</td></tr>
-            <tr><td><a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">Landmarks</a> mucogingivales (ALI_IOS)</td><td><span class="badge predit">predicho</span> red, véase <a href="../ALI/ALI.html">ALI en VISOR</a></td><td>herramienta aparte, salvo que se envíen</td></tr>
-            <tr><td><a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="See the code">Banda mucogingival</a></td><td><span class="badge calcule">calculado</span> spline, ajuste, crecimiento geodésico</td><td>motor, CPU</td></tr>
-            <tr><td><strong>Registro</strong></td><td><span class="badge calcule">ICP</span> rígido <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">calculado</a> sobre el parche</td><td>motor, CPU</td></tr>
+            <tr><td><a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="Ver el glosario">Landmarks</a> mucogingivales (ALI_IOS)</td><td><span class="badge predit">predicho</span> red, véase <a href="../ALI/ALI.html">ALI en VISOR</a></td><td>herramienta aparte, salvo que se envíen</td></tr>
+            <tr><td><a class="gterm" data-term="areg-ios-band" href="AREG_IOS.code.html#mgl" title="Ver el código">Banda mucogingival</a></td><td><span class="badge calcule">calculado</span> spline, ajuste, crecimiento geodésico</td><td>motor, CPU</td></tr>
+            <tr><td><strong>Registro</strong></td><td><span class="badge calcule">ICP</span> rígido <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="Ver el glosario">calculado</a> sobre el parche</td><td>motor, CPU</td></tr>
           </tbody>
         </table>
       </div>
@@ -499,13 +499,13 @@
 
       <h2 id="environment">6. Entorno</h2>
 
-      <p>El motor se ejecuta en un entorno Python propio, construido a partir de un archivo de bloqueo (una lista de versiones exactas), con las bibliotecas de aprendizaje profundo fijadas a una versión exacta de torch porque pytorch3d, la biblioteca de renderizado 3D, se compila contra ella (por eso los motores <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="See glossary">CBCT</a> e <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="See glossary">IOS</a> están separados). La red del paladar usa una GPU cuando el servidor la tiene y recurre a la CPU en caso contrario. El parche mucogingival no necesita ni pytorch3d ni GPU. El servidor guarda el <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="See glossary">checkpoint</a> del paladar (los pesos guardados de la red) y la referencia de orientación; no se fija ningún límite de tiempo.</p>
+      <p>El motor se ejecuta en un entorno Python propio, construido a partir de un archivo de bloqueo (una lista de versiones exactas), con las bibliotecas de aprendizaje profundo fijadas a una versión exacta de torch porque pytorch3d, la biblioteca de renderizado 3D, se compila contra ella (por eso los motores <a class="gterm" data-term="cbct" href="../../glossary.html#g-cbct" title="Ver el glosario">CBCT</a> e <a class="gterm" data-term="ios" href="../../glossary.html#g-ios" title="Ver el glosario">IOS</a> están separados). La red del paladar usa una GPU cuando el servidor la tiene y recurre a la CPU en caso contrario. El parche mucogingival no necesita ni pytorch3d ni GPU. El servidor guarda el <a class="gterm" data-term="checkpoint" href="../../glossary.html#g-checkpoint" title="Ver el glosario">checkpoint</a> del paladar (los pesos guardados de la red) y la referencia de orientación; no se fija ningún límite de tiempo.</p>
 
       <a class="deep-link" href="AREG_IOS.code.html#environment"><b>En el código</b><span>Versiones, dependencias bloqueadas, rutas de datos y ajustes de recursos</span></a>
 
       <h2 id="visor-changes">7. Qué cambió respecto a la lógica legacy</h2>
 
-      <p>La red y el <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a> son los mismos. Lo que cambió es la fontanería que los rodea, y la ruta mucogingival perdió tres refinamientos.</p>
+      <p>La red y el <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="Ver el glosario">ICP</a> son los mismos. Lo que cambió es la fontanería que los rodea, y la ruta mucogingival perdió tres refinamientos.</p>
 
       <div class="table-wrap">
         <table>
@@ -513,10 +513,10 @@
           <tbody>
             <tr><td>Dónde se ejecuta</td><td>un entorno conda lanzado por el widget de AREG</td><td>un motor de servidor en un entorno bloqueado</td></tr>
             <tr><td>Emparejamiento</td><td>se quitan los caracteres T1 o T2 del nombre; la mandíbula se busca en cualquier parte de la ruta; una mandíbula sin nombre cuenta como inferior</td><td>solo palabras completas; una malla sin mandíbula se señala en el informe</td></tr>
-            <tr><td><a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="See glossary">Landmarks</a> dudosos (mucogingival)</td><td>descartados antes de construir la banda</td><td>conservados</td></tr>
+            <tr><td><a class="gterm" data-term="landmark" href="../../glossary.html#g-landmark" title="Ver el glosario">Landmarks</a> dudosos (mucogingival)</td><td>descartados antes de construir la banda</td><td>conservados</td></tr>
             <tr><td>Landmarks comunes a T1 y T2</td><td>ambas bandas usan solo esos</td><td>cada tiempo usa los suyos</td></tr>
             <tr><td>Arranque del ICP (mucogingival)</td><td>un ajuste rígido sobre los landmarks emparejados</td><td>emparejar los centros</td></tr>
-            <tr><td><a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="See the code">Altura del parche</a></td><td>por defecto 5 mm, limitada de 0 a 20 mm</td><td>valor por defecto del motor 5 mm, pero el valor por defecto publicado es 0, y no hay máximo</td></tr>
+            <tr><td><a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="Ver el código">Altura del parche</a></td><td>por defecto 5 mm, limitada de 0 a 20 mm</td><td>valor por defecto del motor 5 mm, pero el valor por defecto publicado es 0, y no hay máximo</td></tr>
             <tr><td>Dientes excluidos de la banda</td><td>etiquetas 17 a 32</td><td>etiquetas 18 a 31</td></tr>
             <tr><td>Orientación en modo totalmente automático</td><td>segmentación solo para el parche mucogingival; el paladar tenía sus propios ajustes de orientación</td><td>Crown_Seg y luego ASO para ambos parches, con los valores por defecto de ASO</td></tr>
             <tr><td>Red del paladar</td><td>GPU fijada en el código; píxeles de fondo votados en una cara; una llamada de limpieza que no hace nada</td><td>GPU si la hay, si no CPU; fondo excluido; la llamada inútil eliminada</td></tr>
@@ -534,7 +534,7 @@
       <p>Cada punto se comprueba en el código y se documenta, con su evidencia, en la página de código; la lista también aparece en los <a href="../../findings.html">hallazgos</a>.</p>
 
       <ul>
-        <li><strong>La <a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="See the code">altura del parche</a> por defecto es 0, lo que significa sin banda.</strong> El formulario dice que 0 usa el valor por defecto del motor, el código hace lo contrario, así que un registro mucogingival lanzado con los valores por defecto usa unos 13 puntos. <a href="AREG_IOS.code.html#f-patch-height-zero">Evidencia</a>.</li>
+        <li><strong>La <a class="gterm" data-term="areg-ios-patch-height" href="AREG_IOS.code.html#f-patch-height-zero" title="Ver el código">altura del parche</a> por defecto es 0, lo que significa sin banda.</strong> El formulario dice que 0 usa el valor por defecto del motor, el código hace lo contrario, así que un registro mucogingival lanzado con los valores por defecto usa unos 13 puntos. <a href="AREG_IOS.code.html#f-patch-height-zero">Evidencia</a>.</li>
         <li><strong>La ruta mucogingival va por detrás del legacy:</strong> faltan tres refinamientos. <a href="AREG_IOS.code.html#f-mgl-port-behind">Evidencia</a>.</li>
         <li><strong>Las caras duplicadas pierden votos</strong> en la red del paladar, como en el legacy. <a href="AREG_IOS.code.html#f-duplicate-faces">Evidencia</a>.</li>
         <li><strong>Totalmente automático orienta cada mandíbula por separado,</strong> así que la oclusión capturada en el escaneo puede no ser la que se transporta a la otra arcada. <a href="AREG_IOS.code.html#f-orient-each-jaw">Evidencia</a>.</li>
@@ -546,7 +546,7 @@
 
       <h2 id="literature">9. Bibliografía</h2>
 
-      <p>El método (un parche palatino predicho por una red multivista, y luego <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="See glossary">ICP</a>) es el publicado para el módulo legacy; la bibliografía de la herramienta está en <a href="../../AREG_IOS/SOURCES.html">su página de fuentes</a> y en el <a href="../../AREG_IOS/AREG_IOS.html#litterature">apartado 12 de la página legacy</a>. El port no añade ninguna publicación propia.</p>
+      <p>El método (un parche palatino predicho por una red multivista, y luego <a class="gterm" data-term="icp" href="../../glossary.html#g-icp" title="Ver el glosario">ICP</a>) es el publicado para el módulo legacy; la bibliografía de la herramienta está en <a href="../../AREG_IOS/SOURCES.html">su página de fuentes</a> y en el <a href="../../AREG_IOS/AREG_IOS.html#litterature">apartado 12 de la página legacy</a>. El port no añade ninguna publicación propia.</p>
 
       
       <footer class="footer">
