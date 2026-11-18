@@ -137,13 +137,13 @@
         <li><code>legacy</code> = SlicerAutomatedDentalTools 3c67957. <code>ALI_CBCT_utils/agent.py</code> 같은 레거시 경로는 <code>ALI_CBCT/</code> 아래에, <code>ALI_IOS_utils/</code>는 <code>ALI_IOS/</code> 아래에 있다.</li>
       </ul>
 
-      <p>한 문단으로: 사용자가 고르는 도구는 모드가 둘인 <code>ALI</code>라는 <strong><a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">퍼사드</a></strong>다. <code>CBCT</code> 모드는 <code>ALI_CBCT</code>를 실행하며, 랜드마크마다 강화 학습 에이전트 하나가 1 mm, 이어서 0.3 mm에서 복셀 단위로 볼륨을 걸어 다닌다(<a href="#visor-cbct">3절</a>). <code>IOS</code> 모드는 <code>ALI_IOS</code>를 실행하며, 레이블이 붙은 구강 내 메시의 치아를 하나씩 고정된 <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">카메라</a>에서 렌더링하고, 렌더를 2D UNet으로 분할하여 마스크를 메시 위로 다시 투영한다(<a href="#visor-ios">4절</a>). 둘 다 스캔마다 <code>.mrk.json</code> 하나와 <code>run_report.json</code>을 쓴다. 네트워크와 가중치는 레거시의 것이며, 달라진 것은 그 주변이다. 이후의 레거시 수정 여러 가지(<a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a> 재정렬, 단계 예산 보호, Mucogingival 정제 스택 전체)는 이식되지 않았다(<a href="#visor-changes">8절</a>).</p>
+      <p>한 문단으로: 사용자가 고르는 도구는 모드가 둘인 <code>ALI</code>라는 <strong><a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="설명 보기">퍼사드</a></strong>다. <code>CBCT</code> 모드는 <code>ALI_CBCT</code>를 실행하며, 랜드마크마다 강화 학습 에이전트 하나가 1 mm, 이어서 0.3 mm에서 복셀 단위로 볼륨을 걸어 다닌다(<a href="#visor-cbct">3절</a>). <code>IOS</code> 모드는 <code>ALI_IOS</code>를 실행하며, 레이블이 붙은 구강 내 메시의 치아를 하나씩 고정된 <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="설명 보기">카메라</a>에서 렌더링하고, 렌더를 2D UNet으로 분할하여 마스크를 메시 위로 다시 투영한다(<a href="#visor-ios">4절</a>). 둘 다 스캔마다 <code>.mrk.json</code> 하나와 <code>run_report.json</code>을 쓴다. 네트워크와 가중치는 레거시의 것이며, 달라진 것은 그 주변이다. 이후의 레거시 수정 여러 가지(<a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="설명 보기">DICOM</a> 재정렬, 단계 예산 보호, Mucogingival 정제 스택 전체)는 이식되지 않았다(<a href="#visor-changes">8절</a>).</p>
 
       <h2 id="visor-status">1. 상태와 체인에서의 위치</h2>
 
       <p class="code-back">쉬운 설명과 수식: <a href="ALI.html#visor-status">아틀라스 페이지</a>.</p>
 
-      <p><span class="badge neutral">구현 및 테스트됨</span> 이식판은 하나가 아니라 서버 도구 둘이다. <code>ALI_CBCT</code>와 <code>ALI_IOS</code>이며, 2026-08-17에 단일 <code>ALI</code> 도구에서 분리되었다(SADT-VISOR 커밋 2ac7d9d). 사용자가 보는 도구는 <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">퍼사드</a> <code>ALI</code>다. 자체 코드는 없고 <code>dispatch = { "CBCT" = "ALI_CBCT", "IOS" = "ALI_IOS" }</code>만 있다(VISOR-serve <code>deployment.toml:205-210</code>). 시작할 때 서버는 두 대상으로부터 양식을 만든다. 먼저 필수 <code>mode</code> 선택, 그다음 둘의 모든 인자이며, 한쪽 대상에만 있는 인자에는 <code>visible_when</code>이 <code>mode</code>에 붙는다(VISOR-serve <code>registry/facade.py:98</code>, <code>:155-166</code>, <code>:236-245</code>). Slicer 패널은 <code>ALIRemote</code> 모듈이며 그 <code>TOOL_NAME</code>은 <code>"ALI"</code>이므로 퍼사드와 통신한다(Remote <code>ALIRemote/ALIRemote.py:92</code>). 다른 서버 도구는 퍼사드를 거치지 않는다. 슈퍼바이저를 통해 필요한 엔진을 이름으로 직접 호출한다(<code>sup.run</code>).</p>
+      <p><span class="badge neutral">구현 및 테스트됨</span> 이식판은 하나가 아니라 서버 도구 둘이다. <code>ALI_CBCT</code>와 <code>ALI_IOS</code>이며, 2026-08-17에 단일 <code>ALI</code> 도구에서 분리되었다(SADT-VISOR 커밋 2ac7d9d). 사용자가 보는 도구는 <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="설명 보기">퍼사드</a> <code>ALI</code>다. 자체 코드는 없고 <code>dispatch = { "CBCT" = "ALI_CBCT", "IOS" = "ALI_IOS" }</code>만 있다(VISOR-serve <code>deployment.toml:205-210</code>). 시작할 때 서버는 두 대상으로부터 양식을 만든다. 먼저 필수 <code>mode</code> 선택, 그다음 둘의 모든 인자이며, 한쪽 대상에만 있는 인자에는 <code>visible_when</code>이 <code>mode</code>에 붙는다(VISOR-serve <code>registry/facade.py:98</code>, <code>:155-166</code>, <code>:236-245</code>). Slicer 패널은 <code>ALIRemote</code> 모듈이며 그 <code>TOOL_NAME</code>은 <code>"ALI"</code>이므로 퍼사드와 통신한다(Remote <code>ALIRemote/ALIRemote.py:92</code>). 다른 서버 도구는 퍼사드를 거치지 않는다. 슈퍼바이저를 통해 필요한 엔진을 이름으로 직접 호출한다(<code>sup.run</code>).</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 900 280" role="img" aria-label="Slicer의 ALIRemote 패널은 ALI 퍼사드에 요청 하나를 보내고, 퍼사드는 모드에 따라 ALI_CBCT 또는 ALI_IOS를 실행한다. ASO, VFACE, AREG_IOSCBCT는 supervisor를 통해 ALI_CBCT를 호출한다. AREG_IOS와 AREG_IOSCBCT는 ALI_IOS를 호출한다. ALI_IOS는 치아 레이블이 없는 메시에 대해 Crown_Seg를 호출한다.">
@@ -235,7 +235,7 @@
           <thead><tr><th>파일</th><th>줄</th><th>역할</th></tr></thead>
           <tbody>
             <tr><td><code>ALI_CBCT/src/sadt_ali_cbct/__init__.py</code></td><td>173</td><td><code>run()</code>, 공개된 시그니처. <code>PREDICTION_ID = "Pred"</code>, <code>OUTPUT_SUFFIXES</code></td></tr>
-            <tr><td><code>CB/dispatch.py</code></td><td>274</td><td><code>detect()</code>(입력에 무엇이 들어 있는지, <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a> 변환), <code>identify()</code>(작업 디렉터리, 엔진 호출, <code>run_report.json</code>)</td></tr>
+            <tr><td><code>CB/dispatch.py</code></td><td>274</td><td><code>detect()</code>(입력에 무엇이 들어 있는지, <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="설명 보기">DICOM</a> 변환), <code>identify()</code>(작업 디렉터리, 엔진 호출, <code>run_report.json</code>)</td></tr>
             <tr><td><code>CB/engine.py</code></td><td>922</td><td>가중치 탐색, 랜드마크 선택, 스캔별 전처리, 프로세스 풀, 마크업 기록, 보고서</td></tr>
             <tr><td><code>CB/agent.py</code></td><td>297</td><td>에이전트: 이동, 재생성, 수렴, <code>Focus</code>, 단계 예산</td></tr>
             <tr><td><code>CB/brain.py</code></td><td>157</td><td>DenseNet3D + 결정 헤드, 스케일마다 네트워크 하나, <code>weights_only=True</code></td></tr>
@@ -246,7 +246,7 @@
             <tr><td><code>ALI_IOS/src/sadt_ali_ios/__init__.py</code></td><td>177</td><td><code>run()</code>, 공개된 시그니처</td></tr>
             <tr><td><code>IO/dispatch.py</code></td><td>641</td><td>입력 감지, 레이블 있음 / 없음 분리, <code>Crown_Seg</code> 호출, 엔진 두 번의 패스, 보고서 병합, 요청된 랜드마크로의 필터링</td></tr>
             <tr><td><code>IO/engine.py</code></td><td>711</td><td>가중치 탐색, UNet 구성, 메시별 및 치아별 예측, MG 경로, 픽셀에서 점으로, 보고서</td></tr>
-            <tr><td><code>IO/render.py</code></td><td>414</td><td><a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">카메라</a> 표, pytorch3d 렌더러, MG 카메라 프레임, 누락된 치아를 위한 악궁 맞춤</td></tr>
+            <tr><td><code>IO/render.py</code></td><td>414</td><td><a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="설명 보기">카메라</a> 표, pytorch3d 렌더러, MG 카메라 프레임, 누락된 치아를 위한 악궁 맞춤</td></tr>
             <tr><td><code>IO/surface.py</code></td><td>211</td><td><code>.vtk</code>/<code>.stl</code> 읽기, 레이블 배열, 단위 구 스케일링, 법선을 색으로, 치아 위의 면</td></tr>
             <tr><td><code>IO/catalog.py</code></td><td>297</td><td>랜드마크 153개, 네트워크, 카메라 반지름, MG 이름과 조준 오프셋</td></tr>
             <tr><td><code>IO/layout.py</code>, <code>progress.py</code>, <code>torch_helpers.py</code>, <code>errors.py</code></td><td>78, 103, 49, 21</td><td>양식, 진행 상황, 지연 torch import, 오류</td></tr>
@@ -257,7 +257,7 @@
         </table>
       </div>
 
-      <p>SADT-VISOR 바깥: VISOR-serve <code>deployment.toml:86-160</code>(두 엔진의 데이터 폴더와 폭 규칙, 주석에 시간 측정 포함)과 <code>:205-210</code>(<a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">퍼사드</a>), <code>registry/facade.py</code>(301줄, 퍼사드 스키마의 구성). 클라이언트에서는 <code>ALIRemote/ALIRemote.py</code>(252줄)와 그 테스트 <code>ALIRemote/Testing/Python/test_ali_client.py</code>.</p>
+      <p>SADT-VISOR 바깥: VISOR-serve <code>deployment.toml:86-160</code>(두 엔진의 데이터 폴더와 폭 규칙, 주석에 시간 측정 포함)과 <code>:205-210</code>(<a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="설명 보기">퍼사드</a>), <code>registry/facade.py</code>(301줄, 퍼사드 스키마의 구성). 클라이언트에서는 <code>ALIRemote/ALIRemote.py</code>(252줄)와 그 테스트 <code>ALIRemote/Testing/Python/test_ali_client.py</code>.</p>
 
       <h2 id="visor-cbct">3. ALI_CBCT: 볼륨 안의 에이전트</h2>
 
@@ -350,7 +350,7 @@
 
       <p><code>detect()</code>(<code>CB/dispatch.py:80-135</code>)가 무엇이 전송되었는지 결정한다. 단일 파일은 <code>.nii .nii.gz .nrrd .nrrd.gz .gipl .gipl.gz</code> 중 하나로 끝나야 한다(<code>CM/discovery.py:22</code>). 표면은 이름으로 거부된다(&ldquo;run ALI_IOS on surfaces&rdquo;, <code>:102-106</code>). 폴더는 재귀적으로 순회되며, 볼륨과 표면이 섞인 폴더는 절반만 처리되지 않고 거부된다(<code>:115-125</code>). 각 스캔은 <strong>입력에 대한 상대 경로</strong>(<code>CM/discovery.py:33-45</code>)를 키로 하므로, 서로 다른 하위 폴더에 있는 <code>scan.nii.gz</code>라는 이름의 두 환자가 더 이상 충돌하지 않는다. <code>.zip</code>은 이 코드에 닿지 않는다. 서버가 <code>run()</code> 전에 압축을 푼다(<code>:89-91</code>).</p>
 
-      <p><a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a>은 <strong>선언되지 않고 감지된다.</strong> 파일은 있지만 볼륨이나 표면이 없는 모든 디렉터리를 GDCM에 물어보며(<code>_dicom_directories</code>, <code>CB/dispatch.py:60-77</code>, <code>CB/preprocess.py:130-143</code>), 발견된 시리즈마다 입력이 아니라 작업의 임시 폴더 아래에 NIfTI 하나로 기록된다.</p>
+      <p><a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="설명 보기">DICOM</a>은 <strong>선언되지 않고 감지된다.</strong> 파일은 있지만 볼륨이나 표면이 없는 모든 디렉터리를 GDCM에 물어보며(<code>_dicom_directories</code>, <code>CB/dispatch.py:60-77</code>, <code>CB/preprocess.py:130-143</code>), 발견된 시리즈마다 입력이 아니라 작업의 임시 폴더 아래에 NIfTI 하나로 기록된다.</p>
 
       <pre><code>destination_root = os.path.join(work_dir, "dicom_converted")
 key = scan_key(directory, root)
@@ -409,7 +409,7 @@ return self._rescale(crop(self.data[scale_key]["image"])).type(torch.float32)
         <li><strong>경계</strong>: 모든 좌표가 패딩되지 않은 볼륨의 <code>[0, size)</code> 안에 머물 때만 이동이 유지된다(<code>:135-141</code>). 그렇지 않으면 짧은 기억을 비우고 에이전트가 재생성된다. 스케일 0에서는 볼륨 안의 아무 곳에서, 스케일 1에서는 스케일이 시작된 곳에서 10 복셀 이내에서, 실행 시드와 랜드마크 이름으로 시드된 생성기에서 뽑는다(<code>:148-177</code>, <code>rng_for</code> <code>:54-68</code>). 세 번 나가면 랜드마크를 찾지 못한 것이다(<code>_MAX_ATTEMPTS = 3</code>, <code>:45</code>, <code>:294-295</code>).</li>
         <li><strong>수렴</strong>: 새 위치는 기억되기 <em>전에</em> 최근 10개의 위치와 비교된다(<code>:179-185</code>, <code>:213-217</code>). 맴돌면 도착한 것이다.</li>
         <li><strong>스케일 변경</strong>: 위치에 간격 비율(1/0.3)을 곱하고 시도 횟수를 초기화한다. 스케일마다 자체 기억을 가진다(<code>:114</code>, <code>:187-199</code>).</li>
-        <li>세밀한 스케일의 <strong><a class="gterm" data-term="ali-focus" href="ALI.html#cbct-search" title="See the explanation">Focus</a></strong>: ±x, ±y, ±z를 따라 4 복셀 떨어진 곳에서 여섯 번 재시작하며, 각각 맴돌 때까지 걷는다. 답은 여섯 도착 지점의 평균이며, 이것이 서브복셀 정밀도를 만든다(<code>:219-246</code>).</li>
+        <li>세밀한 스케일의 <strong><a class="gterm" data-term="ali-focus" href="ALI.html#cbct-search" title="설명 보기">Focus</a></strong>: ±x, ±y, ±z를 따라 4 복셀 떨어진 곳에서 여섯 번 재시작하며, 각각 맴돌 때까지 걷는다. 답은 여섯 도착 지점의 평균이며, 이것이 서브복셀 정밀도를 만든다(<code>:219-246</code>).</li>
       </ol>
 
       <p><strong>예산은 초가 아니라 단계로 센다</strong>: 기본값으로 랜드마크당 순전파 900번, 또는 <code>search_steps</code>(<code>CB/engine.py:55</code>, <code>:81-92</code>). 같은 카운터가 탐색과 여섯 번의 <code>Focus</code> 이동에 쓰이며, 소진되면 <code>NotFound</code>가 발생하고 스캔마다 <code>landmarks_failed</code>에 기록된다(<code>CB/agent.py:238-243</code>, <code>:283-287</code>, <code>CB/engine.py:399-404</code>). 그 이유에 대한 엔진의 주석은 이렇다. 벽시계 시간을 쓰면 결과가 카드가 얼마나 바쁜지에 좌우되었고, &ldquo;four agents wide dropped C4&rdquo;(<code>CB/agent.py:257-270</code>).</p>
@@ -565,7 +565,7 @@ HardPhongShader(..., lights=PointLights(...))</code></pre>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>신경망</th><th>반지름(<a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="See the explanation">단위 구</a>)</th><th>치아당 뷰 수</th><th>방향</th></tr></thead>
+          <thead><tr><th>신경망</th><th>반지름(<a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="설명 보기">단위 구</a>)</th><th>치아당 뷰 수</th><th>방향</th></tr></thead>
           <tbody>
             <tr><td><code>O</code> (occlusal)</td><td>0.2</td><td>5</td><td>고정 표: 교합면 축과 기울임 넷, 턱별(<code>IO/render.py:39-54</code>)</td></tr>
             <tr><td><code>C</code> (cervical)</td><td>0.3</td><td>12</td><td>고정 표: 치관 둘레, 수평 방향과 0.5만큼 기울인 방향(<code>:56-73</code>)</td></tr>
@@ -574,7 +574,7 @@ HardPhongShader(..., lights=PointLights(...))</code></pre>
         </table>
       </div>
 
-      <p>반지름은 <code>CAMERA_RADIUS</code>에서 온다(<code>IO/catalog.py:54</code>). O 표는 "불일치까지 포함해 바이트 단위로 그대로" 복사되었다(<code>IO/render.py:8-12</code>). 각 턱의 벡터 다섯 개 중 축을 뺀 넷은 다른 벡터의 노름으로 나뉘므로 단위 길이가 아니며(0.913, 0.913, 0.791, 0.791. 파일 자체는 &ldquo;several&rdquo;라고 적는다), 배포된 가중치가 이 뷰들로 학습되었기 때문에 그대로 둔다. 이 네 <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">카메라</a>는 치아에서 반지름의 0.913배 또는 0.791배 거리에 선다. 각 방향마다 <code>render_views</code>(<code>:366-414</code>)는 카메라를 <code>centre + direction × radius</code>에 놓고, <code>R</code>과 <code>T</code>로 <strong>한 번</strong> 렌더링하며, 이미지(법선 RGB와 깊이, 4채널)와 그 같은 래스터화의 <code>pix_to_face</code>를 모두 보관한다. MG 프레임(<code>mg_frame</code>, <code>:211-250</code>)은 이웃 치아로부터 구한 치열궁 접선과, <code>MG_AIM_OFFSET</code>(<code>IO/catalog.py:96</code>)만큼 옮긴 조준점을 쓴다.</p>
+      <p>반지름은 <code>CAMERA_RADIUS</code>에서 온다(<code>IO/catalog.py:54</code>). O 표는 "불일치까지 포함해 바이트 단위로 그대로" 복사되었다(<code>IO/render.py:8-12</code>). 각 턱의 벡터 다섯 개 중 축을 뺀 넷은 다른 벡터의 노름으로 나뉘므로 단위 길이가 아니며(0.913, 0.913, 0.791, 0.791. 파일 자체는 &ldquo;several&rdquo;라고 적는다), 배포된 가중치가 이 뷰들로 학습되었기 때문에 그대로 둔다. 이 네 <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="설명 보기">카메라</a>는 치아에서 반지름의 0.913배 또는 0.791배 거리에 선다. 각 방향마다 <code>render_views</code>(<code>:366-414</code>)는 카메라를 <code>centre + direction × radius</code>에 놓고, <code>R</code>과 <code>T</code>로 <strong>한 번</strong> 렌더링하며, 이미지(법선 RGB와 깊이, 4채널)와 그 같은 래스터화의 <code>pix_to_face</code>를 모두 보관한다. MG 프레임(<code>mg_frame</code>, <code>:211-250</code>)은 이웃 치아로부터 구한 치열궁 접선과, <code>MG_AIM_OFFSET</code>(<code>IO/catalog.py:96</code>)만큼 옮긴 조준점을 쓴다.</p>
 
       <h3 id="ios-network">4.4 네트워크와 디코딩</h3>
 
@@ -624,7 +624,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
 
       <p class="code-back">쉬운 설명과 수식: <a href="ALI.html#visor-args">아틀라스 페이지</a>.</p>
 
-      <p>시그니처: <code>CB/__init__.py:62-104</code>와 <code>IO/__init__.py:64-120</code>. "숨김"은 인자가 공개된 스키마에는 있지만 패널이 그리지 않는다는 뜻이다. <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">퍼사드</a>는 두 도구가 공유하는 인자의 설명으로 첫 번째 대상의 것을 유지하므로, <code>input</code>은 IOS 모드에서도 CBCT의 문구("Scan or Folder")를 그대로 둔다(VISOR-serve <code>registry/facade.py:146-147</code>, 읽어서 확인).</p>
+      <p>시그니처: <code>CB/__init__.py:62-104</code>와 <code>IO/__init__.py:64-120</code>. "숨김"은 인자가 공개된 스키마에는 있지만 패널이 그리지 않는다는 뜻이다. <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="설명 보기">퍼사드</a>는 두 도구가 공유하는 인자의 설명으로 첫 번째 대상의 것을 유지하므로, <code>input</code>은 IOS 모드에서도 CBCT의 문구("Scan or Folder")를 그대로 둔다(VISOR-serve <code>registry/facade.py:146-147</code>, 읽어서 확인).</p>
 
       <div class="table-wrap">
         <table>
@@ -650,7 +650,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
         <div class="io-card">
           <h3>입력</h3>
           <ul>
-            <li>CBCT: <code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>, 폴더(재귀) 또는 <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a> 시리즈 폴더(서버가 변환한다. <code>CB/dispatch.py:60-77</code>, <code>:139-166</code>). <code>.zip</code>은 서버가 먼저 푼다</li>
+            <li>CBCT: <code>.nii</code>, <code>.nii.gz</code>, <code>.nrrd</code>, <code>.nrrd.gz</code>, <code>.gipl</code>, <code>.gipl.gz</code>, 폴더(재귀) 또는 <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="설명 보기">DICOM</a> 시리즈 폴더(서버가 변환한다. <code>CB/dispatch.py:60-77</code>, <code>:139-166</code>). <code>.zip</code>은 서버가 먼저 푼다</li>
             <li>IOS: <code>.vtk</code>와 <code>.stl</code>(레거시는 <code>.vtp .obj .off</code>도 받았다. <code>ALI_IOS.py:120</code>). 치아 레이블은 <code>PredictedID</code>, <code>UniversalID</code> 또는 <code>Universal_ID</code>에 있다(<code>IO/surface.py:19</code>)</li>
             <li>볼륨과 표면이 섞인 폴더는 이름을 들어 거부된다</li>
           </ul>
@@ -677,13 +677,13 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
         <table>
           <thead><tr><th>블록</th><th>성격</th><th>위치</th></tr></thead>
           <tbody>
-            <tr><td>입력 감지, <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a> 변환</td><td><span class="badge calcule">계산</span> GDCM, SimpleITK</td><td><code>CB/dispatch.py</code></td></tr>
+            <tr><td>입력 감지, <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="설명 보기">DICOM</a> 변환</td><td><span class="badge calcule">계산</span> GDCM, SimpleITK</td><td><code>CB/dispatch.py</code></td></tr>
             <tr><td>히스토그램 클램프, 리샘플링</td><td><span class="badge calcule">계산</span> SimpleITK, itk</td><td><code>CB/preprocess.py</code></td></tr>
             <tr><td>에이전트의 이동 방향</td><td><span class="badge predit">예측</span> DenseNet3D + MLP, 6개 클래스</td><td><code>CB/brain.py</code></td></tr>
             <tr><td>수렴, 스케일 전환, <code>Focus</code>, 리스폰</td><td><span class="badge calcule">계산</span> 위치 10개의 기억, 평균화, 시드 고정 생성기</td><td><code>CB/agent.py</code></td></tr>
             <tr><td>복셀에서 밀리미터로</td><td><span class="badge calcule">계산</span> <code>abs(origin / spacing)</code></td><td><code>CB/environment.py</code></td></tr>
             <tr><td>치관 분할(레이블 없는 메시)</td><td>다른 도구 <code>Crown_Seg</code>가 <span class="badge predit">예측</span></td><td><code>IO/dispatch.py</code> → <a href="../Crown_Seg/Crown_Seg.html">Crown_Seg</a></td></tr>
-            <tr><td><a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="See the explanation">단위 구</a>, <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">카메라</a> 배치, MG 프레임, 치열궁 피팅</td><td><span class="badge calcule">계산</span> 기하, <code>MG_AIM_OFFSET</code> 사전값</td><td><code>IO/surface.py</code>, <code>IO/render.py</code></td></tr>
+            <tr><td><a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="설명 보기">단위 구</a>, <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="설명 보기">카메라</a> 배치, MG 프레임, 치열궁 피팅</td><td><span class="badge calcule">계산</span> 기하, <code>MG_AIM_OFFSET</code> 사전값</td><td><code>IO/surface.py</code>, <code>IO/render.py</code></td></tr>
             <tr><td>픽셀별 클래스 맵</td><td><span class="badge predit">예측</span> monai 2D UNet</td><td><code>IO/engine.py</code></td></tr>
             <tr><td>픽셀 → 면 → 중심 → 스냅</td><td><span class="badge calcule">계산</span> <code>pix_to_face</code>, 옥트리 로케이터</td><td><code>IO/engine.py</code></td></tr>
             <tr><td>강제된 MG 점</td><td><span class="badge calcule">계산</span> 예측 확률 상위 50개</td><td><code>IO/engine.py</code></td></tr>
@@ -754,7 +754,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
       <p class="code-back">쉬운 설명과 수식: <a href="ALI.html#visor-findings">아틀라스 페이지</a>.</p>
 
       <div id="f-dicom-key" class="callout bug">
-        <div class="callout-title">확인된 버그 · <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="See the explanation">DICOM</a> 시리즈 폴더가 숨김 출력 파일을 만든다</div>
+        <div class="callout-title">확인된 버그 · <a class="gterm" data-term="ali-dicom" href="ALI.html#cbct-input" title="설명 보기">DICOM</a> 시리즈 폴더가 숨김 출력 파일을 만든다</div>
         <p>입력으로 <strong>하나의</strong> DICOM 시리즈 폴더를 선택하면(패널이 유도하는 경우) 스캔 키가 <code>"."</code>이 된다. <code>_dicom_directories</code>가 루트 자신을 포함하고(<code>CB/dispatch.py:70-77</code>), <code>scan_key</code>가 <code>os.path.relpath(root, root)</code>이며(<code>CM/discovery.py:43</code>), 변환된 파일의 이름이 <code>..nii.gz</code>가 되고(<code>CB/dispatch.py:156</code>, <code>:164</code>), <code>scan_stem("..nii.gz")</code>이 <code>"."</code>이기 때문이다(<code>CB/engine.py:152-158</code>). 출력은 숨김 파일 <code>._lm_Pred.mrk.json</code>이다. 이 페이지를 위해 실행함: <code>scan_key</code>와 <code>scan_stem</code>은 정확히 이 값을 돌려준다. 실제 시리즈로 전체 실행을 반복하지는 않았다. 파일을 이름 접두사로 맞추는 하류 도구는 이런 파일을 스캔과 짝지어 주지 못한다.</p>
       </div>
 
@@ -770,7 +770,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
 
       <div id="f-panel-summary" class="callout bug">
         <div class="callout-title">확인된 버그 · Slicer 패널이 "0 scan(s), 0 landmark(s) written"을 보고한다</div>
-        <p><code>ALIRemote._summarize</code>는 <code>report.get("scans")</code>를 읽지만(Remote <code>ALIRemote/ALIRemote.py:216</code>), 두 엔진 모두 스캔별 기록을 <code>cases</code> 아래에 쓴다(<code>CB/engine.py:708</code>, <code>IO/engine.py:704</code>). 둘 사이에서 키 이름을 바꾸는 것은 없다(<code>ServerToolsCore/ServerToolsCoreLib/base_widget.py:119</code>의 보고서 병합은 범용이다). 그래서 실행 끝 메시지는 항상 스캔도 랜드마크도 없다고 말하며, 수렴하지 못한 랜드마크도 절대 나열하지 않는다(<code>ALIRemote.py:216-232</code>). 이 페이지를 위해 실행함: 모듈에서 꺼낸 <code>_summarize</code>에 찾은 랜드마크 둘과 실패한 랜드마크 하나를 가진 케이스 하나의 보고서를 주면 "0 scan(s), 0 landmark(s) written."을 출력하고 실패는 출력하지 않는다. 결과 파일 자체는 올바르게 로드된다(<code>_findMarkupFiles</code>가 폴더를 훑는다). 관련된 잔재가 둘 있다. <code>configureFields</code>는 <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="See the explanation">퍼사드</a>가 더 이상 공개하지 않는 <code>prediction_ID</code> 필드를 찾고(<code>ALIRemote.py:129</code>), 클라이언트 테스트 픽스처는 아직 <code>cbct_regions</code>와 <code>prediction_ID</code>를 선언하면서 <code>mode</code>는 선언하지 않는다(<code>ALIRemote/Testing/Python/test_ali_client.py:101</code>, <code>:409</code>).</p>
+        <p><code>ALIRemote._summarize</code>는 <code>report.get("scans")</code>를 읽지만(Remote <code>ALIRemote/ALIRemote.py:216</code>), 두 엔진 모두 스캔별 기록을 <code>cases</code> 아래에 쓴다(<code>CB/engine.py:708</code>, <code>IO/engine.py:704</code>). 둘 사이에서 키 이름을 바꾸는 것은 없다(<code>ServerToolsCore/ServerToolsCoreLib/base_widget.py:119</code>의 보고서 병합은 범용이다). 그래서 실행 끝 메시지는 항상 스캔도 랜드마크도 없다고 말하며, 수렴하지 못한 랜드마크도 절대 나열하지 않는다(<code>ALIRemote.py:216-232</code>). 이 페이지를 위해 실행함: 모듈에서 꺼낸 <code>_summarize</code>에 찾은 랜드마크 둘과 실패한 랜드마크 하나를 가진 케이스 하나의 보고서를 주면 "0 scan(s), 0 landmark(s) written."을 출력하고 실패는 출력하지 않는다. 결과 파일 자체는 올바르게 로드된다(<code>_findMarkupFiles</code>가 폴더를 훑는다). 관련된 잔재가 둘 있다. <code>configureFields</code>는 <a class="gterm" data-term="ali-facade" href="ALI.html#visor-status" title="설명 보기">퍼사드</a>가 더 이상 공개하지 않는 <code>prediction_ID</code> 필드를 찾고(<code>ALIRemote.py:129</code>), 클라이언트 테스트 픽스처는 아직 <code>cbct_regions</code>와 <code>prediction_ID</code>를 선언하면서 <code>mode</code>는 선언하지 않는다(<code>ALIRemote/Testing/Python/test_ali_client.py:101</code>, <code>:409</code>).</p>
       </div>
 
       <div id="f-mg-stack" class="callout warn">
@@ -785,7 +785,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
 
       <div id="f-description" class="callout note">
         <div class="callout-title">참고 · 점막치은 점만 description을 가진다</div>
-        <p>O와 C 점, 그리고 ALI_CBCT의 모든 점은 품질과 관계없이 <code>description</code>이 비어 있다. 메모는 MG 경로만 채우며(<code>IO/engine.py:567-575</code>, <code>:426</code>에서 기록) ALI_CBCT는 아무것도 넘기지 않는다(<code>CB/engine.py:921</code>). <a class="gterm" data-term="ali-run-report" href="ALI.html#cbct-output" title="See the explanation">실행 보고서</a>의 <code>landmarks_degraded</code>(<code>IO/engine.py:414-419</code>)가 MG에 대한 의심이 기록되는 다른 한 곳이다.</p>
+        <p>O와 C 점, 그리고 ALI_CBCT의 모든 점은 품질과 관계없이 <code>description</code>이 비어 있다. 메모는 MG 경로만 채우며(<code>IO/engine.py:567-575</code>, <code>:426</code>에서 기록) ALI_CBCT는 아무것도 넘기지 않는다(<code>CB/engine.py:921</code>). <a class="gterm" data-term="ali-run-report" href="ALI.html#cbct-output" title="설명 보기">실행 보고서</a>의 <code>landmarks_degraded</code>(<code>IO/engine.py:414-419</code>)가 MG에 대한 의심이 기록되는 다른 한 곳이다.</p>
       </div>
 
       <div id="f-ios-report-noise" class="callout note">
@@ -799,7 +799,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
       </div>
 
       <div id="f-o-table" class="callout ok">
-        <div class="callout-title">확인됨 · O <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="See the explanation">카메라</a> 표는 의도적으로 그대로 재현된다</div>
+        <div class="callout-title">확인됨 · O <a class="gterm" data-term="ali-cameras" href="ALI.html#ios-cameras" title="설명 보기">카메라</a> 표는 의도적으로 그대로 재현된다</div>
         <p>O 방향 둘은 다른 벡터의 노름으로 나뉘어(<code>np.array([0.5, 0.0, 1.0]) / _norm([0.5, 0.5, 1.0])</code>) 길이가 1이 아니라 0.913 또는 0.791이다(계산: 1.118/1.2247과 1.118/1.414). 이식본은 가중치가 이 뷰들로 학습되었기 때문에 이를 의도적으로 유지한다(<code>IO/render.py:8-12</code>, 표 <code>:39-54</code>. 레거시 <code>ALI_IOS_utils/model.py:66-77</code>).</p>
       </div>
 
@@ -810,7 +810,7 @@ return picked[picked &gt;= 0].tolist()                 # IO/engine.py:216-226</c
 
       <h2 id="visor-literature">10. 문헌</h2>
 
-      <p>네트워크는 공개된 것이다. ALI_CBCT는 Gillot et al. 2023을 따르고(다중 스케일 볼륨 위의 에이전트, 스케일 1&nbsp;mm와 0.3&nbsp;mm, <code>CB/catalog.py:69</code>), ALI_IOS는 O 모델에 대해 CLIP 2022 논문을 따른다(<a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="See the explanation">단위 구</a>, 치아당 뷰 다섯 개, 패치 분할, <code>IO/surface.py:72</code>, <code>IO/render.py:39-54</code>). 점막치은 경로는 레거시 쪽과 마찬가지로 미발표이다. 참고문헌은 도구 자체의 것이다: <a href="../../ALI/SOURCES.html">ALI 출처</a>. 레거시 페이지는 각 논문을 코드와 대조해 <a href="../../ALI/ALI.html#litterature">8절</a>에서 논한다.</p>
+      <p>네트워크는 공개된 것이다. ALI_CBCT는 Gillot et al. 2023을 따르고(다중 스케일 볼륨 위의 에이전트, 스케일 1&nbsp;mm와 0.3&nbsp;mm, <code>CB/catalog.py:69</code>), ALI_IOS는 O 모델에 대해 CLIP 2022 논문을 따른다(<a class="gterm" data-term="ali-unit-sphere" href="ALI.html#ios-scaling" title="설명 보기">단위 구</a>, 치아당 뷰 다섯 개, 패치 분할, <code>IO/surface.py:72</code>, <code>IO/render.py:39-54</code>). 점막치은 경로는 레거시 쪽과 마찬가지로 미발표이다. 참고문헌은 도구 자체의 것이다: <a href="../../ALI/SOURCES.html">ALI 출처</a>. 레거시 페이지는 각 논문을 코드와 대조해 <a href="../../ALI/ALI.html#litterature">8절</a>에서 논한다.</p>
 
       <footer class="footer">
         <a href="../../index.html">← 모든 페이지</a> · <a href="ALI.html">아틀라스 페이지(설명)</a> · <a href="../../ALI/ALI.html">이 도구의 레거시 페이지</a> · <a href="../guide/ALI.html">VISOR와 함께 쓰는 가이드</a> · <a href="../index.html">VISOR 개요</a>

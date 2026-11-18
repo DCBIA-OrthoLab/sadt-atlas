@@ -403,10 +403,10 @@ post_process.MedianFilter(surface, projected)</code></pre>
 
       <ul>
         <li><strong>리사이즈</strong>: <code>torch.nn.functional.interpolate</code>, 쌍선형, <code>align_corners=False</code>를 쓰며, 레거시의 <code>cv2.resize</code>를 대신한다. 주석에 따르면 테스트가 두 결과를 1e-5까지 맞춰 고정한다(<code>pipeline.py:163-184</code>, <code>pyproject.toml:45-51</code>).</li>
-        <li><strong>정규화</strong>: 1번째와 99번째 <a class="gterm" data-term="dsx-percentiles" href="DOCShapeAXI.html#visor-explain" title="See the explanation">백분위수</a>로 클립한 다음 [-1, 1]로 매핑한다. 평평한 맵은 NaN이 아니라 0이 된다(<code>pipeline.py:186-199</code>).</li>
+        <li><strong>정규화</strong>: 1번째와 99번째 <a class="gterm" data-term="dsx-percentiles" href="DOCShapeAXI.html#visor-explain" title="설명 보기">백분위수</a>로 클립한 다음 [-1, 1]로 매핑한다. 평평한 맵은 NaN이 아니라 0이 된다(<code>pipeline.py:186-199</code>).</li>
         <li><strong>어느 층인가</strong>: 레거시와 같이 2D EfficientNet 갈래의 마지막 블록이다(<code>DOCShapeAXI_CLI.py:150-151</code>). 이 맵은 다중 뷰 갈래를 설명하며, 포인트 클라우드 갈래는 설명하지 않는다.</li>
         <li><strong>투영</strong>: <code>gradcam_process</code>는 shapeaxi의 것이다(1.0.10과 1.1.1의 <code>saxi_gradcam.py:112-144</code>, 같은 코드). 면은 0에서 시작하여 뷰를 거듭할 때마다 <code>maximum(old, new)</code>를 취하므로, 메시에서 한 면은 <code>max(0, max over views)</code>를 가지며 범위는 [0, 1]이다. 값은 면의 첫 번째 정점으로 가고, 누구의 첫 번째 정점도 아닌 정점은 0으로 초기화된다(<code>:134</code>). 하나의 뷰 안에서 같은 면을 보여 주는 픽셀들은 인덱스를 공유하며, 남는 기록이 무엇인지는 정해져 있지 않다(CPU에서는 마지막 것이고, 최댓값이 아니다). 배경 픽셀은 인덱스 -1을 가지며 마지막 면에 기록된다. CPU 테스트와 세부 사항은 <a href="../../DOCShapeAXI/DOCShapeAXI.code.html#explicabilite">레거시 코드 페이지의 5d절</a>에 있으며, GPU에서는 아무것도 실행하지 않았다.</li>
-        <li><strong><a class="gterm" data-term="dsx-median" href="DOCShapeAXI.html#visor-explain" title="See the explanation">중앙값 필터</a></strong>: <code>post_process.MedianFilter</code>(<code>post_process.py:294-308</code>)는 채워진 정점이든 빈 정점이든 모든 정점을, 자기 자신을 제외한 이웃의 중앙값으로 바꾼다(<code>utils.py:363-376</code>). 빈 정점만 바꾸는 것이 아니다.</li>
+        <li><strong><a class="gterm" data-term="dsx-median" href="DOCShapeAXI.html#visor-explain" title="설명 보기">중앙값 필터</a></strong>: <code>post_process.MedianFilter</code>(<code>post_process.py:294-308</code>)는 채워진 정점이든 빈 정점이든 모든 정점을, 자기 자신을 제외한 이웃의 중앙값으로 바꾼다(<code>utils.py:363-376</code>). 빈 정점만 바꾸는 것이 아니다.</li>
         <li><strong>배열 이름</strong>: 클래스 인덱스는 항상 <code>target_class</code>로 전달되며, 이것이 배열의 이름이 된다(<code>engine.py:104-106,117-129</code>). 레거시는 <code>num_classes &gt; 1</code>일 때만 이를 설정했으므로(<code>DOCShapeAXI_CLI.py:171-174</code>), 회귀 체크포인트도 이제 클래스별 이름 <code>grad_cam_target_class_0</code>을 받는다. 코드에서 읽은 내용이다.</li>
         <li><strong>기록</strong>: 모든 클래스를 거친 뒤 표면마다 한 번, 입력의 기본 이름으로 <code>output_dir</code>에 평평하게 기록한다(<code>engine.py:111-113</code>). 레거시는 클래스 루프 안에서 <code>&lt;out&gt;/explainability/&lt;task&gt;/</code>에 기록했다(<code>DOCShapeAXI_CLI.py:153,185-186</code>).</li>
       </ul>
@@ -466,7 +466,7 @@ post_process.MedianFilter(surface, projected)</code></pre>
             <tr><td>클래스 또는 중증도 점수</td><td><span class="badge predit">예측</span> <strong>네트워크</strong>: <code>SaxiMHAFBClassification</code> 또는 <code>SaxiMHAFBRegression</code>, EfficientNet-B0 뷰 갈래와 점 갈래</td><td>서버</td></tr>
             <tr><td>Argmax</td><td><span class="badge calcule">계산</span></td><td>서버</td></tr>
             <tr><td>Grad-CAM 맵</td><td>네트워크의 기울기로 <span class="badge calcule">계산</span>하며, 네트워크를 설명할 뿐 새로운 것을 예측하지 않는다</td><td>서버</td></tr>
-            <tr><td>리사이즈, 클리핑, 투영, <a class="gterm" data-term="dsx-median" href="DOCShapeAXI.html#visor-explain" title="See the explanation">중앙값 필터</a></td><td><span class="badge calcule">계산</span></td><td>서버</td></tr>
+            <tr><td>리사이즈, 클리핑, 투영, <a class="gterm" data-term="dsx-median" href="DOCShapeAXI.html#visor-explain" title="설명 보기">중앙값 필터</a></td><td><span class="badge calcule">계산</span></td><td>서버</td></tr>
           </tbody>
         </table>
       </div>
@@ -496,7 +496,7 @@ post_process.MedianFilter(surface, projected)</code></pre>
 
       <p class="code-back">쉬운 설명과 수식: <a href="DOCShapeAXI.html#visor-changes">아틀라스 페이지</a>.</p>
 
-      <p>네트워크 아키텍처, 포인트 클라우드와 다중 뷰 입력, Grad-CAM 층과 그 <a class="gterm" data-term="dsx-percentiles" href="DOCShapeAXI.html#visor-explain" title="See the explanation">백분위수</a> 클리핑은 같다. 레거시 줄은 3c67957 시점의 <code>DOCShapeAXI_CLI/DOCShapeAXI_CLI.py</code>다.</p>
+      <p>네트워크 아키텍처, 포인트 클라우드와 다중 뷰 입력, Grad-CAM 층과 그 <a class="gterm" data-term="dsx-percentiles" href="DOCShapeAXI.html#visor-explain" title="설명 보기">백분위수</a> 클리핑은 같다. 레거시 줄은 3c67957 시점의 <code>DOCShapeAXI_CLI/DOCShapeAXI_CLI.py</code>다.</p>
 
       <div class="table-wrap">
         <table>
@@ -510,7 +510,7 @@ post_process.MedianFilter(surface, projected)</code></pre>
             <tr><td>체크포인트 로딩</td><td><code>load_from_checkpoint(path, strict=False)</code> (<code>:135,201</code>)</td><td>여전히 <code>strict=False</code>(<code>pipeline.py:148</code>)이며, 체크포인트가 unpickle할 수 있는 클래스의 허용 목록이 있다(<code>:108-127</code>)</td></tr>
             <tr><td>스케일 인자</td><td>예측에는 <code>EvalTransform(scale_factor)</code>(<code>:209</code>), Grad-CAM에는 <code>EvalTransform()</code>(<code>:144</code>)</td><td>두 패스 모두 <code>EvalTransform(scale_factor)</code>로 만든 하나의 데이터셋을 거친다(<code>engine.py:25-28</code>). 값은 shapeaxi 1.1.1 내부에서 버려지므로(<code>saxi_transforms.py:48-57</code>), 레거시와 마찬가지로 두 패스 모두 피험자별로 정규화한다</td></tr>
             <tr><td>분류 출력</td><td>softmax 후 argmax, 회귀에는 적용하지 않음(<code>:232-235</code>)</td><td>회귀가 아니면 argmax(<code>engine.py:57-62</code>). <code>class</code> 또는 <code>score</code>로 기록</td></tr>
-            <tr><td>회귀 결과</td><td>CSV의 <code>{task}_prediction</code> 열(<code>:243-248</code>)</td><td><a class="gterm" data-term="dsx-report" href="DOCShapeAXI.html#visor-io" title="See the explanation">JSON 보고서</a>의 <code>score</code> 키</td></tr>
+            <tr><td>회귀 결과</td><td>CSV의 <code>{task}_prediction</code> 열(<code>:243-248</code>)</td><td><a class="gterm" data-term="dsx-report" href="DOCShapeAXI.html#visor-io" title="설명 보기">JSON 보고서</a>의 <code>score</code> 키</td></tr>
             <tr><td>Grad-CAM 기록</td><td>표면이 클래스별 루프 안에서 기록됨(<code>:172-186</code>)</td><td>모든 클래스를 거친 뒤 한 번 기록(<code>engine.py:98-113</code>)</td></tr>
             <tr><td>Grad-CAM 리사이즈</td><td>224 x 224로 <code>cv2.resize</code>(<code>:52,179</code>)</td><td>쌍선형 <code>torch.nn.functional.interpolate</code>, 평평한 맵은 NaN 대신 0이 됨(<code>pipeline.py:163-199</code>)</td></tr>
             <tr><td>설명 가능성</td><td>항상(<code>:289-292</code>, 레거시 페이지 <a href="../../DOCShapeAXI/DOCShapeAXI.html#explicabilite">§5</a>)</td><td>선택 사항이며 기본값은 <code>explain=True</code>(<code>__init__.py:22,93-95</code>)</td></tr>
